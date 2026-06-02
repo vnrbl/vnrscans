@@ -13,7 +13,7 @@ export function SeriesGrid({
 }) {
   if (loading) {
     return (
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
         {Array.from({ length: 12 }).map((_, i) => (
           <SeriesCardSkeleton key={i} />
         ))}
@@ -28,7 +28,7 @@ export function SeriesGrid({
     );
   }
   return (
-    <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+    <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
       {items.map((s, index) => (
         <SeriesCard key={s.id} s={s} rank={showRank ? index + 1 : undefined} />
       ))}

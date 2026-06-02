@@ -7,7 +7,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { useRef } from "react";
+import { useDragScroll } from "@/hooks/useDragScroll";
+import { TITLE_CARD_WIDTH, TITLE_COVER_CLASS } from "@/components/titleCardStyles";
 
 export const Route = createFileRoute("/home")({
   head: () => ({
@@ -255,50 +256,7 @@ function ChapterCarouselSection({
   timeField: "created" | "updated";
   linkVariant: "split" | "seriesOnly";
 }) {
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const isDragging = useRef(false);
-  const startX = useRef(0);
-  const scrollLeft = useRef(0);
-
-  const scroll = (direction: "left" | "right") => {
-    if (scrollRef.current) {
-      const scrollAmount = 400;
-      scrollRef.current.scrollBy({
-        left: direction === "left" ? -scrollAmount : scrollAmount,
-        behavior: "smooth",
-      });
-    }
-  };
-
-  const handleMouseDown = (e: React.MouseEvent) => {
-    if (!scrollRef.current) return;
-    isDragging.current = true;
-    startX.current = e.pageX - scrollRef.current.offsetLeft;
-    scrollLeft.current = scrollRef.current.scrollLeft;
-    scrollRef.current.style.cursor = "grabbing";
-  };
-
-  const handleMouseMove = (e: React.MouseEvent) => {
-    if (!isDragging.current || !scrollRef.current) return;
-    e.preventDefault();
-    const x = e.pageX - scrollRef.current.offsetLeft;
-    const walk = (x - startX.current) * 2;
-    scrollRef.current.scrollLeft = scrollLeft.current - walk;
-  };
-
-  const handleMouseUp = () => {
-    isDragging.current = false;
-    if (scrollRef.current) {
-      scrollRef.current.style.cursor = "grab";
-    }
-  };
-
-  const handleMouseLeave = () => {
-    isDragging.current = false;
-    if (scrollRef.current) {
-      scrollRef.current.style.cursor = "grab";
-    }
-  };
+  const { scrollRef, scrollBy, dragHandlers } = useDragScroll<HTMLDivElement>();
 
   return (
     <section className="container mx-auto px-4 py-8">
@@ -313,11 +271,11 @@ function ChapterCarouselSection({
           )}
         </div>
         {chapters.length > 0 && (
-          <div className="hidden md:flex gap-2">
+          <div className="hidden gap-2 md:flex">
             <Button
               variant="outline"
               size="icon"
-              onClick={() => scroll("left")}
+              onClick={() => scrollBy("left")}
               className="h-8 w-8"
             >
               <ChevronLeft className="h-4 w-4" />
@@ -325,7 +283,7 @@ function ChapterCarouselSection({
             <Button
               variant="outline"
               size="icon"
-              onClick={() => scroll("right")}
+              onClick={() => scrollBy("right")}
               className="h-8 w-8"
             >
               <ChevronRight className="h-4 w-4" />
@@ -337,8 +295,8 @@ function ChapterCarouselSection({
       {loading ? (
         <div className="flex gap-4 overflow-hidden">
           {[...Array(6)].map((_, i) => (
-            <div key={i} className="w-[180px] shrink-0 overflow-hidden rounded-lg border border-border/40 bg-card md:w-[220px]">
-              <div className="aspect-[2/3] animate-pulse bg-secondary" />
+            <div key={i} className={`${TITLE_CARD_WIDTH} overflow-hidden rounded-lg border border-border/40 bg-card`}>
+              <div className={`${TITLE_COVER_CLASS} animate-pulse bg-secondary`} />
               <div className="space-y-2 p-3">
                 <div className="h-4 w-3/4 animate-pulse rounded bg-secondary" />
                 <div className="h-3 w-1/2 animate-pulse rounded bg-secondary" />
@@ -349,15 +307,12 @@ function ChapterCarouselSection({
       ) : chapters.length > 0 ? (
         <div
           ref={scrollRef}
-          onMouseDown={handleMouseDown}
-          onMouseMove={handleMouseMove}
-          onMouseUp={handleMouseUp}
-          onMouseLeave={handleMouseLeave}
-          className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide cursor-grab active:cursor-grabbing select-none"
+          {...dragHandlers}
+          className="flex cursor-grab gap-4 overflow-x-auto pb-4 scrollbar-hide select-none active:cursor-grabbing"
           style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
         >
           {chapters.map((chapter) => (
-            <div key={chapter.id} className="w-[180px] shrink-0 md:w-[220px]">
+            <div key={chapter.id} className={TITLE_CARD_WIDTH}>
               <RecentChapterCard
                 chapter={chapter}
                 timeField={timeField}
@@ -393,50 +348,7 @@ function SeriesCarouselSection({
   }>;
   loading: boolean;
 }) {
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const isDragging = useRef(false);
-  const startX = useRef(0);
-  const scrollLeft = useRef(0);
-
-  const scroll = (direction: "left" | "right") => {
-    if (scrollRef.current) {
-      const scrollAmount = 400;
-      scrollRef.current.scrollBy({
-        left: direction === "left" ? -scrollAmount : scrollAmount,
-        behavior: "smooth",
-      });
-    }
-  };
-
-  const handleMouseDown = (e: React.MouseEvent) => {
-    if (!scrollRef.current) return;
-    isDragging.current = true;
-    startX.current = e.pageX - scrollRef.current.offsetLeft;
-    scrollLeft.current = scrollRef.current.scrollLeft;
-    scrollRef.current.style.cursor = "grabbing";
-  };
-
-  const handleMouseMove = (e: React.MouseEvent) => {
-    if (!isDragging.current || !scrollRef.current) return;
-    e.preventDefault();
-    const x = e.pageX - scrollRef.current.offsetLeft;
-    const walk = (x - startX.current) * 2;
-    scrollRef.current.scrollLeft = scrollLeft.current - walk;
-  };
-
-  const handleMouseUp = () => {
-    isDragging.current = false;
-    if (scrollRef.current) {
-      scrollRef.current.style.cursor = "grab";
-    }
-  };
-
-  const handleMouseLeave = () => {
-    isDragging.current = false;
-    if (scrollRef.current) {
-      scrollRef.current.style.cursor = "grab";
-    }
-  };
+  const { scrollRef, scrollBy, dragHandlers } = useDragScroll<HTMLDivElement>();
 
   return (
     <section className="container mx-auto px-4 py-8">
@@ -448,11 +360,11 @@ function SeriesCarouselSection({
           )}
         </div>
         {series.length > 0 && (
-          <div className="hidden md:flex gap-2">
+          <div className="hidden gap-2 md:flex">
             <Button
               variant="outline"
               size="icon"
-              onClick={() => scroll("left")}
+              onClick={() => scrollBy("left")}
               className="h-8 w-8"
             >
               <ChevronLeft className="h-4 w-4" />
@@ -460,7 +372,7 @@ function SeriesCarouselSection({
             <Button
               variant="outline"
               size="icon"
-              onClick={() => scroll("right")}
+              onClick={() => scrollBy("right")}
               className="h-8 w-8"
             >
               <ChevronRight className="h-4 w-4" />
@@ -472,8 +384,8 @@ function SeriesCarouselSection({
       {loading ? (
         <div className="flex gap-4 overflow-hidden">
           {[...Array(6)].map((_, i) => (
-            <div key={i} className="w-[180px] shrink-0 overflow-hidden rounded-lg border border-border/40 bg-card md:w-[220px]">
-              <div className="aspect-[2/3] animate-pulse bg-secondary" />
+            <div key={i} className={`${TITLE_CARD_WIDTH} overflow-hidden rounded-lg border border-border/40 bg-card`}>
+              <div className={`${TITLE_COVER_CLASS} animate-pulse bg-secondary`} />
               <div className="space-y-2 p-3">
                 <div className="h-4 w-3/4 animate-pulse rounded bg-secondary" />
                 <div className="h-3 w-1/2 animate-pulse rounded bg-secondary" />
@@ -484,11 +396,8 @@ function SeriesCarouselSection({
       ) : series.length > 0 ? (
         <div
           ref={scrollRef}
-          onMouseDown={handleMouseDown}
-          onMouseMove={handleMouseMove}
-          onMouseUp={handleMouseUp}
-          onMouseLeave={handleMouseLeave}
-          className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide cursor-grab active:cursor-grabbing select-none"
+          {...dragHandlers}
+          className="flex cursor-grab gap-4 overflow-x-auto pb-4 scrollbar-hide select-none active:cursor-grabbing"
           style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
         >
           {series.map((item) => (
@@ -496,17 +405,17 @@ function SeriesCarouselSection({
               key={item.id}
               to="/title/$slug"
               params={{ slug: item.slug }}
-              className="group w-[180px] shrink-0 overflow-hidden rounded-lg border border-border/40 bg-card transition-all hover:border-primary/50 hover:shadow-lg md:w-[220px]"
+              className={`group ${TITLE_CARD_WIDTH} overflow-hidden rounded-lg border border-border/40 bg-card transition-all hover:border-primary/50 hover:shadow-lg`}
               onDragStart={(e) => e.preventDefault()}
             >
-              <div className="relative aspect-[2/3] overflow-hidden bg-secondary">
+              <div className={TITLE_COVER_CLASS}>
                 {item.cover_url ? (
                   <img
                     src={item.cover_url}
                     alt={item.title}
                     loading="lazy"
                     className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-                    draggable="false"
+                    draggable={false}
                   />
                 ) : (
                   <div className="flex h-full w-full items-center justify-center text-muted-foreground">
@@ -624,13 +533,14 @@ function RecentChapterCard({
   const timeLabel = timeField === "updated" ? "Last read" : "Uploaded";
 
   const cover = (
-    <div className="relative aspect-[2/3] overflow-hidden bg-secondary">
+    <div className={TITLE_COVER_CLASS}>
       {chapter.series?.cover_url ? (
         <img
           src={chapter.series.cover_url}
           alt={chapter.series.title}
           loading="lazy"
           className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+          draggable={false}
         />
       ) : (
         <div className="flex h-full w-full items-center justify-center text-muted-foreground">

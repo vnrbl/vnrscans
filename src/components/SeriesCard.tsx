@@ -1,6 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { Star, BookOpen } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { TITLE_COVER_CLASS } from "@/components/titleCardStyles";
 
 type Series = {
   id: string;
@@ -19,7 +20,7 @@ export function SeriesCard({ s, rank }: { s: Series; rank?: number }) {
       params={{ slug: s.slug }}
       className="group block overflow-hidden rounded-lg border border-border/40 bg-card transition-all hover:border-primary/50 hover:shadow-lg hover:shadow-primary/10"
     >
-      <div className="relative aspect-[2/3] overflow-hidden bg-secondary">
+      <div className={TITLE_COVER_CLASS}>
         {s.cover_url ? (
           <img
             src={s.cover_url}
@@ -61,7 +62,7 @@ export function SeriesCard({ s, rank }: { s: Series; rank?: number }) {
 export function SeriesCardSkeleton() {
   return (
     <div className="overflow-hidden rounded-lg border border-border/40 bg-card">
-      <div className="aspect-[2/3] animate-pulse bg-secondary" />
+      <div className={`${TITLE_COVER_CLASS} animate-pulse bg-secondary`} />
       <div className="p-3">
         <div className="h-4 w-3/4 animate-pulse rounded bg-secondary" />
       </div>
