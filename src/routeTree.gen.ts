@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SearchRouteImport } from './routes/search'
+import { Route as DmcaRouteImport } from './routes/dmca'
 import { Route as ContactRouteImport } from './routes/contact'
 import { Route as BrowseRouteImport } from './routes/browse'
 import { Route as AuthRouteImport } from './routes/auth'
@@ -21,6 +22,11 @@ import { Route as ReadChapterSlugRouteImport } from './routes/read.$chapterSlug'
 const SearchRoute = SearchRouteImport.update({
   id: '/search',
   path: '/search',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DmcaRoute = DmcaRouteImport.update({
+  id: '/dmca',
+  path: '/dmca',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ContactRoute = ContactRouteImport.update({
@@ -65,6 +71,7 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/browse': typeof BrowseRoute
   '/contact': typeof ContactRoute
+  '/dmca': typeof DmcaRoute
   '/search': typeof SearchRoute
   '/read/$chapterSlug': typeof ReadChapterSlugRoute
   '/series/$slug': typeof SeriesSlugRoute
@@ -75,6 +82,7 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/browse': typeof BrowseRoute
   '/contact': typeof ContactRoute
+  '/dmca': typeof DmcaRoute
   '/search': typeof SearchRoute
   '/read/$chapterSlug': typeof ReadChapterSlugRoute
   '/series/$slug': typeof SeriesSlugRoute
@@ -86,6 +94,7 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/browse': typeof BrowseRoute
   '/contact': typeof ContactRoute
+  '/dmca': typeof DmcaRoute
   '/search': typeof SearchRoute
   '/read/$chapterSlug': typeof ReadChapterSlugRoute
   '/series/$slug': typeof SeriesSlugRoute
@@ -98,6 +107,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/browse'
     | '/contact'
+    | '/dmca'
     | '/search'
     | '/read/$chapterSlug'
     | '/series/$slug'
@@ -108,6 +118,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/browse'
     | '/contact'
+    | '/dmca'
     | '/search'
     | '/read/$chapterSlug'
     | '/series/$slug'
@@ -118,6 +129,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/browse'
     | '/contact'
+    | '/dmca'
     | '/search'
     | '/read/$chapterSlug'
     | '/series/$slug'
@@ -129,6 +141,7 @@ export interface RootRouteChildren {
   AuthRoute: typeof AuthRoute
   BrowseRoute: typeof BrowseRoute
   ContactRoute: typeof ContactRoute
+  DmcaRoute: typeof DmcaRoute
   SearchRoute: typeof SearchRoute
   ReadChapterSlugRoute: typeof ReadChapterSlugRoute
   SeriesSlugRoute: typeof SeriesSlugRoute
@@ -141,6 +154,13 @@ declare module '@tanstack/react-router' {
       path: '/search'
       fullPath: '/search'
       preLoaderRoute: typeof SearchRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/dmca': {
+      id: '/dmca'
+      path: '/dmca'
+      fullPath: '/dmca'
+      preLoaderRoute: typeof DmcaRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/contact': {
@@ -201,6 +221,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRoute,
   BrowseRoute: BrowseRoute,
   ContactRoute: ContactRoute,
+  DmcaRoute: DmcaRoute,
   SearchRoute: SearchRoute,
   ReadChapterSlugRoute: ReadChapterSlugRoute,
   SeriesSlugRoute: SeriesSlugRoute,
