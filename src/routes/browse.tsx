@@ -42,7 +42,7 @@ function BrowsePage() {
   const navigate = useNavigate({ from: "/browse" });
 
   const update = (patch: Partial<Search>) =>
-    navigate({ search: (prev) => ({ ...prev, ...patch }) });
+    navigate({ search: (prev: Search) => ({ ...prev, ...patch }) });
 
   const genres = useQuery({
     queryKey: ["genres"],
