@@ -127,7 +127,7 @@ function HomePage() {
         <section className="container mx-auto px-4 py-8">
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             {featured.data.map((series) => (
-              <Link key={series.id} to="/series/$slug" params={{ slug: series.slug }}>
+              <Link key={series.id} to="/title/$slug" params={{ slug: series.slug }}>
                 <Card className="group relative overflow-hidden border-border/50 bg-card transition-all hover:border-primary/50 hover:shadow-lg">
                   <div className="absolute inset-0">
                     {series.cover_url && (
@@ -379,12 +379,12 @@ function RecentChapterCard({
 
   return (
     <article className="group overflow-hidden rounded-lg border border-border/40 bg-card transition-all hover:border-primary/50 hover:shadow-lg hover:shadow-primary/10">
-      <Link to="/series/$slug" params={{ slug: seriesSlug }} className="block">
+      <Link to="/title/$slug" params={{ slug: seriesSlug }} className="block">
         {cover}
       </Link>
       <div className="p-3">
         <Link
-          to="/series/$slug"
+          to="/title/$slug"
           params={{ slug: seriesSlug }}
           className="line-clamp-2 text-sm font-semibold leading-tight text-foreground hover:text-primary"
         >
@@ -404,8 +404,8 @@ function RecentChapterCard({
               className="mt-2 h-8 w-full text-xs font-semibold"
             >
               <Link
-                to="/series/$seriesSlug/$chapterSlug"
-                params={{ seriesSlug, chapterSlug: chapter.slug }}
+                to="/title/$titleSlug/$chapterSlug"
+                params={{ titleSlug: seriesSlug, chapterSlug: chapter.slug }}
               >
                 Ch. {chapter.chapter_number}
               </Link>

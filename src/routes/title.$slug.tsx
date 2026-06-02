@@ -14,7 +14,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-export const Route = createFileRoute("/series/$slug")({
+export const Route = createFileRoute("/title/$slug")({
   head: ({ params }) => ({
     meta: [{ title: `${params.slug} — ShadowShelf` }],
   }),
@@ -169,6 +169,60 @@ function SeriesDetail() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  // Get series rank based on popularity/rating
+  const seriesRank = useQuery({
+    queryKey: ["series-rank", slug],
+    queryFn: async () => {
+      if (!seriesQ.data) return null;
+      
+      // Get all series ordered by view count (popularity)
+      const { data, error } = await supabase
+        .from("series")
+        .select("id")
+        .order("view_count", { ascending: false });
+      
+      if (error) throw error;
+      
+      // Find current series position
+      const rank = data?.findIndex((s) => s.id === seriesQ.data.id);
+      return rank !== undefined && rank >= 0 ? rank + 1 : null;
+    },
+    enabled: !!seriesQ.data,
+  });
+
+  // Get reading history to find last read chapter and all read chapters
+  const readingHistory = useQuery({
+    queryKey: ["reading-history", slug, user?.id],
+    queryFn: async () => {
+      if (!user || !seriesQ.data) return null;
+      const { data } = await supabase
+        .from("reading_history")
+        .select("chapter_id,chapters(slug,chapter_number)")
+        .eq("user_id", user.id)
+        .eq("series_id", seriesQ.data.id)
+        .order("updated_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      return data;
+    },
+    enabled: !!user && !!seriesQ.data,
+  });
+
+  // Get all read chapters for the user
+  const readChapters = useQuery({
+    queryKey: ["read-chapters", slug, user?.id],
+    queryFn: async () => {
+      if (!user || !seriesQ.data) return new Set();
+      const { data } = await supabase
+        .from("reading_history")
+        .select("chapter_id")
+        .eq("user_id", user.id)
+        .eq("series_id", seriesQ.data.id);
+      return new Set(data?.map((r) => r.chapter_id) ?? []);
+    },
+    enabled: !!user && !!seriesQ.data,
+  });
+
   const setStatus = useMutation({
     mutationFn: async (status: string) => {
       if (!user || !seriesQ.data) throw new Error("Sign in to set status");
@@ -188,24 +242,6 @@ function SeriesDetail() {
       toast.success("Status updated");
     },
     onError: (e: Error) => toast.error(e.message),
-  });
-
-  // Get reading history to find last read chapter
-  const readingHistory = useQuery({
-    queryKey: ["reading-history", slug, user?.id],
-    queryFn: async () => {
-      if (!user || !seriesQ.data) return null;
-      const { data } = await supabase
-        .from("reading_history")
-        .select("chapter_id,chapters(slug,chapter_number)")
-        .eq("user_id", user.id)
-        .eq("series_id", seriesQ.data.id)
-        .order("updated_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      return data;
-    },
-    enabled: !!user && !!seriesQ.data,
   });
 
   if (seriesQ.isLoading) {
@@ -253,13 +289,22 @@ function SeriesDetail() {
               </div>
             </div>
             <div className="flex-1">
-              <div className="flex flex-wrap items-center gap-2">
-                <Badge className="uppercase">{s.type}</Badge>
-                <Badge variant="outline">{s.status}</Badge>
-                {s.release_year && <Badge variant="outline">{s.release_year}</Badge>}
+              <div className="flex items-start gap-3">
+                {seriesRank.data && (
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-violet-600 text-xl font-bold text-white shadow-lg">
+                    #{seriesRank.data}
+                  </div>
+                )}
+                <div className="flex-1 min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge className="uppercase">{s.type}</Badge>
+                    <Badge variant="outline">{s.status}</Badge>
+                    {s.release_year && <Badge variant="outline">{s.release_year}</Badge>}
+                  </div>
+                  <h1 className="mt-3 text-3xl font-bold tracking-tight md:text-4xl">{s.title}</h1>
+                  {s.alternative_titles && <p className="mt-1 text-sm text-muted-foreground">{s.alternative_titles}</p>}
+                </div>
               </div>
-              <h1 className="mt-3 text-3xl font-bold tracking-tight md:text-4xl">{s.title}</h1>
-              {s.alternative_titles && <p className="mt-1 text-sm text-muted-foreground">{s.alternative_titles}</p>}
               <div className="mt-3 flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
                 {s.author && <span className="flex items-center gap-1"><User className="h-3.5 w-3.5" />{s.author}</span>}
                 {s.artist && s.artist !== s.author && <span>Artist: {s.artist}</span>}
@@ -292,9 +337,9 @@ function SeriesDetail() {
                 {/* Show reading button if following */}
                 {user && isFollowing.data && chaptersQ.data && chaptersQ.data.length > 0 && readChapterSlug && (
                   <Link 
-                    to="/series/$seriesSlug/$chapterSlug" 
+                    to="/title/$titleSlug/$chapterSlug" 
                     params={{ 
-                      seriesSlug: slug,
+                      titleSlug: slug,
                       chapterSlug: readChapterSlug,
                     }}
                   >
@@ -334,7 +379,7 @@ function SeriesDetail() {
 
                 {/* Guest users */}
                 {!user && firstChapter && (
-                  <Link to="/series/$seriesSlug/$chapterSlug" params={{ seriesSlug: slug, chapterSlug: firstChapter.slug }}>
+                  <Link to="/title/$titleSlug/$chapterSlug" params={{ titleSlug: slug, chapterSlug: firstChapter.slug }}>
                     <Button className="bg-violet-600 hover:bg-violet-700">
                       <BookOpen className="mr-2 h-4 w-4" />
                       {firstChapter.chapter_number != null
@@ -368,22 +413,140 @@ function SeriesDetail() {
           <div className="rounded-lg border border-dashed border-border/50 p-8 text-center text-sm text-muted-foreground">No chapters yet. Check back soon.</div>
         ) : (
           <div className="divide-y divide-border/40 rounded-lg border border-border/40 bg-card">
-            {chaptersQ.data.map((c) => (
-              <Link
-                key={c.id}
-                to="/series/$seriesSlug/$chapterSlug"
-                params={{ seriesSlug: slug, chapterSlug: c.slug }}
-                className="flex items-center justify-between px-4 py-3 transition hover:bg-secondary/40"
-              >
-                <div>
-                  <div className="font-medium">Chapter {c.chapter_number}{c.title ? ` — ${c.title}` : ""}</div>
-                  <div className="text-xs text-muted-foreground">{new Date(c.created_at).toLocaleDateString()}</div>
-                </div>
-                <Badge variant="outline" className="uppercase">{c.chapter_type === "novel" ? "Novel" : "Pages"}</Badge>
-              </Link>
-            ))}
+            {chaptersQ.data.map((c) => {
+              const isRead = readChapters.data?.has(c.id) ?? false;
+              const isNew = new Date(c.created_at) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000); // 7 days
+              const showNewBadge = isNew && !isRead; // Only show NEW if not read
+              
+              return (
+                <Link
+                  key={c.id}
+                  to="/title/$titleSlug/$chapterSlug"
+                  params={{ titleSlug: slug, chapterSlug: c.slug }}
+                  className="flex items-center gap-3 px-4 py-3 transition hover:bg-secondary/40"
+                >
+                  <div className="flex-1">
+                    <div className={`font-medium ${isRead ? "" : ""}`} style={isRead ? { color: "#7f22fe" } : {}}>
+                      Chapter {c.chapter_number}{c.title ? ` — ${c.title}` : ""}
+                    </div>
+                    <div className="text-xs text-muted-foreground">{new Date(c.created_at).toLocaleDateString()}</div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {showNewBadge && (
+                      <Badge className="bg-violet-600 hover:bg-violet-700 text-white uppercase text-xs">
+                        NEW
+                      </Badge>
+                    )}
+                    <Badge variant="outline" className="uppercase">{c.chapter_type === "novel" ? "Novel" : "Pages"}</Badge>
+                  </div>
+                </Link>
+              );
+            })}
           </div>
         )}
+      </div>
+
+      {/* Recommendations Section */}
+      <RecommendationsSection currentSeriesId={s.id} genres={s.series_genres as any[]} />
+    </div>
+  );
+}
+
+// Recommendations Component
+function RecommendationsSection({ currentSeriesId, genres }: { currentSeriesId: string; genres: any[] }) {
+  const genreSlugs = genres?.map((sg) => sg.genre?.slug).filter(Boolean) || [];
+  
+  const recommendations = useQuery({
+    queryKey: ["recommendations", currentSeriesId],
+    queryFn: async () => {
+      // Get titles with similar genres
+      const { data, error } = await supabase
+        .from("series")
+        .select("id,slug,title,cover_url,type,rating_average,status,series_genres(genre:genres(slug))")
+        .neq("id", currentSeriesId)
+        .order("rating_average", { ascending: false })
+        .limit(50);
+      
+      if (error) throw error;
+      
+      // Filter and score by genre similarity
+      const scored = (data || []).map((title: any) => {
+        const titleGenres = title.series_genres?.map((sg: any) => sg.genre?.slug).filter(Boolean) || [];
+        const commonGenres = titleGenres.filter((g: string) => genreSlugs.includes(g));
+        return {
+          ...title,
+          score: commonGenres.length,
+        };
+      });
+      
+      // Sort by score and return top 12
+      return scored
+        .filter(s => s.score > 0)
+        .sort((a, b) => b.score - a.score || (b.rating_average || 0) - (a.rating_average || 0))
+        .slice(0, 12);
+    },
+  });
+
+  if (recommendations.isLoading) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <h2 className="mb-4 text-xl font-bold">Similar Titles</h2>
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="aspect-[2/3] animate-pulse rounded-lg bg-secondary" />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (!recommendations.data || recommendations.data.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="container mx-auto px-4 py-8">
+      <h2 className="mb-4 text-xl font-bold">Similar Titles · Recommendations</h2>
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+        {recommendations.data.map((title: any) => (
+          <Link
+            key={title.id}
+            to="/title/$slug"
+            params={{ slug: title.slug }}
+            className="group block overflow-hidden rounded-lg border border-border/40 bg-card transition-all hover:border-primary/50 hover:shadow-lg"
+          >
+            <div className="relative aspect-[2/3] overflow-hidden bg-secondary">
+              {title.cover_url ? (
+                <img
+                  src={title.cover_url}
+                  alt={title.title}
+                  loading="lazy"
+                  className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                />
+              ) : (
+                <div className="flex h-full w-full items-center justify-center text-muted-foreground">
+                  <BookOpen className="h-10 w-10" />
+                </div>
+              )}
+              <div className="absolute left-2 top-2">
+                <Badge variant="secondary" className="bg-background/80 text-xs uppercase backdrop-blur">
+                  {title.type}
+                </Badge>
+              </div>
+              {title.rating_average && Number(title.rating_average) > 0 ? (
+                <div className="absolute right-2 bottom-2 flex items-center gap-1 rounded-md bg-background/80 px-1.5 py-0.5 text-xs backdrop-blur">
+                  <Star className="h-3 w-3 fill-accent text-accent" />
+                  {Number(title.rating_average).toFixed(1)}
+                </div>
+              ) : null}
+            </div>
+            <div className="p-3">
+              <h3 className="line-clamp-2 text-sm font-semibold leading-tight text-foreground group-hover:text-primary">
+                {title.title}
+              </h3>
+            </div>
+          </Link>
+        ))}
       </div>
     </div>
   );

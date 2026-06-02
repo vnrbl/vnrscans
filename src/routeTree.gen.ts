@@ -18,12 +18,12 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AboutRouteImport } from './routes/about'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as SeriesSlugRouteImport } from './routes/series.$slug'
+import { Route as TitleSlugRouteImport } from './routes/title.$slug'
 import { Route as AuthenticatedProfileRouteImport } from './routes/_authenticated/profile'
 import { Route as AuthenticatedLibraryRouteImport } from './routes/_authenticated/library'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin/index'
-import { Route as SeriesSeriesSlugChapterSlugRouteImport } from './routes/series.$seriesSlug.$chapterSlug'
+import { Route as TitleTitleSlugChapterSlugRouteImport } from './routes/title.$titleSlug.$chapterSlug'
 import { Route as AuthenticatedAdminUsersRouteImport } from './routes/_authenticated/admin/users'
 import { Route as AuthenticatedAdminSeriesRouteImport } from './routes/_authenticated/admin/series'
 import { Route as AuthenticatedAdminReportsRouteImport } from './routes/_authenticated/admin/reports'
@@ -73,9 +73,9 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const SeriesSlugRoute = SeriesSlugRouteImport.update({
-  id: '/series/$slug',
-  path: '/series/$slug',
+const TitleSlugRoute = TitleSlugRouteImport.update({
+  id: '/title/$slug',
+  path: '/title/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedProfileRoute = AuthenticatedProfileRouteImport.update({
@@ -98,10 +98,10 @@ const AuthenticatedAdminIndexRoute = AuthenticatedAdminIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AuthenticatedAdminRoute,
 } as any)
-const SeriesSeriesSlugChapterSlugRoute =
-  SeriesSeriesSlugChapterSlugRouteImport.update({
-    id: '/series/$seriesSlug/$chapterSlug',
-    path: '/series/$seriesSlug/$chapterSlug',
+const TitleTitleSlugChapterSlugRoute =
+  TitleTitleSlugChapterSlugRouteImport.update({
+    id: '/title/$titleSlug/$chapterSlug',
+    path: '/title/$titleSlug/$chapterSlug',
     getParentRoute: () => rootRouteImport,
   } as any)
 const AuthenticatedAdminUsersRoute = AuthenticatedAdminUsersRouteImport.update({
@@ -140,12 +140,12 @@ export interface FileRoutesByFullPath {
   '/admin': typeof AuthenticatedAdminRouteWithChildren
   '/library': typeof AuthenticatedLibraryRoute
   '/profile': typeof AuthenticatedProfileRoute
-  '/series/$slug': typeof SeriesSlugRoute
+  '/title/$slug': typeof TitleSlugRoute
   '/admin/comments': typeof AuthenticatedAdminCommentsRoute
   '/admin/reports': typeof AuthenticatedAdminReportsRoute
   '/admin/series': typeof AuthenticatedAdminSeriesRoute
   '/admin/users': typeof AuthenticatedAdminUsersRoute
-  '/series/$seriesSlug/$chapterSlug': typeof SeriesSeriesSlugChapterSlugRoute
+  '/title/$titleSlug/$chapterSlug': typeof TitleTitleSlugChapterSlugRoute
   '/admin/': typeof AuthenticatedAdminIndexRoute
 }
 export interface FileRoutesByTo {
@@ -159,12 +159,12 @@ export interface FileRoutesByTo {
   '/search': typeof SearchRoute
   '/library': typeof AuthenticatedLibraryRoute
   '/profile': typeof AuthenticatedProfileRoute
-  '/series/$slug': typeof SeriesSlugRoute
+  '/title/$slug': typeof TitleSlugRoute
   '/admin/comments': typeof AuthenticatedAdminCommentsRoute
   '/admin/reports': typeof AuthenticatedAdminReportsRoute
   '/admin/series': typeof AuthenticatedAdminSeriesRoute
   '/admin/users': typeof AuthenticatedAdminUsersRoute
-  '/series/$seriesSlug/$chapterSlug': typeof SeriesSeriesSlugChapterSlugRoute
+  '/title/$titleSlug/$chapterSlug': typeof TitleTitleSlugChapterSlugRoute
   '/admin': typeof AuthenticatedAdminIndexRoute
 }
 export interface FileRoutesById {
@@ -181,12 +181,12 @@ export interface FileRoutesById {
   '/_authenticated/admin': typeof AuthenticatedAdminRouteWithChildren
   '/_authenticated/library': typeof AuthenticatedLibraryRoute
   '/_authenticated/profile': typeof AuthenticatedProfileRoute
-  '/series/$slug': typeof SeriesSlugRoute
+  '/title/$slug': typeof TitleSlugRoute
   '/_authenticated/admin/comments': typeof AuthenticatedAdminCommentsRoute
   '/_authenticated/admin/reports': typeof AuthenticatedAdminReportsRoute
   '/_authenticated/admin/series': typeof AuthenticatedAdminSeriesRoute
   '/_authenticated/admin/users': typeof AuthenticatedAdminUsersRoute
-  '/series/$seriesSlug/$chapterSlug': typeof SeriesSeriesSlugChapterSlugRoute
+  '/title/$titleSlug/$chapterSlug': typeof TitleTitleSlugChapterSlugRoute
   '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute
 }
 export interface FileRouteTypes {
@@ -203,12 +203,12 @@ export interface FileRouteTypes {
     | '/admin'
     | '/library'
     | '/profile'
-    | '/series/$slug'
+    | '/title/$slug'
     | '/admin/comments'
     | '/admin/reports'
     | '/admin/series'
     | '/admin/users'
-    | '/series/$seriesSlug/$chapterSlug'
+    | '/title/$titleSlug/$chapterSlug'
     | '/admin/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -222,12 +222,12 @@ export interface FileRouteTypes {
     | '/search'
     | '/library'
     | '/profile'
-    | '/series/$slug'
+    | '/title/$slug'
     | '/admin/comments'
     | '/admin/reports'
     | '/admin/series'
     | '/admin/users'
-    | '/series/$seriesSlug/$chapterSlug'
+    | '/title/$titleSlug/$chapterSlug'
     | '/admin'
   id:
     | '__root__'
@@ -243,12 +243,12 @@ export interface FileRouteTypes {
     | '/_authenticated/admin'
     | '/_authenticated/library'
     | '/_authenticated/profile'
-    | '/series/$slug'
+    | '/title/$slug'
     | '/_authenticated/admin/comments'
     | '/_authenticated/admin/reports'
     | '/_authenticated/admin/series'
     | '/_authenticated/admin/users'
-    | '/series/$seriesSlug/$chapterSlug'
+    | '/title/$titleSlug/$chapterSlug'
     | '/_authenticated/admin/'
   fileRoutesById: FileRoutesById
 }
@@ -262,8 +262,8 @@ export interface RootRouteChildren {
   DmcaRoute: typeof DmcaRoute
   HomeRoute: typeof HomeRoute
   SearchRoute: typeof SearchRoute
-  SeriesSlugRoute: typeof SeriesSlugRoute
-  SeriesSeriesSlugChapterSlugRoute: typeof SeriesSeriesSlugChapterSlugRoute
+  TitleSlugRoute: typeof TitleSlugRoute
+  TitleTitleSlugChapterSlugRoute: typeof TitleTitleSlugChapterSlugRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -331,11 +331,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/series/$slug': {
-      id: '/series/$slug'
-      path: '/series/$slug'
-      fullPath: '/series/$slug'
-      preLoaderRoute: typeof SeriesSlugRouteImport
+    '/title/$slug': {
+      id: '/title/$slug'
+      path: '/title/$slug'
+      fullPath: '/title/$slug'
+      preLoaderRoute: typeof TitleSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated/profile': {
@@ -366,11 +366,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminIndexRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
     }
-    '/series/$seriesSlug/$chapterSlug': {
-      id: '/series/$seriesSlug/$chapterSlug'
-      path: '/series/$seriesSlug/$chapterSlug'
-      fullPath: '/series/$seriesSlug/$chapterSlug'
-      preLoaderRoute: typeof SeriesSeriesSlugChapterSlugRouteImport
+    '/title/$titleSlug/$chapterSlug': {
+      id: '/title/$titleSlug/$chapterSlug'
+      path: '/title/$titleSlug/$chapterSlug'
+      fullPath: '/title/$titleSlug/$chapterSlug'
+      preLoaderRoute: typeof TitleTitleSlugChapterSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated/admin/users': {
@@ -449,8 +449,8 @@ const rootRouteChildren: RootRouteChildren = {
   DmcaRoute: DmcaRoute,
   HomeRoute: HomeRoute,
   SearchRoute: SearchRoute,
-  SeriesSlugRoute: SeriesSlugRoute,
-  SeriesSeriesSlugChapterSlugRoute: SeriesSeriesSlugChapterSlugRoute,
+  TitleSlugRoute: TitleSlugRoute,
+  TitleTitleSlugChapterSlugRoute: TitleTitleSlugChapterSlugRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

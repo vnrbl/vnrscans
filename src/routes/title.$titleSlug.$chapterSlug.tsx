@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { ChevronLeft, ChevronRight, ArrowLeft, BookOpen, Home, List, Maximize, Minimize, Flag } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -23,7 +23,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 
-export const Route = createFileRoute("/series/$seriesSlug/$chapterSlug")({
+export const Route = createFileRoute("/title/$titleSlug/$chapterSlug")({
   head: ({ params }) => ({ meta: [{ title: `Read ${params.chapterSlug} — 0Verse` }] }),
   component: Reader,
   errorComponent: ({ error }) => (
@@ -34,11 +34,13 @@ export const Route = createFileRoute("/series/$seriesSlug/$chapterSlug")({
 });
 
 function Reader() {
-  const { seriesSlug, chapterSlug } = Route.useParams();
+  const { titleSlug, chapterSlug } = Route.useParams();
+  const seriesSlug = titleSlug;
   const { user } = useAuth();
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [controlsVisible, setControlsVisible] = useState(true);
 
   const chapterQ = useQuery({
     queryKey: ["chapter", chapterSlug],
@@ -131,6 +133,93 @@ function Reader() {
     }
   };
 
+  // Auto-hide controls after 3 seconds of inactivity
+  const hideTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const controlsVisibleRef = useRef(true);
+  const lastTapRef = useRef(0);
+  const isDoubleTapToggleRef = useRef(false);
+
+  const showControls = useCallback(() => {
+    // Skip auto-show if this was triggered right after a double-tap toggle-off
+    if (isDoubleTapToggleRef.current) {
+      isDoubleTapToggleRef.current = false;
+      return;
+    }
+    setControlsVisible(true);
+    controlsVisibleRef.current = true;
+    if (hideTimeoutRef.current) clearTimeout(hideTimeoutRef.current);
+    hideTimeoutRef.current = setTimeout(() => {
+      setControlsVisible(false);
+      controlsVisibleRef.current = false;
+    }, 3000);
+  }, []);
+
+  useEffect(() => {
+    showControls();
+    return () => {
+      if (hideTimeoutRef.current) clearTimeout(hideTimeoutRef.current);
+    };
+  }, []);
+
+  // Show controls on mouse movement or touch
+  useEffect(() => {
+    const handleMouseActivity = () => showControls();
+    const handleScrollActivity = () => showControls();
+    
+    // Double tap detection for mobile
+    const handleDoubleTap = (e: TouchEvent) => {
+      const currentTime = new Date().getTime();
+      const tapLength = currentTime - lastTapRef.current;
+      
+      if (tapLength < 300 && tapLength > 0) {
+        // Check if tap is in middle area (not on edges)
+        const touch = e.touches[0] || e.changedTouches[0];
+        if (!touch) { lastTapRef.current = currentTime; return; }
+        const screenWidth = window.innerWidth;
+        const tapX = touch.clientX;
+        
+        // Middle 60% of screen
+        if (tapX > screenWidth * 0.2 && tapX < screenWidth * 0.8) {
+          e.preventDefault();
+          e.stopPropagation();
+          
+          const newVisible = !controlsVisibleRef.current;
+          controlsVisibleRef.current = newVisible;
+          setControlsVisible(newVisible);
+          
+          // Clear any existing auto-hide timeout
+          if (hideTimeoutRef.current) clearTimeout(hideTimeoutRef.current);
+          
+          if (newVisible) {
+            // If showing, set auto-hide timer
+            hideTimeoutRef.current = setTimeout(() => {
+              setControlsVisible(false);
+              controlsVisibleRef.current = false;
+            }, 3000);
+          } else {
+            // If hiding via double-tap, prevent the scroll/touch events from immediately showing again
+            isDoubleTapToggleRef.current = true;
+          }
+          
+          // Reset lastTap to prevent triple-tap from re-triggering
+          lastTapRef.current = 0;
+          return;
+        }
+      }
+      lastTapRef.current = currentTime;
+    };
+    
+    document.addEventListener("mousemove", handleMouseActivity);
+    document.addEventListener("touchstart", handleDoubleTap, { passive: false });
+    document.addEventListener("scroll", handleScrollActivity);
+    
+    return () => {
+      document.removeEventListener("mousemove", handleMouseActivity);
+      document.removeEventListener("touchstart", handleDoubleTap);
+      document.removeEventListener("scroll", handleScrollActivity);
+    };
+  }, [showControls]);
+
   if (chapterQ.isLoading) {
     return <div className="grid min-h-screen place-items-center bg-background text-muted-foreground">Loading chapter…</div>;
   }
@@ -150,8 +239,12 @@ function Reader() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Top Bar - Hidden in fullscreen */}
-      {!isFullscreen && (
+      {/* Top Bar - Auto-hide */}
+      <div 
+        className={`transition-transform duration-300 ${
+          controlsVisible ? "translate-y-0" : "-translate-y-full"
+        }`}
+      >
         <ReaderTopBar
           title={`Ch. ${c.chapter_number}${c.title ? " — " + c.title : ""}`}
           seriesTitle={c.series?.title ?? ""}
@@ -160,7 +253,7 @@ function Reader() {
           allChapters={siblingsQ.data ?? []}
           currentChapterSlug={chapterSlug}
         />
-      )}
+      </div>
 
       <div className="flex">
         {/* Main content */}
@@ -173,31 +266,41 @@ function Reader() {
         </div>
       </div>
 
-      {/* Floating Controls Sidebar - Always visible */}
-      <FloatingControls
-        isFullscreen={isFullscreen}
-        toggleFullscreen={toggleFullscreen}
-        hasPrev={!!prev}
-        hasNext={!!next}
-        onPrev={() => prev && navigate({ to: "/series/$seriesSlug/$chapterSlug", params: { seriesSlug, chapterSlug: prev.slug } })}
-        onNext={() => next && navigate({ to: "/series/$seriesSlug/$chapterSlug", params: { seriesSlug, chapterSlug: next.slug } })}
-        seriesSlug={seriesSlug}
-        allChapters={siblingsQ.data ?? []}
-        currentChapterSlug={chapterSlug}
-        chapterId={c.id}
-        seriesId={c.series_id}
-        seriesTitle={c.series?.title ?? ""}
-      />
+      {/* Floating Controls Sidebar - Auto-hide */}
+      <div 
+        className={`transition-opacity duration-300 ${
+          controlsVisible ? "opacity-100" : "opacity-0 pointer-events-none"
+        }`}
+      >
+        <FloatingControls
+          isFullscreen={isFullscreen}
+          toggleFullscreen={toggleFullscreen}
+          hasPrev={!!prev}
+          hasNext={!!next}
+          onPrev={() => prev && navigate({ to: "/title/$titleSlug/$chapterSlug", params: { titleSlug: seriesSlug, chapterSlug: prev.slug } })}
+          onNext={() => next && navigate({ to: "/title/$titleSlug/$chapterSlug", params: { titleSlug: seriesSlug, chapterSlug: next.slug } })}
+          seriesSlug={seriesSlug}
+          allChapters={siblingsQ.data ?? []}
+          currentChapterSlug={chapterSlug}
+          chapterId={c.id}
+          seriesId={c.series_id}
+          seriesTitle={c.series?.title ?? ""}
+        />
+      </div>
 
-      {/* Bottom Nav - Hidden in fullscreen */}
-      {!isFullscreen && (
+      {/* Bottom Nav - Auto-hide */}
+      <div 
+        className={`transition-transform duration-300 ${
+          controlsVisible ? "translate-y-0" : "translate-y-full"
+        }`}
+      >
         <nav className="sticky bottom-0 z-30 border-t border-border/50 bg-background/90 backdrop-blur md:hidden">
           <div className="container mx-auto flex items-center justify-between gap-2 px-4 py-3">
             <Button
               variant="outline"
               size="sm"
               disabled={!prev}
-              onClick={() => prev && navigate({ to: "/series/$seriesSlug/$chapterSlug", params: { seriesSlug, chapterSlug: prev.slug } })}
+              onClick={() => prev && navigate({ to: "/title/$titleSlug/$chapterSlug", params: { titleSlug: seriesSlug, chapterSlug: prev.slug } })}
             >
               <ChevronLeft className="mr-1 h-4 w-4" />Prev
             </Button>
@@ -207,11 +310,20 @@ function Reader() {
                   <Home className="h-4 w-4" />
                 </Button>
               </Link>
-              <Link to="/series/$slug" params={{ slug: seriesSlug }}>
-                <Button variant="ghost" size="sm" title="Back to series">
+              <Link to="/title/$slug" params={{ slug: seriesSlug }}>
+                <Button variant="ghost" size="sm" title="Back to title">
                   <BookOpen className="h-4 w-4" />
                 </Button>
               </Link>
+              {/* Fullscreen Button - Mobile */}
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={toggleFullscreen}
+                title={isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
+              >
+                {isFullscreen ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
+              </Button>
               {/* Report Button - Mobile only */}
               <ReportButton 
                 chapterId={c.id} 
@@ -222,13 +334,13 @@ function Reader() {
             <Button
               size="sm"
               disabled={!next}
-              onClick={() => next && navigate({ to: "/series/$seriesSlug/$chapterSlug", params: { seriesSlug, chapterSlug: next.slug } })}
+              onClick={() => next && navigate({ to: "/title/$titleSlug/$chapterSlug", params: { titleSlug: seriesSlug, chapterSlug: next.slug } })}
             >
               Next<ChevronRight className="ml-1 h-4 w-4" />
             </Button>
           </div>
         </nav>
-      )}
+      </div>
     </div>
   );
 }
@@ -253,7 +365,7 @@ function ReaderTopBar({
   return (
     <header className="sticky top-0 z-30 border-b border-border/50 bg-background/90 backdrop-blur">
       <div className="container mx-auto flex items-center justify-between gap-2 px-4 py-3">
-        <Link to="/series/$slug" params={{ slug: seriesSlug }} className="flex min-w-0 items-center gap-2 text-sm">
+        <Link to="/title/$slug" params={{ slug: seriesSlug }} className="flex min-w-0 items-center gap-2 text-sm">
           <ArrowLeft className="h-4 w-4" />
           <div className="min-w-0">
             <div className="truncate font-semibold">{seriesTitle}</div>
@@ -264,7 +376,7 @@ function ReaderTopBar({
           {allChapters.length > 0 && (
             <Select 
               value={currentChapterSlug} 
-              onValueChange={(slug) => navigate({ to: "/series/$seriesSlug/$chapterSlug", params: { seriesSlug, chapterSlug: slug } })}
+              onValueChange={(slug) => navigate({ to: "/title/$titleSlug/$chapterSlug", params: { titleSlug: seriesSlug, chapterSlug: slug } })}
             >
               <SelectTrigger className="w-[180px]">
                 <List className="mr-2 h-4 w-4" />
@@ -387,10 +499,10 @@ function FloatingControls({
 
         {/* Back to series */}
         <Link
-          to="/series/$slug"
+          to="/title/$slug"
           params={{ slug: seriesSlug }}
           className="p-3 rounded-full hover:bg-primary/20 transition-colors"
-          title="Back to series"
+          title="Back to title"
         >
           <BookOpen className="h-5 w-5" />
         </Link>
@@ -438,7 +550,7 @@ function FloatingControls({
               <button
                 key={ch.id}
                 onClick={() => {
-                  navigate({ to: "/series/$seriesSlug/$chapterSlug", params: { seriesSlug, chapterSlug: ch.slug } });
+                  navigate({ to: "/title/$titleSlug/$chapterSlug", params: { titleSlug: seriesSlug, chapterSlug: ch.slug } });
                   setShowChapters(false);
                 }}
                 className={`w-full text-left px-3 py-2 rounded text-sm hover:bg-primary/20 transition-colors ${
@@ -517,7 +629,7 @@ function FloatingReportPanel({
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="chapter">Report Chapter</SelectItem>
-            <SelectItem value="series">Report Series</SelectItem>
+            <SelectItem value="series">Report Title</SelectItem>
           </SelectContent>
         </Select>
         
@@ -590,7 +702,7 @@ function ReportButton({ chapterId, seriesId, seriesTitle }: { chapterId: string;
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="chapter">Report Chapter</SelectItem>
-              <SelectItem value="series">Report Series</SelectItem>
+              <SelectItem value="series">Report Title</SelectItem>
             </SelectContent>
           </Select>
           
