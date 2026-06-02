@@ -24,6 +24,7 @@ import { Route as AuthenticatedLibraryRouteImport } from './routes/_authenticate
 import { Route as AuthenticatedAdminRouteRouteImport } from './routes/_authenticated/admin/route'
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin/index'
 import { Route as AuthenticatedAdminSeriesRouteImport } from './routes/_authenticated/admin/series'
+import { Route as AuthenticatedAdminReportsRouteImport } from './routes/_authenticated/admin/reports'
 import { Route as AuthenticatedAdminCommentsRouteImport } from './routes/_authenticated/admin/comments'
 
 const SearchRoute = SearchRouteImport.update({
@@ -101,6 +102,12 @@ const AuthenticatedAdminSeriesRoute =
     path: '/series',
     getParentRoute: () => AuthenticatedAdminRouteRoute,
   } as any)
+const AuthenticatedAdminReportsRoute =
+  AuthenticatedAdminReportsRouteImport.update({
+    id: '/reports',
+    path: '/reports',
+    getParentRoute: () => AuthenticatedAdminRouteRoute,
+  } as any)
 const AuthenticatedAdminCommentsRoute =
   AuthenticatedAdminCommentsRouteImport.update({
     id: '/comments',
@@ -122,6 +129,7 @@ export interface FileRoutesByFullPath {
   '/read/$chapterSlug': typeof ReadChapterSlugRoute
   '/series/$slug': typeof SeriesSlugRoute
   '/admin/comments': typeof AuthenticatedAdminCommentsRoute
+  '/admin/reports': typeof AuthenticatedAdminReportsRoute
   '/admin/series': typeof AuthenticatedAdminSeriesRoute
   '/admin/': typeof AuthenticatedAdminIndexRoute
 }
@@ -138,6 +146,7 @@ export interface FileRoutesByTo {
   '/read/$chapterSlug': typeof ReadChapterSlugRoute
   '/series/$slug': typeof SeriesSlugRoute
   '/admin/comments': typeof AuthenticatedAdminCommentsRoute
+  '/admin/reports': typeof AuthenticatedAdminReportsRoute
   '/admin/series': typeof AuthenticatedAdminSeriesRoute
   '/admin': typeof AuthenticatedAdminIndexRoute
 }
@@ -157,6 +166,7 @@ export interface FileRoutesById {
   '/read/$chapterSlug': typeof ReadChapterSlugRoute
   '/series/$slug': typeof SeriesSlugRoute
   '/_authenticated/admin/comments': typeof AuthenticatedAdminCommentsRoute
+  '/_authenticated/admin/reports': typeof AuthenticatedAdminReportsRoute
   '/_authenticated/admin/series': typeof AuthenticatedAdminSeriesRoute
   '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute
 }
@@ -176,6 +186,7 @@ export interface FileRouteTypes {
     | '/read/$chapterSlug'
     | '/series/$slug'
     | '/admin/comments'
+    | '/admin/reports'
     | '/admin/series'
     | '/admin/'
   fileRoutesByTo: FileRoutesByTo
@@ -192,6 +203,7 @@ export interface FileRouteTypes {
     | '/read/$chapterSlug'
     | '/series/$slug'
     | '/admin/comments'
+    | '/admin/reports'
     | '/admin/series'
     | '/admin'
   id:
@@ -210,6 +222,7 @@ export interface FileRouteTypes {
     | '/read/$chapterSlug'
     | '/series/$slug'
     | '/_authenticated/admin/comments'
+    | '/_authenticated/admin/reports'
     | '/_authenticated/admin/series'
     | '/_authenticated/admin/'
   fileRoutesById: FileRoutesById
@@ -334,6 +347,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminSeriesRouteImport
       parentRoute: typeof AuthenticatedAdminRouteRoute
     }
+    '/_authenticated/admin/reports': {
+      id: '/_authenticated/admin/reports'
+      path: '/reports'
+      fullPath: '/admin/reports'
+      preLoaderRoute: typeof AuthenticatedAdminReportsRouteImport
+      parentRoute: typeof AuthenticatedAdminRouteRoute
+    }
     '/_authenticated/admin/comments': {
       id: '/_authenticated/admin/comments'
       path: '/comments'
@@ -346,6 +366,7 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedAdminRouteRouteChildren {
   AuthenticatedAdminCommentsRoute: typeof AuthenticatedAdminCommentsRoute
+  AuthenticatedAdminReportsRoute: typeof AuthenticatedAdminReportsRoute
   AuthenticatedAdminSeriesRoute: typeof AuthenticatedAdminSeriesRoute
   AuthenticatedAdminIndexRoute: typeof AuthenticatedAdminIndexRoute
 }
@@ -353,6 +374,7 @@ interface AuthenticatedAdminRouteRouteChildren {
 const AuthenticatedAdminRouteRouteChildren: AuthenticatedAdminRouteRouteChildren =
   {
     AuthenticatedAdminCommentsRoute: AuthenticatedAdminCommentsRoute,
+    AuthenticatedAdminReportsRoute: AuthenticatedAdminReportsRoute,
     AuthenticatedAdminSeriesRoute: AuthenticatedAdminSeriesRoute,
     AuthenticatedAdminIndexRoute: AuthenticatedAdminIndexRoute,
   }
