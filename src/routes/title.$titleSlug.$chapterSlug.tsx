@@ -1,7 +1,11 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { useEffect, useState, useRef, useCallback } from "react";
+<<<<<<< HEAD
 import { ChevronLeft, ChevronRight, ArrowLeft, BookOpen, Home, List, Maximize, Minimize, Flag, ZoomIn, ZoomOut, Heart, Smile, ThumbsUp, Laugh, Star, MessageSquare } from "lucide-react";
+=======
+import { ChevronLeft, ChevronRight, ArrowLeft, BookOpen, Home, List, Maximize, Minimize, Flag } from "lucide-react";
+>>>>>>> cddd9cd718aae83733e3c2c4a2ac8b171c655b8d
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";

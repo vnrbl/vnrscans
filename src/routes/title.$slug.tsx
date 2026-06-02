@@ -1,13 +1,20 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+<<<<<<< HEAD
 import { Star, BookOpen, Calendar, User, UserPlus, UserCheck, Users, ArrowUpDown, Search } from "lucide-react";
+=======
+import { Star, BookOpen, Calendar, User, UserPlus, UserCheck, Users } from "lucide-react";
+>>>>>>> cddd9cd718aae83733e3c2c4a2ac8b171c655b8d
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+<<<<<<< HEAD
 import { Input } from "@/components/ui/input";
 import React from "react";
+=======
+>>>>>>> cddd9cd718aae83733e3c2c4a2ac8b171c655b8d
 import {
   Select,
   SelectContent,
@@ -38,11 +45,14 @@ function SeriesDetail() {
   const { slug } = Route.useParams();
   const { user } = useAuth();
   const qc = useQueryClient();
+<<<<<<< HEAD
   
   // Chapter filtering and ordering state
   const [selectedGroup, setSelectedGroup] = React.useState<string>("all");
   const [sortOrder, setSortOrder] = React.useState<"desc" | "asc">("desc");
   const [searchQuery, setSearchQuery] = React.useState<string>("");
+=======
+>>>>>>> cddd9cd718aae83733e3c2c4a2ac8b171c655b8d
 
   const seriesQ = useQuery({
     queryKey: ["series", "detail", slug],
@@ -59,6 +69,7 @@ function SeriesDetail() {
   });
 
   const chaptersQ = useQuery({
+<<<<<<< HEAD
     queryKey: ["chapters", slug, selectedGroup, sortOrder],
     queryFn: async () => {
       if (!seriesQ.data) return [];
@@ -108,10 +119,14 @@ function SeriesDetail() {
   // Get unique scanlation groups for filtering
   const scanlationGroups = useQuery({
     queryKey: ["scanlation-groups", slug],
+=======
+    queryKey: ["chapters", slug],
+>>>>>>> cddd9cd718aae83733e3c2c4a2ac8b171c655b8d
     queryFn: async () => {
       if (!seriesQ.data) return [];
       const { data, error } = await supabase
         .from("chapters")
+<<<<<<< HEAD
         .select("scanlation_group")
         .eq("series_id", seriesQ.data.id)
         .eq("status", "published")
@@ -122,6 +137,14 @@ function SeriesDetail() {
       // Get unique groups
       const uniqueGroups = [...new Set(data?.map(c => c.scanlation_group).filter(Boolean) ?? [])];
       return uniqueGroups.sort();
+=======
+        .select("id,slug,chapter_number,title,chapter_type,created_at,status,scheduled_at")
+        .eq("series_id", seriesQ.data.id)
+        .eq("status", "published")
+        .order("chapter_number", { ascending: false });
+      if (error) throw error;
+      return (data ?? []).filter((c) => !c.scheduled_at || new Date(c.scheduled_at) <= new Date());
+>>>>>>> cddd9cd718aae83733e3c2c4a2ac8b171c655b8d
     },
     enabled: !!seriesQ.data,
   });
@@ -465,6 +488,7 @@ function SeriesDetail() {
       </div>
 
       <div className="container mx-auto px-4 py-8">
+<<<<<<< HEAD
         <div className="mb-4 flex flex-col gap-4">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <h2 className="flex items-center gap-2 text-xl font-bold">
@@ -594,6 +618,44 @@ function SeriesDetail() {
                 })}
               </tbody>
             </table>
+=======
+        <h2 className="mb-4 flex items-center gap-2 text-xl font-bold"><Calendar className="h-5 w-5 text-primary" />Chapters</h2>
+        {chaptersQ.isLoading ? (
+          <div className="space-y-2">{Array.from({ length: 6 }).map((_, i) => <div key={i} className="h-12 animate-pulse rounded bg-secondary/50" />)}</div>
+        ) : !chaptersQ.data || chaptersQ.data.length === 0 ? (
+          <div className="rounded-lg border border-dashed border-border/50 p-8 text-center text-sm text-muted-foreground">No chapters yet. Check back soon.</div>
+        ) : (
+          <div className="divide-y divide-border/40 rounded-lg border border-border/40 bg-card">
+            {chaptersQ.data.map((c) => {
+              const isRead = readChapters.data?.has(c.id) ?? false;
+              const isNew = new Date(c.created_at) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000); // 7 days
+              const showNewBadge = isNew && !isRead; // Only show NEW if not read
+              
+              return (
+                <Link
+                  key={c.id}
+                  to="/title/$titleSlug/$chapterSlug"
+                  params={{ titleSlug: slug, chapterSlug: c.slug }}
+                  className="flex items-center gap-3 px-4 py-3 transition hover:bg-secondary/40"
+                >
+                  <div className="flex-1">
+                    <div className={`font-medium ${isRead ? "" : ""}`} style={isRead ? { color: "#7f22fe" } : {}}>
+                      Chapter {c.chapter_number}{c.title ? ` — ${c.title}` : ""}
+                    </div>
+                    <div className="text-xs text-muted-foreground">{new Date(c.created_at).toLocaleDateString()}</div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {showNewBadge && (
+                      <Badge className="bg-violet-600 hover:bg-violet-700 text-white uppercase text-xs">
+                        NEW
+                      </Badge>
+                    )}
+                    <Badge variant="outline" className="uppercase">{c.chapter_type === "novel" ? "Novel" : "Pages"}</Badge>
+                  </div>
+                </Link>
+              );
+            })}
+>>>>>>> cddd9cd718aae83733e3c2c4a2ac8b171c655b8d
           </div>
         )}
       </div>
