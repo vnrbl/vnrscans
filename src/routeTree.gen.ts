@@ -19,6 +19,7 @@ import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as SeriesSlugRouteImport } from './routes/series.$slug'
 import { Route as ReadChapterSlugRouteImport } from './routes/read.$chapterSlug'
+import { Route as AuthenticatedProfileRouteImport } from './routes/_authenticated/profile'
 import { Route as AuthenticatedLibraryRouteImport } from './routes/_authenticated/library'
 
 const SearchRoute = SearchRouteImport.update({
@@ -70,6 +71,11 @@ const ReadChapterSlugRoute = ReadChapterSlugRouteImport.update({
   path: '/read/$chapterSlug',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthenticatedProfileRoute = AuthenticatedProfileRouteImport.update({
+  id: '/profile',
+  path: '/profile',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedLibraryRoute = AuthenticatedLibraryRouteImport.update({
   id: '/library',
   path: '/library',
@@ -85,6 +91,7 @@ export interface FileRoutesByFullPath {
   '/dmca': typeof DmcaRoute
   '/search': typeof SearchRoute
   '/library': typeof AuthenticatedLibraryRoute
+  '/profile': typeof AuthenticatedProfileRoute
   '/read/$chapterSlug': typeof ReadChapterSlugRoute
   '/series/$slug': typeof SeriesSlugRoute
 }
@@ -97,6 +104,7 @@ export interface FileRoutesByTo {
   '/dmca': typeof DmcaRoute
   '/search': typeof SearchRoute
   '/library': typeof AuthenticatedLibraryRoute
+  '/profile': typeof AuthenticatedProfileRoute
   '/read/$chapterSlug': typeof ReadChapterSlugRoute
   '/series/$slug': typeof SeriesSlugRoute
 }
@@ -111,6 +119,7 @@ export interface FileRoutesById {
   '/dmca': typeof DmcaRoute
   '/search': typeof SearchRoute
   '/_authenticated/library': typeof AuthenticatedLibraryRoute
+  '/_authenticated/profile': typeof AuthenticatedProfileRoute
   '/read/$chapterSlug': typeof ReadChapterSlugRoute
   '/series/$slug': typeof SeriesSlugRoute
 }
@@ -125,6 +134,7 @@ export interface FileRouteTypes {
     | '/dmca'
     | '/search'
     | '/library'
+    | '/profile'
     | '/read/$chapterSlug'
     | '/series/$slug'
   fileRoutesByTo: FileRoutesByTo
@@ -137,6 +147,7 @@ export interface FileRouteTypes {
     | '/dmca'
     | '/search'
     | '/library'
+    | '/profile'
     | '/read/$chapterSlug'
     | '/series/$slug'
   id:
@@ -150,6 +161,7 @@ export interface FileRouteTypes {
     | '/dmca'
     | '/search'
     | '/_authenticated/library'
+    | '/_authenticated/profile'
     | '/read/$chapterSlug'
     | '/series/$slug'
   fileRoutesById: FileRoutesById
@@ -239,6 +251,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ReadChapterSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authenticated/profile': {
+      id: '/_authenticated/profile'
+      path: '/profile'
+      fullPath: '/profile'
+      preLoaderRoute: typeof AuthenticatedProfileRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/library': {
       id: '/_authenticated/library'
       path: '/library'
@@ -251,10 +270,12 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedLibraryRoute: typeof AuthenticatedLibraryRoute
+  AuthenticatedProfileRoute: typeof AuthenticatedProfileRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedLibraryRoute: AuthenticatedLibraryRoute,
+  AuthenticatedProfileRoute: AuthenticatedProfileRoute,
 }
 
 const AuthenticatedRouteRouteWithChildren =
