@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as SearchRouteImport } from './routes/search'
 import { Route as BrowseRouteImport } from './routes/browse'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as SeriesSlugRouteImport } from './routes/series.$slug'
 
 const SearchRoute = SearchRouteImport.update({
   id: '/search',
@@ -28,35 +29,44 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SeriesSlugRoute = SeriesSlugRouteImport.update({
+  id: '/series/$slug',
+  path: '/series/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/browse': typeof BrowseRoute
   '/search': typeof SearchRoute
+  '/series/$slug': typeof SeriesSlugRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/browse': typeof BrowseRoute
   '/search': typeof SearchRoute
+  '/series/$slug': typeof SeriesSlugRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/browse': typeof BrowseRoute
   '/search': typeof SearchRoute
+  '/series/$slug': typeof SeriesSlugRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/browse' | '/search'
+  fullPaths: '/' | '/browse' | '/search' | '/series/$slug'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/browse' | '/search'
-  id: '__root__' | '/' | '/browse' | '/search'
+  to: '/' | '/browse' | '/search' | '/series/$slug'
+  id: '__root__' | '/' | '/browse' | '/search' | '/series/$slug'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   BrowseRoute: typeof BrowseRoute
   SearchRoute: typeof SearchRoute
+  SeriesSlugRoute: typeof SeriesSlugRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -82,6 +92,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/series/$slug': {
+      id: '/series/$slug'
+      path: '/series/$slug'
+      fullPath: '/series/$slug'
+      preLoaderRoute: typeof SeriesSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -89,6 +106,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   BrowseRoute: BrowseRoute,
   SearchRoute: SearchRoute,
+  SeriesSlugRoute: SeriesSlugRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
