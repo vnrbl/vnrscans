@@ -1,13 +1,13 @@
 import type { ReactNode } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { BookOpen, Clock, History } from "lucide-react";
+import { BookOpen, Clock, History, ChevronLeft, ChevronRight, Star } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { SeriesGrid } from "@/components/SeriesGrid";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { useRef } from "react";
 
 export const Route = createFileRoute("/home")({
   head: () => ({
@@ -127,7 +127,7 @@ function HomePage() {
         <section className="container mx-auto px-4 py-8">
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             {featured.data.map((series) => (
-              <Link key={series.id} to="/series/$slug" params={{ slug: series.slug }}>
+              <Link key={series.id} to="/title/$slug" params={{ slug: series.slug }}>
                 <Card className="group relative overflow-hidden border-border/50 bg-card transition-all hover:border-primary/50 hover:shadow-lg">
                   <div className="absolute inset-0">
                     {series.cover_url && (
@@ -164,7 +164,7 @@ function HomePage() {
 
       {user && (
         <>
-          <ChapterFeedSection
+          <ChapterCarouselSection
             title="New Chapters from Followed"
             description="Latest uploads from series you follow"
             loading={followedChapters.isLoading}
@@ -174,7 +174,7 @@ function HomePage() {
             linkVariant="split"
           />
 
-          <ChapterFeedSection
+          <ChapterCarouselSection
             title="Reading History"
             description="Pick up where you left off"
             icon={<History className="h-5 w-5" />}
@@ -187,55 +187,21 @@ function HomePage() {
         </>
       )}
 
-      {/* Recently Added Section */}
-      <section className="container mx-auto px-4 py-8">
-        <div className="mb-6 flex items-center justify-between">
-          <h2 className="text-2xl font-bold">Recently Added</h2>
-        </div>
-        {recentChapters.isLoading ? (
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
-            {[...Array(6)].map((_, i) => (
-              <div key={i} className="overflow-hidden rounded-lg border border-border/40 bg-card">
-                <div className="aspect-[2/3] animate-pulse bg-secondary" />
-                <div className="space-y-2 p-3">
-                  <div className="h-4 w-3/4 animate-pulse rounded bg-secondary" />
-                  <div className="h-3 w-1/2 animate-pulse rounded bg-secondary" />
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : recentChapters.data && recentChapters.data.length > 0 ? (
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
-            {recentChapters.data.map((chapter) => (
-              <RecentChapterCard key={chapter.id} chapter={chapter as RecentChapter} />
-            ))}
-          </div>
-        ) : (
-          <div className="rounded-lg border border-border/40 bg-card p-8 text-center">
-            <p className="text-muted-foreground">No chapters available yet.</p>
-          </div>
-        )}
-      </section>
-
       {/* Popular Manhwa Section */}
-      <section className="container mx-auto px-4 py-8">
-        <div className="mb-6">
-          <h2 className="text-2xl font-bold">Popular Manhwa</h2>
-          <p className="text-sm text-muted-foreground">Discover the most read manhwa series ranked by our community</p>
-        </div>
-        <SeriesGrid items={popular.data} loading={popular.isLoading} />
-      </section>
+      <SeriesCarouselSection
+        title="Popular Manhwa"
+        description="Discover the most read manhwa series ranked by our community"
+        series={popular.data ?? []}
+        loading={popular.isLoading}
+      />
 
       {/* High Score Manhwa Section */}
-      <section className="bg-secondary/20 py-12">
-        <div className="container mx-auto px-4">
-          <div className="mb-6">
-            <h2 className="text-2xl font-bold">High Score Manhwa</h2>
-            <p className="text-sm text-muted-foreground">Discover the highest rated manhwa series</p>
-          </div>
-          <SeriesGrid items={highScore.data} loading={highScore.isLoading} />
-        </div>
-      </section>
+      <SeriesCarouselSection
+        title="High Score Manhwa"
+        description="Discover the highest rated manhwa series"
+        series={highScore.data ?? []}
+        loading={highScore.isLoading}
+      />
     </div>
   );
 }
@@ -268,6 +234,312 @@ function mapHistoryToChapters(rows: HistoryRow[] | undefined): RecentChapter[] {
       created_at: row.updated_at,
       series: row.series,
     }));
+}
+
+function ChapterCarouselSection({
+  title,
+  description,
+  icon,
+  loading,
+  emptyMessage,
+  chapters,
+  timeField,
+  linkVariant,
+}: {
+  title: string;
+  description?: string;
+  icon?: ReactNode;
+  loading: boolean;
+  emptyMessage: string;
+  chapters: RecentChapter[];
+  timeField: "created" | "updated";
+  linkVariant: "split" | "seriesOnly";
+}) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const isDragging = useRef(false);
+  const startX = useRef(0);
+  const scrollLeft = useRef(0);
+
+  const scroll = (direction: "left" | "right") => {
+    if (scrollRef.current) {
+      const scrollAmount = 400;
+      scrollRef.current.scrollBy({
+        left: direction === "left" ? -scrollAmount : scrollAmount,
+        behavior: "smooth",
+      });
+    }
+  };
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (!scrollRef.current) return;
+    isDragging.current = true;
+    startX.current = e.pageX - scrollRef.current.offsetLeft;
+    scrollLeft.current = scrollRef.current.scrollLeft;
+    scrollRef.current.style.cursor = "grabbing";
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDragging.current || !scrollRef.current) return;
+    e.preventDefault();
+    const x = e.pageX - scrollRef.current.offsetLeft;
+    const walk = (x - startX.current) * 2;
+    scrollRef.current.scrollLeft = scrollLeft.current - walk;
+  };
+
+  const handleMouseUp = () => {
+    isDragging.current = false;
+    if (scrollRef.current) {
+      scrollRef.current.style.cursor = "grab";
+    }
+  };
+
+  const handleMouseLeave = () => {
+    isDragging.current = false;
+    if (scrollRef.current) {
+      scrollRef.current.style.cursor = "grab";
+    }
+  };
+
+  return (
+    <section className="container mx-auto px-4 py-8">
+      <div className="mb-6 flex items-center justify-between">
+        <div>
+          <div className="flex items-center gap-2">
+            {icon}
+            <h2 className="text-2xl font-bold">{title}</h2>
+          </div>
+          {description && (
+            <p className="mt-1 text-sm text-muted-foreground">{description}</p>
+          )}
+        </div>
+        {chapters.length > 0 && (
+          <div className="hidden md:flex gap-2">
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => scroll("left")}
+              className="h-8 w-8"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => scroll("right")}
+              className="h-8 w-8"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
+      </div>
+      
+      {loading ? (
+        <div className="flex gap-4 overflow-hidden">
+          {[...Array(6)].map((_, i) => (
+            <div key={i} className="w-[180px] shrink-0 overflow-hidden rounded-lg border border-border/40 bg-card md:w-[220px]">
+              <div className="aspect-[2/3] animate-pulse bg-secondary" />
+              <div className="space-y-2 p-3">
+                <div className="h-4 w-3/4 animate-pulse rounded bg-secondary" />
+                <div className="h-3 w-1/2 animate-pulse rounded bg-secondary" />
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : chapters.length > 0 ? (
+        <div
+          ref={scrollRef}
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
+          onMouseLeave={handleMouseLeave}
+          className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide cursor-grab active:cursor-grabbing select-none"
+          style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+        >
+          {chapters.map((chapter) => (
+            <div key={chapter.id} className="w-[180px] shrink-0 md:w-[220px]">
+              <RecentChapterCard
+                chapter={chapter}
+                timeField={timeField}
+                linkVariant={linkVariant}
+              />
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="rounded-lg border border-border/40 bg-card p-8 text-center">
+          <p className="text-muted-foreground">{emptyMessage}</p>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function SeriesCarouselSection({
+  title,
+  description,
+  series,
+  loading,
+}: {
+  title: string;
+  description?: string;
+  series: Array<{
+    id: string;
+    slug: string;
+    title: string;
+    cover_url: string | null;
+    type: string;
+    rating_average: number | null;
+  }>;
+  loading: boolean;
+}) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const isDragging = useRef(false);
+  const startX = useRef(0);
+  const scrollLeft = useRef(0);
+
+  const scroll = (direction: "left" | "right") => {
+    if (scrollRef.current) {
+      const scrollAmount = 400;
+      scrollRef.current.scrollBy({
+        left: direction === "left" ? -scrollAmount : scrollAmount,
+        behavior: "smooth",
+      });
+    }
+  };
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (!scrollRef.current) return;
+    isDragging.current = true;
+    startX.current = e.pageX - scrollRef.current.offsetLeft;
+    scrollLeft.current = scrollRef.current.scrollLeft;
+    scrollRef.current.style.cursor = "grabbing";
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDragging.current || !scrollRef.current) return;
+    e.preventDefault();
+    const x = e.pageX - scrollRef.current.offsetLeft;
+    const walk = (x - startX.current) * 2;
+    scrollRef.current.scrollLeft = scrollLeft.current - walk;
+  };
+
+  const handleMouseUp = () => {
+    isDragging.current = false;
+    if (scrollRef.current) {
+      scrollRef.current.style.cursor = "grab";
+    }
+  };
+
+  const handleMouseLeave = () => {
+    isDragging.current = false;
+    if (scrollRef.current) {
+      scrollRef.current.style.cursor = "grab";
+    }
+  };
+
+  return (
+    <section className="container mx-auto px-4 py-8">
+      <div className="mb-6 flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold">{title}</h2>
+          {description && (
+            <p className="mt-1 text-sm text-muted-foreground">{description}</p>
+          )}
+        </div>
+        {series.length > 0 && (
+          <div className="hidden md:flex gap-2">
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => scroll("left")}
+              className="h-8 w-8"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => scroll("right")}
+              className="h-8 w-8"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
+      </div>
+      
+      {loading ? (
+        <div className="flex gap-4 overflow-hidden">
+          {[...Array(6)].map((_, i) => (
+            <div key={i} className="w-[180px] shrink-0 overflow-hidden rounded-lg border border-border/40 bg-card md:w-[220px]">
+              <div className="aspect-[2/3] animate-pulse bg-secondary" />
+              <div className="space-y-2 p-3">
+                <div className="h-4 w-3/4 animate-pulse rounded bg-secondary" />
+                <div className="h-3 w-1/2 animate-pulse rounded bg-secondary" />
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : series.length > 0 ? (
+        <div
+          ref={scrollRef}
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
+          onMouseLeave={handleMouseLeave}
+          className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide cursor-grab active:cursor-grabbing select-none"
+          style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+        >
+          {series.map((item) => (
+            <Link
+              key={item.id}
+              to="/title/$slug"
+              params={{ slug: item.slug }}
+              className="group w-[180px] shrink-0 overflow-hidden rounded-lg border border-border/40 bg-card transition-all hover:border-primary/50 hover:shadow-lg md:w-[220px]"
+              onDragStart={(e) => e.preventDefault()}
+            >
+              <div className="relative aspect-[2/3] overflow-hidden bg-secondary">
+                {item.cover_url ? (
+                  <img
+                    src={item.cover_url}
+                    alt={item.title}
+                    loading="lazy"
+                    className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                    draggable="false"
+                  />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center text-muted-foreground">
+                    <BookOpen className="h-10 w-10" />
+                  </div>
+                )}
+                <div className="absolute left-2 top-2">
+                  <Badge variant="secondary" className="bg-background/80 text-xs uppercase backdrop-blur">
+                    {item.type}
+                  </Badge>
+                </div>
+                {item.rating_average && Number(item.rating_average) > 0 ? (
+                  <div className="absolute right-2 bottom-2 flex items-center gap-1 rounded-md bg-background/80 px-1.5 py-0.5 text-xs backdrop-blur">
+                    <Star className="h-3 w-3 fill-violet-600 text-violet-600" />
+                    {Number(item.rating_average).toFixed(1)}
+                  </div>
+                ) : null}
+              </div>
+              <div className="p-3">
+                <h3 className="line-clamp-2 text-sm font-semibold leading-tight text-foreground group-hover:text-primary">
+                  {item.title}
+                </h3>
+              </div>
+            </Link>
+          ))}
+        </div>
+      ) : (
+        <div className="rounded-lg border border-border/40 bg-card p-8 text-center">
+          <p className="text-muted-foreground">No series available yet.</p>
+        </div>
+      )}
+    </section>
+  );
 }
 
 function ChapterFeedSection({
@@ -379,12 +651,12 @@ function RecentChapterCard({
 
   return (
     <article className="group overflow-hidden rounded-lg border border-border/40 bg-card transition-all hover:border-primary/50 hover:shadow-lg hover:shadow-primary/10">
-      <Link to="/series/$slug" params={{ slug: seriesSlug }} className="block">
+      <Link to="/title/$slug" params={{ slug: seriesSlug }} className="block">
         {cover}
       </Link>
       <div className="p-3">
         <Link
-          to="/series/$slug"
+          to="/title/$slug"
           params={{ slug: seriesSlug }}
           className="line-clamp-2 text-sm font-semibold leading-tight text-foreground hover:text-primary"
         >
@@ -404,8 +676,8 @@ function RecentChapterCard({
               className="mt-2 h-8 w-full text-xs font-semibold"
             >
               <Link
-                to="/series/$seriesSlug/$chapterSlug"
-                params={{ seriesSlug, chapterSlug: chapter.slug }}
+                to="/title/$titleSlug/$chapterSlug"
+                params={{ titleSlug: seriesSlug, chapterSlug: chapter.slug }}
               >
                 Ch. {chapter.chapter_number}
               </Link>

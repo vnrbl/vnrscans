@@ -21,10 +21,11 @@ function Home() {
     queryFn: async () => {
       const { count: seriesCount } = await supabase.from("series").select("*", { count: "exact", head: true });
       const { count: chapterCount } = await supabase.from("chapters").select("*", { count: "exact", head: true });
+      const { count: userCount } = await supabase.from("profiles").select("*", { count: "exact", head: true });
       return {
         chapters: chapterCount || 0,
         series: seriesCount || 0,
-        readers: 10845,
+        readers: userCount || 0,
       };
     },
   });

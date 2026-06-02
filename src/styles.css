@@ -161,6 +161,15 @@
   ::-webkit-scrollbar-thumb { background: oklch(0.35 0.004 286); border-radius: 6px; }
   ::-webkit-scrollbar-thumb:hover { background: var(--primary); }
 
+  /* Hide scrollbar utility */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
   /* Utility classes */
   .glow-primary { box-shadow: var(--glow-primary); }
   .glow-accent { box-shadow: var(--glow-accent); }

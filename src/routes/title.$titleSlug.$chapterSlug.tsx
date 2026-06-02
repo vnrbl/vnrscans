@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
-import { ChevronLeft, ChevronRight, ArrowLeft, BookOpen, Home, List, Maximize, Minimize, Flag } from "lucide-react";
+import { useEffect, useState, useRef, useCallback } from "react";
+import { ChevronLeft, ChevronRight, ArrowLeft, BookOpen, Home, List, Maximize, Minimize, Flag, ZoomIn, ZoomOut, Heart, Smile, ThumbsUp, Laugh, Star, MessageSquare } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -23,7 +23,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 
-export const Route = createFileRoute("/series/$seriesSlug/$chapterSlug")({
+export const Route = createFileRoute("/title/$titleSlug/$chapterSlug")({
   head: ({ params }) => ({ meta: [{ title: `Read ${params.chapterSlug} — 0Verse` }] }),
   component: Reader,
   errorComponent: ({ error }) => (
@@ -34,11 +34,13 @@ export const Route = createFileRoute("/series/$seriesSlug/$chapterSlug")({
 });
 
 function Reader() {
-  const { seriesSlug, chapterSlug } = Route.useParams();
+  const { titleSlug, chapterSlug } = Route.useParams();
+  const seriesSlug = titleSlug;
   const { user } = useAuth();
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [controlsVisible, setControlsVisible] = useState(true);
 
   const chapterQ = useQuery({
     queryKey: ["chapter", chapterSlug],
@@ -112,6 +114,25 @@ function Reader() {
   const prev = idx > 0 ? siblingsQ.data![idx - 1] : null;
   const next = idx >= 0 && siblingsQ.data && idx < siblingsQ.data.length - 1 ? siblingsQ.data[idx + 1] : null;
 
+  // Keyboard navigation (Arrow keys for PC)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore if user is typing in an input/textarea
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+        return;
+      }
+
+      if (e.key === "ArrowLeft" && prev) {
+        navigate({ to: "/title/$titleSlug/$chapterSlug", params: { titleSlug: seriesSlug, chapterSlug: prev.slug } });
+      } else if (e.key === "ArrowRight" && next) {
+        navigate({ to: "/title/$titleSlug/$chapterSlug", params: { titleSlug: seriesSlug, chapterSlug: next.slug } });
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [prev, next, navigate, seriesSlug]);
+
   // Fullscreen management
   useEffect(() => {
     const handleFullscreenChange = () => {
@@ -130,6 +151,93 @@ function Reader() {
       document.exitFullscreen();
     }
   };
+
+  // Auto-hide controls after 3 seconds of inactivity
+  const hideTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const controlsVisibleRef = useRef(true);
+  const lastTapRef = useRef(0);
+  const isDoubleTapToggleRef = useRef(false);
+
+  const showControls = useCallback(() => {
+    // Skip auto-show if this was triggered right after a double-tap toggle-off
+    if (isDoubleTapToggleRef.current) {
+      isDoubleTapToggleRef.current = false;
+      return;
+    }
+    setControlsVisible(true);
+    controlsVisibleRef.current = true;
+    if (hideTimeoutRef.current) clearTimeout(hideTimeoutRef.current);
+    hideTimeoutRef.current = setTimeout(() => {
+      setControlsVisible(false);
+      controlsVisibleRef.current = false;
+    }, 3000);
+  }, []);
+
+  useEffect(() => {
+    showControls();
+    return () => {
+      if (hideTimeoutRef.current) clearTimeout(hideTimeoutRef.current);
+    };
+  }, []);
+
+  // Show controls on mouse movement or touch
+  useEffect(() => {
+    const handleMouseActivity = () => showControls();
+    const handleScrollActivity = () => showControls();
+    
+    // Double tap detection for mobile
+    const handleDoubleTap = (e: TouchEvent) => {
+      const currentTime = new Date().getTime();
+      const tapLength = currentTime - lastTapRef.current;
+      
+      if (tapLength < 300 && tapLength > 0) {
+        // Check if tap is in middle area (not on edges)
+        const touch = e.touches[0] || e.changedTouches[0];
+        if (!touch) { lastTapRef.current = currentTime; return; }
+        const screenWidth = window.innerWidth;
+        const tapX = touch.clientX;
+        
+        // Middle 60% of screen
+        if (tapX > screenWidth * 0.2 && tapX < screenWidth * 0.8) {
+          e.preventDefault();
+          e.stopPropagation();
+          
+          const newVisible = !controlsVisibleRef.current;
+          controlsVisibleRef.current = newVisible;
+          setControlsVisible(newVisible);
+          
+          // Clear any existing auto-hide timeout
+          if (hideTimeoutRef.current) clearTimeout(hideTimeoutRef.current);
+          
+          if (newVisible) {
+            // If showing, set auto-hide timer
+            hideTimeoutRef.current = setTimeout(() => {
+              setControlsVisible(false);
+              controlsVisibleRef.current = false;
+            }, 3000);
+          } else {
+            // If hiding via double-tap, prevent the scroll/touch events from immediately showing again
+            isDoubleTapToggleRef.current = true;
+          }
+          
+          // Reset lastTap to prevent triple-tap from re-triggering
+          lastTapRef.current = 0;
+          return;
+        }
+      }
+      lastTapRef.current = currentTime;
+    };
+    
+    document.addEventListener("mousemove", handleMouseActivity);
+    document.addEventListener("touchstart", handleDoubleTap, { passive: false });
+    document.addEventListener("scroll", handleScrollActivity);
+    
+    return () => {
+      document.removeEventListener("mousemove", handleMouseActivity);
+      document.removeEventListener("touchstart", handleDoubleTap);
+      document.removeEventListener("scroll", handleScrollActivity);
+    };
+  }, [showControls]);
 
   if (chapterQ.isLoading) {
     return <div className="grid min-h-screen place-items-center bg-background text-muted-foreground">Loading chapter…</div>;
@@ -150,8 +258,12 @@ function Reader() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Top Bar - Hidden in fullscreen */}
-      {!isFullscreen && (
+      {/* Top Bar - Auto-hide */}
+      <div 
+        className={`transition-transform duration-300 ${
+          controlsVisible ? "translate-y-0" : "-translate-y-full"
+        }`}
+      >
         <ReaderTopBar
           title={`Ch. ${c.chapter_number}${c.title ? " — " + c.title : ""}`}
           seriesTitle={c.series?.title ?? ""}
@@ -160,7 +272,7 @@ function Reader() {
           allChapters={siblingsQ.data ?? []}
           currentChapterSlug={chapterSlug}
         />
-      )}
+      </div>
 
       <div className="flex">
         {/* Main content */}
@@ -168,36 +280,46 @@ function Reader() {
           {isNovel ? (
             <NovelView content={c.novel_content ?? ""} />
           ) : (
-            <ImageView pages={pagesQ.data} loading={pagesQ.isLoading} />
+            <ImageView pages={pagesQ.data} loading={pagesQ.isLoading} chapterId={c.id} />
           )}
         </div>
       </div>
 
-      {/* Floating Controls Sidebar - Always visible */}
-      <FloatingControls
-        isFullscreen={isFullscreen}
-        toggleFullscreen={toggleFullscreen}
-        hasPrev={!!prev}
-        hasNext={!!next}
-        onPrev={() => prev && navigate({ to: "/series/$seriesSlug/$chapterSlug", params: { seriesSlug, chapterSlug: prev.slug } })}
-        onNext={() => next && navigate({ to: "/series/$seriesSlug/$chapterSlug", params: { seriesSlug, chapterSlug: next.slug } })}
-        seriesSlug={seriesSlug}
-        allChapters={siblingsQ.data ?? []}
-        currentChapterSlug={chapterSlug}
-        chapterId={c.id}
-        seriesId={c.series_id}
-        seriesTitle={c.series?.title ?? ""}
-      />
+      {/* Floating Controls Sidebar - Auto-hide */}
+      <div 
+        className={`transition-opacity duration-300 ${
+          controlsVisible ? "opacity-100" : "opacity-0 pointer-events-none"
+        }`}
+      >
+        <FloatingControls
+          isFullscreen={isFullscreen}
+          toggleFullscreen={toggleFullscreen}
+          hasPrev={!!prev}
+          hasNext={!!next}
+          onPrev={() => prev && navigate({ to: "/title/$titleSlug/$chapterSlug", params: { titleSlug: seriesSlug, chapterSlug: prev.slug } })}
+          onNext={() => next && navigate({ to: "/title/$titleSlug/$chapterSlug", params: { titleSlug: seriesSlug, chapterSlug: next.slug } })}
+          seriesSlug={seriesSlug}
+          allChapters={siblingsQ.data ?? []}
+          currentChapterSlug={chapterSlug}
+          chapterId={c.id}
+          seriesId={c.series_id}
+          seriesTitle={c.series?.title ?? ""}
+        />
+      </div>
 
-      {/* Bottom Nav - Hidden in fullscreen */}
-      {!isFullscreen && (
+      {/* Bottom Nav - Auto-hide */}
+      <div 
+        className={`transition-transform duration-300 ${
+          controlsVisible ? "translate-y-0" : "translate-y-full"
+        }`}
+      >
         <nav className="sticky bottom-0 z-30 border-t border-border/50 bg-background/90 backdrop-blur md:hidden">
           <div className="container mx-auto flex items-center justify-between gap-2 px-4 py-3">
             <Button
               variant="outline"
               size="sm"
               disabled={!prev}
-              onClick={() => prev && navigate({ to: "/series/$seriesSlug/$chapterSlug", params: { seriesSlug, chapterSlug: prev.slug } })}
+              onClick={() => prev && navigate({ to: "/title/$titleSlug/$chapterSlug", params: { titleSlug: seriesSlug, chapterSlug: prev.slug } })}
             >
               <ChevronLeft className="mr-1 h-4 w-4" />Prev
             </Button>
@@ -207,11 +329,20 @@ function Reader() {
                   <Home className="h-4 w-4" />
                 </Button>
               </Link>
-              <Link to="/series/$slug" params={{ slug: seriesSlug }}>
-                <Button variant="ghost" size="sm" title="Back to series">
+              <Link to="/title/$slug" params={{ slug: seriesSlug }}>
+                <Button variant="ghost" size="sm" title="Back to title">
                   <BookOpen className="h-4 w-4" />
                 </Button>
               </Link>
+              {/* Fullscreen Button - Mobile */}
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={toggleFullscreen}
+                title={isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
+              >
+                {isFullscreen ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
+              </Button>
               {/* Report Button - Mobile only */}
               <ReportButton 
                 chapterId={c.id} 
@@ -222,13 +353,13 @@ function Reader() {
             <Button
               size="sm"
               disabled={!next}
-              onClick={() => next && navigate({ to: "/series/$seriesSlug/$chapterSlug", params: { seriesSlug, chapterSlug: next.slug } })}
+              onClick={() => next && navigate({ to: "/title/$titleSlug/$chapterSlug", params: { titleSlug: seriesSlug, chapterSlug: next.slug } })}
             >
               Next<ChevronRight className="ml-1 h-4 w-4" />
             </Button>
           </div>
         </nav>
-      )}
+      </div>
     </div>
   );
 }
@@ -253,7 +384,7 @@ function ReaderTopBar({
   return (
     <header className="sticky top-0 z-30 border-b border-border/50 bg-background/90 backdrop-blur">
       <div className="container mx-auto flex items-center justify-between gap-2 px-4 py-3">
-        <Link to="/series/$slug" params={{ slug: seriesSlug }} className="flex min-w-0 items-center gap-2 text-sm">
+        <Link to="/title/$slug" params={{ slug: seriesSlug }} className="flex min-w-0 items-center gap-2 text-sm">
           <ArrowLeft className="h-4 w-4" />
           <div className="min-w-0">
             <div className="truncate font-semibold">{seriesTitle}</div>
@@ -264,7 +395,7 @@ function ReaderTopBar({
           {allChapters.length > 0 && (
             <Select 
               value={currentChapterSlug} 
-              onValueChange={(slug) => navigate({ to: "/series/$seriesSlug/$chapterSlug", params: { seriesSlug, chapterSlug: slug } })}
+              onValueChange={(slug) => navigate({ to: "/title/$titleSlug/$chapterSlug", params: { titleSlug: seriesSlug, chapterSlug: slug } })}
             >
               <SelectTrigger className="w-[180px]">
                 <List className="mr-2 h-4 w-4" />
@@ -285,25 +416,93 @@ function ReaderTopBar({
   );
 }
 
-function ImageView({ pages, loading }: { pages?: any[]; loading: boolean }) {
+function ImageView({ pages, loading, chapterId }: { pages?: any[]; loading: boolean; chapterId: string }) {
+  const [zoomLevel, setZoomLevel] = useState(100);
+  const [isMobile, setIsMobile] = useState(false);
+  const { user } = useAuth();
+
+  // Detect mobile screen size
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
   if (loading) {
     return <div className="container mx-auto max-w-3xl px-2 py-6 space-y-2">{Array.from({ length: 4 }).map((_, i) => <div key={i} className="aspect-[2/3] animate-pulse rounded bg-secondary" />)}</div>;
   }
   if (!pages || pages.length === 0) {
     return <div className="grid min-h-[50vh] place-items-center text-muted-foreground">No pages uploaded for this chapter yet.</div>;
   }
+
+  const handleZoomIn = () => {
+    setZoomLevel(prev => Math.min(prev + 25, 200));
+  };
+
+  const handleZoomOut = () => {
+    setZoomLevel(prev => Math.max(prev - 25, 50));
+  };
+
+  const handleZoomReset = () => {
+    setZoomLevel(100);
+  };
+
   return (
-    <div className="mx-auto max-w-3xl px-2 py-4">
-      {pages.map((p) => (
-        <img
-          key={p.id}
-          src={p.image_url}
-          alt={`Page ${p.page_number}`}
-          loading="lazy"
-          className="mx-auto block w-full"
-        />
-      ))}
-    </div>
+    <>
+      {/* Zoom Controls - Sticky (Desktop Only) */}
+      <div className="sticky top-20 z-20 justify-center mb-4 hidden md:flex">
+        <div className="inline-flex items-center gap-2 bg-card/95 backdrop-blur border border-border/50 rounded-full px-4 py-2 shadow-lg">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleZoomOut}
+            disabled={zoomLevel <= 50}
+            className="h-8 w-8 p-0 rounded-full"
+            title="Zoom Out"
+          >
+            <ZoomOut className="h-4 w-4" />
+          </Button>
+          <button
+            onClick={handleZoomReset}
+            className="text-sm font-medium min-w-[60px] px-2 py-1 rounded hover:bg-primary/20 transition-colors"
+            title="Reset Zoom"
+          >
+            {zoomLevel}%
+          </button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleZoomIn}
+            disabled={zoomLevel >= 200}
+            className="h-8 w-8 p-0 rounded-full"
+            title="Zoom In"
+          >
+            <ZoomIn className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+
+      {/* Pages with Zoom (Desktop) / Normal (Mobile) */}
+      <div className="mx-auto max-w-3xl px-2 py-4">
+        {pages.map((p) => (
+          <img
+            key={p.id}
+            src={p.image_url}
+            alt={`Page ${p.page_number}`}
+            loading="lazy"
+            className="mx-auto block w-full transition-transform duration-200"
+            style={{ transform: isMobile ? 'scale(1)' : `scale(${zoomLevel / 100})`, transformOrigin: 'top center' }}
+          />
+        ))}
+
+        {/* Reactions & Comments Section */}
+        <ChapterReactions chapterId={chapterId} />
+      </div>
+    </>
   );
 }
 
@@ -387,10 +586,10 @@ function FloatingControls({
 
         {/* Back to series */}
         <Link
-          to="/series/$slug"
+          to="/title/$slug"
           params={{ slug: seriesSlug }}
           className="p-3 rounded-full hover:bg-primary/20 transition-colors"
-          title="Back to series"
+          title="Back to title"
         >
           <BookOpen className="h-5 w-5" />
         </Link>
@@ -438,7 +637,7 @@ function FloatingControls({
               <button
                 key={ch.id}
                 onClick={() => {
-                  navigate({ to: "/series/$seriesSlug/$chapterSlug", params: { seriesSlug, chapterSlug: ch.slug } });
+                  navigate({ to: "/title/$titleSlug/$chapterSlug", params: { titleSlug: seriesSlug, chapterSlug: ch.slug } });
                   setShowChapters(false);
                 }}
                 className={`w-full text-left px-3 py-2 rounded text-sm hover:bg-primary/20 transition-colors ${
@@ -517,7 +716,7 @@ function FloatingReportPanel({
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="chapter">Report Chapter</SelectItem>
-            <SelectItem value="series">Report Series</SelectItem>
+            <SelectItem value="series">Report Title</SelectItem>
           </SelectContent>
         </Select>
         
@@ -590,7 +789,7 @@ function ReportButton({ chapterId, seriesId, seriesTitle }: { chapterId: string;
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="chapter">Report Chapter</SelectItem>
-              <SelectItem value="series">Report Series</SelectItem>
+              <SelectItem value="series">Report Title</SelectItem>
             </SelectContent>
           </Select>
           
@@ -616,5 +815,140 @@ function ReportButton({ chapterId, seriesId, seriesTitle }: { chapterId: string;
         </div>
       </SheetContent>
     </Sheet>
+  );
+}
+
+// Chapter Reactions Component
+function ChapterReactions({ chapterId }: { chapterId: string }) {
+  const { user } = useAuth();
+  const qc = useQueryClient();
+
+  // Reaction emojis with their types
+  const reactions = [
+    { type: "heart", icon: Heart, label: "Love" },
+    { type: "thumbs_up", icon: ThumbsUp, label: "Like" },
+    { type: "laugh", icon: Laugh, label: "Funny" },
+    { type: "star", icon: Star, label: "Amazing" },
+    { type: "smile", icon: Smile, label: "Enjoyed" },
+  ];
+
+  // Fetch reaction counts
+  const reactionsQ = useQuery({
+    queryKey: ["chapter-reactions", chapterId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("chapter_reactions")
+        .select("reaction_type")
+        .eq("chapter_id", chapterId);
+      
+      if (error) throw error;
+
+      // Count reactions by type
+      const counts: Record<string, number> = {};
+      data?.forEach((r) => {
+        counts[r.reaction_type] = (counts[r.reaction_type] || 0) + 1;
+      });
+      return counts;
+    },
+  });
+
+  // Fetch user's reactions
+  const userReactionsQ = useQuery({
+    queryKey: ["user-chapter-reactions", chapterId, user?.id],
+    queryFn: async () => {
+      if (!user) return [];
+      const { data, error } = await supabase
+        .from("chapter_reactions")
+        .select("reaction_type")
+        .eq("chapter_id", chapterId)
+        .eq("user_id", user.id);
+      
+      if (error) throw error;
+      return data?.map((r) => r.reaction_type) || [];
+    },
+    enabled: !!user,
+  });
+
+  // Toggle reaction
+  const toggleReaction = useMutation({
+    mutationFn: async (reactionType: string) => {
+      if (!user) {
+        toast.error("Sign in to react");
+        return;
+      }
+
+      const hasReacted = userReactionsQ.data?.includes(reactionType);
+
+      if (hasReacted) {
+        // Remove reaction
+        const { error } = await supabase
+          .from("chapter_reactions")
+          .delete()
+          .eq("chapter_id", chapterId)
+          .eq("user_id", user.id)
+          .eq("reaction_type", reactionType);
+        
+        if (error) throw error;
+      } else {
+        // Add reaction
+        const { error } = await supabase
+          .from("chapter_reactions")
+          .insert({
+            chapter_id: chapterId,
+            user_id: user.id,
+            reaction_type: reactionType,
+          });
+        
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["chapter-reactions", chapterId] });
+      qc.invalidateQueries({ queryKey: ["user-chapter-reactions", chapterId, user?.id] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  return (
+    <div className="mt-12 mb-8 border-t border-border pt-8">
+      {/* Reactions */}
+      <div className="mb-8">
+        <h3 className="text-lg font-semibold mb-4">How did you like this chapter?</h3>
+        <div className="flex flex-wrap gap-3">
+          {reactions.map((reaction) => {
+            const Icon = reaction.icon;
+            const count = reactionsQ.data?.[reaction.type] || 0;
+            const hasReacted = userReactionsQ.data?.includes(reaction.type);
+
+            return (
+              <button
+                key={reaction.type}
+                onClick={() => toggleReaction.mutate(reaction.type)}
+                disabled={toggleReaction.isPending}
+                className={`flex items-center gap-2 px-4 py-2 rounded-full border transition-all ${
+                  hasReacted
+                    ? "bg-primary/20 border-primary text-primary"
+                    : "border-border hover:bg-primary/10 hover:border-primary/50"
+                }`}
+                title={reaction.label}
+              >
+                <Icon className={`h-5 w-5 ${hasReacted ? "fill-current" : ""}`} />
+                {count > 0 && <span className="text-sm font-medium">{count}</span>}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Comments Placeholder */}
+      <div className="border border-border rounded-lg p-8 text-center">
+        <MessageSquare className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
+        <h3 className="text-lg font-semibold mb-2">Comments</h3>
+        <p className="text-muted-foreground">Coming Soon</p>
+        <p className="text-sm text-muted-foreground mt-2">
+          Share your thoughts and discuss this chapter with other readers
+        </p>
+      </div>
+    </div>
   );
 }

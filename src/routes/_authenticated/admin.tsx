@@ -19,7 +19,7 @@ export const Route = createFileRoute("/_authenticated/admin")({
 function AdminLayout() {
   const items = [
     { to: "/admin", label: "Dashboard", icon: LayoutDashboard, exact: true },
-    { to: "/admin/series", label: "Series", icon: Library },
+    { to: "/admin/series", label: "Titles", icon: Library },
     { to: "/admin/comments", label: "Comments", icon: MessageSquare },
     { to: "/admin/reports", label: "Reports", icon: Flag },
     { to: "/admin/users", label: "Users", icon: Users },

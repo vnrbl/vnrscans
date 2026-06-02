@@ -1,9 +1,12 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { toast } from "sonner";
-import { Plus, Trash2, Eye, EyeOff, Upload, ExternalLink, X, Pencil } from "lucide-react";
+import { Plus, Trash2, Eye, EyeOff, Upload, ExternalLink, X, Pencil, Download, Layers } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+import { $extractChaptersFromUrl, $extractImagesFromUrl } from "@/lib/api/scraper.functions";
+import type { ChapterInfo } from "@/lib/chapter-scraper";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -14,7 +17,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Badge } from "@/components/ui/badge";
 
 export const Route = createFileRoute("/_authenticated/admin/series")({
-  head: () => ({ meta: [{ title: "Admin · Series" }] }),
+  head: () => ({ meta: [{ title: "Admin · Titles" }] }),
   component: AdminSeries,
 });
 
@@ -94,6 +97,7 @@ function seriesPayloadFromForm(form: SeriesForm) {
 
 function AdminSeries() {
   const qc = useQueryClient();
+  const { user } = useAuth();
   const [selectedSeries, setSelectedSeries] = useState<string | null>(null);
   const [editingSeries, setEditingSeries] = useState<any | null>(null);
   
@@ -165,11 +169,11 @@ function AdminSeries() {
   return (
     <div>
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold tracking-tight">Series</h1>
+        <h1 className="text-2xl font-bold tracking-tight">Titles</h1>
         <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger asChild><Button><Plus className="mr-1 h-4 w-4" />New series</Button></DialogTrigger>
+          <DialogTrigger asChild><Button><Plus className="mr-1 h-4 w-4" />New title</Button></DialogTrigger>
           <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
-            <DialogHeader><DialogTitle>Create series</DialogTitle></DialogHeader>
+            <DialogHeader><DialogTitle>Create title</DialogTitle></DialogHeader>
             <SeriesFormFields form={form} setForm={setForm} />
             <DialogFooter>
               <Button onClick={() => create.mutate()} disabled={!form.title || create.isPending}>Create</Button>
@@ -194,7 +198,7 @@ function AdminSeries() {
             <Button variant="ghost" size="icon" onClick={() => setSelectedSeries(s.id)} title="Manage Chapters">
               <Upload className="h-4 w-4 text-violet-600" />
             </Button>
-            <Button variant="ghost" size="icon" onClick={() => { setEditingSeries(s); setForm(seriesToForm(s)); }} title="Edit Series">
+            <Button variant="ghost" size="icon" onClick={() => { setEditingSeries(s); setForm(seriesToForm(s)); }} title="Edit Title">
               <Pencil className="h-4 w-4" />
             </Button>
             <Button variant="ghost" size="icon" onClick={() => toggleHidden.mutate(s)} title={s.is_hidden ? "Show" : "Hide"}>
@@ -219,7 +223,7 @@ function AdminSeries() {
 
       <Dialog open={!!editingSeries} onOpenChange={(v) => { if (!v) { setEditingSeries(null); setForm(emptySeriesForm); } }}>
         <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
-          <DialogHeader><DialogTitle>Edit series</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>Edit title</DialogTitle></DialogHeader>
           <SeriesFormFields form={form} setForm={setForm} />
           <DialogFooter>
             <Button onClick={() => updateSeries.mutate()} disabled={!form.title || updateSeries.isPending}>
@@ -262,7 +266,7 @@ function SeriesFormFields({ form, setForm }: { form: SeriesForm; setForm: (form:
       <div><Label>Release Year</Label><Input type="number" value={form.release_year} onChange={(e) => setForm({ ...form, release_year: e.target.value })} placeholder="2024" /></div>
       <div><Label>Cover URL</Label><Input value={form.cover_url} onChange={(e) => setForm({ ...form, cover_url: e.target.value })} placeholder="https://example.com/cover.jpg" /></div>
       <div><Label>Alternative Titles</Label><Input value={form.alternative_titles} onChange={(e) => setForm({ ...form, alternative_titles: e.target.value })} placeholder="Alt title 1, Alt title 2" /></div>
-      <div><Label>Description</Label><Textarea rows={4} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Enter series description..." /></div>
+      <div><Label>Description</Label><Textarea rows={4} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Enter title description..." /></div>
 
       <div className="grid gap-2 rounded-md border border-border/40 p-3 text-sm">
         <label className="flex items-center gap-2"><input type="checkbox" checked={form.is_featured} onChange={(e) => setForm({ ...form, is_featured: e.target.checked })} />Featured</label>
@@ -275,6 +279,7 @@ function SeriesFormFields({ form, setForm }: { form: SeriesForm; setForm: (form:
 
 function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack: () => void }) {
   const qc = useQueryClient();
+  const { user } = useAuth();
 
   const series = useQuery({
     queryKey: ["admin", "series", seriesId],
@@ -292,9 +297,27 @@ function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack: () => 
         .from("chapters")
         .select("*")
         .eq("series_id", seriesId)
-        .order("chapter_number", { ascending: false });
+        .order("chapter_number", { ascending: false});
       if (error) throw error;
       return data ?? [];
+    },
+  });
+
+  // Get existing scanlation groups for this series only
+  const scanlationGroups = useQuery({
+    queryKey: ["admin", "scanlation-groups", seriesId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("chapters")
+        .select("scanlation_group")
+        .eq("series_id", seriesId)
+        .not("scanlation_group", "is", null);
+      
+      if (error) throw error;
+      
+      // Get unique groups
+      const uniqueGroups = [...new Set(data?.map(c => c.scanlation_group).filter(Boolean) ?? [])];
+      return uniqueGroups.sort();
     },
   });
 
@@ -304,9 +327,32 @@ function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack: () => 
     chapter_number: "", 
     title: "", 
     image_urls: "",
+    chapter_url: "",
     status: "published",
     scheduled_at: "",
+    uploaded_by: "",
+    scanlation_group: "",
   });
+  const [extracting, setExtracting] = useState(false);
+  const [bulkUploadOpen, setBulkUploadOpen] = useState(false);
+  const [seriesUrl, setSeriesUrl] = useState("");
+  const [discoveredChapters, setDiscoveredChapters] = useState<ChapterInfo[]>([]);
+  const [selectedChapters, setSelectedChapters] = useState<Set<number>>(new Set());
+  const [bulkUploading, setBulkUploading] = useState(false);
+
+  // Auto-fill uploaded_by with user email when opening upload dialog
+  useEffect(() => {
+    if (open && user?.email && !form.uploaded_by) {
+      setForm(prev => ({ ...prev, uploaded_by: user.email || "" }));
+    }
+  }, [open, user?.email]);
+
+  // Also auto-fill when bulk upload dialog opens
+  useEffect(() => {
+    if (bulkUploadOpen && user?.email && !form.uploaded_by) {
+      setForm(prev => ({ ...prev, uploaded_by: user.email || "" }));
+    }
+  }, [bulkUploadOpen, user?.email]);
 
   const create = useMutation({
     mutationFn: async () => {
@@ -323,6 +369,8 @@ function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack: () => 
           chapter_type: "image",
           status: form.status as any,
           scheduled_at: form.status === "scheduled" && form.scheduled_at ? new Date(form.scheduled_at).toISOString() : null,
+          uploaded_by: form.uploaded_by || null,
+          scanlation_group: form.scanlation_group || null,
         })
         .select()
         .single();
@@ -344,7 +392,7 @@ function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack: () => 
     onSuccess: () => {
       toast.success("Chapter uploaded");
       setOpen(false);
-      setForm({ chapter_number: "", title: "", image_urls: "", status: "published", scheduled_at: "" });
+      setForm({ chapter_number: "", title: "", image_urls: "", chapter_url: "", status: "published", scheduled_at: "", uploaded_by: "", scanlation_group: "" });
       qc.invalidateQueries({ queryKey: ["admin", "chapters", seriesId] });
     },
     onError: (e: Error) => toast.error(e.message),
@@ -365,9 +413,142 @@ function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack: () => 
       chapter_number: String(chapter.chapter_number ?? ""),
       title: chapter.title ?? "",
       image_urls: (data ?? []).map((p) => p.image_url).join("\n"),
+      chapter_url: "",
       status: chapter.status ?? "published",
       scheduled_at: chapter.scheduled_at ? new Date(chapter.scheduled_at).toISOString().slice(0, 16) : "",
+      uploaded_by: chapter.uploaded_by ?? "",
+      scanlation_group: chapter.scanlation_group ?? "",
     });
+  };
+
+  const extractFromUrl = async () => {
+    if (!form.chapter_url.trim()) {
+      toast.error("Please enter a chapter URL");
+      return;
+    }
+
+    try {
+      setExtracting(true);
+      const result = await $extractImagesFromUrl({ data: { url: form.chapter_url } });
+      
+      if (result.success && result.images) {
+        setForm({ ...form, image_urls: result.images.join("\n") });
+        toast.success(`Extracted ${result.images.length} images from chapter URL`);
+      } else {
+        toast.error(result.error || "Failed to extract images");
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to extract images");
+    } finally {
+      setExtracting(false);
+    }
+  };
+
+  const discoverChapters = async () => {
+    if (!seriesUrl.trim()) {
+      toast.error("Please enter a series URL");
+      return;
+    }
+
+    try {
+      setExtracting(true);
+      const result = await $extractChaptersFromUrl({ data: { url: seriesUrl } });
+      
+      if (result.success && result.chapters) {
+        setDiscoveredChapters(result.chapters);
+        // Auto-select all chapters
+        setSelectedChapters(new Set(result.chapters.map((_, i) => i)));
+        toast.success(`Discovered ${result.chapters.length} chapters`);
+      } else {
+        toast.error(result.error || "Failed to discover chapters");
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to discover chapters");
+    } finally {
+      setExtracting(false);
+    }
+  };
+
+  const toggleChapterSelection = (index: number) => {
+    const newSelected = new Set(selectedChapters);
+    if (newSelected.has(index)) {
+      newSelected.delete(index);
+    } else {
+      newSelected.add(index);
+    }
+    setSelectedChapters(newSelected);
+  };
+
+  const bulkUploadChapters = async () => {
+    if (selectedChapters.size === 0) {
+      toast.error("Please select at least one chapter");
+      return;
+    }
+
+    try {
+      setBulkUploading(true);
+      let successCount = 0;
+      let failCount = 0;
+
+      for (const index of Array.from(selectedChapters).sort((a, b) => a - b)) {
+        const chapter = discoveredChapters[index];
+        
+        try {
+          // Extract images from chapter using server function
+          const result = await $extractImagesFromUrl({ data: { url: chapter.url } });
+          
+          if (!result.success || !result.images) {
+            throw new Error(result.error || "Failed to extract images");
+          }
+          
+          // Create chapter
+          const { data: newChapter, error: chapterError } = await supabase
+            .from("chapters")
+            .insert({
+              series_id: seriesId,
+              chapter_number: chapter.chapterNumber,
+              title: chapter.title || null,
+              slug: `chapter-${chapter.chapterNumber}${chapter.title ? `-${slugify(chapter.title)}` : ""}`,
+              chapter_type: "image",
+              status: "published",
+              uploaded_by: form.uploaded_by || null,
+              scanlation_group: form.scanlation_group || null,
+            })
+            .select()
+            .single();
+
+          if (chapterError) throw chapterError;
+
+          // Insert pages
+          const pages = result.images.map((url, idx) => ({
+            chapter_id: newChapter.id,
+            page_number: idx + 1,
+            image_url: url,
+          }));
+
+          const { error: pagesError } = await supabase.from("chapter_pages").insert(pages);
+          if (pagesError) throw pagesError;
+
+          successCount++;
+          toast.success(`Uploaded Chapter ${chapter.chapterNumber}`);
+        } catch (error) {
+          failCount++;
+          console.error(`Failed to upload Chapter ${chapter.chapterNumber}:`, error);
+          toast.error(`Failed: Chapter ${chapter.chapterNumber}`);
+        }
+      }
+
+      toast.success(`Bulk upload complete: ${successCount} succeeded, ${failCount} failed`);
+      setBulkUploadOpen(false);
+      setSeriesUrl("");
+      setDiscoveredChapters([]);
+      setSelectedChapters(new Set());
+      qc.invalidateQueries({ queryKey: ["admin", "chapters", seriesId] });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Bulk upload failed");
+    } finally {
+      setBulkUploading(false);
+    }
   };
 
   const updateChapter = useMutation({
@@ -383,6 +564,8 @@ function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack: () => 
           slug: `chapter-${chapterNum}${form.title ? `-${slugify(form.title)}` : ""}`,
           status: form.status as any,
           scheduled_at: form.status === "scheduled" && form.scheduled_at ? new Date(form.scheduled_at).toISOString() : null,
+          uploaded_by: form.uploaded_by || null,
+          scanlation_group: form.scanlation_group || null,
           updated_at: new Date().toISOString(),
         })
         .eq("id", editingChapter.id);
@@ -406,7 +589,7 @@ function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack: () => 
     onSuccess: () => {
       toast.success("Chapter updated");
       setEditingChapter(null);
-      setForm({ chapter_number: "", title: "", image_urls: "", status: "published", scheduled_at: "" });
+      setForm({ chapter_number: "", title: "", image_urls: "", chapter_url: "", status: "published", scheduled_at: "", uploaded_by: "", scanlation_group: "" });
       qc.invalidateQueries({ queryKey: ["admin", "chapters", seriesId] });
     },
     onError: (e: Error) => toast.error(e.message),
@@ -439,12 +622,138 @@ function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack: () => 
 
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold">Chapters ({chapters.data?.length || 0})</h2>
-        <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger asChild>
-            <Button className="bg-violet-600 hover:bg-violet-700">
-              <Plus className="mr-1 h-4 w-4" />Upload Chapter
-            </Button>
-          </DialogTrigger>
+        <div className="flex gap-2">
+          <Dialog open={bulkUploadOpen} onOpenChange={setBulkUploadOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline" className="border-violet-600 text-violet-600 hover:bg-violet-600 hover:text-white">
+                <Layers className="mr-1 h-4 w-4" />Bulk Upload from Series URL
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+              <DialogHeader><DialogTitle>Bulk Upload Chapters from Series URL</DialogTitle></DialogHeader>
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label>Uploaded By</Label>
+                    <Input placeholder="Uploader name" value={form.uploaded_by} onChange={(e) => setForm({ ...form, uploaded_by: e.target.value })} />
+                    <p className="text-xs text-muted-foreground mt-1">Auto-filled with your email</p>
+                  </div>
+                  <div>
+                    <Label>Scanlation Group (Optional)</Label>
+                    {scanlationGroups.data && scanlationGroups.data.length > 0 ? (
+                      <Select value={form.scanlation_group} onValueChange={(v) => setForm({ ...form, scanlation_group: v === "custom" ? "" : v })}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select or add new" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {scanlationGroups.data.map((group) => (
+                            <SelectItem key={group} value={group}>
+                              {group}
+                            </SelectItem>
+                          ))}
+                          <SelectItem value="custom">+ Add New Group</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <Input placeholder="Group/Team name" value={form.scanlation_group} onChange={(e) => setForm({ ...form, scanlation_group: e.target.value })} />
+                    )}
+                    {scanlationGroups.data && scanlationGroups.data.length > 0 && form.scanlation_group === "" && (
+                      <Input 
+                        placeholder="Enter new group name" 
+                        value={form.scanlation_group} 
+                        onChange={(e) => setForm({ ...form, scanlation_group: e.target.value })}
+                        className="mt-2"
+                      />
+                    )}
+                  </div>
+                </div>
+
+                <div className="rounded-lg border border-violet-500/30 bg-violet-500/5 p-4 space-y-3">
+                  <Label className="text-violet-600 font-semibold">Series URL</Label>
+                  <div className="flex gap-2">
+                    <Input 
+                      placeholder="https://example.com/manga/title-name" 
+                      value={seriesUrl} 
+                      onChange={(e) => setSeriesUrl(e.target.value)}
+                      className="flex-1"
+                    />
+                    <Button 
+                      type="button"
+                      onClick={discoverChapters} 
+                      disabled={!seriesUrl.trim() || extracting}
+                      className="bg-violet-600 hover:bg-violet-700"
+                    >
+                      {extracting ? "Discovering..." : "Discover Chapters"}
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Paste the series main page URL. We'll automatically discover all available chapters.
+                  </p>
+                </div>
+
+                {discoveredChapters.length > 0 && (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <Label className="font-semibold">Select Chapters to Upload ({selectedChapters.size}/{discoveredChapters.length})</Label>
+                      <div className="flex gap-2">
+                        <Button 
+                          type="button"
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => setSelectedChapters(new Set(discoveredChapters.map((_, i) => i)))}
+                        >
+                          Select All
+                        </Button>
+                        <Button 
+                          type="button"
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => setSelectedChapters(new Set())}
+                        >
+                          Deselect All
+                        </Button>
+                      </div>
+                    </div>
+                    <div className="max-h-96 overflow-y-auto border border-border/40 rounded-lg divide-y divide-border/40">
+                      {discoveredChapters.map((chapter, index) => (
+                        <label 
+                          key={index}
+                          className="flex items-center gap-3 p-3 hover:bg-secondary/40 cursor-pointer"
+                        >
+                          <input 
+                            type="checkbox"
+                            checked={selectedChapters.has(index)}
+                            onChange={() => toggleChapterSelection(index)}
+                            className="h-4 w-4"
+                          />
+                          <div className="flex-1 min-w-0">
+                            <div className="font-medium">Chapter {chapter.chapterNumber}</div>
+                            {chapter.title && <div className="text-sm text-muted-foreground truncate">{chapter.title}</div>}
+                            <div className="text-xs text-muted-foreground truncate">{chapter.url}</div>
+                          </div>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+              <DialogFooter>
+                <Button 
+                  onClick={bulkUploadChapters} 
+                  disabled={selectedChapters.size === 0 || bulkUploading}
+                  className="bg-violet-600 hover:bg-violet-700"
+                >
+                  {bulkUploading ? "Uploading..." : `Upload ${selectedChapters.size} Chapter${selectedChapters.size !== 1 ? 's' : ''}`}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+          <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild>
+              <Button className="bg-violet-600 hover:bg-violet-700">
+                <Plus className="mr-1 h-4 w-4" />Upload Chapter
+              </Button>
+            </DialogTrigger>
           <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader><DialogTitle>Upload Chapter from URLs</DialogTitle></DialogHeader>
             <div className="space-y-4">
@@ -469,17 +778,82 @@ function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack: () => 
                 <Label>Chapter Title (Optional)</Label>
                 <Input placeholder="e.g., The Beginning" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
               </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label>Uploaded By</Label>
+                  <Input placeholder="Uploader name" value={form.uploaded_by} onChange={(e) => setForm({ ...form, uploaded_by: e.target.value })} />
+                  <p className="text-xs text-muted-foreground mt-1">Auto-filled with your email</p>
+                </div>
+                <div>
+                  <Label>Scanlation Group (Optional)</Label>
+                  {scanlationGroups.data && scanlationGroups.data.length > 0 ? (
+                    <Select value={form.scanlation_group} onValueChange={(v) => setForm({ ...form, scanlation_group: v === "custom" ? "" : v })}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select or add new" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {scanlationGroups.data.map((group) => (
+                          <SelectItem key={group} value={group}>
+                            {group}
+                          </SelectItem>
+                        ))}
+                        <SelectItem value="custom">+ Add New Group</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <Input placeholder="Group/Team name" value={form.scanlation_group} onChange={(e) => setForm({ ...form, scanlation_group: e.target.value })} />
+                  )}
+                  {scanlationGroups.data && scanlationGroups.data.length > 0 && form.scanlation_group === "" && (
+                    <Input 
+                      placeholder="Enter new group name" 
+                      value={form.scanlation_group} 
+                      onChange={(e) => setForm({ ...form, scanlation_group: e.target.value })}
+                      className="mt-2"
+                    />
+                  )}
+                </div>
+              </div>
+
+              {/* Chapter URL Extraction */}
+              <div className="rounded-lg border border-violet-500/30 bg-violet-500/5 p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <Label className="text-violet-600 font-semibold">Option 1: Extract from Chapter URL</Label>
+                  <Download className="h-4 w-4 text-violet-600" />
+                </div>
+                <div className="flex gap-2">
+                  <Input 
+                    placeholder="https://example.com/manga/title/chapter-1" 
+                    value={form.chapter_url} 
+                    onChange={(e) => setForm({ ...form, chapter_url: e.target.value })}
+                    className="flex-1"
+                  />
+                  <Button 
+                    type="button"
+                    onClick={extractFromUrl} 
+                    disabled={!form.chapter_url.trim() || extracting}
+                    variant="outline"
+                    className="border-violet-600 text-violet-600 hover:bg-violet-600 hover:text-white"
+                  >
+                    {extracting ? "Extracting..." : "Extract"}
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Paste a chapter URL from any manga/manhwa site and we'll automatically extract all images.
+                </p>
+              </div>
+
+              {/* Manual URL Input */}
               <div>
-                <Label>Image URLs (one per line) *</Label>
+                <Label>Option 2: Manual Image URLs (one per line) *</Label>
                 <Textarea
-                  rows={12}
+                  rows={10}
                   placeholder="https://example.com/page1.jpg&#10;https://example.com/page2.jpg&#10;https://example.com/page3.jpg"
                   value={form.image_urls}
                   onChange={(e) => setForm({ ...form, image_urls: e.target.value })}
                   className="font-mono text-sm"
                 />
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Paste image URLs from other scans, one URL per line. Supports direct image links from any source.
+                  Or paste image URLs directly, one URL per line. Supports direct image links from any website.
                 </p>
               </div>
             </div>
@@ -490,6 +864,7 @@ function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack: () => 
             </DialogFooter>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
 
       <div className="mt-6 divide-y divide-border/40 rounded-lg border border-border/40 bg-card">
@@ -505,7 +880,21 @@ function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack: () => 
                 </Link>
                 <ExternalLink className="h-3 w-3" />
               </div>
-              <div className="text-xs text-muted-foreground">{new Date(ch.created_at).toLocaleDateString()}</div>
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <span>{new Date(ch.created_at).toLocaleDateString()}</span>
+                {ch.scanlation_group && (
+                  <>
+                    <span>•</span>
+                    <span className="text-violet-600">{ch.scanlation_group}</span>
+                  </>
+                )}
+                {ch.uploaded_by && (
+                  <>
+                    <span>•</span>
+                    <span>by {ch.uploaded_by}</span>
+                  </>
+                )}
+              </div>
             </div>
             <Button variant="ghost" size="icon" onClick={() => openChapterEdit(ch)} title="Edit Chapter">
               <Pencil className="h-4 w-4" />
@@ -527,7 +916,7 @@ function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack: () => 
         ))}
       </div>
 
-      <Dialog open={!!editingChapter} onOpenChange={(v) => { if (!v) { setEditingChapter(null); setForm({ chapter_number: "", title: "", image_urls: "", status: "published", scheduled_at: "" }); } }}>
+      <Dialog open={!!editingChapter} onOpenChange={(v) => { if (!v) { setEditingChapter(null); setForm({ chapter_number: "", title: "", image_urls: "", chapter_url: "", status: "published", scheduled_at: "", uploaded_by: "", scanlation_group: "" }); } }}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>Edit Chapter</DialogTitle></DialogHeader>
           <div className="space-y-4">
@@ -551,6 +940,40 @@ function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack: () => 
             <div>
               <Label>Chapter Title</Label>
               <Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>Uploaded By</Label>
+                <Input value={form.uploaded_by} onChange={(e) => setForm({ ...form, uploaded_by: e.target.value })} placeholder="Uploader name" />
+              </div>
+              <div>
+                <Label>Scanlation Group</Label>
+                {scanlationGroups.data && scanlationGroups.data.length > 0 ? (
+                  <Select value={form.scanlation_group} onValueChange={(v) => setForm({ ...form, scanlation_group: v === "custom" ? "" : v })}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select or add new" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {scanlationGroups.data.map((group) => (
+                        <SelectItem key={group} value={group}>
+                          {group}
+                        </SelectItem>
+                      ))}
+                      <SelectItem value="custom">+ Add New Group</SelectItem>
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <Input value={form.scanlation_group} onChange={(e) => setForm({ ...form, scanlation_group: e.target.value })} placeholder="Group/Team name" />
+                )}
+                {scanlationGroups.data && scanlationGroups.data.length > 0 && form.scanlation_group === "" && (
+                  <Input 
+                    placeholder="Enter new group name" 
+                    value={form.scanlation_group} 
+                    onChange={(e) => setForm({ ...form, scanlation_group: e.target.value })}
+                    className="mt-2"
+                  />
+                )}
+              </div>
             </div>
             <div>
               <Label>Image URLs (one per line) *</Label>
