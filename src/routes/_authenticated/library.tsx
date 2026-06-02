@@ -56,7 +56,7 @@ function LibraryPage() {
   };
 
   return (
-    <div className="container mx-auto px-4 py-8">
+    <div className="container mx-auto px-8 py-8">
       <h1 className="text-2xl font-bold tracking-tight md:text-3xl">My Library</h1>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-6">

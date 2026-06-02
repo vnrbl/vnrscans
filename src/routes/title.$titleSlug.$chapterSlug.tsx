@@ -1,11 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { useEffect, useState, useRef, useCallback } from "react";
-<<<<<<< HEAD
 import { ChevronLeft, ChevronRight, ArrowLeft, BookOpen, Home, List, Maximize, Minimize, Flag, ZoomIn, ZoomOut, Heart, Smile, ThumbsUp, Laugh, Star, MessageSquare } from "lucide-react";
-=======
-import { ChevronLeft, ChevronRight, ArrowLeft, BookOpen, Home, List, Maximize, Minimize, Flag } from "lucide-react";
->>>>>>> cddd9cd718aae83733e3c2c4a2ac8b171c655b8d
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -318,7 +314,7 @@ function Reader() {
         }`}
       >
         <nav className="sticky bottom-0 z-30 border-t border-border/50 bg-background/90 backdrop-blur md:hidden">
-          <div className="container mx-auto flex items-center justify-between gap-2 px-4 py-3">
+          <div className="container mx-auto flex items-center justify-between gap-2 px-8 py-3">
             <Button
               variant="outline"
               size="sm"
@@ -387,7 +383,7 @@ function ReaderTopBar({
 
   return (
     <header className="sticky top-0 z-30 border-b border-border/50 bg-background/90 backdrop-blur">
-      <div className="container mx-auto flex items-center justify-between gap-2 px-4 py-3">
+      <div className="container mx-auto flex items-center justify-between gap-2 px-8 py-3">
         <Link to="/title/$slug" params={{ slug: seriesSlug }} className="flex min-w-0 items-center gap-2 text-sm">
           <ArrowLeft className="h-4 w-4" />
           <div className="min-w-0">

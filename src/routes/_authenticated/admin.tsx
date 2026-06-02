@@ -25,7 +25,7 @@ function AdminLayout() {
     { to: "/admin/users", label: "Users", icon: Users },
   ];
   return (
-    <div className="container mx-auto grid gap-6 px-4 py-6 md:grid-cols-[200px_1fr]">
+    <div className="container mx-auto grid gap-6 px-8 py-6 md:grid-cols-[200px_1fr]">
       <aside className="md:sticky md:top-20 md:self-start">
         <nav className="rounded-lg border border-border/40 bg-card p-2">
           {items.map((it) => (

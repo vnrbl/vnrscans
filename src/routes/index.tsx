@@ -36,7 +36,7 @@ function Home() {
       <section className="relative overflow-hidden bg-gradient-to-br from-background via-violet-950/10 to-background py-20 md:py-32">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(139,92,246,0.1),transparent_50%)]" />
         
-        <div className="container relative mx-auto px-4 text-center">
+        <div className="container relative mx-auto px-8 text-center">
           <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-violet-500/20 bg-violet-500/10 px-4 py-2 backdrop-blur-sm">
             <div className="h-2 w-2 animate-pulse rounded-full bg-violet-400" />
             <span className="text-sm font-medium text-violet-400">Welcome to 0Verse</span>

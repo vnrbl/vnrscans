@@ -1,20 +1,13 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-<<<<<<< HEAD
-import { Star, BookOpen, Calendar, User, UserPlus, UserCheck, Users, ArrowUpDown, Search } from "lucide-react";
-=======
-import { Star, BookOpen, Calendar, User, UserPlus, UserCheck, Users } from "lucide-react";
->>>>>>> cddd9cd718aae83733e3c2c4a2ac8b171c655b8d
+import { Star, BookOpen, UserPlus, UserCheck, Users, ArrowUpDown, Search, Trophy, Flag, History, ChevronLeft, ChevronRight, Bookmark } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-<<<<<<< HEAD
 import { Input } from "@/components/ui/input";
 import React from "react";
-=======
->>>>>>> cddd9cd718aae83733e3c2c4a2ac8b171c655b8d
 import {
   Select,
   SelectContent,
@@ -22,6 +15,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useDragScroll, DRAG_SCROLL_CONTAINER_CLASS } from "@/hooks/useDragScroll";
+import { TITLE_CARD_WIDTH, TITLE_COVER_CLASS } from "@/components/titleCardStyles";
 
 export const Route = createFileRoute("/title/$slug")({
   head: ({ params }) => ({
@@ -29,13 +24,13 @@ export const Route = createFileRoute("/title/$slug")({
   }),
   component: SeriesDetail,
   notFoundComponent: () => (
-    <div className="container mx-auto px-4 py-16 text-center">
+    <div className="container mx-auto px-8 py-16 text-center">
       <h1 className="text-2xl font-bold">Series not found</h1>
       <Link to="/browse" className="text-primary">Back to browse</Link>
     </div>
   ),
   errorComponent: ({ error }) => (
-    <div className="container mx-auto px-4 py-16 text-center text-muted-foreground">
+    <div className="container mx-auto px-8 py-16 text-center text-muted-foreground">
       Couldn't load this series: {error.message}
     </div>
   ),
@@ -45,14 +40,11 @@ function SeriesDetail() {
   const { slug } = Route.useParams();
   const { user } = useAuth();
   const qc = useQueryClient();
-<<<<<<< HEAD
-  
+
   // Chapter filtering and ordering state
   const [selectedGroup, setSelectedGroup] = React.useState<string>("all");
   const [sortOrder, setSortOrder] = React.useState<"desc" | "asc">("desc");
   const [searchQuery, setSearchQuery] = React.useState<string>("");
-=======
->>>>>>> cddd9cd718aae83733e3c2c4a2ac8b171c655b8d
 
   const seriesQ = useQuery({
     queryKey: ["series", "detail", slug],
@@ -69,44 +61,40 @@ function SeriesDetail() {
   });
 
   const chaptersQ = useQuery({
-<<<<<<< HEAD
     queryKey: ["chapters", slug, selectedGroup, sortOrder],
     queryFn: async () => {
       if (!seriesQ.data) return [];
-      
+
       let query = supabase
         .from("chapters")
         .select("id,slug,chapter_number,title,chapter_type,created_at,status,scheduled_at,uploaded_by,scanlation_group")
         .eq("series_id", seriesQ.data.id)
         .eq("status", "published");
-      
-      // Filter by scanlation group if selected
+
       if (selectedGroup !== "all") {
         query = query.eq("scanlation_group", selectedGroup);
       }
-      
-      // Order by chapter number
+
       query = query.order("chapter_number", { ascending: sortOrder === "asc" });
-      
+
       const { data, error } = await query;
       if (error) throw error;
       return (data ?? []).filter((c) => !c.scheduled_at || new Date(c.scheduled_at) <= new Date());
     },
     enabled: !!seriesQ.data,
   });
-  
-  // Filter chapters by search query (client-side)
+
   const filteredChapters = React.useMemo(() => {
     if (!chaptersQ.data) return [];
     if (!searchQuery.trim()) return chaptersQ.data;
-    
+
     const query = searchQuery.toLowerCase();
     return chaptersQ.data.filter((c) => {
       const chapterNum = c.chapter_number?.toString() || "";
       const chapterTitle = c.title?.toLowerCase() || "";
       const uploader = ((c as any).uploaded_by || "").toLowerCase();
       const group = ((c as any).scanlation_group || "").toLowerCase();
-      
+
       return (
         chapterNum.includes(query) ||
         chapterTitle.includes(query) ||
@@ -115,36 +103,22 @@ function SeriesDetail() {
       );
     });
   }, [chaptersQ.data, searchQuery]);
-  
-  // Get unique scanlation groups for filtering
+
   const scanlationGroups = useQuery({
     queryKey: ["scanlation-groups", slug],
-=======
-    queryKey: ["chapters", slug],
->>>>>>> cddd9cd718aae83733e3c2c4a2ac8b171c655b8d
     queryFn: async () => {
       if (!seriesQ.data) return [];
       const { data, error } = await supabase
         .from("chapters")
-<<<<<<< HEAD
         .select("scanlation_group")
         .eq("series_id", seriesQ.data.id)
         .eq("status", "published")
         .not("scanlation_group", "is", null);
-      
+
       if (error) throw error;
-      
-      // Get unique groups
-      const uniqueGroups = [...new Set(data?.map(c => c.scanlation_group).filter(Boolean) ?? [])];
+
+      const uniqueGroups = [...new Set(data?.map((c) => c.scanlation_group).filter(Boolean) ?? [])];
       return uniqueGroups.sort();
-=======
-        .select("id,slug,chapter_number,title,chapter_type,created_at,status,scheduled_at")
-        .eq("series_id", seriesQ.data.id)
-        .eq("status", "published")
-        .order("chapter_number", { ascending: false });
-      if (error) throw error;
-      return (data ?? []).filter((c) => !c.scheduled_at || new Date(c.scheduled_at) <= new Date());
->>>>>>> cddd9cd718aae83733e3c2c4a2ac8b171c655b8d
     },
     enabled: !!seriesQ.data,
   });
@@ -305,6 +279,20 @@ function SeriesDetail() {
     enabled: !!user && !!seriesQ.data,
   });
 
+  const ratingsCount = useQuery({
+    queryKey: ["ratings-count", slug],
+    queryFn: async () => {
+      if (!seriesQ.data) return 0;
+      const { count, error } = await supabase
+        .from("ratings")
+        .select("*", { count: "exact", head: true })
+        .eq("series_id", seriesQ.data.id);
+      if (error) throw error;
+      return count ?? 0;
+    },
+    enabled: !!seriesQ.data,
+  });
+
   const setStatus = useMutation({
     mutationFn: async (status: string) => {
       if (!user || !seriesQ.data) throw new Error("Sign in to set status");
@@ -327,7 +315,7 @@ function SeriesDetail() {
   });
 
   if (seriesQ.isLoading) {
-    return <div className="container mx-auto px-4 py-12"><div className="h-96 animate-pulse rounded-lg bg-secondary" /></div>;
+    return <div className="container mx-auto px-8 py-12"><div className="h-96 animate-pulse rounded-lg bg-secondary" /></div>;
   }
   if (!seriesQ.data) return null;
   const s = seriesQ.data;
@@ -344,424 +332,552 @@ function SeriesDetail() {
   const readChapterNumber = isContinue
     ? lastReadChapter.chapter_number
     : firstChapter?.chapter_number;
-  const readButtonLabel = isContinue ? "Continue" : "Start reading";
+  const readButtonLabel = isContinue ? "Resume" : "Start reading";
   const readButtonText =
     readChapterNumber != null
-      ? `${readButtonLabel} · Ch. ${readChapterNumber}`
+      ? `${readButtonLabel} Ch. ${readChapterNumber}`
       : readButtonLabel;
 
+  const genres = ((s.series_genres as any[]) ?? [])
+    .map((sg) => sg.genre)
+    .filter(Boolean) as Array<{ id: string; name: string; slug: string }>;
+  const authors = splitNames(s.author);
+  const artists = splitNames(s.artist);
+  const contentRating = (s as { content_rating?: string }).content_rating;
+
   return (
-    <div>
-      <div className="relative">
-        {s.cover_url && (
-          <div className="absolute inset-0 h-72 overflow-hidden -z-10">
-            <img src={s.cover_url} alt="" className="h-full w-full object-cover opacity-20 blur-3xl" />
-            <div className="absolute inset-0 bg-gradient-to-b from-background/60 via-background/80 to-background" />
-          </div>
-        )}
-        <div className="container mx-auto px-4 pt-8">
-          <div className="flex flex-col gap-6 md:flex-row">
-            <div className="mx-auto w-44 shrink-0 md:mx-0">
-              <div className="aspect-[2/3] overflow-hidden rounded-lg border border-border/50 bg-secondary shadow-2xl">
-                {s.cover_url ? (
-                  <img src={s.cover_url} alt={s.title} className="h-full w-full object-cover" />
-                ) : (
-                  <div className="grid h-full place-items-center text-muted-foreground"><BookOpen /></div>
-                )}
-              </div>
-            </div>
-            <div className="flex-1">
-              <div className="flex items-start gap-3">
-                {seriesRank.data && (
-                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-violet-600 text-xl font-bold text-white shadow-lg">
-                    #{seriesRank.data}
-                  </div>
-                )}
-                <div className="flex-1 min-w-0">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Badge className="uppercase">{s.type}</Badge>
-                    <Badge variant="outline">{s.status}</Badge>
-                    {s.release_year && <Badge variant="outline">{s.release_year}</Badge>}
-                  </div>
-                  <h1 className="mt-3 text-3xl font-bold tracking-tight md:text-4xl">{s.title}</h1>
-                  {s.alternative_titles && <p className="mt-1 text-sm text-muted-foreground">{s.alternative_titles}</p>}
-                </div>
-              </div>
-              <div className="mt-3 flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
-                {s.author && <span className="flex items-center gap-1"><User className="h-3.5 w-3.5" />{s.author}</span>}
-                {s.artist && s.artist !== s.author && <span>Artist: {s.artist}</span>}
-                <span className="flex items-center gap-1"><Star className="h-3.5 w-3.5 fill-accent text-accent" />{Number(s.rating_average || 0).toFixed(2)}</span>
-                <span className="flex items-center gap-1"><Users className="h-3.5 w-3.5" />{followersCount.data?.toLocaleString() ?? 0} followers</span>
-              </div>
-              <div className="mt-4 flex flex-wrap gap-1.5">
-                {(s.series_genres as any[])?.map((sg) =>
-                  sg.genre ? (
-                    <Link key={sg.genre.id} to="/browse" search={{ genre: sg.genre.slug }}>
-                      <Badge variant="secondary" className="hover:bg-primary/20">{sg.genre.name}</Badge>
-                    </Link>
-                  ) : null
-                )}
-              </div>
-              {s.description && <p className="mt-4 max-w-2xl text-sm leading-relaxed text-muted-foreground">{s.description}</p>}
-
-              <div className="mt-6 flex flex-wrap gap-2">
-                {/* Show Follow button first if not following */}
-                {user && !isFollowing.data && (
-                  <Button
-                    className="bg-violet-600 hover:bg-violet-700"
-                    onClick={() => toggleFollow.mutate()}
-                  >
-                    <UserPlus className="mr-2 h-4 w-4" />
-                    Follow
-                  </Button>
-                )}
-
-                {/* Show reading button if following */}
-                {user && isFollowing.data && chaptersQ.data && chaptersQ.data.length > 0 && readChapterSlug && (
-                  <Link 
-                    to="/title/$titleSlug/$chapterSlug" 
-                    params={{ 
-                      titleSlug: slug,
-                      chapterSlug: readChapterSlug,
-                    }}
-                  >
-                    <Button className="bg-violet-600 hover:bg-violet-700">
-                      <BookOpen className="mr-2 h-4 w-4" />
-                      {readButtonText}
-                    </Button>
-                  </Link>
-                )}
-
-                {/* Show status selector only if following */}
-                {user && isFollowing.data && (
-                  <>
-                    <Select 
-                      value={libraryStatus.data ?? "reading"} 
-                      onValueChange={(v) => setStatus.mutate(v)}
-                    >
-                      <SelectTrigger className="w-[180px]">
-                        <SelectValue placeholder="Set Status" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="reading">Reading</SelectItem>
-                        <SelectItem value="completed">Completed</SelectItem>
-                        <SelectItem value="plan_to_read">Plan to Read</SelectItem>
-                        <SelectItem value="dropped">Dropped</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <Button
-                      variant="outline"
-                      onClick={() => toggleFollow.mutate()}
-                    >
-                      <UserCheck className="mr-2 h-4 w-4" />
-                      Following
-                    </Button>
-                  </>
-                )}
-
-                {/* Guest users */}
-                {!user && firstChapter && (
-                  <Link to="/title/$titleSlug/$chapterSlug" params={{ titleSlug: slug, chapterSlug: firstChapter.slug }}>
-                    <Button className="bg-violet-600 hover:bg-violet-700">
-                      <BookOpen className="mr-2 h-4 w-4" />
-                      {firstChapter.chapter_number != null
-                        ? `Start reading · Ch. ${firstChapter.chapter_number}`
-                        : "Start reading"}
-                    </Button>
-                  </Link>
-                )}
-              </div>
-
-              {user && (
-                <div className="mt-4 flex items-center gap-2">
-                  <span className="text-xs text-muted-foreground">Your rating:</span>
-                  {[1, 2, 3, 4, 5].map((n) => (
-                    <button key={n} onClick={() => rate.mutate(n)} aria-label={`Rate ${n}`}>
-                      <Star className={`h-5 w-5 transition ${(myRating.data ?? 0) >= n ? "fill-accent text-accent" : "text-muted-foreground hover:text-accent"}`} />
-                    </button>
-                  ))}
+    <div className="min-h-screen bg-background">
+      <div className="container mx-auto px-8 py-6 lg:py-8">
+        <div className="flex flex-col gap-8 lg:flex-row lg:gap-10">
+          {/* Left sidebar — cover & actions */}
+          <aside className="mx-auto w-full max-w-[220px] shrink-0 lg:mx-0">
+            <div className="overflow-hidden rounded-lg border border-border/50 bg-secondary shadow-xl">
+              {s.cover_url ? (
+                <img src={s.cover_url} alt={s.title} className="aspect-[2/3] w-full object-cover" />
+              ) : (
+                <div className="flex aspect-[2/3] items-center justify-center text-muted-foreground">
+                  <BookOpen className="h-12 w-12" />
                 </div>
               )}
             </div>
-          </div>
-        </div>
-      </div>
 
-      <div className="container mx-auto px-4 py-8">
-<<<<<<< HEAD
-        <div className="mb-4 flex flex-col gap-4">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <h2 className="flex items-center gap-2 text-xl font-bold">
-              <Calendar className="h-5 w-5 text-primary" />
-              Chapters
-            </h2>
-            
-            {/* Filters and Sort */}
-            <div className="flex flex-wrap gap-2">
-              {/* Scanlation Group Filter */}
-              {scanlationGroups.data && scanlationGroups.data.length > 0 && (
-                <Select value={selectedGroup} onValueChange={setSelectedGroup}>
-                  <SelectTrigger className="w-[180px]">
-                    <SelectValue placeholder="All Groups" />
+            <div className="mt-4 space-y-2">
+              {chaptersQ.data && chaptersQ.data.length > 0 && readChapterSlug && (
+                <Link
+                  to="/title/$titleSlug/$chapterSlug"
+                  params={{ titleSlug: slug, chapterSlug: readChapterSlug }}
+                  className="block"
+                >
+                  <Button className="h-11 w-full bg-violet-600 text-base font-semibold hover:bg-violet-700">
+                    <BookOpen className="mr-2 h-4 w-4" />
+                    {readButtonText}
+                  </Button>
+                </Link>
+              )}
+
+              {user && !isFollowing.data && (
+                <Button
+                  className="h-11 w-full bg-violet-600/90 font-semibold hover:bg-violet-700"
+                  onClick={() => toggleFollow.mutate()}
+                >
+                  <UserPlus className="mr-2 h-4 w-4" />
+                  Follow
+                </Button>
+              )}
+
+              {user && isFollowing.data && (
+                <Select
+                  value={libraryStatus.data ?? "reading"}
+                  onValueChange={(v) => setStatus.mutate(v)}
+                >
+                  <SelectTrigger className="h-11 w-full border-violet-600/40 bg-violet-600/10 font-semibold text-violet-400">
+                    <div className="flex items-center gap-2">
+                      <Bookmark className="h-4 w-4" />
+                      <SelectValue placeholder="Reading" />
+                    </div>
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All Groups</SelectItem>
-                    {scanlationGroups.data.map((group) => (
-                      <SelectItem key={group} value={group}>
-                        {group}
-                      </SelectItem>
-                    ))}
+                    <SelectItem value="reading">Reading</SelectItem>
+                    <SelectItem value="completed">Completed</SelectItem>
+                    <SelectItem value="plan_to_read">Plan to Read</SelectItem>
+                    <SelectItem value="dropped">Dropped</SelectItem>
                   </SelectContent>
                 </Select>
               )}
-              
-              {/* Sort Order */}
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setSortOrder(prev => prev === "desc" ? "asc" : "desc")}
-                className="gap-2"
-              >
-                <ArrowUpDown className="h-4 w-4" />
-                {sortOrder === "desc" ? "Newest First" : "Oldest First"}
-              </Button>
-            </div>
-          </div>
-          
-          {/* Search Bar */}
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              type="text"
-              placeholder="Search chapters by number, title, uploader, or group..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9"
-            />
-          </div>
-        </div>
-        
-        {chaptersQ.isLoading ? (
-          <div className="space-y-2">{Array.from({ length: 6 }).map((_, i) => <div key={i} className="h-12 animate-pulse rounded bg-secondary/50" />)}</div>
-        ) : !filteredChapters || filteredChapters.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-border/50 p-8 text-center text-sm text-muted-foreground">
-            {searchQuery ? (
-              <>No chapters found matching "{searchQuery}"</>
-            ) : selectedGroup !== "all" ? (
-              <>No chapters from {selectedGroup}. Try selecting "All Groups".</>
-            ) : (
-              <>No chapters yet. Check back soon.</>
-            )}
-          </div>
-        ) : (
-          <div className="overflow-x-auto rounded-lg border border-border/40 bg-card">
-            <table className="w-full">
-              <thead className="border-b border-border/40 bg-secondary/30">
-                <tr>
-                  <th className="px-4 py-3 text-left text-sm font-semibold">Chapter</th>
-                  <th className="px-4 py-3 text-left text-sm font-semibold hidden md:table-cell">Uploaded By</th>
-                  <th className="px-4 py-3 text-left text-sm font-semibold hidden md:table-cell">Group</th>
-                  <th className="px-4 py-3 text-left text-sm font-semibold">Upload Date</th>
-                  <th className="px-4 py-3 text-right text-sm font-semibold hidden sm:table-cell">Type</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border/40">
-                {filteredChapters.map((c) => {
-                  const isRead = readChapters.data?.has(c.id) ?? false;
-                  const isNew = new Date(c.created_at) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-                  const showNewBadge = isNew && !isRead;
-                  
-                  return (
-                    <tr key={c.id} className="transition hover:bg-secondary/40">
-                      <td className="px-4 py-3">
-                        <Link
-                          to="/title/$titleSlug/$chapterSlug"
-                          params={{ titleSlug: slug, chapterSlug: c.slug }}
-                          className="flex items-center gap-2"
-                        >
-                          <div className={`font-medium ${isRead ? "" : ""}`} style={isRead ? { color: "#7f22fe" } : {}}>
-                            Chapter {c.chapter_number}{c.title ? ` — ${c.title}` : ""}
-                          </div>
-                          {showNewBadge && (
-                            <Badge className="bg-violet-600 hover:bg-violet-700 text-white uppercase text-xs">
-                              NEW
-                            </Badge>
-                          )}
-                        </Link>
-                      </td>
-                      <td className="px-4 py-3 hidden md:table-cell">
-                        <span className="text-sm text-muted-foreground">
-                          {(c as any).uploaded_by || "—"}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 hidden md:table-cell">
-                        {(c as any).scanlation_group ? (
-                          <span className="text-sm font-medium text-violet-600">
-                            {(c as any).scanlation_group}
-                          </span>
-                        ) : (
-                          <span className="text-sm text-muted-foreground">—</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className="text-sm text-muted-foreground">
-                          {new Date(c.created_at).toLocaleDateString()}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-right hidden sm:table-cell">
-                        <Badge variant="outline" className="uppercase text-xs">
-                          {c.chapter_type === "novel" ? "Novel" : "Pages"}
-                        </Badge>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-=======
-        <h2 className="mb-4 flex items-center gap-2 text-xl font-bold"><Calendar className="h-5 w-5 text-primary" />Chapters</h2>
-        {chaptersQ.isLoading ? (
-          <div className="space-y-2">{Array.from({ length: 6 }).map((_, i) => <div key={i} className="h-12 animate-pulse rounded bg-secondary/50" />)}</div>
-        ) : !chaptersQ.data || chaptersQ.data.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-border/50 p-8 text-center text-sm text-muted-foreground">No chapters yet. Check back soon.</div>
-        ) : (
-          <div className="divide-y divide-border/40 rounded-lg border border-border/40 bg-card">
-            {chaptersQ.data.map((c) => {
-              const isRead = readChapters.data?.has(c.id) ?? false;
-              const isNew = new Date(c.created_at) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000); // 7 days
-              const showNewBadge = isNew && !isRead; // Only show NEW if not read
-              
-              return (
-                <Link
-                  key={c.id}
-                  to="/title/$titleSlug/$chapterSlug"
-                  params={{ titleSlug: slug, chapterSlug: c.slug }}
-                  className="flex items-center gap-3 px-4 py-3 transition hover:bg-secondary/40"
-                >
-                  <div className="flex-1">
-                    <div className={`font-medium ${isRead ? "" : ""}`} style={isRead ? { color: "#7f22fe" } : {}}>
-                      Chapter {c.chapter_number}{c.title ? ` — ${c.title}` : ""}
-                    </div>
-                    <div className="text-xs text-muted-foreground">{new Date(c.created_at).toLocaleDateString()}</div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {showNewBadge && (
-                      <Badge className="bg-violet-600 hover:bg-violet-700 text-white uppercase text-xs">
-                        NEW
-                      </Badge>
-                    )}
-                    <Badge variant="outline" className="uppercase">{c.chapter_type === "novel" ? "Novel" : "Pages"}</Badge>
-                  </div>
-                </Link>
-              );
-            })}
->>>>>>> cddd9cd718aae83733e3c2c4a2ac8b171c655b8d
-          </div>
-        )}
-      </div>
 
-      {/* Recommendations Section */}
-      <RecommendationsSection currentSeriesId={s.id} genres={s.series_genres as any[]} />
+              {user && isFollowing.data && (
+                <Button
+                  variant="outline"
+                  className="h-10 w-full border-border/60"
+                  onClick={() => toggleFollow.mutate()}
+                >
+                  <UserCheck className="mr-2 h-4 w-4" />
+                  Following
+                </Button>
+              )}
+            </div>
+
+            {user && (
+              <div className="mt-5 flex justify-center gap-1">
+                {[1, 2, 3, 4, 5].map((n) => (
+                  <button key={n} onClick={() => rate.mutate(n)} aria-label={`Rate ${n}`}>
+                    <Star
+                      className={`h-5 w-5 transition ${
+                        (myRating.data ?? 0) >= n
+                          ? "fill-violet-500 text-violet-500"
+                          : "text-muted-foreground hover:text-violet-400"
+                      }`}
+                    />
+                  </button>
+                ))}
+              </div>
+            )}
+
+            <div className="mt-4 flex flex-col gap-1 text-center text-xs text-muted-foreground">
+              <button type="button" className="inline-flex items-center justify-center gap-1.5 hover:text-foreground">
+                <History className="h-3.5 w-3.5" />
+                Edit history
+              </button>
+              <button type="button" className="inline-flex items-center justify-center gap-1.5 hover:text-foreground">
+                <Flag className="h-3.5 w-3.5" />
+                Report
+              </button>
+            </div>
+          </aside>
+
+          {/* Right — metadata */}
+          <main className="min-w-0 flex-1">
+            <nav className="mb-3 flex items-center gap-1.5 text-xs uppercase tracking-wide text-muted-foreground">
+              <Link to="/home" className="hover:text-violet-400">
+                Home
+              </Link>
+              <span>/</span>
+              <Link to="/browse" search={{ type: s.type }} className="hover:text-violet-400">
+                {s.type}
+              </Link>
+            </nav>
+
+            <div className="mb-3 flex flex-wrap items-center gap-2">
+              <Badge variant="secondary" className="rounded-md uppercase">
+                {s.type}
+              </Badge>
+              {contentRating && (
+                <Badge
+                  className={`rounded-md uppercase ${
+                    contentRating === "safe"
+                      ? "bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600/30"
+                      : contentRating === "suggestive"
+                        ? "bg-amber-600/20 text-amber-400 hover:bg-amber-600/30"
+                        : "bg-red-600/20 text-red-400 hover:bg-red-600/30"
+                  }`}
+                >
+                  {contentRating}
+                </Badge>
+              )}
+              {s.release_year && (
+                <Badge variant="outline" className="rounded-md">
+                  {s.release_year}
+                </Badge>
+              )}
+              <Badge variant="outline" className="gap-1.5 rounded-md capitalize">
+                {s.status === "ongoing" && (
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                )}
+                {statusLabel(s.status)}
+              </Badge>
+            </div>
+
+            <h1 className="text-3xl font-bold tracking-tight md:text-4xl lg:text-[2.75rem] lg:leading-tight">
+              {s.title}
+            </h1>
+
+            {s.alternative_titles && (
+              <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{s.alternative_titles}</p>
+            )}
+
+            <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
+              {seriesRank.data && (
+                <span className="inline-flex items-center gap-1.5 rounded-md bg-violet-600/15 px-2.5 py-1 font-semibold text-violet-400">
+                  <Trophy className="h-4 w-4" />
+                  #{seriesRank.data.toLocaleString()}
+                </span>
+              )}
+              <span className="inline-flex items-center gap-1.5 text-muted-foreground">
+                <Star className="h-4 w-4 fill-violet-500 text-violet-500" />
+                <span className="font-medium text-foreground">
+                  {Number(s.rating_average || 0).toFixed(1)}
+                </span>
+                by {ratingsCount.data?.toLocaleString() ?? 0} users
+              </span>
+              <span className="inline-flex items-center gap-1.5 text-muted-foreground">
+                <Users className="h-4 w-4" />
+                <span className="font-medium text-foreground">
+                  {followersCount.data?.toLocaleString() ?? 0}
+                </span>{" "}
+                followed
+              </span>
+              <span className="text-muted-foreground">
+                <span className="font-medium text-foreground">{Number(s.view_count || 0).toLocaleString()}</span> views
+              </span>
+            </div>
+
+            {s.description && (
+              <div className="mt-5 max-w-3xl">
+                <ExpandableSynopsis text={s.description} />
+              </div>
+            )}
+
+            {genres.length > 0 && (
+              <MetaSection label="Genres">
+                {genres.map((genre) => (
+                  <MetaPill key={genre.id} href="/browse" search={{ genre: genre.slug }}>
+                    {genre.name}
+                  </MetaPill>
+                ))}
+              </MetaSection>
+            )}
+
+            {authors.length > 0 && (
+              <MetaSection label="Authors">
+                {authors.map((name) => (
+                  <MetaPill key={name}>{name}</MetaPill>
+                ))}
+              </MetaSection>
+            )}
+
+            {artists.length > 0 && (
+              <MetaSection label="Artists">
+                {artists.map((name) => (
+                  <MetaPill key={name}>{name}</MetaPill>
+                ))}
+              </MetaSection>
+            )}
+
+            <MetaSection label="Info">
+              <MetaPill>Updated {new Date(s.updated_at).toLocaleDateString()}</MetaPill>
+              {chaptersQ.data && (
+                <MetaPill>{chaptersQ.data.length} chapters</MetaPill>
+              )}
+              <MetaPill className="capitalize">{s.type}</MetaPill>
+            </MetaSection>
+          </main>
+        </div>
+
+        {/* Chapters + Recommendations */}
+        <div className="mt-10 grid gap-8 xl:grid-cols-[1fr_340px]">
+          <section>
+            <div className="mb-4 flex flex-col gap-4">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <h2 className="text-xl font-bold">Chapters</h2>
+
+                <div className="flex flex-wrap gap-2">
+                  {scanlationGroups.data && scanlationGroups.data.length > 0 && (
+                    <Select value={selectedGroup} onValueChange={setSelectedGroup}>
+                      <SelectTrigger className="w-[180px]">
+                        <SelectValue placeholder="All Groups" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Groups</SelectItem>
+                        {scanlationGroups.data.map((group) => (
+                          <SelectItem key={group} value={group}>
+                            {group}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setSortOrder((prev) => (prev === "desc" ? "asc" : "desc"))}
+                    className="gap-2"
+                  >
+                    <ArrowUpDown className="h-4 w-4" />
+                    {sortOrder === "desc" ? "Newest First" : "Oldest First"}
+                  </Button>
+                </div>
+              </div>
+
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  type="text"
+                  placeholder="Search chapters by number, title, uploader, or group..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
+            </div>
+
+            {chaptersQ.isLoading ? (
+              <div className="space-y-2">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <div key={i} className="h-12 animate-pulse rounded bg-secondary/50" />
+                ))}
+              </div>
+            ) : !filteredChapters || filteredChapters.length === 0 ? (
+              <div className="rounded-lg border border-dashed border-border/50 p-8 text-center text-sm text-muted-foreground">
+                {searchQuery ? (
+                  <>No chapters found matching "{searchQuery}"</>
+                ) : selectedGroup !== "all" ? (
+                  <>No chapters from {selectedGroup}. Try selecting "All Groups".</>
+                ) : (
+                  <>No chapters yet. Check back soon.</>
+                )}
+              </div>
+            ) : (
+              <div className="overflow-x-auto rounded-lg border border-border/40 bg-card">
+                <table className="w-full">
+                  <thead className="border-b border-border/40 bg-secondary/30">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-sm font-semibold">Chapter</th>
+                      <th className="hidden px-4 py-3 text-left text-sm font-semibold md:table-cell">Uploaded By</th>
+                      <th className="hidden px-4 py-3 text-left text-sm font-semibold md:table-cell">Group</th>
+                      <th className="px-4 py-3 text-left text-sm font-semibold">Upload Date</th>
+                      <th className="hidden px-4 py-3 text-right text-sm font-semibold sm:table-cell">Type</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border/40">
+                    {filteredChapters.map((c) => {
+                      const isRead = readChapters.data?.has(c.id) ?? false;
+                      const isNew = new Date(c.created_at) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+                      const showNewBadge = isNew && !isRead;
+
+                      return (
+                        <tr key={c.id} className="transition hover:bg-secondary/40">
+                          <td className="px-4 py-3">
+                            <Link
+                              to="/title/$titleSlug/$chapterSlug"
+                              params={{ titleSlug: slug, chapterSlug: c.slug }}
+                              className="flex items-center gap-2"
+                            >
+                              <span className="font-medium" style={isRead ? { color: "#7f22fe" } : undefined}>
+                                Chapter {c.chapter_number}
+                                {c.title ? ` — ${c.title}` : ""}
+                              </span>
+                              {showNewBadge && (
+                                <Badge className="bg-violet-600 text-xs uppercase text-white hover:bg-violet-700">
+                                  NEW
+                                </Badge>
+                              )}
+                            </Link>
+                          </td>
+                          <td className="hidden px-4 py-3 md:table-cell">
+                            <span className="text-sm text-muted-foreground">
+                              {(c as { uploaded_by?: string }).uploaded_by || "—"}
+                            </span>
+                          </td>
+                          <td className="hidden px-4 py-3 md:table-cell">
+                            {(c as { scanlation_group?: string }).scanlation_group ? (
+                              <span className="text-sm font-medium text-violet-600">
+                                {(c as { scanlation_group?: string }).scanlation_group}
+                              </span>
+                            ) : (
+                              <span className="text-sm text-muted-foreground">—</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className="text-sm text-muted-foreground">
+                              {new Date(c.created_at).toLocaleDateString()}
+                            </span>
+                          </td>
+                          <td className="hidden px-4 py-3 text-right sm:table-cell">
+                            <Badge variant="outline" className="text-xs uppercase">
+                              {c.chapter_type === "novel" ? "Novel" : "Pages"}
+                            </Badge>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
+
+          <RecommendationsSidebar currentSeriesId={s.id} genres={s.series_genres as any[]} />
+        </div>
+      </div>
     </div>
   );
 }
 
-// Recommendations Component
-function RecommendationsSection({ currentSeriesId, genres }: { currentSeriesId: string; genres: any[] }) {
+// Recommendations sidebar carousel
+function RecommendationsSidebar({ currentSeriesId, genres }: { currentSeriesId: string; genres: any[] }) {
   const genreSlugs = genres?.map((sg) => sg.genre?.slug).filter(Boolean) || [];
-  
+  const { scrollRef, scrollBy, dragHandlers } = useDragScroll<HTMLDivElement>();
+
   const recommendations = useQuery({
     queryKey: ["recommendations", currentSeriesId],
     queryFn: async () => {
-      // Get titles with similar genres
       const { data, error } = await supabase
         .from("series")
         .select("id,slug,title,cover_url,type,rating_average,status,series_genres(genre:genres(slug))")
         .neq("id", currentSeriesId)
         .order("rating_average", { ascending: false })
         .limit(50);
-      
+
       if (error) throw error;
-      
-      // Filter and score by genre similarity
+
       const scored = (data || []).map((title: any) => {
         const titleGenres = title.series_genres?.map((sg: any) => sg.genre?.slug).filter(Boolean) || [];
         const commonGenres = titleGenres.filter((g: string) => genreSlugs.includes(g));
-        return {
-          ...title,
-          score: commonGenres.length,
-        };
+        return { ...title, score: commonGenres.length };
       });
-      
-      // Sort by score and return top 12
+
       return scored
-        .filter(s => s.score > 0)
+        .filter((item) => item.score > 0)
         .sort((a, b) => b.score - a.score || (b.rating_average || 0) - (a.rating_average || 0))
         .slice(0, 12);
     },
   });
 
-  if (recommendations.isLoading) {
-    return (
-      <div className="container mx-auto px-4 py-8">
-        <h2 className="mb-4 text-xl font-bold">Similar Titles</h2>
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="aspect-[2/3] animate-pulse rounded-lg bg-secondary" />
+  return (
+    <aside className="min-w-0">
+      <div className="mb-4 flex items-center justify-between">
+        <h2 className="text-xl font-bold">Recommendations</h2>
+        {(recommendations.data?.length ?? 0) > 0 && (
+          <div className="hidden gap-1 md:flex">
+            <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => scrollBy("left")}>
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => scrollBy("right")}>
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
+      </div>
+
+      {recommendations.isLoading ? (
+        <div className="flex gap-3 overflow-hidden">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className={`${TITLE_CARD_WIDTH} shrink-0`}>
+              <div className={`${TITLE_COVER_CLASS} animate-pulse bg-secondary`} />
+            </div>
           ))}
         </div>
-      </div>
+      ) : !recommendations.data || recommendations.data.length === 0 ? (
+        <p className="text-sm text-muted-foreground">No similar titles found.</p>
+      ) : (
+        <div
+          ref={scrollRef}
+          {...dragHandlers}
+          className={DRAG_SCROLL_CONTAINER_CLASS}
+          style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+        >
+          {recommendations.data.map((title: any) => (
+            <Link
+              key={title.id}
+              to="/title/$slug"
+              params={{ slug: title.slug }}
+              className={`group ${TITLE_CARD_WIDTH} overflow-hidden rounded-lg border border-border/40 bg-card transition-all hover:border-primary/50 hover:shadow-lg`}
+            >
+              <div className={TITLE_COVER_CLASS}>
+                {title.cover_url ? (
+                  <img
+                    src={title.cover_url}
+                    alt={title.title}
+                    loading="lazy"
+                    className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                    draggable={false}
+                  />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center text-muted-foreground">
+                    <BookOpen className="h-8 w-8" />
+                  </div>
+                )}
+                {title.rating_average && Number(title.rating_average) > 0 ? (
+                  <div className="absolute bottom-2 right-2 flex items-center gap-1 rounded-md bg-background/80 px-1.5 py-0.5 text-xs backdrop-blur">
+                    <Star className="h-3 w-3 fill-violet-500 text-violet-500" />
+                    {Number(title.rating_average).toFixed(1)}
+                  </div>
+                ) : null}
+              </div>
+              <div className="p-2.5">
+                <h3 className="line-clamp-2 text-xs font-semibold leading-tight group-hover:text-violet-400">
+                  {title.title}
+                </h3>
+              </div>
+            </Link>
+          ))}
+        </div>
+      )}
+    </aside>
+  );
+}
+
+function MetaSection({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="mt-5">
+      <h3 className="mb-2.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">{label}</h3>
+      <div className="flex flex-wrap gap-2">{children}</div>
+    </div>
+  );
+}
+
+function MetaPill({
+  children,
+  href,
+  search,
+  className = "",
+}: {
+  children: React.ReactNode;
+  href?: string;
+  search?: Record<string, string>;
+  className?: string;
+}) {
+  const pillClass = `inline-flex rounded-md bg-secondary/70 px-3 py-1.5 text-sm text-foreground transition hover:bg-secondary ${className}`;
+
+  if (href) {
+    return (
+      <Link to={href} search={search} className={pillClass}>
+        {children}
+      </Link>
     );
   }
 
-  if (!recommendations.data || recommendations.data.length === 0) {
-    return null;
-  }
+  return <span className={pillClass}>{children}</span>;
+}
+
+function ExpandableSynopsis({ text }: { text: string }) {
+  const [expanded, setExpanded] = React.useState(false);
+  const isLong = text.length > 320;
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <h2 className="mb-4 text-xl font-bold">Similar Titles · Recommendations</h2>
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
-        {recommendations.data.map((title: any) => (
-          <Link
-            key={title.id}
-            to="/title/$slug"
-            params={{ slug: title.slug }}
-            className="group block overflow-hidden rounded-lg border border-border/40 bg-card transition-all hover:border-primary/50 hover:shadow-lg"
-          >
-            <div className="relative aspect-[2/3] overflow-hidden bg-secondary">
-              {title.cover_url ? (
-                <img
-                  src={title.cover_url}
-                  alt={title.title}
-                  loading="lazy"
-                  className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-                />
-              ) : (
-                <div className="flex h-full w-full items-center justify-center text-muted-foreground">
-                  <BookOpen className="h-10 w-10" />
-                </div>
-              )}
-              <div className="absolute left-2 top-2">
-                <Badge variant="secondary" className="bg-background/80 text-xs uppercase backdrop-blur">
-                  {title.type}
-                </Badge>
-              </div>
-              {title.rating_average && Number(title.rating_average) > 0 ? (
-                <div className="absolute right-2 bottom-2 flex items-center gap-1 rounded-md bg-background/80 px-1.5 py-0.5 text-xs backdrop-blur">
-                  <Star className="h-3 w-3 fill-accent text-accent" />
-                  {Number(title.rating_average).toFixed(1)}
-                </div>
-              ) : null}
-            </div>
-            <div className="p-3">
-              <h3 className="line-clamp-2 text-sm font-semibold leading-tight text-foreground group-hover:text-primary">
-                {title.title}
-              </h3>
-            </div>
-          </Link>
-        ))}
-      </div>
-    </div>
+    <p className="text-sm leading-relaxed text-muted-foreground">
+      {expanded || !isLong ? text : `${text.slice(0, 320).trim()}…`}
+      {isLong && (
+        <button
+          type="button"
+          onClick={() => setExpanded((prev) => !prev)}
+          className="ml-1 font-medium text-violet-400 hover:text-violet-300 hover:underline"
+        >
+          [{expanded ? "view less" : "view more"}]
+        </button>
+      )}
+    </p>
   );
+}
+
+function splitNames(value: string | null | undefined): string[] {
+  if (!value) return [];
+  return value
+    .split(/[,;/|]/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
+function statusLabel(status: string): string {
+  switch (status) {
+    case "ongoing":
+      return "Releasing";
+    case "completed":
+      return "Completed";
+    case "hiatus":
+      return "Hiatus";
+    default:
+      return status;
+  }
 }

@@ -30,7 +30,7 @@ export function Navbar() {
 
   return (
     <header className="sticky top-0 z-40 border-b border-border/50 bg-background/95 backdrop-blur-md supports-[backdrop-filter]:bg-background/60">
-      <div className="container mx-auto flex h-16 items-center justify-between px-4">
+      <div className="container mx-auto flex h-16 items-center justify-between px-8">
         <Link to="/" className="flex items-center gap-2 transition-transform hover:scale-105">
           <div className="relative grid h-10 w-10 place-items-center rounded-lg bg-primary">
             <span className="text-lg font-bold text-primary-foreground">0V</span>
@@ -98,7 +98,7 @@ export function Navbar() {
 
       {open && (
         <div className="border-t border-border/50 md:hidden">
-          <nav className="container mx-auto flex flex-col px-4 py-2">
+          <nav className="container mx-auto flex flex-col px-8 py-2">
             {links.map((l) => (
               <Link
                 key={l.to}

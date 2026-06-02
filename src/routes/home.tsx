@@ -7,7 +7,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { useDragScroll } from "@/hooks/useDragScroll";
+import { useDragScroll, DRAG_SCROLL_CONTAINER_CLASS } from "@/hooks/useDragScroll";
 import { TITLE_CARD_WIDTH, TITLE_COVER_CLASS } from "@/components/titleCardStyles";
 
 export const Route = createFileRoute("/home")({
@@ -125,7 +125,7 @@ function HomePage() {
     <div className="min-h-screen">
       {/* Featured Section */}
       {featured.data && featured.data.length > 0 && (
-        <section className="container mx-auto px-4 py-8">
+        <section className="container mx-auto px-8 py-8">
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             {featured.data.map((series) => (
               <Link key={series.id} to="/title/$slug" params={{ slug: series.slug }}>
@@ -259,7 +259,7 @@ function ChapterCarouselSection({
   const { scrollRef, scrollBy, dragHandlers } = useDragScroll<HTMLDivElement>();
 
   return (
-    <section className="container mx-auto px-4 py-8">
+    <section className="container mx-auto px-8 py-8">
       <div className="mb-6 flex items-center justify-between">
         <div>
           <div className="flex items-center gap-2">
@@ -308,7 +308,7 @@ function ChapterCarouselSection({
         <div
           ref={scrollRef}
           {...dragHandlers}
-          className="flex cursor-grab gap-4 overflow-x-auto pb-4 scrollbar-hide select-none active:cursor-grabbing"
+          className={DRAG_SCROLL_CONTAINER_CLASS}
           style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
         >
           {chapters.map((chapter) => (
@@ -351,7 +351,7 @@ function SeriesCarouselSection({
   const { scrollRef, scrollBy, dragHandlers } = useDragScroll<HTMLDivElement>();
 
   return (
-    <section className="container mx-auto px-4 py-8">
+    <section className="container mx-auto px-8 py-8">
       <div className="mb-6 flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold">{title}</h2>
@@ -397,7 +397,7 @@ function SeriesCarouselSection({
         <div
           ref={scrollRef}
           {...dragHandlers}
-          className="flex cursor-grab gap-4 overflow-x-auto pb-4 scrollbar-hide select-none active:cursor-grabbing"
+          className={DRAG_SCROLL_CONTAINER_CLASS}
           style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
         >
           {series.map((item) => (
@@ -406,7 +406,6 @@ function SeriesCarouselSection({
               to="/title/$slug"
               params={{ slug: item.slug }}
               className={`group ${TITLE_CARD_WIDTH} overflow-hidden rounded-lg border border-border/40 bg-card transition-all hover:border-primary/50 hover:shadow-lg`}
-              onDragStart={(e) => e.preventDefault()}
             >
               <div className={TITLE_COVER_CLASS}>
                 {item.cover_url ? (
@@ -471,7 +470,7 @@ function ChapterFeedSection({
   linkVariant: "split" | "seriesOnly";
 }) {
   return (
-    <section className="container mx-auto px-4 py-8">
+    <section className="container mx-auto px-8 py-8">
       <div className="mb-6">
         <div className="flex items-center gap-2">
           {icon}

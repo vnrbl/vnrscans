@@ -3,7 +3,7 @@ import { createFileRoute } from "@tanstack/react-router";
 export const Route = createFileRoute("/contact")({
   head: () => ({ meta: [{ title: "Contact — ShadowShelf" }] }),
   component: () => (
-    <div className="container mx-auto max-w-3xl px-4 py-12">
+    <div className="container mx-auto max-w-3xl px-8 py-12">
       <h1 className="text-3xl font-bold tracking-tight">Contact</h1>
       <p className="mt-4 text-muted-foreground">
         For partnership, submission, or licensing inquiries, email{" "}

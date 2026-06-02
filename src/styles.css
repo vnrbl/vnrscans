@@ -140,6 +140,12 @@
   --sidebar-ring: oklch(0.68 0.22 305 / 0.6);
 }
 
+@layer components {
+  .page-container {
+    @apply container mx-auto px-8;
+  }
+}
+
 @layer base {
   * {
     border-color: var(--color-border);

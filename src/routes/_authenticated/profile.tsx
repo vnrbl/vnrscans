@@ -50,7 +50,7 @@ function ProfilePage() {
   });
 
   return (
-    <div className="container mx-auto max-w-xl px-4 py-8">
+    <div className="container mx-auto max-w-xl px-8 py-8">
       <h1 className="text-2xl font-bold tracking-tight">Profile</h1>
       <form onSubmit={(e) => { e.preventDefault(); save.mutate(); }} className="mt-6 space-y-4">
         <div>
