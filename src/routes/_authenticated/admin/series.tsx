@@ -42,6 +42,7 @@ type SeriesForm = {
   is_featured: boolean;
   is_trending: boolean;
   is_hidden: boolean;
+  chapter_count: string;
 };
 
 const emptySeriesForm: SeriesForm = {
@@ -57,6 +58,7 @@ const emptySeriesForm: SeriesForm = {
   is_featured: false,
   is_trending: false,
   is_hidden: false,
+  chapter_count: "",
 };
 
 function seriesToForm(series: any): SeriesForm {
@@ -73,6 +75,7 @@ function seriesToForm(series: any): SeriesForm {
     is_featured: Boolean(series.is_featured),
     is_trending: Boolean(series.is_trending),
     is_hidden: Boolean(series.is_hidden),
+    chapter_count: String(series.chapter_count || 0),
   };
 }
 
@@ -91,6 +94,7 @@ function seriesPayloadFromForm(form: SeriesForm) {
     is_featured: form.is_featured,
     is_trending: form.is_trending,
     is_hidden: form.is_hidden,
+    chapter_count: form.chapter_count ? parseInt(form.chapter_count, 10) : null,
     updated_at: new Date().toISOString(),
   };
 }
@@ -110,15 +114,24 @@ function AdminSeries() {
         .order("updated_at", { ascending: false });
       if (error) throw error;
       
-      // Get all chapters and count unique base chapter numbers
+      // For series without manual chapter count, calculate from actual chapters
       const seriesWithChapters = await Promise.all(
         (seriesData ?? []).map(async (s: any) => {
+          // If chapter_count is manually set and > 0, use it
+          if (s.chapter_count && s.chapter_count > 0) {
+            return {
+              ...s,
+              chapter_count: s.chapter_count,
+            };
+          }
+          
+          // Otherwise, calculate from actual chapters
           const { data: chapters } = await supabase
             .from("chapters")
             .select("chapter_number")
             .eq("series_id", s.id);
           
-          // Get unique base chapter numbers (floor of each chapter number)
+          // Get unique base chapter numbers
           const uniqueChapters = new Set(
             (chapters ?? []).map((ch) => Math.floor(ch.chapter_number))
           );
@@ -289,7 +302,10 @@ function SeriesFormFields({ form, setForm }: { form: SeriesForm; setForm: (form:
         <div><Label>Artist</Label><Input value={form.artist} onChange={(e) => setForm({ ...form, artist: e.target.value })} placeholder="Artist name" /></div>
       </div>
 
-      <div><Label>Release Year</Label><Input type="number" value={form.release_year} onChange={(e) => setForm({ ...form, release_year: e.target.value })} placeholder="2024" /></div>
+      <div className="grid grid-cols-2 gap-3">
+        <div><Label>Release Year</Label><Input type="number" value={form.release_year} onChange={(e) => setForm({ ...form, release_year: e.target.value })} placeholder="2024" /></div>
+        <div><Label>Chapter Count</Label><Input type="number" value={form.chapter_count} onChange={(e) => setForm({ ...form, chapter_count: e.target.value })} placeholder="0" /></div>
+      </div>
       <div><Label>Cover URL</Label><Input value={form.cover_url} onChange={(e) => setForm({ ...form, cover_url: e.target.value })} placeholder="https://example.com/cover.jpg" /></div>
       <div><Label>Alternative Titles</Label><Input value={form.alternative_titles} onChange={(e) => setForm({ ...form, alternative_titles: e.target.value })} placeholder="Alt title 1, Alt title 2" /></div>
       <div><Label>Description</Label><Textarea rows={4} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Enter title description..." /></div>
@@ -678,7 +694,7 @@ function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack: () => 
                   <div>
                     <Label>Uploaded By</Label>
                     <Input placeholder="Uploader name" value={form.uploaded_by} onChange={(e) => setForm({ ...form, uploaded_by: e.target.value })} />
-                    <p className="text-xs text-muted-foreground mt-1">Auto-filled with your email</p>
+                    <p className="text-xs text-muted-foreground mt-1">Auto-filled with your username</p>
                   </div>
                   <div>
                     <Label>Scanlation Group (Optional)</Label>
@@ -824,7 +840,7 @@ function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack: () => 
                 <div>
                   <Label>Uploaded By</Label>
                   <Input placeholder="Uploader name" value={form.uploaded_by} onChange={(e) => setForm({ ...form, uploaded_by: e.target.value })} />
-                  <p className="text-xs text-muted-foreground mt-1">Auto-filled with your email</p>
+                  <p className="text-xs text-muted-foreground mt-1">Auto-filled with your username</p>
                 </div>
                 <div>
                   <Label>Scanlation Group (Optional)</Label>
