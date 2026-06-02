@@ -17,17 +17,6 @@ export const Route = createFileRoute("/")({
   component: Home,
 });
 
-function useSeriesQuery(key: string, build: (q: ReturnType<typeof supabase.from<"series", any>>) => any) {
-  return useQuery({
-    queryKey: ["series", key],
-    queryFn: async () => {
-      const { data, error } = await build(supabase.from("series"));
-      if (error) throw error;
-      return data ?? [];
-    },
-  });
-}
-
 function Section({ title, icon: Icon, to, children }: { title: string; icon: any; to?: string; children: React.ReactNode }) {
   return (
     <section className="py-8">
