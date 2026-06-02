@@ -553,8 +553,16 @@ function SeriesDetail() {
 
             <MetaSection label="Info">
               <MetaPill>Updated {new Date(s.updated_at).toLocaleDateString()}</MetaPill>
-              {chaptersQ.data && (
-                <MetaPill>{chaptersQ.data.length} chapters</MetaPill>
+              {uniqueChapterCount > 0 && (
+                <button
+                  onClick={() => {
+                    const chaptersSection = document.getElementById('chapters-section');
+                    chaptersSection?.scrollIntoView({ behavior: 'smooth' });
+                  }}
+                  className="inline-flex items-center rounded-full bg-secondary px-3 py-1.5 text-sm font-medium text-secondary-foreground transition-colors hover:bg-primary hover:text-primary-foreground"
+                >
+                  {uniqueChapterCount} chapters
+                </button>
               )}
               <MetaPill className="capitalize">{s.type}</MetaPill>
             </MetaSection>
@@ -563,7 +571,7 @@ function SeriesDetail() {
 
         {/* Chapters + Recommendations */}
         <div className="mt-10 grid gap-8 xl:grid-cols-[1fr_340px]">
-          <section>
+          <section id="chapters-section">
             <div className="mb-4 flex flex-col gap-4">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <h2 className="text-xl font-bold">

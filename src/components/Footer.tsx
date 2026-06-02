@@ -5,7 +5,7 @@ export function Footer() {
     <footer className="border-t border-border/50 bg-secondary/20">
       <div className="container mx-auto px-8 py-8">
         <div className="flex flex-col items-center justify-center gap-4 text-center">
-          <Link to="/" className="flex items-center gap-2 transition-transform hover:scale-105">
+          <Link to="/home" className="flex items-center gap-2 transition-transform hover:scale-105">
             <div className="relative grid h-10 w-10 place-items-center rounded-lg bg-violet-600">
               <span className="text-lg font-bold text-white">0V</span>
             </div>

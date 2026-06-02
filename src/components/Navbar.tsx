@@ -31,7 +31,7 @@ export function Navbar() {
   return (
     <header className="sticky top-0 z-40 border-b border-border/50 bg-background/95 backdrop-blur-md supports-[backdrop-filter]:bg-background/60">
       <div className="container mx-auto flex h-16 items-center justify-between px-8">
-        <Link to="/" className="flex items-center gap-2 transition-transform hover:scale-105">
+        <Link to="/home" className="flex items-center gap-2 transition-transform hover:scale-105">
           <div className="relative grid h-10 w-10 place-items-center rounded-lg bg-primary">
             <span className="text-lg font-bold text-primary-foreground">0V</span>
           </div>

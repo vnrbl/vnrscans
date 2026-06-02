@@ -42,15 +42,91 @@ function Reader() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [controlsVisible, setControlsVisible] = useState(true);
 
+  // Scroll position management
+  const scrollPositionKey = `scroll-${titleSlug}-${chapterSlug}`;
+
+  // Save scroll position periodically
+  useEffect(() => {
+    const saveScrollPosition = () => {
+      const scrollY = window.scrollY;
+      localStorage.setItem(scrollPositionKey, scrollY.toString());
+    };
+
+    const handleScroll = () => {
+      // Throttle scroll saving to avoid too many localStorage writes
+      clearTimeout((window as any).scrollSaveTimeout);
+      (window as any).scrollSaveTimeout = setTimeout(saveScrollPosition, 500);
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    
+    // Save on page unload
+    window.addEventListener('beforeunload', saveScrollPosition);
+
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      window.removeEventListener('beforeunload', saveScrollPosition);
+      clearTimeout((window as any).scrollSaveTimeout);
+    };
+  }, [scrollPositionKey]);
+
+  // Restore scroll position when chapter loads
+  useEffect(() => {
+    if (chapterQ.data) {
+      const savedPosition = localStorage.getItem(scrollPositionKey);
+      if (savedPosition) {
+        const scrollY = parseInt(savedPosition, 10);
+        // Small delay to ensure content is rendered
+        setTimeout(() => {
+          window.scrollTo({ top: scrollY, behavior: 'smooth' });
+          console.log(`Restored scroll position to ${scrollY}px for ${titleSlug}/${chapterSlug}`);
+        }, 100);
+      }
+    }
+  }, [chapterQ.data, scrollPositionKey, titleSlug, chapterSlug]);
+
   const chapterQ = useQuery({
-    queryKey: ["chapter", chapterSlug],
+    queryKey: ["chapter", titleSlug, chapterSlug],
     queryFn: async () => {
+      console.log(`Loading chapter: titleSlug=${titleSlug}, chapterSlug=${chapterSlug}`);
+      
+      // First get the series to ensure it exists
+      const { data: seriesData, error: seriesError } = await supabase
+        .from("series")
+        .select("id, slug, title, type")
+        .eq("slug", titleSlug)
+        .single();
+      
+      if (seriesError) {
+        console.error(`Series error for slug ${titleSlug}:`, seriesError);
+        throw seriesError;
+      }
+      if (!seriesData) {
+        console.error(`No series found for slug: ${titleSlug}`);
+        throw new Error(`Series "${titleSlug}" not found`);
+      }
+
+      console.log(`Found series: ${seriesData.title} (ID: ${seriesData.id})`);
+
+      // Then get the chapter that belongs to this series
       const { data, error } = await supabase
         .from("chapters")
         .select("*, series:series(id,slug,title,type)")
         .eq("slug", chapterSlug)
+        .eq("series_id", seriesData.id)
         .maybeSingle();
-      if (error) throw error;
+      
+      if (error) {
+        console.error(`Chapter error for slug ${chapterSlug} in series ${seriesData.id}:`, error);
+        throw error;
+      }
+      
+      if (!data) {
+        console.error(`No chapter found: chapterSlug=${chapterSlug}, seriesId=${seriesData.id}`);
+        throw new Error(`Chapter "${chapterSlug}" not found in series "${seriesData.title}"`);
+      }
+
+      console.log(`Found chapter: Ch.${data.chapter_number} in ${data.series?.title} (Chapter ID: ${data.id})`);
       return data;
     },
   });
@@ -72,13 +148,18 @@ function Reader() {
   const siblingsQ = useQuery({
     queryKey: ["chapter-siblings", chapterQ.data?.series?.id],
     queryFn: async () => {
+      console.log(`Loading siblings for series ID: ${chapterQ.data!.series!.id}`);
       const { data, error } = await supabase
         .from("chapters")
         .select("id,slug,chapter_number")
         .eq("series_id", chapterQ.data!.series!.id)
         .eq("status", "published")
         .order("chapter_number");
-      if (error) throw error;
+      if (error) {
+        console.error("Siblings query error:", error);
+        throw error;
+      }
+      console.log(`Found ${data?.length || 0} sibling chapters`);
       return data ?? [];
     },
     enabled: !!chapterQ.data?.series?.id,
@@ -87,12 +168,16 @@ function Reader() {
   // Save reading history
   useEffect(() => {
     if (!user || !chapterQ.data) return;
+    
+    // Save reading progress with scroll position
+    const currentScrollPosition = window.scrollY;
+    
     supabase.from("reading_history").upsert(
       {
         user_id: user.id,
         series_id: chapterQ.data.series_id,
         chapter_id: chapterQ.data.id,
-        progress: 0,
+        progress: currentScrollPosition, // Store scroll position as progress
         updated_at: new Date().toISOString(),
       },
       { onConflict: "user_id,chapter_id" } as any
@@ -123,15 +208,19 @@ function Reader() {
       }
 
       if (e.key === "ArrowLeft" && prev) {
+        // Clear current scroll position before navigating
+        localStorage.removeItem(scrollPositionKey);
         navigate({ to: "/title/$titleSlug/$chapterSlug", params: { titleSlug: seriesSlug, chapterSlug: prev.slug } });
       } else if (e.key === "ArrowRight" && next) {
+        // Clear current scroll position before navigating
+        localStorage.removeItem(scrollPositionKey);
         navigate({ to: "/title/$titleSlug/$chapterSlug", params: { titleSlug: seriesSlug, chapterSlug: next.slug } });
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [prev, next, navigate, seriesSlug]);
+  }, [prev, next, navigate, seriesSlug, scrollPositionKey]);
 
   // Fullscreen management
   useEffect(() => {
@@ -242,12 +331,32 @@ function Reader() {
   if (chapterQ.isLoading) {
     return <div className="grid min-h-screen place-items-center bg-background text-muted-foreground">Loading chapter…</div>;
   }
+  if (chapterQ.error) {
+    return (
+      <div className="grid min-h-screen place-items-center bg-background p-4 text-center">
+        <div>
+          <h1 className="text-2xl font-bold text-destructive">Error loading chapter</h1>
+          <p className="mt-2 text-muted-foreground">{(chapterQ.error as Error).message}</p>
+          <div className="mt-4 space-x-2">
+            <Link to="/home" className="text-primary">Go home</Link>
+            <span className="text-muted-foreground">•</span>
+            <Link to="/title/$slug" params={{ slug: titleSlug }} className="text-primary">Back to series</Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
   if (!chapterQ.data) {
     return (
       <div className="grid min-h-screen place-items-center bg-background p-4 text-center">
         <div>
           <h1 className="text-2xl font-bold">Chapter not found</h1>
-          <Link to="/" className="text-primary">Go home</Link>
+          <p className="mt-2 text-muted-foreground">Chapter "{chapterSlug}" was not found in series "{titleSlug}"</p>
+          <div className="mt-4 space-x-2">
+            <Link to="/home" className="text-primary">Go home</Link>
+            <span className="text-muted-foreground">•</span>
+            <Link to="/title/$slug" params={{ slug: titleSlug }} className="text-primary">Back to series</Link>
+          </div>
         </div>
       </div>
     );
@@ -271,6 +380,7 @@ function Reader() {
           isNovel={isNovel}
           allChapters={siblingsQ.data ?? []}
           currentChapterSlug={chapterSlug}
+          scrollPositionKey={scrollPositionKey}
         />
       </div>
 
@@ -296,14 +406,25 @@ function Reader() {
           toggleFullscreen={toggleFullscreen}
           hasPrev={!!prev}
           hasNext={!!next}
-          onPrev={() => prev && navigate({ to: "/title/$titleSlug/$chapterSlug", params: { titleSlug: seriesSlug, chapterSlug: prev.slug } })}
-          onNext={() => next && navigate({ to: "/title/$titleSlug/$chapterSlug", params: { titleSlug: seriesSlug, chapterSlug: next.slug } })}
+          onPrev={() => {
+            if (prev) {
+              localStorage.removeItem(scrollPositionKey);
+              navigate({ to: "/title/$titleSlug/$chapterSlug", params: { titleSlug: seriesSlug, chapterSlug: prev.slug } });
+            }
+          }}
+          onNext={() => {
+            if (next) {
+              localStorage.removeItem(scrollPositionKey);
+              navigate({ to: "/title/$titleSlug/$chapterSlug", params: { titleSlug: seriesSlug, chapterSlug: next.slug } });
+            }
+          }}
           seriesSlug={seriesSlug}
           allChapters={siblingsQ.data ?? []}
           currentChapterSlug={chapterSlug}
           chapterId={c.id}
           seriesId={c.series_id}
           seriesTitle={c.series?.title ?? ""}
+          scrollPositionKey={scrollPositionKey}
         />
       </div>
 
@@ -319,7 +440,12 @@ function Reader() {
               variant="outline"
               size="sm"
               disabled={!prev}
-              onClick={() => prev && navigate({ to: "/title/$titleSlug/$chapterSlug", params: { titleSlug: seriesSlug, chapterSlug: prev.slug } })}
+              onClick={() => {
+                if (prev) {
+                  localStorage.removeItem(scrollPositionKey);
+                  navigate({ to: "/title/$titleSlug/$chapterSlug", params: { titleSlug: seriesSlug, chapterSlug: prev.slug } });
+                }
+              }}
             >
               <ChevronLeft className="mr-1 h-4 w-4" />Prev
             </Button>
@@ -353,7 +479,12 @@ function Reader() {
             <Button
               size="sm"
               disabled={!next}
-              onClick={() => next && navigate({ to: "/title/$titleSlug/$chapterSlug", params: { titleSlug: seriesSlug, chapterSlug: next.slug } })}
+              onClick={() => {
+                if (next) {
+                  localStorage.removeItem(scrollPositionKey);
+                  navigate({ to: "/title/$titleSlug/$chapterSlug", params: { titleSlug: seriesSlug, chapterSlug: next.slug } });
+                }
+              }}
             >
               Next<ChevronRight className="ml-1 h-4 w-4" />
             </Button>
@@ -370,7 +501,8 @@ function ReaderTopBar({
   seriesSlug, 
   isNovel, 
   allChapters, 
-  currentChapterSlug 
+  currentChapterSlug,
+  scrollPositionKey
 }: { 
   title: string; 
   seriesTitle: string; 
@@ -378,6 +510,7 @@ function ReaderTopBar({
   isNovel: boolean;
   allChapters: Array<{ id: string; slug: string; chapter_number: number }>;
   currentChapterSlug: string;
+  scrollPositionKey: string;
 }) {
   const navigate = useNavigate();
 
@@ -395,7 +528,10 @@ function ReaderTopBar({
           {allChapters.length > 0 && (
             <Select 
               value={currentChapterSlug} 
-              onValueChange={(slug) => navigate({ to: "/title/$titleSlug/$chapterSlug", params: { titleSlug: seriesSlug, chapterSlug: slug } })}
+              onValueChange={(slug) => {
+                localStorage.removeItem(scrollPositionKey);
+                navigate({ to: "/title/$titleSlug/$chapterSlug", params: { titleSlug: seriesSlug, chapterSlug: slug } });
+              }}
             >
               <SelectTrigger className="w-[180px]">
                 <List className="mr-2 h-4 w-4" />

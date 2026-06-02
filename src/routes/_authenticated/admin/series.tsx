@@ -933,7 +933,7 @@ function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack: () => 
             <div className="flex h-10 w-10 items-center justify-center rounded bg-violet-600/10 text-sm font-bold text-violet-600">{ch.chapter_number}</div>
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
-                <Link to="/read/$chapterSlug" params={{ chapterSlug: ch.slug }} className="truncate font-medium hover:text-violet-600" target="_blank">
+                <Link to="/title/$titleSlug/$chapterSlug" params={{ titleSlug: series.data?.slug || "", chapterSlug: ch.slug }} className="truncate font-medium hover:text-violet-600" target="_blank">
                   Chapter {ch.chapter_number}{ch.title && `: ${ch.title}`}
                 </Link>
                 <ExternalLink className="h-3 w-3" />
