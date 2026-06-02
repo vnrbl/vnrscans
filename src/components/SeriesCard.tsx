@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { Star, BookOpen, Eye } from "lucide-react";
+import { Star, BookOpen } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
 type Series = {
@@ -10,7 +10,6 @@ type Series = {
   type: string;
   rating_average: number | null;
   status?: string | null;
-  view_count?: number | null;
 };
 
 export function SeriesCard({ s }: { s: Series }) {
@@ -49,12 +48,6 @@ export function SeriesCard({ s }: { s: Series }) {
         <h3 className="line-clamp-2 text-sm font-semibold leading-tight text-foreground group-hover:text-primary">
           {s.title}
         </h3>
-        {s.view_count !== null && s.view_count !== undefined && (
-          <div className="mt-1.5 flex items-center gap-1 text-xs text-muted-foreground">
-            <Eye className="h-3 w-3" />
-            {s.view_count.toLocaleString()}
-          </div>
-        )}
       </div>
     </Link>
   );

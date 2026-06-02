@@ -451,6 +451,18 @@ export type Database = {
         }
         Returns: boolean
       }
+      increment_chapter_view: {
+        Args: {
+          _chapter_id: string
+        }
+        Returns: undefined
+      }
+      increment_series_view: {
+        Args: {
+          _series_id: string
+        }
+        Returns: undefined
+      }
     }
     Enums: {
       app_role: "user" | "moderator" | "admin"

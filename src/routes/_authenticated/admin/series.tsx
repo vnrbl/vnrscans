@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
-import { Plus, Trash2, Eye, EyeOff, Upload, ExternalLink, X } from "lucide-react";
+import { Plus, Trash2, Eye, EyeOff, Upload, ExternalLink, X, Pencil } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,7 +12,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export const Route = createFileRoute("/_authenticated/admin/series")({
   head: () => ({ meta: [{ title: "Admin · Series" }] }),
@@ -23,9 +22,80 @@ function slugify(s: string) {
   return s.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 }
 
+const seriesTypes = ["manga", "manhwa", "manhua", "novel"] as const;
+const seriesStatuses = ["ongoing", "completed", "hiatus"] as const;
+const chapterStatuses = ["draft", "published", "scheduled"] as const;
+
+type SeriesForm = {
+  title: string;
+  type: string;
+  status: string;
+  author: string;
+  artist: string;
+  description: string;
+  cover_url: string;
+  release_year: string;
+  alternative_titles: string;
+  is_featured: boolean;
+  is_trending: boolean;
+  is_hidden: boolean;
+};
+
+const emptySeriesForm: SeriesForm = {
+  title: "",
+  type: "manga",
+  status: "ongoing",
+  author: "",
+  artist: "",
+  description: "",
+  cover_url: "",
+  release_year: "",
+  alternative_titles: "",
+  is_featured: false,
+  is_trending: false,
+  is_hidden: false,
+};
+
+function seriesToForm(series: any): SeriesForm {
+  return {
+    title: series.title ?? "",
+    type: series.type ?? "manga",
+    status: series.status ?? "ongoing",
+    author: series.author ?? "",
+    artist: series.artist ?? "",
+    description: series.description ?? "",
+    cover_url: series.cover_url ?? "",
+    release_year: series.release_year ? String(series.release_year) : "",
+    alternative_titles: series.alternative_titles ?? "",
+    is_featured: Boolean(series.is_featured),
+    is_trending: Boolean(series.is_trending),
+    is_hidden: Boolean(series.is_hidden),
+  };
+}
+
+function seriesPayloadFromForm(form: SeriesForm) {
+  return {
+    title: form.title,
+    slug: slugify(form.title),
+    type: form.type as any,
+    status: form.status as any,
+    author: form.author || null,
+    artist: form.artist || null,
+    description: form.description || null,
+    cover_url: form.cover_url || null,
+    release_year: form.release_year ? parseInt(form.release_year, 10) : null,
+    alternative_titles: form.alternative_titles || null,
+    is_featured: form.is_featured,
+    is_trending: form.is_trending,
+    is_hidden: form.is_hidden,
+    updated_at: new Date().toISOString(),
+  };
+}
+
 function AdminSeries() {
   const qc = useQueryClient();
   const [selectedSeries, setSelectedSeries] = useState<string | null>(null);
+  const [editingSeries, setEditingSeries] = useState<any | null>(null);
   
   const list = useQuery({
     queryKey: ["admin", "series"],
@@ -37,40 +107,35 @@ function AdminSeries() {
   });
 
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({ 
-    title: "", 
-    type: "manga", 
-    status: "ongoing", 
-    author: "", 
-    artist: "",
-    description: "", 
-    cover_url: "",
-    tags: "",
-    release_year: "",
-    alternative_titles: "",
-  });
+  const [form, setForm] = useState<SeriesForm>(emptySeriesForm);
 
   const create = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.from("series").insert({
-        title: form.title,
-        slug: slugify(form.title),
-        type: form.type as any,
-        status: form.status as any,
-        author: form.author || null,
-        artist: form.artist || null,
-        description: form.description || null,
-        cover_url: form.cover_url || null,
-        tags: form.tags ? form.tags.split(",").map(t => t.trim()) : [],
-        release_year: form.release_year ? parseInt(form.release_year) : null,
-        alternative_titles: form.alternative_titles ? form.alternative_titles.split(",").map(t => t.trim()) : [],
-      });
+      const { error } = await supabase.from("series").insert(seriesPayloadFromForm(form));
       if (error) throw error;
     },
     onSuccess: () => {
       toast.success("Series created");
       setOpen(false);
-      setForm({ title: "", type: "manga", status: "ongoing", author: "", artist: "", description: "", cover_url: "", tags: "", release_year: "", alternative_titles: "" });
+      setForm(emptySeriesForm);
+      qc.invalidateQueries({ queryKey: ["admin", "series"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const updateSeries = useMutation({
+    mutationFn: async () => {
+      if (!editingSeries) throw new Error("No series selected");
+      const { error } = await supabase
+        .from("series")
+        .update(seriesPayloadFromForm(form))
+        .eq("id", editingSeries.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Series updated");
+      setEditingSeries(null);
+      setForm(emptySeriesForm);
       qc.invalidateQueries({ queryKey: ["admin", "series"] });
     },
     onError: (e: Error) => toast.error(e.message),
@@ -105,41 +170,7 @@ function AdminSeries() {
           <DialogTrigger asChild><Button><Plus className="mr-1 h-4 w-4" />New series</Button></DialogTrigger>
           <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
             <DialogHeader><DialogTitle>Create series</DialogTitle></DialogHeader>
-            <div className="space-y-3">
-              <div><Label>Title *</Label><Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="Enter series title" /></div>
-              
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <Label>Type</Label>
-                  <Select value={form.type} onValueChange={(v) => setForm({ ...form, type: v })}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>{["manga","manhwa","manhua","novel"].map((t) => <SelectItem key={t} value={t}>{t.toUpperCase()}</SelectItem>)}</SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label>Status</Label>
-                  <Select value={form.status} onValueChange={(v) => setForm({ ...form, status: v })}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>{["ongoing","completed","hiatus","cancelled"].map((t) => <SelectItem key={t} value={t}>{t.charAt(0).toUpperCase() + t.slice(1)}</SelectItem>)}</SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div><Label>Author</Label><Input value={form.author} onChange={(e) => setForm({ ...form, author: e.target.value })} placeholder="Author name" /></div>
-                <div><Label>Artist</Label><Input value={form.artist} onChange={(e) => setForm({ ...form, artist: e.target.value })} placeholder="Artist name" /></div>
-              </div>
-
-              <div><Label>Release Year</Label><Input type="number" value={form.release_year} onChange={(e) => setForm({ ...form, release_year: e.target.value })} placeholder="2024" /></div>
-              
-              <div><Label>Cover URL</Label><Input value={form.cover_url} onChange={(e) => setForm({ ...form, cover_url: e.target.value })} placeholder="https://example.com/cover.jpg" /></div>
-              
-              <div><Label>Tags (comma separated)</Label><Input value={form.tags} onChange={(e) => setForm({ ...form, tags: e.target.value })} placeholder="action, fantasy, romance" /></div>
-              
-              <div><Label>Alternative Titles (comma separated)</Label><Input value={form.alternative_titles} onChange={(e) => setForm({ ...form, alternative_titles: e.target.value })} placeholder="Alt title 1, Alt title 2" /></div>
-              
-              <div><Label>Description</Label><Textarea rows={4} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Enter series description..." /></div>
-            </div>
+            <SeriesFormFields form={form} setForm={setForm} />
             <DialogFooter>
               <Button onClick={() => create.mutate()} disabled={!form.title || create.isPending}>Create</Button>
             </DialogFooter>
@@ -154,7 +185,7 @@ function AdminSeries() {
             {s.cover_url ? <img src={s.cover_url} alt="" className="h-14 w-10 rounded object-cover" /> : <div className="h-14 w-10 rounded bg-secondary" />}
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
-                <Link to="/series/$slug" params={{ slug: s.slug }} className="truncate font-medium hover:text-primary">{s.title}</Link>
+                <button type="button" onClick={() => setSelectedSeries(s.id)} className="truncate text-left font-medium hover:text-primary">{s.title}</button>
                 <Badge variant="outline" className="uppercase">{s.type}</Badge>
                 {s.is_hidden && <Badge variant="secondary">Hidden</Badge>}
               </div>
@@ -162,6 +193,9 @@ function AdminSeries() {
             </div>
             <Button variant="ghost" size="icon" onClick={() => setSelectedSeries(s.id)} title="Manage Chapters">
               <Upload className="h-4 w-4 text-violet-600" />
+            </Button>
+            <Button variant="ghost" size="icon" onClick={() => { setEditingSeries(s); setForm(seriesToForm(s)); }} title="Edit Series">
+              <Pencil className="h-4 w-4" />
             </Button>
             <Button variant="ghost" size="icon" onClick={() => toggleHidden.mutate(s)} title={s.is_hidden ? "Show" : "Hide"}>
               {s.is_hidden ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
@@ -181,6 +215,59 @@ function AdminSeries() {
             </AlertDialog>
           </div>
         ))}
+      </div>
+
+      <Dialog open={!!editingSeries} onOpenChange={(v) => { if (!v) { setEditingSeries(null); setForm(emptySeriesForm); } }}>
+        <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
+          <DialogHeader><DialogTitle>Edit series</DialogTitle></DialogHeader>
+          <SeriesFormFields form={form} setForm={setForm} />
+          <DialogFooter>
+            <Button onClick={() => updateSeries.mutate()} disabled={!form.title || updateSeries.isPending}>
+              {updateSeries.isPending ? "Saving..." : "Save changes"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+function SeriesFormFields({ form, setForm }: { form: SeriesForm; setForm: (form: SeriesForm) => void }) {
+  return (
+    <div className="space-y-3">
+      <div><Label>Title *</Label><Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="Enter series title" /></div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <Label>Type</Label>
+          <Select value={form.type} onValueChange={(v) => setForm({ ...form, type: v })}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>{seriesTypes.map((t) => <SelectItem key={t} value={t}>{t.toUpperCase()}</SelectItem>)}</SelectContent>
+          </Select>
+        </div>
+        <div>
+          <Label>Status</Label>
+          <Select value={form.status} onValueChange={(v) => setForm({ ...form, status: v })}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>{seriesStatuses.map((t) => <SelectItem key={t} value={t}>{t.charAt(0).toUpperCase() + t.slice(1)}</SelectItem>)}</SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <div><Label>Author</Label><Input value={form.author} onChange={(e) => setForm({ ...form, author: e.target.value })} placeholder="Author name" /></div>
+        <div><Label>Artist</Label><Input value={form.artist} onChange={(e) => setForm({ ...form, artist: e.target.value })} placeholder="Artist name" /></div>
+      </div>
+
+      <div><Label>Release Year</Label><Input type="number" value={form.release_year} onChange={(e) => setForm({ ...form, release_year: e.target.value })} placeholder="2024" /></div>
+      <div><Label>Cover URL</Label><Input value={form.cover_url} onChange={(e) => setForm({ ...form, cover_url: e.target.value })} placeholder="https://example.com/cover.jpg" /></div>
+      <div><Label>Alternative Titles</Label><Input value={form.alternative_titles} onChange={(e) => setForm({ ...form, alternative_titles: e.target.value })} placeholder="Alt title 1, Alt title 2" /></div>
+      <div><Label>Description</Label><Textarea rows={4} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Enter series description..." /></div>
+
+      <div className="grid gap-2 rounded-md border border-border/40 p-3 text-sm">
+        <label className="flex items-center gap-2"><input type="checkbox" checked={form.is_featured} onChange={(e) => setForm({ ...form, is_featured: e.target.checked })} />Featured</label>
+        <label className="flex items-center gap-2"><input type="checkbox" checked={form.is_trending} onChange={(e) => setForm({ ...form, is_trending: e.target.checked })} />Trending</label>
+        <label className="flex items-center gap-2"><input type="checkbox" checked={form.is_hidden} onChange={(e) => setForm({ ...form, is_hidden: e.target.checked })} />Hidden</label>
       </div>
     </div>
   );
@@ -212,12 +299,13 @@ function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack: () => 
   });
 
   const [open, setOpen] = useState(false);
+  const [editingChapter, setEditingChapter] = useState<any | null>(null);
   const [form, setForm] = useState({ 
     chapter_number: "", 
     title: "", 
     image_urls: "",
-    volume: "",
-    release_date: "",
+    status: "published",
+    scheduled_at: "",
   });
 
   const create = useMutation({
@@ -233,7 +321,8 @@ function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack: () => 
           title: form.title || null,
           slug: `chapter-${chapterNum}${form.title ? `-${slugify(form.title)}` : ""}`,
           chapter_type: "image",
-          status: "published",
+          status: form.status as any,
+          scheduled_at: form.status === "scheduled" && form.scheduled_at ? new Date(form.scheduled_at).toISOString() : null,
         })
         .select()
         .single();
@@ -255,7 +344,69 @@ function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack: () => 
     onSuccess: () => {
       toast.success("Chapter uploaded");
       setOpen(false);
-      setForm({ chapter_number: "", title: "", image_urls: "", volume: "", release_date: "" });
+      setForm({ chapter_number: "", title: "", image_urls: "", status: "published", scheduled_at: "" });
+      qc.invalidateQueries({ queryKey: ["admin", "chapters", seriesId] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const openChapterEdit = async (chapter: any) => {
+    const { data, error } = await supabase
+      .from("chapter_pages")
+      .select("image_url")
+      .eq("chapter_id", chapter.id)
+      .order("page_number");
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    setEditingChapter(chapter);
+    setForm({
+      chapter_number: String(chapter.chapter_number ?? ""),
+      title: chapter.title ?? "",
+      image_urls: (data ?? []).map((p) => p.image_url).join("\n"),
+      status: chapter.status ?? "published",
+      scheduled_at: chapter.scheduled_at ? new Date(chapter.scheduled_at).toISOString().slice(0, 16) : "",
+    });
+  };
+
+  const updateChapter = useMutation({
+    mutationFn: async () => {
+      if (!editingChapter) throw new Error("No chapter selected");
+      const chapterNum = parseFloat(form.chapter_number);
+      if (isNaN(chapterNum)) throw new Error("Invalid chapter number");
+      const { error: chapterError } = await supabase
+        .from("chapters")
+        .update({
+          chapter_number: chapterNum,
+          title: form.title || null,
+          slug: `chapter-${chapterNum}${form.title ? `-${slugify(form.title)}` : ""}`,
+          status: form.status as any,
+          scheduled_at: form.status === "scheduled" && form.scheduled_at ? new Date(form.scheduled_at).toISOString() : null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", editingChapter.id);
+      if (chapterError) throw chapterError;
+
+      const urls = form.image_urls.split("\n").map((u) => u.trim()).filter(Boolean);
+      if (urls.length === 0) throw new Error("At least one image URL is required");
+
+      const { error: deleteError } = await supabase.from("chapter_pages").delete().eq("chapter_id", editingChapter.id);
+      if (deleteError) throw deleteError;
+
+      const { error: pagesError } = await supabase.from("chapter_pages").insert(
+        urls.map((url, idx) => ({
+          chapter_id: editingChapter.id,
+          page_number: idx + 1,
+          image_url: url,
+        }))
+      );
+      if (pagesError) throw pagesError;
+    },
+    onSuccess: () => {
+      toast.success("Chapter updated");
+      setEditingChapter(null);
+      setForm({ chapter_number: "", title: "", image_urls: "", status: "published", scheduled_at: "" });
       qc.invalidateQueries({ queryKey: ["admin", "chapters", seriesId] });
     },
     onError: (e: Error) => toast.error(e.message),
@@ -303,12 +454,15 @@ function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack: () => 
                   <Input type="number" step="0.1" placeholder="1 or 1.5" value={form.chapter_number} onChange={(e) => setForm({ ...form, chapter_number: e.target.value })} />
                 </div>
                 <div>
-                  <Label>Volume (Optional)</Label>
-                  <Input type="number" placeholder="1" value={form.volume} onChange={(e) => setForm({ ...form, volume: e.target.value })} />
+                  <Label>Status</Label>
+                  <Select value={form.status} onValueChange={(v) => setForm({ ...form, status: v })}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>{chapterStatuses.map((s) => <SelectItem key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</SelectItem>)}</SelectContent>
+                  </Select>
                 </div>
                 <div>
-                  <Label>Release Date</Label>
-                  <Input type="date" value={form.release_date} onChange={(e) => setForm({ ...form, release_date: e.target.value })} />
+                  <Label>Scheduled At</Label>
+                  <Input type="datetime-local" value={form.scheduled_at} onChange={(e) => setForm({ ...form, scheduled_at: e.target.value })} disabled={form.status !== "scheduled"} />
                 </div>
               </div>
               <div>
@@ -353,6 +507,9 @@ function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack: () => 
               </div>
               <div className="text-xs text-muted-foreground">{new Date(ch.created_at).toLocaleDateString()}</div>
             </div>
+            <Button variant="ghost" size="icon" onClick={() => openChapterEdit(ch)} title="Edit Chapter">
+              <Pencil className="h-4 w-4" />
+            </Button>
             <AlertDialog>
               <AlertDialogTrigger asChild><Button variant="ghost" size="icon"><Trash2 className="h-4 w-4 text-destructive" /></Button></AlertDialogTrigger>
               <AlertDialogContent>
@@ -369,6 +526,44 @@ function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack: () => 
           </div>
         ))}
       </div>
+
+      <Dialog open={!!editingChapter} onOpenChange={(v) => { if (!v) { setEditingChapter(null); setForm({ chapter_number: "", title: "", image_urls: "", status: "published", scheduled_at: "" }); } }}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader><DialogTitle>Edit Chapter</DialogTitle></DialogHeader>
+          <div className="space-y-4">
+            <div className="grid grid-cols-3 gap-3">
+              <div>
+                <Label>Chapter Number *</Label>
+                <Input type="number" step="0.1" value={form.chapter_number} onChange={(e) => setForm({ ...form, chapter_number: e.target.value })} />
+              </div>
+              <div>
+                <Label>Status</Label>
+                <Select value={form.status} onValueChange={(v) => setForm({ ...form, status: v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>{chapterStatuses.map((s) => <SelectItem key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Scheduled At</Label>
+                <Input type="datetime-local" value={form.scheduled_at} onChange={(e) => setForm({ ...form, scheduled_at: e.target.value })} disabled={form.status !== "scheduled"} />
+              </div>
+            </div>
+            <div>
+              <Label>Chapter Title</Label>
+              <Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
+            </div>
+            <div>
+              <Label>Image URLs (one per line) *</Label>
+              <Textarea rows={12} value={form.image_urls} onChange={(e) => setForm({ ...form, image_urls: e.target.value })} className="font-mono text-sm" />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button onClick={() => updateChapter.mutate()} disabled={!form.chapter_number || !form.image_urls.trim() || updateChapter.isPending}>
+              {updateChapter.isPending ? "Saving..." : "Save changes"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

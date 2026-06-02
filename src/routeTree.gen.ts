@@ -19,11 +19,11 @@ import { Route as AboutRouteImport } from './routes/about'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as SeriesSlugRouteImport } from './routes/series.$slug'
-import { Route as ReadChapterSlugRouteImport } from './routes/read.$chapterSlug'
 import { Route as AuthenticatedProfileRouteImport } from './routes/_authenticated/profile'
 import { Route as AuthenticatedLibraryRouteImport } from './routes/_authenticated/library'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin/index'
+import { Route as SeriesSeriesSlugChapterSlugRouteImport } from './routes/series.$seriesSlug.$chapterSlug'
 import { Route as AuthenticatedAdminUsersRouteImport } from './routes/_authenticated/admin/users'
 import { Route as AuthenticatedAdminSeriesRouteImport } from './routes/_authenticated/admin/series'
 import { Route as AuthenticatedAdminReportsRouteImport } from './routes/_authenticated/admin/reports'
@@ -78,11 +78,6 @@ const SeriesSlugRoute = SeriesSlugRouteImport.update({
   path: '/series/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ReadChapterSlugRoute = ReadChapterSlugRouteImport.update({
-  id: '/read/$chapterSlug',
-  path: '/read/$chapterSlug',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const AuthenticatedProfileRoute = AuthenticatedProfileRouteImport.update({
   id: '/profile',
   path: '/profile',
@@ -103,6 +98,12 @@ const AuthenticatedAdminIndexRoute = AuthenticatedAdminIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AuthenticatedAdminRoute,
 } as any)
+const SeriesSeriesSlugChapterSlugRoute =
+  SeriesSeriesSlugChapterSlugRouteImport.update({
+    id: '/series/$seriesSlug/$chapterSlug',
+    path: '/series/$seriesSlug/$chapterSlug',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const AuthenticatedAdminUsersRoute = AuthenticatedAdminUsersRouteImport.update({
   id: '/users',
   path: '/users',
@@ -139,12 +140,12 @@ export interface FileRoutesByFullPath {
   '/admin': typeof AuthenticatedAdminRouteWithChildren
   '/library': typeof AuthenticatedLibraryRoute
   '/profile': typeof AuthenticatedProfileRoute
-  '/read/$chapterSlug': typeof ReadChapterSlugRoute
   '/series/$slug': typeof SeriesSlugRoute
   '/admin/comments': typeof AuthenticatedAdminCommentsRoute
   '/admin/reports': typeof AuthenticatedAdminReportsRoute
   '/admin/series': typeof AuthenticatedAdminSeriesRoute
   '/admin/users': typeof AuthenticatedAdminUsersRoute
+  '/series/$seriesSlug/$chapterSlug': typeof SeriesSeriesSlugChapterSlugRoute
   '/admin/': typeof AuthenticatedAdminIndexRoute
 }
 export interface FileRoutesByTo {
@@ -158,12 +159,12 @@ export interface FileRoutesByTo {
   '/search': typeof SearchRoute
   '/library': typeof AuthenticatedLibraryRoute
   '/profile': typeof AuthenticatedProfileRoute
-  '/read/$chapterSlug': typeof ReadChapterSlugRoute
   '/series/$slug': typeof SeriesSlugRoute
   '/admin/comments': typeof AuthenticatedAdminCommentsRoute
   '/admin/reports': typeof AuthenticatedAdminReportsRoute
   '/admin/series': typeof AuthenticatedAdminSeriesRoute
   '/admin/users': typeof AuthenticatedAdminUsersRoute
+  '/series/$seriesSlug/$chapterSlug': typeof SeriesSeriesSlugChapterSlugRoute
   '/admin': typeof AuthenticatedAdminIndexRoute
 }
 export interface FileRoutesById {
@@ -180,12 +181,12 @@ export interface FileRoutesById {
   '/_authenticated/admin': typeof AuthenticatedAdminRouteWithChildren
   '/_authenticated/library': typeof AuthenticatedLibraryRoute
   '/_authenticated/profile': typeof AuthenticatedProfileRoute
-  '/read/$chapterSlug': typeof ReadChapterSlugRoute
   '/series/$slug': typeof SeriesSlugRoute
   '/_authenticated/admin/comments': typeof AuthenticatedAdminCommentsRoute
   '/_authenticated/admin/reports': typeof AuthenticatedAdminReportsRoute
   '/_authenticated/admin/series': typeof AuthenticatedAdminSeriesRoute
   '/_authenticated/admin/users': typeof AuthenticatedAdminUsersRoute
+  '/series/$seriesSlug/$chapterSlug': typeof SeriesSeriesSlugChapterSlugRoute
   '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute
 }
 export interface FileRouteTypes {
@@ -202,12 +203,12 @@ export interface FileRouteTypes {
     | '/admin'
     | '/library'
     | '/profile'
-    | '/read/$chapterSlug'
     | '/series/$slug'
     | '/admin/comments'
     | '/admin/reports'
     | '/admin/series'
     | '/admin/users'
+    | '/series/$seriesSlug/$chapterSlug'
     | '/admin/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -221,12 +222,12 @@ export interface FileRouteTypes {
     | '/search'
     | '/library'
     | '/profile'
-    | '/read/$chapterSlug'
     | '/series/$slug'
     | '/admin/comments'
     | '/admin/reports'
     | '/admin/series'
     | '/admin/users'
+    | '/series/$seriesSlug/$chapterSlug'
     | '/admin'
   id:
     | '__root__'
@@ -242,12 +243,12 @@ export interface FileRouteTypes {
     | '/_authenticated/admin'
     | '/_authenticated/library'
     | '/_authenticated/profile'
-    | '/read/$chapterSlug'
     | '/series/$slug'
     | '/_authenticated/admin/comments'
     | '/_authenticated/admin/reports'
     | '/_authenticated/admin/series'
     | '/_authenticated/admin/users'
+    | '/series/$seriesSlug/$chapterSlug'
     | '/_authenticated/admin/'
   fileRoutesById: FileRoutesById
 }
@@ -261,8 +262,8 @@ export interface RootRouteChildren {
   DmcaRoute: typeof DmcaRoute
   HomeRoute: typeof HomeRoute
   SearchRoute: typeof SearchRoute
-  ReadChapterSlugRoute: typeof ReadChapterSlugRoute
   SeriesSlugRoute: typeof SeriesSlugRoute
+  SeriesSeriesSlugChapterSlugRoute: typeof SeriesSeriesSlugChapterSlugRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -337,13 +338,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SeriesSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/read/$chapterSlug': {
-      id: '/read/$chapterSlug'
-      path: '/read/$chapterSlug'
-      fullPath: '/read/$chapterSlug'
-      preLoaderRoute: typeof ReadChapterSlugRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/_authenticated/profile': {
       id: '/_authenticated/profile'
       path: '/profile'
@@ -371,6 +365,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/admin/'
       preLoaderRoute: typeof AuthenticatedAdminIndexRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
+    }
+    '/series/$seriesSlug/$chapterSlug': {
+      id: '/series/$seriesSlug/$chapterSlug'
+      path: '/series/$seriesSlug/$chapterSlug'
+      fullPath: '/series/$seriesSlug/$chapterSlug'
+      preLoaderRoute: typeof SeriesSeriesSlugChapterSlugRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/_authenticated/admin/users': {
       id: '/_authenticated/admin/users'
@@ -448,8 +449,8 @@ const rootRouteChildren: RootRouteChildren = {
   DmcaRoute: DmcaRoute,
   HomeRoute: HomeRoute,
   SearchRoute: SearchRoute,
-  ReadChapterSlugRoute: ReadChapterSlugRoute,
   SeriesSlugRoute: SeriesSlugRoute,
+  SeriesSeriesSlugChapterSlugRoute: SeriesSeriesSlugChapterSlugRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

@@ -54,7 +54,7 @@ function Home() {
           </p>
           
           <div className="mt-8">
-            <Link to="/browse">
+            <Link to="/home">
               <Button size="lg" className="h-12 bg-violet-600 px-8 text-base font-semibold hover:bg-violet-700">
                 Start Reading
               </Button>

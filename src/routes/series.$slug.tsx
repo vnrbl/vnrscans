@@ -1,6 +1,6 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Star, BookOpen, Calendar, User, Bookmark, BookmarkCheck, Eye } from "lucide-react";
+import { Star, BookOpen, Calendar, User, UserPlus, UserCheck, Users } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -67,17 +67,33 @@ function SeriesDetail() {
     enabled: !!seriesQ.data,
   });
 
-  const bookmark = useQuery({
-    queryKey: ["bookmark", slug, user?.id],
+  // Count followers
+  const followersCount = useQuery({
+    queryKey: ["followers-count", slug],
     queryFn: async () => {
-      if (!user || !seriesQ.data) return null;
+      if (!seriesQ.data) return 0;
+      const { count, error } = await supabase
+        .from("user_library")
+        .select("*", { count: "exact", head: true })
+        .eq("series_id", seriesQ.data.id);
+      if (error) throw error;
+      return count ?? 0;
+    },
+    enabled: !!seriesQ.data,
+  });
+
+  // Check if user is following (has entry in user_library)
+  const isFollowing = useQuery({
+    queryKey: ["following", slug, user?.id],
+    queryFn: async () => {
+      if (!user || !seriesQ.data) return false;
       const { data } = await supabase
-        .from("bookmarks")
+        .from("user_library")
         .select("id")
         .eq("user_id", user.id)
         .eq("series_id", seriesQ.data.id)
         .maybeSingle();
-      return data;
+      return !!data;
     },
     enabled: !!user && !!seriesQ.data,
   });
@@ -112,18 +128,27 @@ function SeriesDetail() {
     enabled: !!user && !!seriesQ.data,
   });
 
-  const toggleBookmark = useMutation({
+  const toggleFollow = useMutation({
     mutationFn: async () => {
-      if (!user || !seriesQ.data) throw new Error("Sign in to bookmark");
-      if (bookmark.data) {
-        await supabase.from("bookmarks").delete().eq("id", bookmark.data.id);
+      if (!user || !seriesQ.data) throw new Error("Sign in to follow");
+      if (isFollowing.data) {
+        // Unfollow: remove from user_library
+        await supabase.from("user_library").delete().eq("user_id", user.id).eq("series_id", seriesQ.data.id);
       } else {
-        await supabase.from("bookmarks").insert({ user_id: user.id, series_id: seriesQ.data.id });
+        // Follow: add to user_library with default status "reading"
+        await supabase.from("user_library").insert({ 
+          user_id: user.id, 
+          series_id: seriesQ.data.id,
+          reading_status: "reading"
+        });
       }
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["bookmark", slug] });
-      toast.success(bookmark.data ? "Removed from library" : "Added to library");
+      qc.invalidateQueries({ queryKey: ["following", slug] });
+      qc.invalidateQueries({ queryKey: ["library-status", slug] });
+      qc.invalidateQueries({ queryKey: ["library"] });
+      qc.invalidateQueries({ queryKey: ["followers-count", slug] });
+      toast.success(isFollowing.data ? "Unfollowed" : "Following");
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -147,19 +172,15 @@ function SeriesDetail() {
   const setStatus = useMutation({
     mutationFn: async (status: string) => {
       if (!user || !seriesQ.data) throw new Error("Sign in to set status");
-      if (status === "none") {
-        await supabase.from("user_library").delete().eq("user_id", user.id).eq("series_id", seriesQ.data.id);
-      } else {
-        const { error } = await supabase
-          .from("user_library")
-          .upsert({ 
-            user_id: user.id, 
-            series_id: seriesQ.data.id, 
-            reading_status: status,
-            updated_at: new Date().toISOString()
-          }, { onConflict: "user_id,series_id" } as any);
-        if (error) throw error;
-      }
+      const { error } = await supabase
+        .from("user_library")
+        .update({ 
+          reading_status: status,
+          updated_at: new Date().toISOString()
+        })
+        .eq("user_id", user.id)
+        .eq("series_id", seriesQ.data.id);
+      if (error) throw error;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["library-status", slug] });
@@ -167,6 +188,24 @@ function SeriesDetail() {
       toast.success("Status updated");
     },
     onError: (e: Error) => toast.error(e.message),
+  });
+
+  // Get reading history to find last read chapter
+  const readingHistory = useQuery({
+    queryKey: ["reading-history", slug, user?.id],
+    queryFn: async () => {
+      if (!user || !seriesQ.data) return null;
+      const { data } = await supabase
+        .from("reading_history")
+        .select("chapter_id,chapters(slug,chapter_number)")
+        .eq("user_id", user.id)
+        .eq("series_id", seriesQ.data.id)
+        .order("updated_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      return data;
+    },
+    enabled: !!user && !!seriesQ.data,
   });
 
   if (seriesQ.isLoading) {
@@ -207,7 +246,7 @@ function SeriesDetail() {
                 {s.author && <span className="flex items-center gap-1"><User className="h-3.5 w-3.5" />{s.author}</span>}
                 {s.artist && s.artist !== s.author && <span>Artist: {s.artist}</span>}
                 <span className="flex items-center gap-1"><Star className="h-3.5 w-3.5 fill-accent text-accent" />{Number(s.rating_average || 0).toFixed(2)}</span>
-                <span className="flex items-center gap-1"><Eye className="h-3.5 w-3.5" />{s.view_count?.toLocaleString() ?? 0} views</span>
+                <span className="flex items-center gap-1"><Users className="h-3.5 w-3.5" />{followersCount.data?.toLocaleString() ?? 0} followers</span>
               </div>
               <div className="mt-4 flex flex-wrap gap-1.5">
                 {(s.series_genres as any[])?.map((sg) =>
@@ -221,36 +260,69 @@ function SeriesDetail() {
               {s.description && <p className="mt-4 max-w-2xl text-sm leading-relaxed text-muted-foreground">{s.description}</p>}
 
               <div className="mt-6 flex flex-wrap gap-2">
-                {chaptersQ.data && chaptersQ.data.length > 0 && (
-                  <Link to="/read/$chapterSlug" params={{ chapterSlug: chaptersQ.data[chaptersQ.data.length - 1].slug }}>
+                {/* Show Follow button first if not following */}
+                {user && !isFollowing.data && (
+                  <Button
+                    className="bg-violet-600 hover:bg-violet-700"
+                    onClick={() => toggleFollow.mutate()}
+                  >
+                    <UserPlus className="mr-2 h-4 w-4" />
+                    Follow
+                  </Button>
+                )}
+
+                {/* Show reading button if following */}
+                {user && isFollowing.data && chaptersQ.data && chaptersQ.data.length > 0 && (
+                  <Link 
+                    to="/series/$seriesSlug/$chapterSlug" 
+                    params={{ 
+                      seriesSlug: slug,
+                      chapterSlug: libraryStatus.data === "reading" && readingHistory.data?.chapters?.slug
+                        ? readingHistory.data.chapters.slug
+                        : chaptersQ.data[chaptersQ.data.length - 1].slug 
+                    }}
+                  >
+                    <Button className="bg-violet-600 hover:bg-violet-700">
+                      <BookOpen className="mr-2 h-4 w-4" />
+                      {libraryStatus.data === "reading" && readingHistory.data?.chapters ? "Continue" : "Start reading"}
+                    </Button>
+                  </Link>
+                )}
+
+                {/* Show status selector only if following */}
+                {user && isFollowing.data && (
+                  <>
+                    <Select 
+                      value={libraryStatus.data ?? "reading"} 
+                      onValueChange={(v) => setStatus.mutate(v)}
+                    >
+                      <SelectTrigger className="w-[180px]">
+                        <SelectValue placeholder="Set Status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="reading">Reading</SelectItem>
+                        <SelectItem value="completed">Completed</SelectItem>
+                        <SelectItem value="plan_to_read">Plan to Read</SelectItem>
+                        <SelectItem value="dropped">Dropped</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      variant="outline"
+                      onClick={() => toggleFollow.mutate()}
+                    >
+                      <UserCheck className="mr-2 h-4 w-4" />
+                      Following
+                    </Button>
+                  </>
+                )}
+
+                {/* Guest users */}
+                {!user && chaptersQ.data && chaptersQ.data.length > 0 && (
+                  <Link to="/series/$seriesSlug/$chapterSlug" params={{ seriesSlug: slug, chapterSlug: chaptersQ.data[chaptersQ.data.length - 1].slug }}>
                     <Button className="bg-violet-600 hover:bg-violet-700">
                       <BookOpen className="mr-2 h-4 w-4" /> Start reading
                     </Button>
                   </Link>
-                )}
-                <Button
-                  variant="outline"
-                  onClick={() => (user ? toggleBookmark.mutate() : toast.error("Sign in to bookmark"))}
-                >
-                  {bookmark.data ? <BookmarkCheck className="mr-2 h-4 w-4" /> : <Bookmark className="mr-2 h-4 w-4" />}
-                  {bookmark.data ? "In library" : "Add to library"}
-                </Button>
-                {user && (
-                  <Select 
-                    value={libraryStatus.data ?? "none"} 
-                    onValueChange={(v) => setStatus.mutate(v)}
-                  >
-                    <SelectTrigger className="w-[180px]">
-                      <SelectValue placeholder="Set Status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">No Status</SelectItem>
-                      <SelectItem value="reading">Reading</SelectItem>
-                      <SelectItem value="completed">Completed</SelectItem>
-                      <SelectItem value="plan_to_read">Plan to Read</SelectItem>
-                      <SelectItem value="dropped">Dropped</SelectItem>
-                    </SelectContent>
-                  </Select>
                 )}
               </div>
 
@@ -280,8 +352,8 @@ function SeriesDetail() {
             {chaptersQ.data.map((c) => (
               <Link
                 key={c.id}
-                to="/read/$chapterSlug"
-                params={{ chapterSlug: c.slug }}
+                to="/series/$seriesSlug/$chapterSlug"
+                params={{ seriesSlug: slug, chapterSlug: c.slug }}
                 className="flex items-center justify-between px-4 py-3 transition hover:bg-secondary/40"
               >
                 <div>
