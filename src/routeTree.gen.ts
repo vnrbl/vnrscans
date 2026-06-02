@@ -21,6 +21,7 @@ import { Route as SeriesSlugRouteImport } from './routes/series.$slug'
 import { Route as ReadChapterSlugRouteImport } from './routes/read.$chapterSlug'
 import { Route as AuthenticatedProfileRouteImport } from './routes/_authenticated/profile'
 import { Route as AuthenticatedLibraryRouteImport } from './routes/_authenticated/library'
+import { Route as AuthenticatedAdminRouteRouteImport } from './routes/_authenticated/admin/route'
 
 const SearchRoute = SearchRouteImport.update({
   id: '/search',
@@ -81,6 +82,11 @@ const AuthenticatedLibraryRoute = AuthenticatedLibraryRouteImport.update({
   path: '/library',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedAdminRouteRoute = AuthenticatedAdminRouteRouteImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -90,6 +96,7 @@ export interface FileRoutesByFullPath {
   '/contact': typeof ContactRoute
   '/dmca': typeof DmcaRoute
   '/search': typeof SearchRoute
+  '/admin': typeof AuthenticatedAdminRouteRoute
   '/library': typeof AuthenticatedLibraryRoute
   '/profile': typeof AuthenticatedProfileRoute
   '/read/$chapterSlug': typeof ReadChapterSlugRoute
@@ -103,6 +110,7 @@ export interface FileRoutesByTo {
   '/contact': typeof ContactRoute
   '/dmca': typeof DmcaRoute
   '/search': typeof SearchRoute
+  '/admin': typeof AuthenticatedAdminRouteRoute
   '/library': typeof AuthenticatedLibraryRoute
   '/profile': typeof AuthenticatedProfileRoute
   '/read/$chapterSlug': typeof ReadChapterSlugRoute
@@ -118,6 +126,7 @@ export interface FileRoutesById {
   '/contact': typeof ContactRoute
   '/dmca': typeof DmcaRoute
   '/search': typeof SearchRoute
+  '/_authenticated/admin': typeof AuthenticatedAdminRouteRoute
   '/_authenticated/library': typeof AuthenticatedLibraryRoute
   '/_authenticated/profile': typeof AuthenticatedProfileRoute
   '/read/$chapterSlug': typeof ReadChapterSlugRoute
@@ -133,6 +142,7 @@ export interface FileRouteTypes {
     | '/contact'
     | '/dmca'
     | '/search'
+    | '/admin'
     | '/library'
     | '/profile'
     | '/read/$chapterSlug'
@@ -146,6 +156,7 @@ export interface FileRouteTypes {
     | '/contact'
     | '/dmca'
     | '/search'
+    | '/admin'
     | '/library'
     | '/profile'
     | '/read/$chapterSlug'
@@ -160,6 +171,7 @@ export interface FileRouteTypes {
     | '/contact'
     | '/dmca'
     | '/search'
+    | '/_authenticated/admin'
     | '/_authenticated/library'
     | '/_authenticated/profile'
     | '/read/$chapterSlug'
@@ -265,15 +277,24 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedLibraryRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/admin': {
+      id: '/_authenticated/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AuthenticatedAdminRouteRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
   }
 }
 
 interface AuthenticatedRouteRouteChildren {
+  AuthenticatedAdminRouteRoute: typeof AuthenticatedAdminRouteRoute
   AuthenticatedLibraryRoute: typeof AuthenticatedLibraryRoute
   AuthenticatedProfileRoute: typeof AuthenticatedProfileRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
+  AuthenticatedAdminRouteRoute: AuthenticatedAdminRouteRoute,
   AuthenticatedLibraryRoute: AuthenticatedLibraryRoute,
   AuthenticatedProfileRoute: AuthenticatedProfileRoute,
 }
