@@ -104,6 +104,15 @@ function SeriesDetail() {
     });
   }, [chaptersQ.data, searchQuery]);
 
+  // Calculate unique chapter count (base chapters only, ignoring .1, .2 variants)
+  const uniqueChapterCount = React.useMemo(() => {
+    if (!chaptersQ.data) return 0;
+    const uniqueChapters = new Set(
+      chaptersQ.data.map((ch) => Math.floor(ch.chapter_number))
+    );
+    return uniqueChapters.size;
+  }, [chaptersQ.data]);
+
   const scanlationGroups = useQuery({
     queryKey: ["scanlation-groups", slug],
     queryFn: async () => {
@@ -432,17 +441,6 @@ function SeriesDetail() {
                 ))}
               </div>
             )}
-
-            <div className="mt-4 flex flex-col gap-1 text-center text-xs text-muted-foreground">
-              <button type="button" className="inline-flex items-center justify-center gap-1.5 hover:text-foreground">
-                <History className="h-3.5 w-3.5" />
-                Edit history
-              </button>
-              <button type="button" className="inline-flex items-center justify-center gap-1.5 hover:text-foreground">
-                <Flag className="h-3.5 w-3.5" />
-                Report
-              </button>
-            </div>
           </aside>
 
           {/* Right — metadata */}
@@ -568,7 +566,9 @@ function SeriesDetail() {
           <section>
             <div className="mb-4 flex flex-col gap-4">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <h2 className="text-xl font-bold">Chapters</h2>
+                <h2 className="text-xl font-bold">
+                  Chapters {uniqueChapterCount > 0 && <span className="text-muted-foreground">({uniqueChapterCount})</span>}
+                </h2>
 
                 <div className="flex flex-wrap gap-2">
                   {scanlationGroups.data && scanlationGroups.data.length > 0 && (

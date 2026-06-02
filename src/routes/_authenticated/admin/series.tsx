@@ -104,9 +104,33 @@ function AdminSeries() {
   const list = useQuery({
     queryKey: ["admin", "series"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("series").select("*").order("updated_at", { ascending: false });
+      const { data: seriesData, error } = await supabase
+        .from("series")
+        .select("*")
+        .order("updated_at", { ascending: false });
       if (error) throw error;
-      return data ?? [];
+      
+      // Get all chapters and count unique base chapter numbers
+      const seriesWithChapters = await Promise.all(
+        (seriesData ?? []).map(async (s: any) => {
+          const { data: chapters } = await supabase
+            .from("chapters")
+            .select("chapter_number")
+            .eq("series_id", s.id);
+          
+          // Get unique base chapter numbers (floor of each chapter number)
+          const uniqueChapters = new Set(
+            (chapters ?? []).map((ch) => Math.floor(ch.chapter_number))
+          );
+          
+          return {
+            ...s,
+            chapter_count: uniqueChapters.size,
+          };
+        })
+      );
+      
+      return seriesWithChapters;
     },
   });
 
@@ -193,7 +217,9 @@ function AdminSeries() {
                 <Badge variant="outline" className="uppercase">{s.type}</Badge>
                 {s.is_hidden && <Badge variant="secondary">Hidden</Badge>}
               </div>
-              <div className="text-xs text-muted-foreground">{s.status} · {Number(s.rating_average || 0).toFixed(1)}★ · {s.view_count} views</div>
+              <div className="text-xs text-muted-foreground">
+                {s.status} · {Number(s.rating_average || 0).toFixed(1)}★ · {s.view_count} views · {(s as any).chapter_count} chapters
+              </div>
             </div>
             <Button variant="ghost" size="icon" onClick={() => setSelectedSeries(s.id)} title="Manage Chapters">
               <Upload className="h-4 w-4 text-violet-600" />
@@ -340,19 +366,35 @@ function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack: () => 
   const [selectedChapters, setSelectedChapters] = useState<Set<number>>(new Set());
   const [bulkUploading, setBulkUploading] = useState(false);
 
-  // Auto-fill uploaded_by with user email when opening upload dialog
+  // Get user profile for username
+  const userProfile = useQuery({
+    queryKey: ["user-profile", user?.id],
+    queryFn: async () => {
+      if (!user) return null;
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("username")
+        .eq("id", user.id)
+        .single();
+      if (error) return null;
+      return data;
+    },
+    enabled: !!user,
+  });
+
+  // Auto-fill uploaded_by with username when opening upload dialog
   useEffect(() => {
-    if (open && user?.email && !form.uploaded_by) {
-      setForm(prev => ({ ...prev, uploaded_by: user.email || "" }));
+    if (open && userProfile.data?.username && !form.uploaded_by) {
+      setForm(prev => ({ ...prev, uploaded_by: userProfile.data.username || "" }));
     }
-  }, [open, user?.email]);
+  }, [open, userProfile.data?.username]);
 
   // Also auto-fill when bulk upload dialog opens
   useEffect(() => {
-    if (bulkUploadOpen && user?.email && !form.uploaded_by) {
-      setForm(prev => ({ ...prev, uploaded_by: user.email || "" }));
+    if (bulkUploadOpen && userProfile.data?.username && !form.uploaded_by) {
+      setForm(prev => ({ ...prev, uploaded_by: userProfile.data.username || "" }));
     }
-  }, [bulkUploadOpen, user?.email]);
+  }, [bulkUploadOpen, userProfile.data?.username]);
 
   const create = useMutation({
     mutationFn: async () => {
