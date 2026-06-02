@@ -68,7 +68,7 @@ function AuthPage() {
 
   return (
     <div className="grid min-h-screen place-items-center bg-gradient-to-br from-background via-background to-secondary/30 p-4">
-      <div className="w-full max-w-md rounded-2xl border border-border/50 bg-card/80 p-6 shadow-2xl backdrop-blur">
+      <div className="w-full max-w-md rounded-2xl border border-border/50 bg-card p-6 shadow-2xl backdrop-blur">
         <div className="mb-6 flex flex-col items-center">
           <div className="grid h-12 w-12 place-items-center rounded-xl bg-gradient-to-br from-primary to-accent glow-primary">
             <BookOpen className="h-6 w-6 text-primary-foreground" />

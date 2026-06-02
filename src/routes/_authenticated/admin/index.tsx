@@ -42,7 +42,7 @@ function AdminHome() {
       <p className="text-sm text-muted-foreground">Overview of your platform.</p>
       <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {cards.map((c) => (
-          <div key={c.label} className="rounded-xl border border-border/40 bg-card/50 p-5">
+          <div key={c.label} className="rounded-xl border border-border/40 bg-card p-5">
             <div className="flex items-center justify-between">
               <span className="text-sm text-muted-foreground">{c.label}</span>
               <c.icon className="h-4 w-4 text-primary" />

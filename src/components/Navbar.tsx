@@ -32,10 +32,10 @@ export function Navbar() {
     <header className="sticky top-0 z-40 border-b border-border/50 bg-background/95 backdrop-blur-md supports-[backdrop-filter]:bg-background/60">
       <div className="container mx-auto flex h-16 items-center justify-between px-4">
         <Link to="/" className="flex items-center gap-2 transition-transform hover:scale-105">
-          <div className="relative grid h-10 w-10 place-items-center rounded-lg bg-violet-600">
-            <span className="text-lg font-bold text-white">0V</span>
+          <div className="relative grid h-10 w-10 place-items-center rounded-lg bg-primary">
+            <span className="text-lg font-bold text-primary-foreground">0V</span>
           </div>
-          <span className="text-xl font-bold tracking-tight text-violet-600">
+          <span className="text-xl font-bold tracking-tight text-primary">
             0Verse
           </span>
         </Link>
@@ -58,7 +58,7 @@ export function Navbar() {
           {user ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="rounded-full transition-all hover:bg-violet-600/10">
+                <Button variant="ghost" size="icon" className="rounded-full transition-all hover:bg-primary/10">
                   <UserIcon className="h-5 w-5" />
                 </Button>
               </DropdownMenuTrigger>
@@ -72,7 +72,7 @@ export function Navbar() {
                 {isAdmin && (
                   <>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={() => navigate({ to: "/admin" })} className="text-violet-600">
+                    <DropdownMenuItem onClick={() => navigate({ to: "/admin" })} className="text-primary">
                       <ShieldCheck className="mr-2 h-4 w-4" /> Admin Panel
                     </DropdownMenuItem>
                   </>
@@ -85,7 +85,7 @@ export function Navbar() {
             </DropdownMenu>
           ) : (
             <Link to="/auth">
-              <Button size="sm" className="bg-violet-600 hover:bg-violet-700">
+              <Button size="sm">
                 Sign In
               </Button>
             </Link>

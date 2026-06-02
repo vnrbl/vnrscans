@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { ChevronLeft, ChevronRight, Settings, ArrowLeft, BookOpen, List, Maximize, Minimize, Flag, Camera } from "lucide-react";
+import { ChevronLeft, ChevronRight, ArrowLeft, BookOpen, Home, List, Maximize, Minimize, Flag } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -19,7 +19,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Slider } from "@/components/ui/slider";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
@@ -203,12 +202,16 @@ function Reader() {
               <ChevronLeft className="mr-1 h-4 w-4" />Prev
             </Button>
             <div className="flex items-center gap-2">
-              {/* Settings Button - Mobile */}
-              <MobileSettingsButton 
-                seriesSlug={seriesSlug}
-                isFullscreen={isFullscreen}
-                toggleFullscreen={toggleFullscreen}
-              />
+              <Link to="/home">
+                <Button variant="ghost" size="sm" title="Home">
+                  <Home className="h-4 w-4" />
+                </Button>
+              </Link>
+              <Link to="/series/$slug" params={{ slug: seriesSlug }}>
+                <Button variant="ghost" size="sm" title="Back to series">
+                  <BookOpen className="h-4 w-4" />
+                </Button>
+              </Link>
               {/* Report Button - Mobile only */}
               <ReportButton 
                 chapterId={c.id} 
@@ -282,56 +285,6 @@ function ReaderTopBar({
   );
 }
 
-function ReaderSettings({ seriesSlug, isFullscreen, toggleFullscreen }: { seriesSlug: string; isFullscreen: boolean; toggleFullscreen: () => void }) {
-  const [fontSize, setFontSize] = useState<number>(() => Number(typeof window !== "undefined" ? localStorage.getItem("novel.fontSize") : 0) || 18);
-  const [lineHeight, setLineHeight] = useState<number>(() => Number(typeof window !== "undefined" ? localStorage.getItem("novel.lineHeight") : 0) || 1.7);
-  useEffect(() => {
-    document.documentElement.style.setProperty("--novel-font-size", `${fontSize}px`);
-    document.documentElement.style.setProperty("--novel-line-height", String(lineHeight));
-    localStorage.setItem("novel.fontSize", String(fontSize));
-    localStorage.setItem("novel.lineHeight", String(lineHeight));
-  }, [fontSize, lineHeight]);
-  return (
-    <Sheet>
-      <SheetTrigger asChild>
-        <Button variant="ghost" size="sm">
-          <Settings className="mr-1 h-4 w-4" />
-          Settings
-        </Button>
-      </SheetTrigger>
-      <SheetContent>
-        <SheetHeader><SheetTitle>Reader Settings</SheetTitle></SheetHeader>
-        <div className="mt-6 space-y-6">
-          <div>
-            <Label>Font size: {fontSize}px</Label>
-            <Slider value={[fontSize]} min={14} max={28} step={1} onValueChange={(v) => setFontSize(v[0])} />
-          </div>
-          <div>
-            <Label>Line height: {lineHeight.toFixed(2)}</Label>
-            <Slider value={[lineHeight * 100]} min={120} max={220} step={5} onValueChange={(v) => setLineHeight(v[0] / 100)} />
-          </div>
-          <div className="pt-4 border-t">
-            <Button 
-              variant="outline" 
-              className="w-full mb-3"
-              onClick={toggleFullscreen}
-            >
-              {isFullscreen ? <Minimize className="mr-2 h-4 w-4" /> : <Maximize className="mr-2 h-4 w-4" />}
-              {isFullscreen ? "Exit Fullscreen" : "Fullscreen Mode"}
-            </Button>
-            <Link to="/series/$slug" params={{ slug: seriesSlug }}>
-              <Button variant="outline" className="w-full">
-                <BookOpen className="mr-2 h-4 w-4" />
-                All Chapters
-              </Button>
-            </Link>
-          </div>
-        </div>
-      </SheetContent>
-    </Sheet>
-  );
-}
-
 function ImageView({ pages, loading }: { pages?: any[]; loading: boolean }) {
   if (loading) {
     return <div className="container mx-auto max-w-3xl px-2 py-6 space-y-2">{Array.from({ length: 4 }).map((_, i) => <div key={i} className="aspect-[2/3] animate-pulse rounded bg-secondary" />)}</div>;
@@ -398,18 +351,17 @@ function FloatingControls({
 }) {
   const navigate = useNavigate();
   const [showChapters, setShowChapters] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
   const [showReport, setShowReport] = useState(false);
 
   return (
     <>
       {/* Floating Vertical Sidebar */}
-      <div className="fixed right-4 top-1/2 -translate-y-1/2 z-50 hidden md:flex flex-col gap-2 bg-secondary/80 backdrop-blur-lg rounded-full p-2 border border-border/50 shadow-lg">
+      <div className="fixed right-4 top-1/2 -translate-y-1/2 z-50 hidden md:flex flex-col gap-2 bg-card backdrop-blur-lg rounded-full p-2 border border-border/50 shadow-lg">
         {/* Previous Chapter */}
         <button
           onClick={onPrev}
           disabled={!hasPrev}
-          className="p-3 rounded-full hover:bg-violet-600/20 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+          className="p-3 rounded-full hover:bg-primary/20 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
           title="Previous Chapter"
         >
           <ChevronLeft className="h-5 w-5" />
@@ -418,25 +370,35 @@ function FloatingControls({
         {/* Chapter List */}
         <button
           onClick={() => setShowChapters(!showChapters)}
-          className="p-3 rounded-full hover:bg-violet-600/20 transition-colors"
+          className="p-3 rounded-full hover:bg-primary/20 transition-colors"
           title="Chapters"
         >
           <List className="h-5 w-5" />
         </button>
 
-        {/* Settings */}
-        <button
-          onClick={() => setShowSettings(!showSettings)}
-          className="p-3 rounded-full hover:bg-violet-600/20 transition-colors"
-          title="Settings"
+        {/* Home */}
+        <Link
+          to="/home"
+          className="p-3 rounded-full hover:bg-primary/20 transition-colors"
+          title="Home"
         >
-          <Settings className="h-5 w-5" />
-        </button>
+          <Home className="h-5 w-5" />
+        </Link>
+
+        {/* Back to series */}
+        <Link
+          to="/series/$slug"
+          params={{ slug: seriesSlug }}
+          className="p-3 rounded-full hover:bg-primary/20 transition-colors"
+          title="Back to series"
+        >
+          <BookOpen className="h-5 w-5" />
+        </Link>
 
         {/* Fullscreen Toggle */}
         <button
           onClick={toggleFullscreen}
-          className="p-3 rounded-full hover:bg-violet-600/20 transition-colors"
+          className="p-3 rounded-full hover:bg-primary/20 transition-colors"
           title={isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
         >
           {isFullscreen ? <Minimize className="h-5 w-5" /> : <Maximize className="h-5 w-5" />}
@@ -445,7 +407,7 @@ function FloatingControls({
         {/* Report */}
         <button
           onClick={() => setShowReport(!showReport)}
-          className="p-3 rounded-full hover:bg-violet-600/20 transition-colors"
+          className="p-3 rounded-full hover:bg-primary/20 transition-colors"
           title="Report"
         >
           <Flag className="h-5 w-5" />
@@ -455,7 +417,7 @@ function FloatingControls({
         <button
           onClick={onNext}
           disabled={!hasNext}
-          className="p-3 rounded-full hover:bg-violet-600/20 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+          className="p-3 rounded-full hover:bg-primary/20 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
           title="Next Chapter"
         >
           <ChevronRight className="h-5 w-5" />
@@ -464,8 +426,8 @@ function FloatingControls({
 
       {/* Chapters Panel */}
       {showChapters && (
-        <div className="fixed right-20 top-1/2 -translate-y-1/2 z-40 w-64 max-h-96 overflow-y-auto bg-card/95 backdrop-blur-lg rounded-lg border border-border/50 shadow-xl">
-          <div className="sticky top-0 bg-card/95 backdrop-blur p-3 border-b border-border/50 flex items-center justify-between">
+        <div className="fixed right-20 top-1/2 -translate-y-1/2 z-40 w-64 max-h-96 overflow-y-auto bg-card backdrop-blur-lg rounded-lg border border-border/50 shadow-xl">
+          <div className="sticky top-0 bg-card backdrop-blur p-3 border-b border-border/50 flex items-center justify-between">
             <span className="text-sm font-semibold">Chapters</span>
             <button onClick={() => setShowChapters(false)} className="hover:text-primary">
               <ArrowLeft className="h-4 w-4" />
@@ -479,8 +441,8 @@ function FloatingControls({
                   navigate({ to: "/series/$seriesSlug/$chapterSlug", params: { seriesSlug, chapterSlug: ch.slug } });
                   setShowChapters(false);
                 }}
-                className={`w-full text-left px-3 py-2 rounded text-sm hover:bg-violet-600/20 transition-colors ${
-                  ch.slug === currentChapterSlug ? "bg-violet-600/30 font-medium" : ""
+                className={`w-full text-left px-3 py-2 rounded text-sm hover:bg-primary/20 transition-colors ${
+                  ch.slug === currentChapterSlug ? "bg-primary/30 font-medium" : ""
                 }`}
               >
                 Chapter {ch.chapter_number}
@@ -488,16 +450,6 @@ function FloatingControls({
             ))}
           </div>
         </div>
-      )}
-
-      {/* Settings Panel */}
-      {showSettings && (
-        <FloatingSettingsPanel 
-          onClose={() => setShowSettings(false)} 
-          seriesSlug={seriesSlug}
-          isFullscreen={isFullscreen}
-          toggleFullscreen={toggleFullscreen}
-        />
       )}
 
       {/* Report Panel */}
@@ -510,105 +462,6 @@ function FloatingControls({
         />
       )}
     </>
-  );
-}
-
-// Floating Settings Panel
-function FloatingSettingsPanel({ 
-  onClose, 
-  seriesSlug,
-  isFullscreen,
-  toggleFullscreen 
-}: { 
-  onClose: () => void; 
-  seriesSlug: string;
-  isFullscreen: boolean;
-  toggleFullscreen: () => void;
-}) {
-  const [fontSize, setFontSize] = useState<number>(() => Number(typeof window !== "undefined" ? localStorage.getItem("novel.fontSize") : 0) || 18);
-  const [lineHeight, setLineHeight] = useState<number>(() => Number(typeof window !== "undefined" ? localStorage.getItem("novel.lineHeight") : 0) || 1.7);
-  
-  useEffect(() => {
-    document.documentElement.style.setProperty("--novel-font-size", `${fontSize}px`);
-    document.documentElement.style.setProperty("--novel-line-height", String(lineHeight));
-    localStorage.setItem("novel.fontSize", String(fontSize));
-    localStorage.setItem("novel.lineHeight", String(lineHeight));
-  }, [fontSize, lineHeight]);
-
-  const takeScreenshot = async () => {
-    try {
-      // Using html2canvas library would be ideal, but for now we'll use native API
-      if (typeof window !== "undefined" && "requestIdleCallback" in window) {
-        const mainContent = document.querySelector(".flex-1");
-        if (!mainContent) {
-          toast.error("Content area not found");
-          return;
-        }
-
-        // Request clipboard permission and copy
-        try {
-          // For modern browsers with clipboard API
-          await navigator.clipboard.write([]).catch(() => {});
-          toast.info("Taking screenshot... Use browser's screenshot tools (Ctrl+Shift+S or Cmd+Shift+4)");
-        } catch {
-          toast.info("Use browser screenshot: Ctrl+Shift+S (Windows) or Cmd+Shift+4 (Mac)");
-        }
-      } else {
-        toast.info("Use browser screenshot: Ctrl+Shift+S (Windows) or Cmd+Shift+4 (Mac)");
-      }
-    } catch (error) {
-      toast.error("Screenshot feature requires browser support");
-    }
-  };
-
-  return (
-    <div className="fixed right-20 top-1/2 -translate-y-1/2 z-40 w-72 bg-card/95 backdrop-blur-lg rounded-lg border border-border/50 shadow-xl">
-      <div className="sticky top-0 bg-card/95 backdrop-blur p-3 border-b border-border/50 flex items-center justify-between">
-        <span className="text-sm font-semibold">Settings</span>
-        <button onClick={onClose} className="hover:text-primary">
-          <ArrowLeft className="h-4 w-4" />
-        </button>
-      </div>
-      <div className="p-4 space-y-4">
-        <div>
-          <Label className="text-xs">Font size: {fontSize}px</Label>
-          <Slider value={[fontSize]} min={14} max={28} step={1} onValueChange={(v) => setFontSize(v[0])} />
-        </div>
-        <div>
-          <Label className="text-xs">Line height: {lineHeight.toFixed(2)}</Label>
-          <Slider value={[lineHeight * 100]} min={120} max={220} step={5} onValueChange={(v) => setLineHeight(v[0] / 100)} />
-        </div>
-        <div className="pt-2 border-t space-y-2">
-          <Button 
-            variant="outline" 
-            className="w-full"
-            size="sm"
-            onClick={() => {
-              toggleFullscreen();
-              onClose();
-            }}
-          >
-            {isFullscreen ? <Minimize className="mr-2 h-4 w-4" /> : <Maximize className="mr-2 h-4 w-4" />}
-            {isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
-          </Button>
-          <Button 
-            variant="outline" 
-            className="w-full"
-            size="sm"
-            onClick={takeScreenshot}
-          >
-            <Camera className="mr-2 h-4 w-4" />
-            Screenshot
-          </Button>
-          <Link to="/series/$slug" params={{ slug: seriesSlug }}>
-            <Button variant="outline" className="w-full" size="sm">
-              <BookOpen className="mr-2 h-4 w-4" />
-              All Chapters
-            </Button>
-          </Link>
-        </div>
-      </div>
-    </div>
   );
 }
 
@@ -650,8 +503,8 @@ function FloatingReportPanel({
   });
 
   return (
-    <div className="fixed right-20 top-1/2 -translate-y-1/2 z-40 w-72 bg-card/95 backdrop-blur-lg rounded-lg border border-border/50 shadow-xl">
-      <div className="sticky top-0 bg-card/95 backdrop-blur p-3 border-b border-border/50 flex items-center justify-between">
+    <div className="fixed right-20 top-1/2 -translate-y-1/2 z-40 w-72 bg-card backdrop-blur-lg rounded-lg border border-border/50 shadow-xl">
+      <div className="sticky top-0 bg-card backdrop-blur p-3 border-b border-border/50 flex items-center justify-between">
         <span className="text-sm font-semibold">Report Issue</span>
         <button onClick={onClose} className="hover:text-primary">
           <ArrowLeft className="h-4 w-4" />
@@ -760,84 +613,6 @@ function ReportButton({ chapterId, seriesId, seriesTitle }: { chapterId: string;
           >
             Submit Report
           </Button>
-        </div>
-      </SheetContent>
-    </Sheet>
-  );
-}
-
-// Mobile Settings Button
-function MobileSettingsButton({ 
-  seriesSlug,
-  isFullscreen,
-  toggleFullscreen 
-}: { 
-  seriesSlug: string;
-  isFullscreen: boolean;
-  toggleFullscreen: () => void;
-}) {
-  const [fontSize, setFontSize] = useState<number>(() => Number(typeof window !== "undefined" ? localStorage.getItem("novel.fontSize") : 0) || 18);
-  const [lineHeight, setLineHeight] = useState<number>(() => Number(typeof window !== "undefined" ? localStorage.getItem("novel.lineHeight") : 0) || 1.7);
-  
-  useEffect(() => {
-    document.documentElement.style.setProperty("--novel-font-size", `${fontSize}px`);
-    document.documentElement.style.setProperty("--novel-line-height", String(lineHeight));
-    localStorage.setItem("novel.fontSize", String(fontSize));
-    localStorage.setItem("novel.lineHeight", String(lineHeight));
-  }, [fontSize, lineHeight]);
-
-  const takeScreenshot = async () => {
-    try {
-      toast.info("Use browser screenshot: Volume Down + Power (Android) or Side + Power (iOS)");
-    } catch (error) {
-      toast.error("Screenshot feature requires browser support");
-    }
-  };
-
-  return (
-    <Sheet>
-      <SheetTrigger asChild>
-        <Button variant="ghost" size="sm">
-          <Settings className="h-4 w-4" />
-        </Button>
-      </SheetTrigger>
-      <SheetContent side="bottom" className="h-[450px]">
-        <SheetHeader>
-          <SheetTitle>Reader Settings</SheetTitle>
-        </SheetHeader>
-        <div className="mt-6 space-y-4">
-          <div>
-            <Label className="text-sm">Font size: {fontSize}px</Label>
-            <Slider value={[fontSize]} min={14} max={28} step={1} onValueChange={(v) => setFontSize(v[0])} />
-          </div>
-          <div>
-            <Label className="text-sm">Line height: {lineHeight.toFixed(2)}</Label>
-            <Slider value={[lineHeight * 100]} min={120} max={220} step={5} onValueChange={(v) => setLineHeight(v[0] / 100)} />
-          </div>
-          <div className="pt-2 border-t space-y-2">
-            <Button 
-              variant="outline" 
-              className="w-full"
-              onClick={toggleFullscreen}
-            >
-              {isFullscreen ? <Minimize className="mr-2 h-4 w-4" /> : <Maximize className="mr-2 h-4 w-4" />}
-              {isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
-            </Button>
-            <Button 
-              variant="outline" 
-              className="w-full"
-              onClick={takeScreenshot}
-            >
-              <Camera className="mr-2 h-4 w-4" />
-              Screenshot
-            </Button>
-            <Link to="/series/$slug" params={{ slug: seriesSlug }}>
-              <Button variant="outline" className="w-full">
-                <BookOpen className="mr-2 h-4 w-4" />
-                All Chapters
-              </Button>
-            </Link>
-          </div>
         </div>
       </SheetContent>
     </Sheet>

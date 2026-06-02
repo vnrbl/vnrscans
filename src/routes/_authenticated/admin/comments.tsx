@@ -37,7 +37,7 @@ function AdminComments() {
   return (
     <div>
       <h1 className="text-2xl font-bold tracking-tight">Comments</h1>
-      <div className="mt-6 divide-y divide-border/40 rounded-lg border border-border/40 bg-card/50">
+      <div className="mt-6 divide-y divide-border/40 rounded-lg border border-border/40 bg-card">
         {(q.data ?? []).length === 0 && <div className="p-6 text-sm text-muted-foreground">No comments yet.</div>}
         {(q.data ?? []).map((c) => (
           <div key={c.id} className="flex items-start gap-3 p-3">

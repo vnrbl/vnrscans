@@ -1,7 +1,9 @@
+import type { ReactNode } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { Clock } from "lucide-react";
+import { BookOpen, Clock, History } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 import { SeriesGrid } from "@/components/SeriesGrid";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -18,6 +20,8 @@ export const Route = createFileRoute("/home")({
 });
 
 function HomePage() {
+  const { user } = useAuth();
+
   // Featured manhwa carousel
   const featured = useQuery({
     queryKey: ["featured"],
@@ -38,12 +42,54 @@ function HomePage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("chapters")
-        .select("id,slug,title,chapter_number,created_at,series:series_id(slug,title)")
+        .select("id,slug,title,chapter_number,created_at,series:series_id(slug,title,cover_url)")
+        .eq("status", "published")
         .order("created_at", { ascending: false })
         .limit(18);
       if (error) throw error;
       return data ?? [];
     },
+  });
+
+  const readingHistory = useQuery({
+    queryKey: ["home-reading-history", user?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("reading_history")
+        .select(
+          "id,updated_at,series:series_id(slug,title,cover_url),chapters:chapter_id(slug,chapter_number,title)"
+        )
+        .eq("user_id", user!.id)
+        .order("updated_at", { ascending: false })
+        .limit(18);
+      if (error) throw error;
+      return data ?? [];
+    },
+    enabled: !!user,
+  });
+
+  const followedChapters = useQuery({
+    queryKey: ["home-followed-chapters", user?.id],
+    queryFn: async () => {
+      const { data: library, error: libError } = await supabase
+        .from("user_library")
+        .select("series_id")
+        .eq("user_id", user!.id);
+      if (libError) throw libError;
+      const seriesIds = (library ?? []).map((row) => row.series_id);
+      if (seriesIds.length === 0) return [];
+
+      const { data, error } = await supabase
+        .from("chapters")
+        .select("id,slug,title,chapter_number,created_at,series:series_id(slug,title,cover_url)")
+        .in("series_id", seriesIds)
+        .eq("status", "published")
+        .order("created_at", { ascending: false })
+        .limit(18);
+      if (error) throw error;
+      return data ?? [];
+    },
+    enabled: !!user,
   });
 
   // Popular manhwa
@@ -116,42 +162,56 @@ function HomePage() {
         </section>
       )}
 
+      {user && (
+        <>
+          <ChapterFeedSection
+            title="New Chapters from Followed"
+            description="Latest uploads from series you follow"
+            loading={followedChapters.isLoading}
+            emptyMessage="Follow series to get new chapter updates here."
+            chapters={(followedChapters.data ?? []) as RecentChapter[]}
+            timeField="created"
+            linkVariant="split"
+          />
+
+          <ChapterFeedSection
+            title="Reading History"
+            description="Pick up where you left off"
+            icon={<History className="h-5 w-5" />}
+            loading={readingHistory.isLoading}
+            emptyMessage="No reading history yet. Start a series to see it here."
+            chapters={mapHistoryToChapters(readingHistory.data)}
+            timeField="updated"
+            linkVariant="seriesOnly"
+          />
+        </>
+      )}
+
       {/* Recently Added Section */}
       <section className="container mx-auto px-4 py-8">
         <div className="mb-6 flex items-center justify-between">
           <h2 className="text-2xl font-bold">Recently Added</h2>
         </div>
         {recentChapters.isLoading ? (
-          <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
             {[...Array(6)].map((_, i) => (
-              <div key={i} className="h-16 animate-pulse rounded-lg bg-secondary" />
+              <div key={i} className="overflow-hidden rounded-lg border border-border/40 bg-card">
+                <div className="aspect-[2/3] animate-pulse bg-secondary" />
+                <div className="space-y-2 p-3">
+                  <div className="h-4 w-3/4 animate-pulse rounded bg-secondary" />
+                  <div className="h-3 w-1/2 animate-pulse rounded bg-secondary" />
+                </div>
+              </div>
             ))}
           </div>
         ) : recentChapters.data && recentChapters.data.length > 0 ? (
-          <div className="space-y-2">
-            {recentChapters.data.map((chapter: any) => (
-              <Link
-                key={chapter.id}
-                to="/series/$slug"
-                params={{ slug: chapter.series?.slug || "" }}
-                className="flex items-center gap-4 rounded-lg border border-border/40 bg-card/50 p-3 transition-all hover:border-primary/50 hover:bg-card"
-              >
-                <div className="min-w-0 flex-1">
-                  <h3 className="truncate font-medium">{chapter.series?.title}</h3>
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <span>Ch. {chapter.chapter_number}</span>
-                    {chapter.title && <span className="truncate">• {chapter.title}</span>}
-                  </div>
-                </div>
-                <div className="flex items-center gap-1 whitespace-nowrap text-xs text-muted-foreground">
-                  <Clock className="h-3 w-3" />
-                  {formatTimeAgo(chapter.created_at)}
-                </div>
-              </Link>
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+            {recentChapters.data.map((chapter) => (
+              <RecentChapterCard key={chapter.id} chapter={chapter as RecentChapter} />
             ))}
           </div>
         ) : (
-          <div className="rounded-lg border border-border/40 bg-card/50 p-8 text-center">
+          <div className="rounded-lg border border-border/40 bg-card p-8 text-center">
             <p className="text-muted-foreground">No chapters available yet.</p>
           </div>
         )}
@@ -177,6 +237,187 @@ function HomePage() {
         </div>
       </section>
     </div>
+  );
+}
+
+type RecentChapter = {
+  id: string;
+  slug: string;
+  title: string | null;
+  chapter_number: number;
+  created_at: string;
+  series: { slug: string; title: string; cover_url: string | null } | null;
+};
+
+type HistoryRow = {
+  id: string;
+  updated_at: string;
+  series: { slug: string; title: string; cover_url: string | null } | null;
+  chapters: { slug: string; chapter_number: number; title: string | null } | null;
+};
+
+function mapHistoryToChapters(rows: HistoryRow[] | undefined): RecentChapter[] {
+  if (!rows) return [];
+  return rows
+    .filter((row) => row.chapters?.slug && row.series?.slug)
+    .map((row) => ({
+      id: row.id,
+      slug: row.chapters!.slug,
+      title: row.chapters!.title,
+      chapter_number: row.chapters!.chapter_number,
+      created_at: row.updated_at,
+      series: row.series,
+    }));
+}
+
+function ChapterFeedSection({
+  title,
+  description,
+  icon,
+  loading,
+  emptyMessage,
+  chapters,
+  timeField,
+  linkVariant,
+}: {
+  title: string;
+  description?: string;
+  icon?: ReactNode;
+  loading: boolean;
+  emptyMessage: string;
+  chapters: RecentChapter[];
+  timeField: "created" | "updated";
+  linkVariant: "split" | "seriesOnly";
+}) {
+  return (
+    <section className="container mx-auto px-4 py-8">
+      <div className="mb-6">
+        <div className="flex items-center gap-2">
+          {icon}
+          <h2 className="text-2xl font-bold">{title}</h2>
+        </div>
+        {description && (
+          <p className="mt-1 text-sm text-muted-foreground">{description}</p>
+        )}
+      </div>
+      {loading ? (
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+          {[...Array(6)].map((_, i) => (
+            <div key={i} className="overflow-hidden rounded-lg border border-border/40 bg-card">
+              <div className="aspect-[2/3] animate-pulse bg-secondary" />
+              <div className="space-y-2 p-3">
+                <div className="h-4 w-3/4 animate-pulse rounded bg-secondary" />
+                <div className="h-3 w-1/2 animate-pulse rounded bg-secondary" />
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : chapters.length > 0 ? (
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+          {chapters.map((chapter) => (
+            <RecentChapterCard
+              key={chapter.id}
+              chapter={chapter}
+              timeField={timeField}
+              linkVariant={linkVariant}
+            />
+          ))}
+        </div>
+      ) : (
+        <div className="rounded-lg border border-border/40 bg-card p-8 text-center">
+          <p className="text-muted-foreground">{emptyMessage}</p>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function RecentChapterCard({
+  chapter,
+  timeField = "created",
+  linkVariant = "split",
+}: {
+  chapter: RecentChapter;
+  timeField?: "created" | "updated";
+  linkVariant?: "split" | "seriesOnly";
+}) {
+  const seriesSlug = chapter.series?.slug;
+  if (!seriesSlug) return null;
+
+  const chapterLabel = chapter.title
+    ? `Chapter ${chapter.chapter_number}: ${chapter.title}`
+    : timeField === "created"
+      ? `Chapter ${chapter.chapter_number} uploaded`
+      : `Chapter ${chapter.chapter_number}`;
+  const timeLabel = timeField === "updated" ? "Last read" : "Uploaded";
+
+  const cover = (
+    <div className="relative aspect-[2/3] overflow-hidden bg-secondary">
+      {chapter.series?.cover_url ? (
+        <img
+          src={chapter.series.cover_url}
+          alt={chapter.series.title}
+          loading="lazy"
+          className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+        />
+      ) : (
+        <div className="flex h-full w-full items-center justify-center text-muted-foreground">
+          <BookOpen className="h-10 w-10" />
+        </div>
+      )}
+    </div>
+  );
+
+  const timeRow = (
+    <div className="mt-2 flex items-center gap-1 text-xs text-muted-foreground">
+      <Clock className="h-3 w-3 shrink-0" />
+      <span>
+        {timeLabel} {formatTimeAgo(chapter.created_at)}
+      </span>
+    </div>
+  );
+
+  return (
+    <article className="group overflow-hidden rounded-lg border border-border/40 bg-card transition-all hover:border-primary/50 hover:shadow-lg hover:shadow-primary/10">
+      <Link to="/series/$slug" params={{ slug: seriesSlug }} className="block">
+        {cover}
+      </Link>
+      <div className="p-3">
+        <Link
+          to="/series/$slug"
+          params={{ slug: seriesSlug }}
+          className="line-clamp-2 text-sm font-semibold leading-tight text-foreground hover:text-primary"
+        >
+          {chapter.series?.title}
+        </Link>
+        {linkVariant === "seriesOnly" ? (
+          <>
+            <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{chapterLabel}</p>
+            {timeRow}
+          </>
+        ) : (
+          <>
+            <Button
+              asChild
+              variant="secondary"
+              size="sm"
+              className="mt-2 h-8 w-full text-xs font-semibold"
+            >
+              <Link
+                to="/series/$seriesSlug/$chapterSlug"
+                params={{ seriesSlug, chapterSlug: chapter.slug }}
+              >
+                Ch. {chapter.chapter_number}
+              </Link>
+            </Button>
+            {chapter.title && (
+              <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{chapter.title}</p>
+            )}
+            {timeRow}
+          </>
+        )}
+      </div>
+    </article>
   );
 }
 

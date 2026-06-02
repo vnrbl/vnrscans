@@ -63,21 +63,21 @@ function Home() {
 
           {/* Stats Banner */}
           <div className="mx-auto mt-16 grid max-w-4xl grid-cols-1 gap-6 md:grid-cols-3">
-            <div className="group relative overflow-hidden rounded-2xl border border-violet-500/20 bg-card/80 p-6 backdrop-blur-sm transition-all hover:border-violet-500/40">
+            <div className="group relative overflow-hidden rounded-2xl border border-violet-500/20 bg-card p-6 backdrop-blur-sm transition-all hover:border-violet-500/40">
               <div className="relative text-3xl font-bold text-violet-600">
                 {stats.data?.chapters.toLocaleString() || "0"}
               </div>
               <div className="relative mt-1 text-sm text-muted-foreground">NEW CHAPTERS</div>
             </div>
             
-            <div className="group relative overflow-hidden rounded-2xl border border-violet-500/20 bg-card/80 p-6 backdrop-blur-sm transition-all hover:border-violet-500/40">
+            <div className="group relative overflow-hidden rounded-2xl border border-violet-500/20 bg-card p-6 backdrop-blur-sm transition-all hover:border-violet-500/40">
               <div className="relative text-3xl font-bold text-violet-600">
                 {stats.data?.series.toLocaleString() || "0"}
               </div>
               <div className="relative mt-1 text-sm text-muted-foreground">MANHWA SERIES</div>
             </div>
             
-            <div className="group relative overflow-hidden rounded-2xl border border-violet-500/20 bg-card/80 p-6 backdrop-blur-sm transition-all hover:border-violet-500/40">
+            <div className="group relative overflow-hidden rounded-2xl border border-violet-500/20 bg-card p-6 backdrop-blur-sm transition-all hover:border-violet-500/40">
               <div className="relative text-3xl font-bold text-violet-600">
                 {stats.data?.readers.toLocaleString()}
               </div>

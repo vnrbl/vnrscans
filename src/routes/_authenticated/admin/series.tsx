@@ -178,7 +178,7 @@ function AdminSeries() {
         </Dialog>
       </div>
 
-      <div className="mt-6 divide-y divide-border/40 rounded-lg border border-border/40 bg-card/50">
+      <div className="mt-6 divide-y divide-border/40 rounded-lg border border-border/40 bg-card">
         {list.isLoading && <div className="p-6 text-sm text-muted-foreground">Loading…</div>}
         {(list.data ?? []).map((s) => (
           <div key={s.id} className="flex items-center gap-3 p-3">
@@ -492,7 +492,7 @@ function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack: () => 
         </Dialog>
       </div>
 
-      <div className="mt-6 divide-y divide-border/40 rounded-lg border border-border/40 bg-card/50">
+      <div className="mt-6 divide-y divide-border/40 rounded-lg border border-border/40 bg-card">
         {chapters.isLoading && <div className="p-6 text-sm text-muted-foreground">Loading...</div>}
         {chapters.data?.length === 0 && <div className="p-6 text-center text-sm text-muted-foreground">No chapters yet.</div>}
         {(chapters.data ?? []).map((ch) => (

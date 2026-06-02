@@ -214,6 +214,24 @@ function SeriesDetail() {
   if (!seriesQ.data) return null;
   const s = seriesQ.data;
 
+  const lastReadChapter = readingHistory.data?.chapters as
+    | { slug: string; chapter_number: number }
+    | null
+    | undefined;
+  const firstChapter = chaptersQ.data?.[chaptersQ.data.length - 1];
+  const isContinue = libraryStatus.data === "reading" && lastReadChapter;
+  const readChapterSlug = isContinue
+    ? lastReadChapter.slug
+    : firstChapter?.slug;
+  const readChapterNumber = isContinue
+    ? lastReadChapter.chapter_number
+    : firstChapter?.chapter_number;
+  const readButtonLabel = isContinue ? "Continue" : "Start reading";
+  const readButtonText =
+    readChapterNumber != null
+      ? `${readButtonLabel} · Ch. ${readChapterNumber}`
+      : readButtonLabel;
+
   return (
     <div>
       <div className="relative">
@@ -272,19 +290,17 @@ function SeriesDetail() {
                 )}
 
                 {/* Show reading button if following */}
-                {user && isFollowing.data && chaptersQ.data && chaptersQ.data.length > 0 && (
+                {user && isFollowing.data && chaptersQ.data && chaptersQ.data.length > 0 && readChapterSlug && (
                   <Link 
                     to="/series/$seriesSlug/$chapterSlug" 
                     params={{ 
                       seriesSlug: slug,
-                      chapterSlug: libraryStatus.data === "reading" && readingHistory.data?.chapters?.slug
-                        ? readingHistory.data.chapters.slug
-                        : chaptersQ.data[chaptersQ.data.length - 1].slug 
+                      chapterSlug: readChapterSlug,
                     }}
                   >
                     <Button className="bg-violet-600 hover:bg-violet-700">
                       <BookOpen className="mr-2 h-4 w-4" />
-                      {libraryStatus.data === "reading" && readingHistory.data?.chapters ? "Continue" : "Start reading"}
+                      {readButtonText}
                     </Button>
                   </Link>
                 )}
@@ -317,10 +333,13 @@ function SeriesDetail() {
                 )}
 
                 {/* Guest users */}
-                {!user && chaptersQ.data && chaptersQ.data.length > 0 && (
-                  <Link to="/series/$seriesSlug/$chapterSlug" params={{ seriesSlug: slug, chapterSlug: chaptersQ.data[chaptersQ.data.length - 1].slug }}>
+                {!user && firstChapter && (
+                  <Link to="/series/$seriesSlug/$chapterSlug" params={{ seriesSlug: slug, chapterSlug: firstChapter.slug }}>
                     <Button className="bg-violet-600 hover:bg-violet-700">
-                      <BookOpen className="mr-2 h-4 w-4" /> Start reading
+                      <BookOpen className="mr-2 h-4 w-4" />
+                      {firstChapter.chapter_number != null
+                        ? `Start reading · Ch. ${firstChapter.chapter_number}`
+                        : "Start reading"}
                     </Button>
                   </Link>
                 )}
@@ -348,7 +367,7 @@ function SeriesDetail() {
         ) : !chaptersQ.data || chaptersQ.data.length === 0 ? (
           <div className="rounded-lg border border-dashed border-border/50 p-8 text-center text-sm text-muted-foreground">No chapters yet. Check back soon.</div>
         ) : (
-          <div className="divide-y divide-border/40 rounded-lg border border-border/40 bg-card/50">
+          <div className="divide-y divide-border/40 rounded-lg border border-border/40 bg-card">
             {chaptersQ.data.map((c) => (
               <Link
                 key={c.id}
