@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SearchRouteImport } from './routes/search'
 import { Route as BrowseRouteImport } from './routes/browse'
+import { Route as AuthRouteImport } from './routes/auth'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as SeriesSlugRouteImport } from './routes/series.$slug'
 import { Route as ReadChapterSlugRouteImport } from './routes/read.$chapterSlug'
@@ -23,6 +24,11 @@ const SearchRoute = SearchRouteImport.update({
 const BrowseRoute = BrowseRouteImport.update({
   id: '/browse',
   path: '/browse',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthRoute = AuthRouteImport.update({
+  id: '/auth',
+  path: '/auth',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -43,6 +49,7 @@ const ReadChapterSlugRoute = ReadChapterSlugRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/auth': typeof AuthRoute
   '/browse': typeof BrowseRoute
   '/search': typeof SearchRoute
   '/read/$chapterSlug': typeof ReadChapterSlugRoute
@@ -50,6 +57,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/auth': typeof AuthRoute
   '/browse': typeof BrowseRoute
   '/search': typeof SearchRoute
   '/read/$chapterSlug': typeof ReadChapterSlugRoute
@@ -58,6 +66,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/auth': typeof AuthRoute
   '/browse': typeof BrowseRoute
   '/search': typeof SearchRoute
   '/read/$chapterSlug': typeof ReadChapterSlugRoute
@@ -67,15 +76,23 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/auth'
     | '/browse'
     | '/search'
     | '/read/$chapterSlug'
     | '/series/$slug'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/browse' | '/search' | '/read/$chapterSlug' | '/series/$slug'
+  to:
+    | '/'
+    | '/auth'
+    | '/browse'
+    | '/search'
+    | '/read/$chapterSlug'
+    | '/series/$slug'
   id:
     | '__root__'
     | '/'
+    | '/auth'
     | '/browse'
     | '/search'
     | '/read/$chapterSlug'
@@ -84,6 +101,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AuthRoute: typeof AuthRoute
   BrowseRoute: typeof BrowseRoute
   SearchRoute: typeof SearchRoute
   ReadChapterSlugRoute: typeof ReadChapterSlugRoute
@@ -104,6 +122,13 @@ declare module '@tanstack/react-router' {
       path: '/browse'
       fullPath: '/browse'
       preLoaderRoute: typeof BrowseRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/auth': {
+      id: '/auth'
+      path: '/auth'
+      fullPath: '/auth'
+      preLoaderRoute: typeof AuthRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -132,6 +157,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AuthRoute: AuthRoute,
   BrowseRoute: BrowseRoute,
   SearchRoute: SearchRoute,
   ReadChapterSlugRoute: ReadChapterSlugRoute,
