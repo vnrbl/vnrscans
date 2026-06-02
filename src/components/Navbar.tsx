@@ -19,9 +19,8 @@ export function Navbar() {
   const navigate = useNavigate();
 
   const links = [
-    { to: "/", label: "Home" },
     { to: "/browse", label: "Browse" },
-    { to: "/search", label: "Search" },
+    { to: "/home", label: "Home" },
   ];
 
   const signOut = async () => {
@@ -30,21 +29,23 @@ export function Navbar() {
   };
 
   return (
-    <header className="sticky top-0 z-40 border-b border-border/50 bg-background/80 backdrop-blur-xl">
+    <header className="sticky top-0 z-40 border-b border-border/50 bg-background/95 backdrop-blur-md supports-[backdrop-filter]:bg-background/60">
       <div className="container mx-auto flex h-16 items-center justify-between px-4">
-        <Link to="/" className="flex items-center gap-2">
-          <div className="grid h-8 w-8 place-items-center rounded-md bg-gradient-to-br from-primary to-accent glow-primary">
-            <BookOpen className="h-4 w-4 text-primary-foreground" />
+        <Link to="/" className="flex items-center gap-2 transition-transform hover:scale-105">
+          <div className="relative grid h-10 w-10 place-items-center rounded-lg bg-violet-600">
+            <span className="text-lg font-bold text-white">0V</span>
           </div>
-          <span className="text-lg font-bold tracking-tight text-gradient">ShadowShelf</span>
+          <span className="text-xl font-bold tracking-tight text-violet-600">
+            0Verse
+          </span>
         </Link>
 
-        <nav className="hidden md:flex items-center gap-1">
+        <nav className="hidden items-center gap-1 md:flex">
           {links.map((l) => (
             <Link
               key={l.to}
               to={l.to}
-              className="rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+              className="rounded-md px-4 py-2 text-sm font-medium text-muted-foreground transition-all hover:bg-secondary hover:text-foreground"
               activeProps={{ className: "text-foreground bg-secondary" }}
               activeOptions={{ exact: l.to === "/" }}
             >
@@ -53,17 +54,12 @@ export function Navbar() {
           ))}
         </nav>
 
-        <div className="flex items-center gap-2">
-          <Link to="/search" className="md:hidden">
-            <Button variant="ghost" size="icon">
-              <Search className="h-4 w-4" />
-            </Button>
-          </Link>
+        <div className="flex items-center gap-3">
           {user ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="rounded-full">
-                  <UserIcon className="h-4 w-4" />
+                <Button variant="ghost" size="icon" className="rounded-full transition-all hover:bg-violet-600/10">
+                  <UserIcon className="h-5 w-5" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-48">
@@ -74,9 +70,12 @@ export function Navbar() {
                   <UserIcon className="mr-2 h-4 w-4" /> Profile
                 </DropdownMenuItem>
                 {isAdmin && (
-                  <DropdownMenuItem onClick={() => navigate({ to: "/admin" })}>
-                    <ShieldCheck className="mr-2 h-4 w-4" /> Admin
-                  </DropdownMenuItem>
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => navigate({ to: "/admin" })} className="text-violet-600">
+                      <ShieldCheck className="mr-2 h-4 w-4" /> Admin Panel
+                    </DropdownMenuItem>
+                  </>
                 )}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={signOut}>
@@ -86,8 +85,8 @@ export function Navbar() {
             </DropdownMenu>
           ) : (
             <Link to="/auth">
-              <Button size="sm" className="bg-gradient-to-r from-primary to-accent text-primary-foreground">
-                Sign in
+              <Button size="sm" className="bg-violet-600 hover:bg-violet-700">
+                Sign In
               </Button>
             </Link>
           )}

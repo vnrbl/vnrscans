@@ -30,7 +30,7 @@ function SearchPage() {
       if (!q || q.length < 2) return [];
       const { data, error } = await supabase
         .from("series")
-        .select("id,slug,title,cover_url,type,rating_average,status")
+        .select("id,slug,title,cover_url,type,rating_average,status,view_count")
         .or(`title.ilike.%${q}%,alternative_titles.ilike.%${q}%,author.ilike.%${q}%`)
         .limit(30);
       if (error) throw error;

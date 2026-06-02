@@ -83,10 +83,10 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "ShadowShelf — Read Manga, Manhwa, Manhua & Novels" },
-      { name: "description", content: "Dark, fast reader for licensed and original manga, manhwa, manhua, and novels." },
-      { property: "og:title", content: "ShadowShelf" },
-      { property: "og:description", content: "Read original & licensed manga, manhwa, manhua, and novels." },
+      { title: "0Verse — Read Manga, Manhwa, Manhua & Novels" },
+      { name: "description", content: "Discover manhwa stories drawn by imagination. Fast, free, and ad-free reading experience." },
+      { property: "og:title", content: "0Verse" },
+      { property: "og:description", content: "Read manga, manhwa, manhua, and novels on 0Verse." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
     ],
@@ -94,6 +94,11 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       {
         rel: "stylesheet",
         href: appCss,
+      },
+      {
+        rel: "icon",
+        type: "image/svg+xml",
+        href: "/favicon.svg",
       },
     ],
   }),

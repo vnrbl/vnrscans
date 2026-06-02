@@ -1,11 +1,18 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Star, BookOpen, Calendar, User, Bookmark, BookmarkCheck } from "lucide-react";
+import { Star, BookOpen, Calendar, User, Bookmark, BookmarkCheck, Eye } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 export const Route = createFileRoute("/series/$slug")({
   head: ({ params }) => ({
@@ -90,6 +97,21 @@ function SeriesDetail() {
     enabled: !!user && !!seriesQ.data,
   });
 
+  const libraryStatus = useQuery({
+    queryKey: ["library-status", slug, user?.id],
+    queryFn: async () => {
+      if (!user || !seriesQ.data) return null;
+      const { data } = await supabase
+        .from("user_library")
+        .select("reading_status")
+        .eq("user_id", user.id)
+        .eq("series_id", seriesQ.data.id)
+        .maybeSingle();
+      return data?.reading_status ?? null;
+    },
+    enabled: !!user && !!seriesQ.data,
+  });
+
   const toggleBookmark = useMutation({
     mutationFn: async () => {
       if (!user || !seriesQ.data) throw new Error("Sign in to bookmark");
@@ -118,6 +140,31 @@ function SeriesDetail() {
       qc.invalidateQueries({ queryKey: ["rating", slug] });
       qc.invalidateQueries({ queryKey: ["series", "detail", slug] });
       toast.success("Rating saved");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const setStatus = useMutation({
+    mutationFn: async (status: string) => {
+      if (!user || !seriesQ.data) throw new Error("Sign in to set status");
+      if (status === "none") {
+        await supabase.from("user_library").delete().eq("user_id", user.id).eq("series_id", seriesQ.data.id);
+      } else {
+        const { error } = await supabase
+          .from("user_library")
+          .upsert({ 
+            user_id: user.id, 
+            series_id: seriesQ.data.id, 
+            reading_status: status,
+            updated_at: new Date().toISOString()
+          }, { onConflict: "user_id,series_id" } as any);
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["library-status", slug] });
+      qc.invalidateQueries({ queryKey: ["library"] });
+      toast.success("Status updated");
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -160,7 +207,7 @@ function SeriesDetail() {
                 {s.author && <span className="flex items-center gap-1"><User className="h-3.5 w-3.5" />{s.author}</span>}
                 {s.artist && s.artist !== s.author && <span>Artist: {s.artist}</span>}
                 <span className="flex items-center gap-1"><Star className="h-3.5 w-3.5 fill-accent text-accent" />{Number(s.rating_average || 0).toFixed(2)}</span>
-                <span>{s.view_count?.toLocaleString() ?? 0} views</span>
+                <span className="flex items-center gap-1"><Eye className="h-3.5 w-3.5" />{s.view_count?.toLocaleString() ?? 0} views</span>
               </div>
               <div className="mt-4 flex flex-wrap gap-1.5">
                 {(s.series_genres as any[])?.map((sg) =>
@@ -176,7 +223,7 @@ function SeriesDetail() {
               <div className="mt-6 flex flex-wrap gap-2">
                 {chaptersQ.data && chaptersQ.data.length > 0 && (
                   <Link to="/read/$chapterSlug" params={{ chapterSlug: chaptersQ.data[chaptersQ.data.length - 1].slug }}>
-                    <Button className="bg-gradient-to-r from-primary to-accent text-primary-foreground">
+                    <Button className="bg-violet-600 hover:bg-violet-700">
                       <BookOpen className="mr-2 h-4 w-4" /> Start reading
                     </Button>
                   </Link>
@@ -188,6 +235,23 @@ function SeriesDetail() {
                   {bookmark.data ? <BookmarkCheck className="mr-2 h-4 w-4" /> : <Bookmark className="mr-2 h-4 w-4" />}
                   {bookmark.data ? "In library" : "Add to library"}
                 </Button>
+                {user && (
+                  <Select 
+                    value={libraryStatus.data ?? "none"} 
+                    onValueChange={(v) => setStatus.mutate(v)}
+                  >
+                    <SelectTrigger className="w-[180px]">
+                      <SelectValue placeholder="Set Status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">No Status</SelectItem>
+                      <SelectItem value="reading">Reading</SelectItem>
+                      <SelectItem value="completed">Completed</SelectItem>
+                      <SelectItem value="plan_to_read">Plan to Read</SelectItem>
+                      <SelectItem value="dropped">Dropped</SelectItem>
+                    </SelectContent>
+                  </Select>
+                )}
               </div>
 
               {user && (

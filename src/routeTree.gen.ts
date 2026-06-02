@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SearchRouteImport } from './routes/search'
+import { Route as HomeRouteImport } from './routes/home'
 import { Route as DmcaRouteImport } from './routes/dmca'
 import { Route as ContactRouteImport } from './routes/contact'
 import { Route as BrowseRouteImport } from './routes/browse'
@@ -31,6 +32,11 @@ import { Route as AuthenticatedAdminCommentsRouteImport } from './routes/_authen
 const SearchRoute = SearchRouteImport.update({
   id: '/search',
   path: '/search',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const HomeRoute = HomeRouteImport.update({
+  id: '/home',
+  path: '/home',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DmcaRoute = DmcaRouteImport.update({
@@ -128,6 +134,7 @@ export interface FileRoutesByFullPath {
   '/browse': typeof BrowseRoute
   '/contact': typeof ContactRoute
   '/dmca': typeof DmcaRoute
+  '/home': typeof HomeRoute
   '/search': typeof SearchRoute
   '/admin': typeof AuthenticatedAdminRouteWithChildren
   '/library': typeof AuthenticatedLibraryRoute
@@ -147,6 +154,7 @@ export interface FileRoutesByTo {
   '/browse': typeof BrowseRoute
   '/contact': typeof ContactRoute
   '/dmca': typeof DmcaRoute
+  '/home': typeof HomeRoute
   '/search': typeof SearchRoute
   '/library': typeof AuthenticatedLibraryRoute
   '/profile': typeof AuthenticatedProfileRoute
@@ -167,6 +175,7 @@ export interface FileRoutesById {
   '/browse': typeof BrowseRoute
   '/contact': typeof ContactRoute
   '/dmca': typeof DmcaRoute
+  '/home': typeof HomeRoute
   '/search': typeof SearchRoute
   '/_authenticated/admin': typeof AuthenticatedAdminRouteWithChildren
   '/_authenticated/library': typeof AuthenticatedLibraryRoute
@@ -188,6 +197,7 @@ export interface FileRouteTypes {
     | '/browse'
     | '/contact'
     | '/dmca'
+    | '/home'
     | '/search'
     | '/admin'
     | '/library'
@@ -207,6 +217,7 @@ export interface FileRouteTypes {
     | '/browse'
     | '/contact'
     | '/dmca'
+    | '/home'
     | '/search'
     | '/library'
     | '/profile'
@@ -226,6 +237,7 @@ export interface FileRouteTypes {
     | '/browse'
     | '/contact'
     | '/dmca'
+    | '/home'
     | '/search'
     | '/_authenticated/admin'
     | '/_authenticated/library'
@@ -247,6 +259,7 @@ export interface RootRouteChildren {
   BrowseRoute: typeof BrowseRoute
   ContactRoute: typeof ContactRoute
   DmcaRoute: typeof DmcaRoute
+  HomeRoute: typeof HomeRoute
   SearchRoute: typeof SearchRoute
   ReadChapterSlugRoute: typeof ReadChapterSlugRoute
   SeriesSlugRoute: typeof SeriesSlugRoute
@@ -259,6 +272,13 @@ declare module '@tanstack/react-router' {
       path: '/search'
       fullPath: '/search'
       preLoaderRoute: typeof SearchRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/home': {
+      id: '/home'
+      path: '/home'
+      fullPath: '/home'
+      preLoaderRoute: typeof HomeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/dmca': {
@@ -426,6 +446,7 @@ const rootRouteChildren: RootRouteChildren = {
   BrowseRoute: BrowseRoute,
   ContactRoute: ContactRoute,
   DmcaRoute: DmcaRoute,
+  HomeRoute: HomeRoute,
   SearchRoute: SearchRoute,
   ReadChapterSlugRoute: ReadChapterSlugRoute,
   SeriesSlugRoute: SeriesSlugRoute,
