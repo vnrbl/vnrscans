@@ -39,6 +39,8 @@ function Reader() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const qc = useQueryClient();
+  
+  // All state hooks must be at the top, before any conditional returns
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [controlsVisible, setControlsVisible] = useState(true);
   const [zoomLevel, setZoomLevel] = useState(100);
@@ -46,6 +48,10 @@ function Reader() {
   const [scrollingDown, setScrollingDown] = useState(false);
   const [showChapters, setShowChapters] = useState(false);
   const [showSpeedControl, setShowSpeedControl] = useState(false);
+  const hideTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const controlsVisibleRef = useRef(true);
+  const lastTapRef = useRef(0);
+  const isDoubleTapToggleRef = useRef(false);
 
   const chapterQ = useQuery({
     queryKey: ["chapter", titleSlug, chapterSlug],
@@ -268,11 +274,6 @@ function Reader() {
   };
 
   // Auto-hide controls after 3 seconds of inactivity
-  const hideTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const controlsVisibleRef = useRef(true);
-  const lastTapRef = useRef(0);
-  const isDoubleTapToggleRef = useRef(false);
-
   const showControls = useCallback(() => {
     // Skip auto-show if this was triggered right after a double-tap toggle-off
     if (isDoubleTapToggleRef.current) {
