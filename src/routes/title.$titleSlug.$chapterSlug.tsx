@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { useEffect, useState, useRef, useCallback } from "react";
-import { ChevronLeft, ChevronRight, ArrowLeft, BookOpen, Home, List, Maximize, Minimize, Flag, ZoomIn, ZoomOut, Heart, Smile, ThumbsUp, Laugh, Star, MessageSquare, Play, Pause } from "lucide-react";
+import { ChevronLeft, ChevronRight, ArrowLeft, BookOpen, Home, List, Maximize, Minimize, Flag, ZoomIn, ZoomOut, Heart, Smile, ThumbsUp, Laugh, Star, MessageSquare, Play, Pause, ArrowUp } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -48,6 +48,7 @@ function Reader() {
   const [scrollingDown, setScrollingDown] = useState(false);
   const [showChapters, setShowChapters] = useState(false);
   const [showSpeedControl, setShowSpeedControl] = useState(false);
+  const [showScrollTop, setShowScrollTop] = useState(false);
   const hideTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const controlsVisibleRef = useRef(true);
   const lastTapRef = useRef(0);
@@ -234,6 +235,9 @@ function Reader() {
         window.requestAnimationFrame(() => {
           const currentScrollY = window.scrollY;
           
+          // Show scroll-to-top button when scrolled down more than 300px
+          setShowScrollTop(currentScrollY > 300);
+          
           // Only update if scrolled more than 10px to avoid jitter
           if (Math.abs(currentScrollY - lastScrollY) > 10) {
             const isScrollingDown = currentScrollY > lastScrollY;
@@ -277,6 +281,10 @@ function Reader() {
     } else {
       document.exitFullscreen();
     }
+  };
+
+  const scrollToTop = () => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   // Auto-hide controls after 3 seconds of inactivity
@@ -502,59 +510,67 @@ function Reader() {
         />
       </div>
 
-      {/* Bottom Nav - Auto-hide */}
-      <div 
-        className={`transition-transform duration-300 ${
-          controlsVisible ? "translate-y-0" : "translate-y-full"
-        }`}
-      >
-        <nav className="sticky bottom-0 z-30 border-t border-border/50 bg-background/90 backdrop-blur md:hidden">
-          <div className="container mx-auto flex items-center justify-between gap-2 px-8 py-3">
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={!prev}
-              onClick={() => prev && navigate({ to: "/title/$titleSlug/$chapterSlug", params: { titleSlug: seriesSlug, chapterSlug: prev.slug } })}
-            >
-              <ChevronLeft className="mr-1 h-4 w-4" />Prev
-            </Button>
-            <div className="flex items-center gap-2">
-              <Link to="/home">
-                <Button variant="ghost" size="sm" title="Home">
-                  <Home className="h-4 w-4" />
-                </Button>
-              </Link>
-              <Link to="/title/$slug" params={{ slug: seriesSlug }}>
-                <Button variant="ghost" size="sm" title="Back to title">
-                  <BookOpen className="h-4 w-4" />
-                </Button>
-              </Link>
-              {/* Fullscreen Button - Mobile */}
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                onClick={toggleFullscreen}
-                title={isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
-              >
-                {isFullscreen ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
+      {/* Bottom Nav - Fixed at bottom (Mobile only) */}
+      <nav className={`fixed bottom-0 left-0 right-0 z-30 border-t border-border/50 bg-background/90 backdrop-blur md:hidden transition-transform duration-300 ${
+        controlsVisible ? "translate-y-0" : "translate-y-full"
+      }`}>
+        <div className="container mx-auto flex items-center justify-between gap-2 px-8 py-3">
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={!prev}
+            onClick={() => prev && navigate({ to: "/title/$titleSlug/$chapterSlug", params: { titleSlug: seriesSlug, chapterSlug: prev.slug } })}
+          >
+            <ChevronLeft className="mr-1 h-4 w-4" />Prev
+          </Button>
+          <div className="flex items-center gap-2">
+            <Link to="/home">
+              <Button variant="ghost" size="sm" title="Home">
+                <Home className="h-4 w-4" />
               </Button>
-              {/* Report Button - Mobile only */}
-              <ReportButton 
-                chapterId={c.id} 
-                seriesId={c.series_id} 
-                seriesTitle={c.series?.title ?? ""} 
-              />
-            </div>
-            <Button
-              size="sm"
-              disabled={!next}
-              onClick={() => next && navigate({ to: "/title/$titleSlug/$chapterSlug", params: { titleSlug: seriesSlug, chapterSlug: next.slug } })}
+            </Link>
+            <Link to="/title/$slug" params={{ slug: seriesSlug }}>
+              <Button variant="ghost" size="sm" title="Back to title">
+                <BookOpen className="h-4 w-4" />
+              </Button>
+            </Link>
+            {/* Fullscreen Button - Mobile */}
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={toggleFullscreen}
+              title={isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
             >
-              Next<ChevronRight className="ml-1 h-4 w-4" />
+              {isFullscreen ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
             </Button>
+            {/* Report Button - Mobile only */}
+            <ReportButton 
+              chapterId={c.id} 
+              seriesId={c.series_id} 
+              seriesTitle={c.series?.title ?? ""} 
+            />
           </div>
-        </nav>
-      </div>
+          <Button
+            size="sm"
+            disabled={!next}
+            onClick={() => next && navigate({ to: "/title/$titleSlug/$chapterSlug", params: { titleSlug: seriesSlug, chapterSlug: next.slug } })}
+          >
+            Next<ChevronRight className="ml-1 h-4 w-4" />
+          </Button>
+        </div>
+      </nav>
+
+      {/* Scroll to Top Button - Both Mobile and Desktop */}
+      <button
+        onClick={scrollToTop}
+        className={`fixed bottom-20 right-6 z-40 rounded-full bg-primary p-3 text-primary-foreground shadow-lg transition-all duration-300 hover:scale-110 hover:shadow-xl md:bottom-6 ${
+          showScrollTop ? "opacity-100 translate-y-0" : "opacity-0 translate-y-10 pointer-events-none"
+        }`}
+        title="Scroll to top"
+        aria-label="Scroll to top"
+      >
+        <ArrowUp className="h-5 w-5" />
+      </button>
     </div>
   );
 }
