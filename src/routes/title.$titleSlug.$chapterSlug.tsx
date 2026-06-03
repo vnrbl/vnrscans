@@ -226,9 +226,10 @@ function Reader() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [prev, next, navigate, seriesSlug]);
 
-  // Scroll direction detection - hide controls on scroll down, show on scroll up (MOBILE ONLY)
+  // Scroll direction detection - hide controls on scroll down, show ONLY when scrolling up (MOBILE)
   useEffect(() => {
     let ticking = false;
+    let hideTimeout: NodeJS.Timeout | null = null;
 
     const handleScroll = () => {
       // Only apply auto-hide on mobile (screen width < 768px)
@@ -244,10 +245,25 @@ function Reader() {
             setScrollingDown(isScrollingDown);
             setLastScrollY(currentScrollY);
             
-            // Show controls when scrolling up, hide when scrolling down
-            // But ONLY on mobile - always show on desktop
             if (isMobile && !showChapters && !showSpeedControl) {
-              setControlsVisible(!isScrollingDown || currentScrollY < 100);
+              // MOBILE: Only show when actively scrolling UP, hide otherwise
+              if (!isScrollingDown) {
+                // Scrolling UP - show controls
+                setControlsVisible(true);
+                
+                // Clear any pending hide timeout
+                if (hideTimeout) clearTimeout(hideTimeout);
+                
+                // Hide controls 1 second after user stops scrolling up
+                hideTimeout = setTimeout(() => {
+                  setControlsVisible(false);
+                }, 1000);
+              } else {
+                // Scrolling DOWN - hide immediately
+                setControlsVisible(false);
+                if (hideTimeout) clearTimeout(hideTimeout);
+              }
+              
               // Hide scroll-to-top on scroll down, show on scroll up (mobile only)
               if (currentScrollY > 300) {
                 setShowScrollTop(!isScrollingDown);
@@ -269,7 +285,10 @@ function Reader() {
     };
 
     window.addEventListener("scroll", handleScroll, { passive: true });
-    return () => window.removeEventListener("scroll", handleScroll);
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+      if (hideTimeout) clearTimeout(hideTimeout);
+    };
   }, [lastScrollY, showChapters, showSpeedControl]);
 
   // Fullscreen management
@@ -334,37 +353,41 @@ function Reader() {
     };
   }, [isAutoScrolling, autoScrollSpeed]);
 
-  // Auto-hide controls after 3 seconds of inactivity
+  // Auto-hide controls after 3 seconds of inactivity (Desktop only)
   const showControls = useCallback(() => {
+    const isMobile = window.innerWidth < 768;
+    
     // Skip auto-show if this was triggered right after a double-tap toggle-off
     if (isDoubleTapToggleRef.current) {
       isDoubleTapToggleRef.current = false;
       return;
     }
+    
+    // On mobile, don't auto-show controls - only scroll up shows them
+    if (isMobile) {
+      return;
+    }
+    
+    // Desktop: show controls
     setControlsVisible(true);
     controlsVisibleRef.current = true;
     if (hideTimeoutRef.current) clearTimeout(hideTimeoutRef.current);
-    
-    // Only auto-hide on mobile, keep visible on desktop
-    if (window.innerWidth < 768) {
-      hideTimeoutRef.current = setTimeout(() => {
-        // Don't hide if panels are open
-        if (!showChapters && !showSpeedControl) {
-          setControlsVisible(false);
-          controlsVisibleRef.current = false;
-        }
-      }, 3000);
-    }
   }, [showChapters, showSpeedControl]);
 
   useEffect(() => {
-    showControls();
+    // Set initial visibility based on device type
+    const isMobile = window.innerWidth < 768;
+    if (isMobile) {
+      setControlsVisible(false); // Start hidden on mobile
+    } else {
+      showControls(); // Start visible on desktop
+    }
     return () => {
       if (hideTimeoutRef.current) clearTimeout(hideTimeoutRef.current);
     };
   }, [showControls]);
 
-  // Handle window resize - ensure controls are visible on desktop
+  // Handle window resize - ensure controls are visible on desktop, hidden on mobile
   useEffect(() => {
     const handleResize = () => {
       const isDesktop = window.innerWidth >= 768;
@@ -373,6 +396,10 @@ function Reader() {
         controlsVisibleRef.current = true;
         // Clear any pending auto-hide timeout
         if (hideTimeoutRef.current) clearTimeout(hideTimeoutRef.current);
+      } else {
+        // Mobile: start hidden
+        setControlsVisible(false);
+        controlsVisibleRef.current = false;
       }
     };
 
@@ -383,13 +410,21 @@ function Reader() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Show controls on mouse movement or touch
+  // Show controls on mouse movement (Desktop only) and handle double-tap toggle (Mobile)
   useEffect(() => {
-    const handleMouseActivity = () => showControls();
-    const handleScrollActivity = () => showControls();
+    // Desktop: show controls on mouse move
+    const handleMouseActivity = () => {
+      const isDesktop = window.innerWidth >= 768;
+      if (isDesktop) {
+        showControls();
+      }
+    };
     
-    // Double tap detection for mobile
+    // Double tap detection for mobile - toggle controls
     const handleDoubleTap = (e: TouchEvent) => {
+      const isMobile = window.innerWidth < 768;
+      if (!isMobile) return;
+      
       const currentTime = new Date().getTime();
       const tapLength = currentTime - lastTapRef.current;
       
@@ -413,13 +448,13 @@ function Reader() {
           if (hideTimeoutRef.current) clearTimeout(hideTimeoutRef.current);
           
           if (newVisible) {
-            // If showing, set auto-hide timer
+            // If showing, set auto-hide timer (1 second on mobile)
             hideTimeoutRef.current = setTimeout(() => {
               setControlsVisible(false);
               controlsVisibleRef.current = false;
-            }, 3000);
+            }, 1000);
           } else {
-            // If hiding via double-tap, prevent the scroll/touch events from immediately showing again
+            // If hiding via double-tap, prevent other events from showing again
             isDoubleTapToggleRef.current = true;
           }
           
@@ -433,12 +468,10 @@ function Reader() {
     
     document.addEventListener("mousemove", handleMouseActivity);
     document.addEventListener("touchstart", handleDoubleTap, { passive: false });
-    document.addEventListener("scroll", handleScrollActivity);
     
     return () => {
       document.removeEventListener("mousemove", handleMouseActivity);
       document.removeEventListener("touchstart", handleDoubleTap);
-      document.removeEventListener("scroll", handleScrollActivity);
     };
   }, [showControls]);
 
