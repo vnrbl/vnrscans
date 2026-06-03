@@ -9,6 +9,7 @@ import {
   useRouterState,
 } from "@tanstack/react-router";
 import { useEffect, type ReactNode } from "react";
+import { Analytics } from "@vercel/analytics/react";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
@@ -21,6 +22,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { isReaderLayoutPath } from "@/lib/layout";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { ReaderSettingsProvider } from "@/contexts/ReaderSettingsContext";
+import { Analytics } from "@vercel/analytics/react";
 
 function NotFoundComponent() {
   return (
@@ -121,6 +123,7 @@ function RootShell({ children }: { children: ReactNode }) {
       <body>
         {children}
         <Scripts />
+        <Analytics />
       </body>
     </html>
   );
@@ -159,6 +162,7 @@ function AppShell() {
       <>
         <Outlet />
         <Toaster />
+        <Analytics />
       </>
     );
   }
@@ -171,6 +175,7 @@ function AppShell() {
       </main>
       <Footer />
       <Toaster />
+      <Analytics />
     </div>
   );
 }
