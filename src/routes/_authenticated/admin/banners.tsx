@@ -98,6 +98,7 @@ function AdminBanners() {
       if (error) throw error;
       return data || [];
     },
+    staleTime: 3 * 60 * 1000, // Cache for 3 minutes
   });
 
   const allSeries = useQuery({
@@ -110,6 +111,7 @@ function AdminBanners() {
       if (error) throw error;
       return data || [];
     },
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
   });
 
   const carouselItems = useQuery({
@@ -117,7 +119,7 @@ function AdminBanners() {
     queryFn: async () => {
       console.log("Fetching carousel items...");
       try {
-        const { data, error } = await supabase
+        const { data, error} = await supabase
           .from("carousel_items")
           .select("*, series:series_id(id, title, slug, cover_url)")
           .order("position", { ascending: true });
@@ -139,6 +141,7 @@ function AdminBanners() {
       }
     },
     retry: false,
+    staleTime: 2 * 60 * 1000, // Cache for 2 minutes
   });
 
   const availableSeries = useQuery({
@@ -176,6 +179,7 @@ function AdminBanners() {
       }
     },
     retry: false,
+    staleTime: 2 * 60 * 1000, // Cache for 2 minutes
   });
 
   const createBanner = useMutation({
@@ -381,16 +385,16 @@ function AdminBanners() {
               <Sparkles className="h-5 w-5 text-violet-500" />
               Homepage Carousel
             </h2>
-            <p className="text-sm text-muted-foreground">Add titles to homepage hero carousel (Max 10)</p>
+            <p className="text-sm text-muted-foreground">Add titles to homepage hero carousel (Max 20)</p>
           </div>
           <Dialog open={carouselDialogOpen} onOpenChange={setCarouselDialogOpen}>
             <DialogTrigger asChild>
               <Button 
-                disabled={(carouselItems.data?.length || 0) >= 10}
+                disabled={(carouselItems.data?.length || 0) >= 20}
                 variant="outline"
               >
                 <Plus className="mr-1 h-4 w-4" />
-                Add Title ({carouselItems.data?.length || 0}/10)
+                Add Title ({carouselItems.data?.length || 0}/20)
               </Button>
             </DialogTrigger>
             <DialogContent>

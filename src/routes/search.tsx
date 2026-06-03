@@ -39,7 +39,7 @@ function SearchPage() {
   });
 
   return (
-    <div className="container mx-auto px-8 py-8">
+    <div className="container mx-auto px-8 md:px-12 lg:px-16 py-8">
       <h1 className="text-2xl font-bold tracking-tight md:text-3xl">Search</h1>
       <div className="relative my-6">
         <SearchIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />

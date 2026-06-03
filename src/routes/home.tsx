@@ -193,7 +193,7 @@ function HomePage() {
 
       {/* Featured Section */}
       {featured.data && featured.data.length > 0 && (
-        <section className="container mx-auto px-8 py-4">
+        <section className="container mx-auto px-8 md:px-12 lg:px-16 py-4">
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             {featured.data.map((series) => (
               <Link key={series.id} to="/title/$slug" params={{ slug: series.slug }}>
@@ -336,7 +336,7 @@ function ChapterCarouselSection({
   const { scrollRef, scrollBy, dragHandlers } = useDragScroll<HTMLDivElement>();
 
   return (
-    <section className="container mx-auto px-8 py-4">
+    <section className="container mx-auto px-8 md:px-12 lg:px-16 py-4">
       <div className="mb-4 flex items-center justify-between">
         <div>
           <div className="flex items-center gap-2">
@@ -428,7 +428,7 @@ function SeriesCarouselSection({
   const { scrollRef, scrollBy, dragHandlers } = useDragScroll<HTMLDivElement>();
 
   return (
-    <section className="container mx-auto px-8 py-4">
+    <section className="container mx-auto px-8 md:px-12 lg:px-16 py-4">
       <div className="mb-4 flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold">{title}</h2>
@@ -581,7 +581,7 @@ function LatestUpdatesSection({
   };
 
   return (
-    <section className="container mx-auto px-8 py-4">
+    <section className="container mx-auto px-8 md:px-12 lg:px-16 py-4">
       <div className="mb-4 flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold">{title}</h2>

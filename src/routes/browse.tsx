@@ -207,7 +207,7 @@ function BrowsePage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="container mx-auto px-8 py-8">
+      <div className="container mx-auto px-8 md:px-12 lg:px-16 py-8">
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-4xl font-bold tracking-tight">Browse Manga</h1>

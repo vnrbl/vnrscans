@@ -359,7 +359,7 @@ function SeriesDetail() {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="container mx-auto px-8 py-6 lg:py-8">
+      <div className="container mx-auto px-8 md:px-12 lg:px-16 py-6 lg:py-8">
         <div className="flex flex-col gap-8 lg:flex-row lg:gap-10">
           {/* Left sidebar — cover & actions */}
           <aside className="mx-auto w-full max-w-[220px] shrink-0 lg:mx-0">

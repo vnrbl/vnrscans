@@ -22,6 +22,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
+import { NotificationBell } from "@/components/notifications/NotificationBell";
 
 export function Navbar() {
   const [open, setOpen] = useState(false);
@@ -134,7 +135,7 @@ export function Navbar() {
 
   return (
     <header className="sticky top-0 z-40 border-b border-border/50 bg-background/95 backdrop-blur-md supports-[backdrop-filter]:bg-background/60">
-      <div className="container mx-auto flex h-16 items-center justify-between gap-4 px-4 sm:px-8">
+      <div className="container mx-auto flex h-16 items-center justify-between gap-4 px-8 md:px-12 lg:px-16">
         {/* Logo */}
         <Link to="/home" className="flex shrink-0 items-center gap-2 transition-transform hover:scale-105">
           <div className="relative grid h-10 w-10 place-items-center rounded-lg bg-primary">
@@ -263,6 +264,9 @@ export function Navbar() {
                 <Library className="h-5 w-5" />
               </Button>
 
+              {/* Notifications Bell */}
+              <NotificationBell />
+
               {/* User Dropdown with Stats */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -301,12 +305,6 @@ export function Navbar() {
                       <DropdownMenuSeparator />
                     </>
                   )}
-                  <DropdownMenuItem onClick={() => navigate({ to: "/library" })}>
-                    <Library className="mr-2 h-4 w-4" /> Library
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => navigate({ to: "/recommendations" })}>
-                    <Sparkles className="mr-2 h-4 w-4" /> Recommendations
-                  </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => navigate({ to: "/profile" })}>
                     <UserIcon className="mr-2 h-4 w-4" /> Profile
                   </DropdownMenuItem>

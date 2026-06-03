@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useMemo } from "react";
 import { Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { ChevronLeft, ChevronRight } from "lucide-react";
@@ -61,11 +61,28 @@ export function HomeHeroCarousel() {
       }
     },
     retry: false,
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
   });
 
   const items = carouselSeries.data ?? [];
-  // Triple the items for infinite loop effect
-  const loopedItems = items.length > 0 ? [...items, ...items, ...items] : [];
+  
+  // Shuffle function (Fisher-Yates algorithm)
+  const shuffleArray = <T,>(array: T[]): T[] => {
+    const shuffled = [...array];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    return shuffled;
+  };
+  
+  // Shuffle items once on load (use useMemo to prevent re-shuffling on every render)
+  const shuffledItems = useMemo(() => {
+    return items.length > 0 ? shuffleArray(items) : [];
+  }, [items.length]); // Only re-shuffle when items count changes
+  
+  // Triple the shuffled items for infinite loop effect
+  const loopedItems = shuffledItems.length > 0 ? [...shuffledItems, ...shuffledItems, ...shuffledItems] : [];
 
   const updateArrows = () => {
     if (!scrollContainerRef.current) return;
@@ -77,12 +94,12 @@ export function HomeHeroCarousel() {
   // Infinite loop scroll logic
   useEffect(() => {
     const container = scrollContainerRef.current;
-    if (!container || items.length === 0) return;
+    if (!container || shuffledItems.length === 0) return;
 
     const handleScroll = () => {
       const { scrollLeft, scrollWidth, clientWidth } = container;
-      const itemWidth = 196; // 180px card + 16px gap
-      const sectionWidth = items.length * itemWidth;
+      const itemWidth = 286; // 270px card + 16px gap (1.5x of 196)
+      const sectionWidth = shuffledItems.length * itemWidth;
       
       // Reset to middle section when reaching edges
       if (scrollLeft <= itemWidth) {
@@ -96,22 +113,22 @@ export function HomeHeroCarousel() {
 
     container.addEventListener('scroll', handleScroll);
     return () => container.removeEventListener('scroll', handleScroll);
-  }, [items.length]);
+  }, [shuffledItems.length]);
 
   // Initialize scroll to middle section
   useEffect(() => {
-    if (scrollContainerRef.current && items.length > 0) {
-      const itemWidth = 196;
-      const sectionWidth = items.length * itemWidth;
+    if (scrollContainerRef.current && shuffledItems.length > 0) {
+      const itemWidth = 286; // 270px card + 16px gap
+      const sectionWidth = shuffledItems.length * itemWidth;
       scrollContainerRef.current.scrollLeft = sectionWidth;
       updateArrows();
     }
-  }, [items.length]);
+  }, [shuffledItems.length]);
 
   // Auto-scroll animation
   useEffect(() => {
     const container = scrollContainerRef.current;
-    if (!container || items.length === 0 || isPaused || !isAutoScrolling) return;
+    if (!container || shuffledItems.length === 0 || isPaused || !isAutoScrolling) return;
 
     const startAutoScroll = () => {
       autoScrollIntervalRef.current = setInterval(() => {
@@ -129,7 +146,7 @@ export function HomeHeroCarousel() {
         clearInterval(autoScrollIntervalRef.current);
       }
     };
-  }, [items.length, isPaused, isAutoScrolling]);
+  }, [shuffledItems.length, isPaused, isAutoScrolling]);
 
   const scroll = (direction: 'left' | 'right') => {
     if (!scrollContainerRef.current) return;
@@ -158,7 +175,11 @@ export function HomeHeroCarousel() {
 
   return (
     <section className="relative w-full overflow-hidden bg-gradient-to-b from-background via-background/95 to-background/90 py-6 mt-8">
-      <div className="container mx-auto px-4 md:px-8">
+      <div className="container mx-auto px-8 md:px-12 lg:px-16">
+        {/* Vignette fade effect on left and right edges */}
+        <div className="absolute left-0 top-0 bottom-0 w-32 md:w-40 lg:w-48 bg-gradient-to-r from-background via-background/80 to-transparent z-10 pointer-events-none" />
+        <div className="absolute right-0 top-0 bottom-0 w-32 md:w-40 lg:w-48 bg-gradient-to-l from-background via-background/80 to-transparent z-10 pointer-events-none" />
+        
         {/* Scrollable Container */}
         <div 
           className="relative group"
@@ -191,9 +212,34 @@ export function HomeHeroCarousel() {
               <Link
                 key={`${item.id}-${index}`}
                 to={`/title/${item.series.slug}`}
-                className="group/card flex-shrink-0"
+                className="group/card flex-shrink-0 block"
+                style={{ perspective: '1000px' }}
               >
-                <div className="relative w-[140px] h-[200px] md:w-[160px] md:h-[230px] lg:w-[180px] lg:h-[260px] rounded-lg overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-300 hover:scale-105">
+                <div 
+                  className="relative w-[210px] h-[300px] md:w-[240px] md:h-[345px] lg:w-[270px] lg:h-[390px] rounded-lg overflow-hidden shadow-lg group-hover/card:shadow-[0_20px_50px_rgba(139,92,246,0.4)] transition-all duration-300"
+                  style={{ 
+                    transformStyle: 'preserve-3d',
+                    transform: 'rotateY(0deg) rotateX(0deg)'
+                  }}
+                  onMouseMove={(e) => {
+                    const card = e.currentTarget;
+                    const rect = card.getBoundingClientRect();
+                    const x = e.clientX - rect.left;
+                    const y = e.clientY - rect.top;
+                    
+                    const centerX = rect.width / 2;
+                    const centerY = rect.height / 2;
+                    
+                    const rotateX = ((y - centerY) / centerY) * -10; // -10 to 10 degrees
+                    const rotateY = ((x - centerX) / centerX) * 10; // -10 to 10 degrees
+                    
+                    card.style.transform = `rotateY(${rotateY}deg) rotateX(${rotateX}deg)`;
+                  }}
+                  onMouseLeave={(e) => {
+                    const card = e.currentTarget;
+                    card.style.transform = 'rotateY(0deg) rotateX(0deg)';
+                  }}
+                >
                   {/* Cover Image */}
                   {item.series.cover_url ? (
                     <img

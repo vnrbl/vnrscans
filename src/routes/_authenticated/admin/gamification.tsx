@@ -78,12 +78,21 @@ function AdminGamification() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("achievements")
-        .select("*")
+        .select("*, unlocks:user_achievements(count)")
         .order("rarity")
         .order("requirement_value");
-      if (error) throw error;
+      if (error) {
+        console.error("Error fetching achievements:", error);
+        // Return empty array if table doesn't exist
+        if (error.code === '42P01') {
+          return [];
+        }
+        throw error;
+      }
       return data || [];
     },
+    retry: false,
+    staleTime: 3 * 60 * 1000, // Cache for 3 minutes
   });
 
   const xpEvents = useQuery({
@@ -93,9 +102,18 @@ function AdminGamification() {
         .from("xp_events")
         .select("*")
         .order("starts_at", { ascending: false });
-      if (error) throw error;
+      if (error) {
+        console.error("Error fetching XP events:", error);
+        // Return empty array if table doesn't exist
+        if (error.code === '42P01') {
+          return [];
+        }
+        throw error;
+      }
       return data || [];
     },
+    retry: false,
+    staleTime: 3 * 60 * 1000, // Cache for 3 minutes
   });
 
   const createAchievement = useMutation({
@@ -290,7 +308,7 @@ function AdminGamification() {
                         <Badge variant="outline">{item.category}</Badge>
                         <span>• {item.requirement_type.replace("_", " ")}: {item.requirement_value}</span>
                         <span>• +{item.xp_reward} XP</span>
-                        <span>• {item.unlocks[0]?.count || 0} unlocked</span>
+                        <span>• {Array.isArray(item.unlocks) ? item.unlocks.length : 0} unlocked</span>
                       </div>
                     </div>
                   </div>

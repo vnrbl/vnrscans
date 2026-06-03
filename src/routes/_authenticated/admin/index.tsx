@@ -18,6 +18,7 @@ function useCount(table: string, filter?: (q: any) => any) {
       if (error) throw error;
       return count ?? 0;
     },
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
   });
 }
 

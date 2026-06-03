@@ -47,7 +47,7 @@ function AdminLayout() {
     { to: "/admin/logs", label: "Security Logs", icon: Shield },
   ];
   return (
-    <div className="container mx-auto grid gap-6 px-8 py-6 md:grid-cols-[220px_1fr]">
+    <div className="container mx-auto grid gap-6 px-8 md:px-12 lg:px-16 py-6 md:grid-cols-[220px_1fr]">
       <aside className="md:sticky md:top-20 md:max-h-[calc(100vh-6rem)] md:self-start md:overflow-y-auto">
         <nav className="rounded-lg border border-border/40 bg-card p-2">
           {items.map((it) => (

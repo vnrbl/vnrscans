@@ -133,7 +133,7 @@ function RecommendationsPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="container mx-auto px-4 py-6 sm:px-8">
+      <div className="container mx-auto px-8 md:px-12 lg:px-16 py-6">
         <div className="mb-6">
           <div className="flex items-center gap-3">
             <Sparkles className="h-8 w-8 text-violet-600" />

@@ -108,70 +108,48 @@ function AdminSeries() {
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [visibilityFilter, setVisibilityFilter] = useState<string>("all");
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 20;
   
   const list = useQuery({
-    queryKey: ["admin", "series"],
+    queryKey: ["admin", "series", currentPage, searchQuery, typeFilter, statusFilter, visibilityFilter],
     queryFn: async () => {
-      const { data: seriesData, error } = await supabase
+      let query = supabase
         .from("series")
-        .select("*")
+        .select("*", { count: "exact" })
         .order("updated_at", { ascending: false });
+      
+      // Apply filters
+      if (searchQuery) {
+        query = query.or(`title.ilike.%${searchQuery}%,alternative_titles.ilike.%${searchQuery}%,author.ilike.%${searchQuery}%,artist.ilike.%${searchQuery}%`);
+      }
+      if (typeFilter !== "all") {
+        query = query.eq("type", typeFilter);
+      }
+      if (statusFilter !== "all") {
+        query = query.eq("status", statusFilter);
+      }
+      if (visibilityFilter === "visible") {
+        query = query.eq("is_hidden", false);
+      } else if (visibilityFilter === "hidden") {
+        query = query.eq("is_hidden", true);
+      }
+      
+      // Pagination
+      const from = (currentPage - 1) * itemsPerPage;
+      const to = from + itemsPerPage - 1;
+      query = query.range(from, to);
+      
+      const { data: seriesData, error, count } = await query;
       if (error) throw error;
       
-      // For series without manual chapter count, calculate from actual chapters
-      const seriesWithChapters = await Promise.all(
-        (seriesData ?? []).map(async (s: any) => {
-          // If chapter_count is manually set and > 0, use it
-          if (s.chapter_count && s.chapter_count > 0) {
-            return {
-              ...s,
-              chapter_count: s.chapter_count,
-            };
-          }
-          
-          // Otherwise, calculate from actual chapters
-          const { data: chapters } = await supabase
-            .from("chapters")
-            .select("chapter_number")
-            .eq("series_id", s.id);
-          
-          // Get unique base chapter numbers
-          const uniqueChapters = new Set(
-            (chapters ?? []).map((ch) => Math.floor(ch.chapter_number))
-          );
-          
-          return {
-            ...s,
-            chapter_count: uniqueChapters.size,
-          };
-        })
-      );
-      
-      return seriesWithChapters;
+      return {
+        series: seriesData ?? [],
+        totalCount: count ?? 0,
+        totalPages: Math.ceil((count ?? 0) / itemsPerPage),
+      };
     },
-  });
-
-  // Filter the series based on search and filters
-  const filteredSeries = (list.data ?? []).filter((s: any) => {
-    // Search filter
-    const matchesSearch = searchQuery === "" || 
-      s.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (s.alternative_titles && s.alternative_titles.toLowerCase().includes(searchQuery.toLowerCase())) ||
-      (s.author && s.author.toLowerCase().includes(searchQuery.toLowerCase())) ||
-      (s.artist && s.artist.toLowerCase().includes(searchQuery.toLowerCase()));
-    
-    // Type filter
-    const matchesType = typeFilter === "all" || s.type === typeFilter;
-    
-    // Status filter
-    const matchesStatus = statusFilter === "all" || s.status === statusFilter;
-    
-    // Visibility filter
-    const matchesVisibility = visibilityFilter === "all" ||
-      (visibilityFilter === "visible" && !s.is_hidden) ||
-      (visibilityFilter === "hidden" && s.is_hidden);
-    
-    return matchesSearch && matchesType && matchesStatus && matchesVisibility;
+    staleTime: 2 * 60 * 1000, // Cache for 2 minutes
   });
 
   const [open, setOpen] = useState(false);
@@ -187,6 +165,7 @@ function AdminSeries() {
       setOpen(false);
       setForm(emptySeriesForm);
       qc.invalidateQueries({ queryKey: ["admin", "series"] });
+      setCurrentPage(1); // Reset to first page
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -316,6 +295,7 @@ function AdminSeries() {
                 setTypeFilter("all");
                 setStatusFilter("all");
                 setVisibilityFilter("all");
+                setCurrentPage(1);
               }}
               className="text-muted-foreground"
             >
@@ -324,21 +304,22 @@ function AdminSeries() {
           )}
 
           <div className="ml-auto text-sm text-muted-foreground">
-            Showing {filteredSeries.length} of {list.data?.length || 0} titles
+            Showing {list.data?.series.length || 0} of {list.data?.totalCount || 0} titles
+            {list.data && list.data.totalPages > 1 && ` (Page ${currentPage} of ${list.data.totalPages})`}
           </div>
         </div>
       </div>
 
       <div className="mt-6 divide-y divide-border/40 rounded-lg border border-border/40 bg-card">
         {list.isLoading && <div className="p-6 text-sm text-muted-foreground">Loading…</div>}
-        {filteredSeries.length === 0 && !list.isLoading && (
+        {(list.data?.series.length === 0) && !list.isLoading && (
           <div className="p-8 text-center text-muted-foreground">
             {searchQuery || typeFilter !== "all" || statusFilter !== "all" || visibilityFilter !== "all" 
               ? "No titles match your filters" 
               : "No titles found"}
           </div>
         )}
-        {filteredSeries.map((s: any) => (
+        {(list.data?.series || []).map((s: any) => (
           <div key={s.id} className="flex items-center gap-3 p-3">
             {s.cover_url ? <img src={s.cover_url} alt="" className="h-14 w-10 rounded object-cover" /> : <div className="h-14 w-10 rounded bg-secondary" />}
             <div className="min-w-0 flex-1">
@@ -348,7 +329,7 @@ function AdminSeries() {
                 {s.is_hidden && <Badge variant="secondary">Hidden</Badge>}
               </div>
               <div className="text-xs text-muted-foreground">
-                {s.status} · {Number(s.rating_average || 0).toFixed(1)}★ · {s.view_count} views · {(s as any).chapter_count} chapters
+                {s.status} · {Number(s.rating_average || 0).toFixed(1)}★ · {s.view_count} views · {s.chapter_count || 0} chapters
               </div>
             </div>
             <Button variant="ghost" size="icon" onClick={() => setSelectedSeries(s.id)} title="Manage Chapters">
@@ -376,6 +357,55 @@ function AdminSeries() {
           </div>
         ))}
       </div>
+
+      {/* Pagination Controls */}
+      {list.data && list.data.totalPages > 1 && (
+        <div className="mt-6 flex items-center justify-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+            disabled={currentPage === 1 || list.isLoading}
+          >
+            Previous
+          </Button>
+          <div className="flex items-center gap-1">
+            {Array.from({ length: Math.min(5, list.data.totalPages) }, (_, i) => {
+              let pageNum;
+              if (list.data.totalPages <= 5) {
+                pageNum = i + 1;
+              } else if (currentPage <= 3) {
+                pageNum = i + 1;
+              } else if (currentPage >= list.data.totalPages - 2) {
+                pageNum = list.data.totalPages - 4 + i;
+              } else {
+                pageNum = currentPage - 2 + i;
+              }
+              
+              return (
+                <Button
+                  key={pageNum}
+                  variant={currentPage === pageNum ? "default" : "outline"}
+                  size="sm"
+                  className="w-10"
+                  onClick={() => setCurrentPage(pageNum)}
+                  disabled={list.isLoading}
+                >
+                  {pageNum}
+                </Button>
+              );
+            })}
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setCurrentPage(p => Math.min(list.data.totalPages, p + 1))}
+            disabled={currentPage === list.data.totalPages || list.isLoading}
+          >
+            Next
+          </Button>
+        </div>
+      )}
 
       <Dialog open={!!editingSeries} onOpenChange={(v) => { if (!v) { setEditingSeries(null); setForm(emptySeriesForm); } }}>
         <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
