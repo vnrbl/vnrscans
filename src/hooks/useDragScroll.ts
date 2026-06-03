@@ -4,7 +4,7 @@ const DRAG_THRESHOLD = 5;
 
 /** Apply on the horizontal scroll container */
 export const DRAG_SCROLL_CONTAINER_CLASS =
-  "flex gap-4 overflow-x-auto pb-4 scrollbar-hide touch-pan-x md:cursor-grab [&[data-dragging=true]]:cursor-grabbing [&[data-dragging=true]_*]:pointer-events-none";
+  "flex gap-4 overflow-x-auto overscroll-x-contain pb-4 scrollbar-hide [-webkit-overflow-scrolling:touch] md:touch-pan-x md:cursor-grab [&[data-dragging=true]]:cursor-grabbing [&[data-dragging=true]_*]:pointer-events-none";
 
 export function useDragScroll<T extends HTMLElement>() {
   const scrollRef = useRef<T>(null);
@@ -41,13 +41,16 @@ export function useDragScroll<T extends HTMLElement>() {
   const handlePointerDown = useCallback(
     (e: PointerEvent) => {
       const el = scrollRef.current;
-      if (!el || e.pointerType !== "mouse" || e.button !== 0) return;
+      if (!el || e.button !== 0) return;
 
       pointerId.current = e.pointerId;
       startX.current = e.clientX;
+      const startY = e.clientY;
       scrollLeftStart.current = el.scrollLeft;
       isDragging.current = false;
       suppressClick.current = false;
+
+      let axisLock: "x" | "y" | null = e.pointerType === "mouse" ? "x" : null;
 
       const onMove = (moveEvent: globalThis.PointerEvent) => {
         if (pointerId.current !== moveEvent.pointerId) return;
@@ -55,7 +58,7 @@ export function useDragScroll<T extends HTMLElement>() {
         const container = scrollRef.current;
         if (!container) return;
 
-        if (moveEvent.buttons !== 1) {
+        if (e.pointerType === "mouse" && moveEvent.buttons !== 1) {
           finishDrag(container, moveEvent.pointerId);
           document.removeEventListener("pointermove", onMove);
           document.removeEventListener("pointerup", onUp);
@@ -64,17 +67,38 @@ export function useDragScroll<T extends HTMLElement>() {
         }
 
         const dx = moveEvent.clientX - startX.current;
+        const dy = moveEvent.clientY - startY;
+
+        if (e.pointerType === "touch" && !axisLock) {
+          if (Math.abs(dx) < DRAG_THRESHOLD && Math.abs(dy) < DRAG_THRESHOLD) return;
+          axisLock = Math.abs(dx) > Math.abs(dy) ? "x" : "y";
+          if (axisLock === "y") {
+            document.removeEventListener("pointermove", onMove);
+            document.removeEventListener("pointerup", onUp);
+            document.removeEventListener("pointercancel", onUp);
+            pointerId.current = null;
+            return;
+          }
+        }
+
+        if (axisLock === "y") return;
 
         if (!isDragging.current) {
           if (Math.abs(dx) < DRAG_THRESHOLD) return;
 
           isDragging.current = true;
           suppressClick.current = true;
-          container.setPointerCapture(moveEvent.pointerId);
+          try {
+            container.setPointerCapture(moveEvent.pointerId);
+          } catch {
+            /* capture may fail on some browsers */
+          }
           container.dataset.dragging = "true";
-          container.style.cursor = "grabbing";
-          document.body.style.userSelect = "none";
-          document.body.style.cursor = "grabbing";
+          if (e.pointerType === "mouse") {
+            container.style.cursor = "grabbing";
+            document.body.style.userSelect = "none";
+            document.body.style.cursor = "grabbing";
+          }
         }
 
         moveEvent.preventDefault();
@@ -89,7 +113,7 @@ export function useDragScroll<T extends HTMLElement>() {
         document.removeEventListener("pointercancel", onUp);
       };
 
-      document.addEventListener("pointermove", onMove);
+      document.addEventListener("pointermove", onMove, { passive: false });
       document.addEventListener("pointerup", onUp);
       document.addEventListener("pointercancel", onUp);
     },

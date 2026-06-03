@@ -13,6 +13,7 @@ import { useEffect, type ReactNode } from "react";
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { Navbar } from "@/components/Navbar";
+import { AnnouncementBanner } from "@/components/AnnouncementBanner";
 import { Footer } from "@/components/Footer";
 import { Toaster } from "@/components/ui/sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -163,6 +164,7 @@ function AppShell() {
   }
   return (
     <div className="flex min-h-screen flex-col">
+      <AnnouncementBanner />
       <Navbar />
       <main className="flex-1">
         <Outlet />

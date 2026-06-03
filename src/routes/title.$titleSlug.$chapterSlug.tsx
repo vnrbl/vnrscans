@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { useEffect, useState, useRef, useCallback } from "react";
-import { ChevronLeft, ChevronRight, ArrowLeft, BookOpen, Home, List, Maximize, Minimize, Flag, ZoomIn, ZoomOut, Heart, Smile, ThumbsUp, Laugh, Star, MessageSquare } from "lucide-react";
+import { ChevronLeft, ChevronRight, ArrowLeft, BookOpen, Home, List, Maximize, Minimize, Flag, ZoomIn, ZoomOut, Heart, Smile, ThumbsUp, Laugh, Star, MessageSquare, Play, Pause } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -41,6 +41,7 @@ function Reader() {
   const qc = useQueryClient();
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [controlsVisible, setControlsVisible] = useState(true);
+  const [zoomLevel, setZoomLevel] = useState(100);
 
   const chapterQ = useQuery({
     queryKey: ["chapter", titleSlug, chapterSlug],
@@ -378,15 +379,20 @@ function Reader() {
           {isNovel ? (
             <NovelView content={c.novel_content ?? ""} chapterId={c.id} />
           ) : (
-            <ImageView pages={pagesQ.data} loading={pagesQ.isLoading} chapterId={c.id} />
+            <ImageView 
+              pages={pagesQ.data} 
+              loading={pagesQ.isLoading} 
+              chapterId={c.id}
+              zoomLevel={zoomLevel}
+            />
           )}
         </div>
       </div>
 
-      {/* Floating Controls Sidebar - Auto-hide */}
+      {/* Floating Controls Sidebar - Always visible on desktop, auto-hide on mobile */}
       <div 
         className={`transition-opacity duration-300 ${
-          controlsVisible ? "opacity-100" : "opacity-0 pointer-events-none"
+          controlsVisible ? "opacity-100" : "md:opacity-100 opacity-0 pointer-events-none md:pointer-events-auto"
         }`}
       >
         <FloatingControls
@@ -402,6 +408,11 @@ function Reader() {
           chapterId={c.id}
           seriesId={c.series_id}
           seriesTitle={c.series?.title ?? ""}
+          isNovel={isNovel}
+          zoomLevel={zoomLevel}
+          onZoomIn={() => setZoomLevel(prev => Math.min(prev + 25, 200))}
+          onZoomOut={() => setZoomLevel(prev => Math.max(prev - 25, 50))}
+          onZoomReset={() => setZoomLevel(100)}
         />
       </div>
 
@@ -514,8 +525,7 @@ function ReaderTopBar({
   );
 }
 
-function ImageView({ pages, loading, chapterId }: { pages?: any[]; loading: boolean; chapterId: string }) {
-  const [zoomLevel, setZoomLevel] = useState(100);
+function ImageView({ pages, loading, chapterId, zoomLevel }: { pages?: any[]; loading: boolean; chapterId: string; zoomLevel: number }) {
   const [isMobile, setIsMobile] = useState(false);
   const { user } = useAuth();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -616,39 +626,6 @@ function ImageView({ pages, loading, chapterId }: { pages?: any[]; loading: bool
 
   return (
     <>
-      {/* Zoom Controls - Sticky (Desktop Only) */}
-      <div className="sticky top-20 z-20 justify-center mb-4 hidden md:flex">
-        <div className="inline-flex items-center gap-2 bg-card/95 backdrop-blur border border-border/50 rounded-full px-4 py-2 shadow-lg">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleZoomOut}
-            disabled={zoomLevel <= 50}
-            className="h-8 w-8 p-0 rounded-full"
-            title="Zoom Out"
-          >
-            <ZoomOut className="h-4 w-4" />
-          </Button>
-          <button
-            onClick={handleZoomReset}
-            className="text-sm font-medium min-w-[60px] px-2 py-1 rounded hover:bg-primary/20 transition-colors"
-            title="Reset Zoom"
-          >
-            {zoomLevel}%
-          </button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleZoomIn}
-            disabled={zoomLevel >= 200}
-            className="h-8 w-8 p-0 rounded-full"
-            title="Zoom In"
-          >
-            <ZoomIn className="h-4 w-4" />
-          </Button>
-        </div>
-      </div>
-
       {/* Pages with Zoom (Desktop) / Normal (Mobile) */}
       <div className="mx-auto max-w-3xl px-2 py-4">
         {pages.map((p) => (
@@ -746,6 +723,11 @@ function FloatingControls({
   chapterId,
   seriesId,
   seriesTitle,
+  isNovel,
+  zoomLevel,
+  onZoomIn,
+  onZoomOut,
+  onZoomReset,
 }: {
   isFullscreen: boolean;
   toggleFullscreen: () => void;
@@ -759,10 +741,84 @@ function FloatingControls({
   chapterId: string;
   seriesId: string;
   seriesTitle: string;
+  isNovel?: boolean;
+  zoomLevel?: number;
+  onZoomIn?: () => void;
+  onZoomOut?: () => void;
+  onZoomReset?: () => void;
 }) {
   const navigate = useNavigate();
   const [showChapters, setShowChapters] = useState(false);
   const [showReport, setShowReport] = useState(false);
+  const [autoScrollEnabled, setAutoScrollEnabled] = useState(false);
+  const [scrollSpeed, setScrollSpeed] = useState(3); // 1-10 scale, 3 = slow
+  const [showSpeedControl, setShowSpeedControl] = useState(false);
+  const scrollIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Auto-scroll logic
+  useEffect(() => {
+    if (autoScrollEnabled) {
+      // Clear any existing interval
+      if (scrollIntervalRef.current) {
+        clearInterval(scrollIntervalRef.current);
+      }
+
+      // Calculate scroll amount based on speed (1-10 scale)
+      // Speed 1 = 0.5px per 16ms, Speed 10 = 5px per 16ms
+      const scrollAmount = scrollSpeed * 0.5;
+      
+      scrollIntervalRef.current = setInterval(() => {
+        window.scrollBy({ top: scrollAmount, behavior: 'auto' });
+        
+        // Stop if reached bottom
+        if ((window.innerHeight + window.pageYOffset) >= document.documentElement.scrollHeight) {
+          setAutoScrollEnabled(false);
+        }
+      }, 16); // ~60fps
+
+      return () => {
+        if (scrollIntervalRef.current) {
+          clearInterval(scrollIntervalRef.current);
+        }
+      };
+    } else {
+      if (scrollIntervalRef.current) {
+        clearInterval(scrollIntervalRef.current);
+      }
+    }
+  }, [autoScrollEnabled, scrollSpeed]);
+
+  // Stop auto-scroll on manual scroll or interaction
+  useEffect(() => {
+    const handleUserScroll = (e: WheelEvent | TouchEvent) => {
+      if (autoScrollEnabled) {
+        setAutoScrollEnabled(false);
+      }
+    };
+
+    const handleKeyPress = (e: KeyboardEvent) => {
+      if (autoScrollEnabled && ['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Space'].includes(e.key)) {
+        setAutoScrollEnabled(false);
+      }
+    };
+
+    window.addEventListener('wheel', handleUserScroll, { passive: true });
+    window.addEventListener('touchmove', handleUserScroll, { passive: true });
+    window.addEventListener('keydown', handleKeyPress);
+
+    return () => {
+      window.removeEventListener('wheel', handleUserScroll);
+      window.removeEventListener('touchmove', handleUserScroll);
+      window.removeEventListener('keydown', handleKeyPress);
+    };
+  }, [autoScrollEnabled]);
+
+  const toggleAutoScroll = () => {
+    setAutoScrollEnabled(prev => !prev);
+    if (!autoScrollEnabled) {
+      setShowSpeedControl(false);
+    }
+  };
 
   return (
     <>
@@ -777,6 +833,72 @@ function FloatingControls({
         >
           <ChevronLeft className="h-5 w-5" />
         </button>
+
+        {/* Auto Scroll Toggle */}
+        <button
+          onClick={toggleAutoScroll}
+          className={`p-3 rounded-full transition-colors ${
+            autoScrollEnabled 
+              ? 'bg-violet-600 text-white hover:bg-violet-700' 
+              : 'hover:bg-primary/20'
+          }`}
+          title={autoScrollEnabled ? "Pause Auto Scroll" : "Start Auto Scroll"}
+        >
+          {autoScrollEnabled ? (
+            <Pause className="h-5 w-5" />
+          ) : (
+            <Play className="h-5 w-5" />
+          )}
+        </button>
+
+        {/* Speed Control Button */}
+        {autoScrollEnabled && (
+          <button
+            onClick={() => setShowSpeedControl(!showSpeedControl)}
+            className="p-3 rounded-full hover:bg-primary/20 transition-colors text-xs font-bold"
+            title="Adjust Speed"
+          >
+            {scrollSpeed}x
+          </button>
+        )}
+
+        {/* Zoom Controls (Image chapters only) */}
+        {!isNovel && zoomLevel !== undefined && onZoomIn && onZoomOut && onZoomReset && (
+          <>
+            <div className="h-px bg-border/50 my-1" />
+            
+            {/* Zoom In */}
+            <button
+              onClick={onZoomIn}
+              disabled={zoomLevel >= 200}
+              className="p-3 rounded-full hover:bg-primary/20 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+              title="Zoom In"
+            >
+              <ZoomIn className="h-5 w-5" />
+            </button>
+
+            {/* Zoom Level Display & Reset */}
+            <button
+              onClick={onZoomReset}
+              className="p-3 rounded-full hover:bg-primary/20 transition-colors flex items-center justify-center text-xs font-semibold"
+              title="Reset Zoom (100%)"
+            >
+              {zoomLevel}%
+            </button>
+
+            {/* Zoom Out */}
+            <button
+              onClick={onZoomOut}
+              disabled={zoomLevel <= 50}
+              className="p-3 rounded-full hover:bg-primary/20 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+              title="Zoom Out"
+            >
+              <ZoomOut className="h-5 w-5" />
+            </button>
+            
+            <div className="h-px bg-border/50 my-1" />
+          </>
+        )}
 
         {/* Chapter List */}
         <button
@@ -835,16 +957,74 @@ function FloatingControls({
         </button>
       </div>
 
+      {/* Speed Control Panel */}
+      {showSpeedControl && autoScrollEnabled && (
+        <div className="fixed right-20 top-1/2 -translate-y-1/2 z-40 w-56 bg-card backdrop-blur-lg rounded-lg border border-border/50 shadow-xl p-4">
+          <div className="mb-3">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-semibold">Scroll Speed</span>
+              <button 
+                onClick={() => setShowSpeedControl(false)}
+                className="hover:text-primary"
+              >
+                <ArrowLeft className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="text-xs text-muted-foreground mb-3">
+              {scrollSpeed <= 3 ? 'Slow' : scrollSpeed <= 6 ? 'Medium' : 'Fast'}
+            </div>
+          </div>
+          
+          {/* Speed Slider */}
+          <input
+            type="range"
+            min="1"
+            max="10"
+            value={scrollSpeed}
+            onChange={(e) => setScrollSpeed(Number(e.target.value))}
+            className="w-full h-2 bg-secondary rounded-lg appearance-none cursor-pointer accent-violet-600"
+          />
+          
+          {/* Speed Presets */}
+          <div className="flex justify-between mt-3 gap-2">
+            <Button
+              variant={scrollSpeed === 2 ? "default" : "outline"}
+              size="sm"
+              onClick={() => setScrollSpeed(2)}
+              className="flex-1 text-xs"
+            >
+              Slow
+            </Button>
+            <Button
+              variant={scrollSpeed === 5 ? "default" : "outline"}
+              size="sm"
+              onClick={() => setScrollSpeed(5)}
+              className="flex-1 text-xs"
+            >
+              Medium
+            </Button>
+            <Button
+              variant={scrollSpeed === 8 ? "default" : "outline"}
+              size="sm"
+              onClick={() => setScrollSpeed(8)}
+              className="flex-1 text-xs"
+            >
+              Fast
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* Chapters Panel */}
       {showChapters && (
-        <div className="fixed right-20 top-1/2 -translate-y-1/2 z-40 w-64 max-h-96 overflow-y-auto bg-card backdrop-blur-lg rounded-lg border border-border/50 shadow-xl">
-          <div className="sticky top-0 bg-card backdrop-blur p-3 border-b border-border/50 flex items-center justify-between">
-            <span className="text-sm font-semibold">Chapters</span>
-            <button onClick={() => setShowChapters(false)} className="hover:text-primary">
-              <ArrowLeft className="h-4 w-4" />
+        <div className="fixed right-20 top-1/2 -translate-y-1/2 z-40 w-80 max-h-[500px] overflow-hidden bg-card backdrop-blur-lg rounded-xl border border-border/50 shadow-2xl">
+          <div className="sticky top-0 bg-card/95 backdrop-blur-md p-4 border-b border-border/50 flex items-center justify-between">
+            <span className="text-base font-bold">Chapters</span>
+            <button onClick={() => setShowChapters(false)} className="hover:text-primary transition-colors p-1 rounded-full hover:bg-primary/10">
+              <ArrowLeft className="h-5 w-5" />
             </button>
           </div>
-          <div className="p-2 space-y-1">
+          <div className="overflow-y-auto max-h-[420px] p-3 space-y-1.5 scrollbar-thin">
             {allChapters.map((ch) => (
               <button
                 key={ch.id}
@@ -852,8 +1032,10 @@ function FloatingControls({
                   navigate({ to: "/title/$titleSlug/$chapterSlug", params: { titleSlug: seriesSlug, chapterSlug: ch.slug } });
                   setShowChapters(false);
                 }}
-                className={`w-full text-left px-3 py-2 rounded text-sm hover:bg-primary/20 transition-colors ${
-                  ch.slug === currentChapterSlug ? "bg-primary/30 font-medium" : ""
+                className={`w-full text-left px-4 py-2.5 rounded-lg text-sm hover:bg-primary/20 transition-all ${
+                  ch.slug === currentChapterSlug 
+                    ? "bg-violet-600 text-white font-semibold shadow-md" 
+                    : "hover:shadow-sm"
                 }`}
               >
                 Chapter {ch.chapter_number}

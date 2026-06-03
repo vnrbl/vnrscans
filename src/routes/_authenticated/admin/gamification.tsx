@@ -78,7 +78,7 @@ function AdminGamification() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("achievements")
-        .select("*, unlocks:user_achievements(count)")
+        .select("*")
         .order("rarity")
         .order("requirement_value");
       if (error) throw error;
@@ -101,16 +101,17 @@ function AdminGamification() {
   const createAchievement = useMutation({
     mutationFn: async () => {
       const { error } = await supabase.from("achievements").insert({
-        name: achievementForm.name,
-        description: achievementForm.description,
+        name: achievementForm.name.trim(),
+        description: achievementForm.description?.trim() || null,
         icon: achievementForm.icon || null,
         category: achievementForm.category,
         requirement_type: achievementForm.requirement_type,
-        requirement_value: parseInt(achievementForm.requirement_value),
-        xp_reward: parseInt(achievementForm.xp_reward),
+        requirement_value: parseInt(achievementForm.requirement_value, 10) || 1,
+        xp_reward: parseInt(achievementForm.xp_reward, 10) || 10,
         badge_color: achievementForm.badge_color,
         rarity: achievementForm.rarity,
         is_secret: achievementForm.is_secret,
+        is_active: true,
       });
       if (error) throw error;
     },
@@ -167,12 +168,15 @@ function AdminGamification() {
   const createXPEvent = useMutation({
     mutationFn: async () => {
       const { error } = await supabase.from("xp_events").insert({
-        name: xpEventForm.name,
-        description: xpEventForm.description || null,
-        xp_multiplier: parseFloat(xpEventForm.xp_multiplier),
-        starts_at: xpEventForm.starts_at,
-        ends_at: xpEventForm.ends_at,
+        name: xpEventForm.name.trim(),
+        description: xpEventForm.description?.trim() || null,
+        xp_multiplier: parseFloat(xpEventForm.xp_multiplier) || 2,
+        starts_at: xpEventForm.starts_at
+          ? new Date(xpEventForm.starts_at).toISOString()
+          : new Date().toISOString(),
+        ends_at: xpEventForm.ends_at ? new Date(xpEventForm.ends_at).toISOString() : null,
         applies_to: xpEventForm.applies_to,
+        is_active: true,
       });
       if (error) throw error;
     },

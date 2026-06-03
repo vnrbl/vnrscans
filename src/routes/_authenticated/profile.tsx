@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 
 export const Route = createFileRoute("/_authenticated/profile")({
-  head: () => ({ meta: [{ title: "Profile — ShadowShelf" }] }),
+  head: () => ({ meta: [{ title: "Profile — 0Verse" }] }),
   component: ProfilePage,
 });
 

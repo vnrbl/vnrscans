@@ -20,7 +20,7 @@ import { TITLE_CARD_WIDTH, TITLE_COVER_CLASS } from "@/components/titleCardStyle
 
 export const Route = createFileRoute("/title/$slug")({
   head: ({ params }) => ({
-    meta: [{ title: `${params.slug} — ShadowShelf` }],
+    meta: [{ title: `${params.slug} — 0Verse` }],
   }),
   component: SeriesDetail,
   notFoundComponent: () => (

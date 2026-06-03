@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Plus, Pencil, Trash2, Eye, EyeOff, Image as ImageIcon } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { logAdminAction } from "@/lib/adminLog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -81,24 +82,27 @@ function AdminBanners() {
 
   const createBanner = useMutation({
     mutationFn: async () => {
+      const priority = parseInt(form.priority, 10);
       const { error } = await supabase.from("banners").insert({
-        title: form.title,
-        description: form.description || null,
-        image_url: form.image_url || null,
-        link_url: form.link_url || null,
-        link_text: form.link_text || null,
+        title: form.title.trim(),
+        description: form.description?.trim() || null,
+        image_url: form.image_url?.trim() || null,
+        link_url: form.link_url?.trim() || null,
+        link_text: form.link_text?.trim() || null,
         position: form.position,
-        priority: parseInt(form.priority),
+        priority: Number.isFinite(priority) ? priority : 0,
         background_color: form.background_color,
         text_color: form.text_color,
-        starts_at: form.starts_at || new Date().toISOString(),
-        expires_at: form.expires_at || null,
-        target_series_id: form.target_series_id || null,
+        starts_at: form.starts_at ? new Date(form.starts_at).toISOString() : new Date().toISOString(),
+        expires_at: form.expires_at ? new Date(form.expires_at).toISOString() : null,
+        target_series_id: form.target_series_id && form.target_series_id !== "none" ? form.target_series_id : null,
+        is_active: true,
       });
       if (error) throw error;
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       toast.success("Banner created");
+      await logAdminAction("create", "banner", undefined, { title: form.title });
       setOpen(false);
       setForm(emptyForm);
       qc.invalidateQueries({ queryKey: ["admin", "banners"] });
@@ -123,7 +127,7 @@ function AdminBanners() {
           text_color: form.text_color,
           starts_at: form.starts_at,
           expires_at: form.expires_at || null,
-          target_series_id: form.target_series_id || null,
+          target_series_id: form.target_series_id && form.target_series_id !== "none" ? form.target_series_id : null,
           updated_at: new Date().toISOString(),
         })
         .eq("id", editingItem.id);
@@ -409,7 +413,7 @@ function BannerForm({ form, setForm, series }: { form: BannerForm; setForm: (for
             <SelectValue placeholder="Select a title..." />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">None</SelectItem>
+            <SelectItem value="none">None</SelectItem>
             {series.map((s) => (
               <SelectItem key={s.id} value={s.id}>{s.title}</SelectItem>
             ))}

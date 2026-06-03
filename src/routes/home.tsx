@@ -9,6 +9,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useDragScroll, DRAG_SCROLL_CONTAINER_CLASS } from "@/hooks/useDragScroll";
 import { TITLE_CARD_WIDTH, TITLE_COVER_CLASS } from "@/components/titleCardStyles";
+import { HomeHeroCarousel } from "@/components/HomeHeroCarousel";
 
 export const Route = createFileRoute("/home")({
   head: () => ({
@@ -62,13 +63,22 @@ function HomePage() {
       const { data, error } = await supabase
         .from("reading_history")
         .select(
-          "id,updated_at,series:series_id(slug,title,cover_url),chapters:chapter_id(slug,chapter_number,title)"
+          "id,updated_at,series_id,series:series_id(slug,title,cover_url),chapters:chapter_id(slug,chapter_number,title)"
         )
         .eq("user_id", user!.id)
-        .order("updated_at", { ascending: false })
-        .limit(18);
+        .order("updated_at", { ascending: false });
       if (error) throw error;
-      return data ?? [];
+      
+      // Group by series and keep only the most recent chapter per series
+      const seriesMap = new Map();
+      (data ?? []).forEach((item) => {
+        if (item.series_id && !seriesMap.has(item.series_id)) {
+          seriesMap.set(item.series_id, item);
+        }
+      });
+      
+      // Convert back to array and limit to 18
+      return Array.from(seriesMap.values()).slice(0, 18);
     },
     enabled: !!user,
     staleTime: 1000 * 60, // 1 minute
@@ -117,6 +127,50 @@ function HomePage() {
     gcTime: 1000 * 60 * 30, // 30 minutes
   });
 
+  // Latest updates - series with recent chapter releases
+  const latestUpdates = useQuery({
+    queryKey: ["latest-updates"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("chapters")
+        .select("id,slug,chapter_number,title,created_at,series_id,series:series_id(id,slug,title,cover_url,type)")
+        .eq("status", "published")
+        .order("created_at", { ascending: false })
+        .limit(100);
+      
+      if (error) throw error;
+      
+      // Group by series and collect recent chapters for each
+      const seriesMap = new Map();
+      (data || []).forEach((ch: any) => {
+        if (!ch.series) return;
+        const seriesId = ch.series.id;
+        if (!seriesMap.has(seriesId)) {
+          seriesMap.set(seriesId, {
+            ...ch.series,
+            latest_update: ch.created_at,
+            recent_chapters: [],
+          });
+        }
+        // Add chapter to the series (limit to 5 chapters per series)
+        const seriesData = seriesMap.get(seriesId);
+        if (seriesData.recent_chapters.length < 5) {
+          seriesData.recent_chapters.push({
+            id: ch.id,
+            slug: ch.slug,
+            chapter_number: ch.chapter_number,
+            title: ch.title,
+            created_at: ch.created_at,
+          });
+        }
+      });
+      
+      // Convert to array and take first 12 unique series
+      return Array.from(seriesMap.values()).slice(0, 12);
+    },
+    staleTime: 1000 * 60 * 2, // 2 minutes
+    gcTime: 1000 * 60 * 5, // 5 minutes
+  });
   // High score manhwa
   const highScore = useQuery({
     queryKey: ["high-score"],
@@ -135,6 +189,8 @@ function HomePage() {
 
   return (
     <div className="min-h-screen">
+      <HomeHeroCarousel />
+
       {/* Featured Section */}
       {featured.data && featured.data.length > 0 && (
         <section className="container mx-auto px-8 py-4">
@@ -199,6 +255,15 @@ function HomePage() {
           />
         </>
       )}
+
+      {/* Latest Updates Section */}
+      <LatestUpdatesSection
+        title="Latest Updates"
+        description="Recently updated series with new chapters"
+        series={latestUpdates.data ?? []}
+        loading={latestUpdates.isLoading}
+        userId={user?.id}
+      />
 
       {/* Popular Manhwa Section */}
       <SeriesCarouselSection
@@ -456,6 +521,182 @@ function SeriesCarouselSection({
       ) : (
         <div className="rounded-lg border border-border/40 bg-card p-8 text-center">
           <p className="text-muted-foreground">No series available yet.</p>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function LatestUpdatesSection({
+  title,
+  description,
+  series,
+  loading,
+  userId,
+}: {
+  title: string;
+  description?: string;
+  series: Array<{
+    id: string;
+    slug: string;
+    title: string;
+    cover_url: string | null;
+    type: string;
+    recent_chapters: Array<{
+      id: string;
+      slug: string;
+      chapter_number: number;
+      title: string | null;
+      created_at: string;
+    }>;
+  }>;
+  loading: boolean;
+  userId?: string;
+}) {
+  // Fetch reading history to determine read status
+  const readingHistoryQuery = useQuery({
+    queryKey: ["latest-updates-reading-history", userId],
+    queryFn: async () => {
+      if (!userId) return [];
+      const { data, error } = await supabase
+        .from("reading_history")
+        .select("chapter_id")
+        .eq("user_id", userId);
+      if (error) throw error;
+      return data?.map(d => d.chapter_id) ?? [];
+    },
+    enabled: !!userId,
+    staleTime: 1000 * 60 * 2, // 2 minutes
+  });
+
+  const readChapterIds = new Set(readingHistoryQuery.data ?? []);
+
+  // Helper function to determine if chapter is newly added (within 24 hours)
+  const isNewChapter = (createdAt: string) => {
+    const oneDayAgo = new Date();
+    oneDayAgo.setHours(oneDayAgo.getHours() - 24);
+    return new Date(createdAt) > oneDayAgo;
+  };
+
+  return (
+    <section className="container mx-auto px-8 py-4">
+      <div className="mb-4 flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold">{title}</h2>
+          {description && (
+            <p className="mt-1 text-sm text-muted-foreground">{description}</p>
+          )}
+        </div>
+      </div>
+      
+      {loading ? (
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {[...Array(6)].map((_, i) => (
+            <div key={i} className="overflow-hidden rounded-lg border border-border/40 bg-card">
+              <div className="flex gap-4 p-4">
+                <div className="h-[200px] w-[140px] shrink-0 animate-pulse rounded-lg bg-secondary" />
+                <div className="flex-1 space-y-3">
+                  <div className="h-5 w-3/4 animate-pulse rounded bg-secondary" />
+                  <div className="h-4 w-1/2 animate-pulse rounded bg-secondary" />
+                  <div className="h-4 w-full animate-pulse rounded bg-secondary" />
+                  <div className="h-4 w-full animate-pulse rounded bg-secondary" />
+                  <div className="h-4 w-full animate-pulse rounded bg-secondary" />
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : series.length > 0 ? (
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {series.map((item) => (
+            <div
+              key={item.id}
+              className="group overflow-hidden rounded-lg border border-border/40 bg-card transition-all hover:border-primary/50 hover:shadow-lg"
+            >
+              <div className="flex gap-4 p-4">
+                {/* Cover Image */}
+                <Link
+                  to="/title/$slug"
+                  params={{ slug: item.slug }}
+                  className="shrink-0"
+                >
+                  <div className="relative h-[200px] w-[140px] overflow-hidden rounded-lg bg-secondary">
+                    {item.cover_url ? (
+                      <img
+                        src={item.cover_url}
+                        alt={item.title}
+                        loading="lazy"
+                        className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                        draggable={false}
+                      />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center text-muted-foreground">
+                        <BookOpen className="h-10 w-10" />
+                      </div>
+                    )}
+                  </div>
+                </Link>
+
+                {/* Series Info and Chapters */}
+                <div className="flex min-w-0 flex-1 flex-col">
+                  <Link
+                    to="/title/$slug"
+                    params={{ slug: item.slug }}
+                    className="line-clamp-2 text-base font-bold leading-tight hover:text-violet-600"
+                  >
+                    {item.title}
+                  </Link>
+
+                  {/* Recent Chapters List with Read Status */}
+                  <div className="mt-3 space-y-2">
+                    {item.recent_chapters.map((chapter) => {
+                      const isRead = readChapterIds.has(chapter.id);
+                      const isNew = isNewChapter(chapter.created_at);
+                      
+                      return (
+                        <Link
+                          key={chapter.id}
+                          to="/title/$titleSlug/$chapterSlug"
+                          params={{ titleSlug: item.slug, chapterSlug: chapter.slug }}
+                          className={`flex items-center justify-between text-sm transition-colors ${
+                            isRead 
+                              ? 'text-muted-foreground hover:text-muted-foreground/80' 
+                              : 'hover:text-violet-600 font-medium'
+                          }`}
+                        >
+                          <div className="flex min-w-0 flex-1 items-center gap-2">
+                            {isRead ? (
+                              <BookOpen className="h-3.5 w-3.5 shrink-0 text-green-600" />
+                            ) : (
+                              <BookOpen className="h-3.5 w-3.5 shrink-0 text-violet-600" />
+                            )}
+                            <span className="truncate">
+                              Chapter {chapter.chapter_number}
+                            </span>
+                            {isNew && !isRead && (
+                              <span className="shrink-0 flex items-center gap-1 rounded-full bg-violet-600 px-2 py-0.5 text-[10px] font-bold text-white">
+                                <svg className="h-2.5 w-2.5" fill="currentColor" viewBox="0 0 20 20">
+                                  <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                                </svg>
+                                NEW
+                              </span>
+                            )}
+                          </div>
+                          <span className="ml-2 shrink-0 text-xs text-muted-foreground">
+                            {formatTimeAgo(chapter.created_at)}
+                          </span>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="rounded-lg border border-border/40 bg-card p-8 text-center">
+          <p className="text-muted-foreground">No recent updates available.</p>
         </div>
       )}
     </section>

@@ -1,9 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { Plus, Pencil, Trash2, Shield } from "lucide-react";
+import { Plus, Pencil, Trash2, Shield, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { logAdminAction } from "@/lib/adminLog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -49,6 +50,9 @@ const emptyForm: PermissionForm = {
 function AdminPermissions() {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
+  const [roleDialogOpen, setRoleDialogOpen] = useState(false);
+  const [assignUserId, setAssignUserId] = useState("");
+  const [assignRole, setAssignRole] = useState<"admin" | "moderator" | "user">("moderator");
   const [editingItem, setEditingItem] = useState<any | null>(null);
   const [form, setForm] = useState<PermissionForm>(emptyForm);
 
@@ -70,7 +74,7 @@ function AdminPermissions() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("user_roles")
-        .select("*, profile:user_id(username, avatar_url)")
+        .select("*, profile:profiles!user_id(username, avatar_url)")
         .order("created_at", { ascending: false });
       if (error) throw error;
       return data || [];
@@ -116,6 +120,50 @@ function AdminPermissions() {
       setEditingItem(null);
       setForm(emptyForm);
       qc.invalidateQueries({ queryKey: ["admin", "permissions"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const profiles = useQuery({
+    queryKey: ["admin", "profiles-list"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("id, username")
+        .order("username")
+        .limit(500);
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  const assignUserRole = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.from("user_roles").insert({
+        user_id: assignUserId,
+        role: assignRole,
+      });
+      if (error) throw error;
+      await logAdminAction("assign_role", "user_role", assignUserId, { role: assignRole });
+    },
+    onSuccess: () => {
+      toast.success("Role assigned");
+      setRoleDialogOpen(false);
+      setAssignUserId("");
+      qc.invalidateQueries({ queryKey: ["admin", "user_roles"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const revokeRole = useMutation({
+    mutationFn: async (row: { id: string; user_id: string; role: string }) => {
+      const { error } = await supabase.from("user_roles").delete().eq("id", row.id);
+      if (error) throw error;
+      await logAdminAction("revoke_role", "user_role", row.user_id, { role: row.role });
+    },
+    onSuccess: () => {
+      toast.success("Role removed");
+      qc.invalidateQueries({ queryKey: ["admin", "user_roles"] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -256,7 +304,58 @@ function AdminPermissions() {
 
         {/* User Roles */}
         <div>
-          <h2 className="mb-3 text-lg font-semibold">User Role Assignments</h2>
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-lg font-semibold">User Role Assignments</h2>
+            <Dialog open={roleDialogOpen} onOpenChange={setRoleDialogOpen}>
+              <DialogTrigger asChild>
+                <Button size="sm" variant="outline">
+                  <UserPlus className="mr-1 h-4 w-4" />
+                  Assign role
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Assign role to user</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div>
+                    <Label>User</Label>
+                    <Select value={assignUserId} onValueChange={setAssignUserId}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select user..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {(profiles.data ?? []).map((p) => (
+                          <SelectItem key={p.id} value={p.id}>@{p.username}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label>Role</Label>
+                    <Select value={assignRole} onValueChange={(v) => setAssignRole(v as typeof assignRole)}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="admin">Admin</SelectItem>
+                        <SelectItem value="moderator">Moderator</SelectItem>
+                        <SelectItem value="user">User</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button
+                    onClick={() => assignUserRole.mutate()}
+                    disabled={!assignUserId || assignUserRole.isPending}
+                  >
+                    Assign
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </div>
           <div className="space-y-2">
             {userRoles.isLoading && <p className="text-sm text-muted-foreground">Loading...</p>}
 
@@ -280,9 +379,21 @@ function AdminPermissions() {
                     </Badge>
                   </div>
                 </div>
-                <span className="text-xs text-muted-foreground">
-                  {new Date(item.created_at).toLocaleDateString()}
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground">
+                    {new Date(item.created_at).toLocaleDateString()}
+                  </span>
+                  {item.role !== "user" && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 text-destructive"
+                      onClick={() => revokeRole.mutate(item)}
+                    >
+                      Revoke
+                    </Button>
+                  )}
+                </div>
               </div>
             ))}
           </div>

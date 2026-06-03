@@ -4,6 +4,7 @@ import { useState } from "react";
 import { CheckCircle2, XCircle, AlertTriangle, ExternalLink, Flag } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { logAdminAction } from "@/lib/adminLog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -29,7 +30,7 @@ function AdminModeration() {
     queryFn: async () => {
       let query = supabase
         .from("moderation_queue")
-        .select("*, reporter:reported_by(username), reviewer:reviewed_by(username)")
+        .select("*")
         .order("priority", { ascending: false })
         .order("created_at", { ascending: false });
 
@@ -44,8 +45,10 @@ function AdminModeration() {
   });
 
   const reviewItem = useMutation({
-    mutationFn: async ({ id, status }: { id: string; status: string }) => {
+    mutationFn: async ({ id, status, item }: { id: string; status: string; item: Record<string, unknown> }) => {
       const { data: user } = await supabase.auth.getUser();
+      await applyModerationAction(item, actionTaken);
+
       const { error } = await supabase
         .from("moderation_queue")
         .update({
@@ -54,9 +57,23 @@ function AdminModeration() {
           reviewed_at: new Date().toISOString(),
           review_notes: reviewNotes || null,
           action_taken: actionTaken,
+          updated_at: new Date().toISOString(),
         })
         .eq("id", id);
+
       if (error) throw error;
+
+      if (item.source_report_id) {
+        await supabase
+          .from("reports")
+          .update({ status: status === "approved" ? "dismissed" : "resolved" })
+          .eq("id", item.source_report_id);
+      }
+
+      await logAdminAction(`moderation_${status}`, "moderation", id, {
+        content_type: item.content_type,
+        action_taken: actionTaken,
+      });
     },
     onSuccess: () => {
       toast.success("Item reviewed");
@@ -139,12 +156,12 @@ function AdminModeration() {
                     
                     <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
                       <span>ID: {item.content_id.slice(0, 8)}</span>
-                      {item.reporter && <span>Reported by: @{item.reporter.username}</span>}
+                      {item.reported_by && <span>Reported by: user {item.reported_by.slice(0, 8)}…</span>}
                       <span>Created: {new Date(item.created_at).toLocaleString()}</span>
                       {item.reviewed_at && (
                         <>
                           <span>Reviewed: {new Date(item.reviewed_at).toLocaleString()}</span>
-                          {item.reviewer && <span>By: @{item.reviewer.username}</span>}
+                          {item.reviewed_by && <span>By: user {item.reviewed_by.slice(0, 8)}…</span>}
                         </>
                       )}
                     </div>
@@ -259,7 +276,7 @@ function AdminModeration() {
 
           <DialogFooter>
             <Button
-              onClick={() => reviewItem.mutate({ id: reviewDialog?.id, status: reviewDialog?.action })}
+              onClick={() => reviewItem.mutate({ id: reviewDialog?.id, status: reviewDialog?.action, item: reviewDialog })}
               disabled={reviewItem.isPending}
             >
               {reviewItem.isPending ? "Processing..." : "Confirm"}
@@ -269,6 +286,21 @@ function AdminModeration() {
       </Dialog>
     </div>
   );
+}
+
+async function applyModerationAction(item: Record<string, unknown>, action: string) {
+  const contentType = String(item.content_type ?? "");
+  const contentId = String(item.content_id ?? "");
+
+  if (action === "content_removed" && contentType === "comment") {
+    await supabase.from("comments").update({ is_hidden: true }).eq("id", contentId);
+  }
+  if (action === "user_banned" && contentType === "comment") {
+    const { data: comment } = await supabase.from("comments").select("user_id").eq("id", contentId).single();
+    if (comment?.user_id) {
+      await supabase.from("profiles").update({ is_banned: true }).eq("id", comment.user_id);
+    }
+  }
 }
 
 function getContentLink(type: string, id: string): string {
