@@ -168,7 +168,10 @@ export function HomeHeroCarousel() {
   };
 
   const handleMouseLeave = () => {
-    setIsPaused(false);
+    // Small delay to prevent flickering when moving between cards
+    setTimeout(() => {
+      setIsPaused(false);
+    }, 100);
   };
 
   if (carouselSeries.isLoading || items.length === 0) return null;
@@ -181,11 +184,7 @@ export function HomeHeroCarousel() {
         <div className="absolute right-0 top-0 bottom-0 w-32 md:w-40 lg:w-48 bg-gradient-to-l from-background via-background/80 to-transparent z-10 pointer-events-none" />
         
         {/* Scrollable Container */}
-        <div 
-          className="relative group"
-          onMouseEnter={handleMouseEnter}
-          onMouseLeave={handleMouseLeave}
-        >
+        <div className="relative group">
           {/* Left Arrow */}
           {showLeftArrow && (
             <Button
@@ -207,6 +206,8 @@ export function HomeHeroCarousel() {
               msOverflowStyle: 'none',
               scrollBehavior: 'auto',
             }}
+            onMouseEnter={handleMouseEnter}
+            onMouseLeave={handleMouseLeave}
           >
             {loopedItems.map((item, index) => (
               <Link

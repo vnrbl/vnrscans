@@ -12,6 +12,22 @@ export default defineConfig({
     // nitro/vite builds from this
     server: { entry: "server" },
   },
+  nitro: {
+    // Configure Nitro to use Vercel preset for deployment
+    preset: "vercel",
+    vercel: {
+      regions: ["iad1"],
+      functions: {
+        memory: 1024,
+        maxDuration: 10,
+      },
+    },
+    rollupConfig: {
+      output: {
+        format: "esm",
+      },
+    },
+  },
   vite: {
     optimizeDeps: {
       include: [

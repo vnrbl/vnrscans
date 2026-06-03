@@ -26,8 +26,15 @@ import {
   TrendingUp,
   Award,
   Eye,
-  Camera
+  Camera,
+  Code
 } from "lucide-react";
+import { ReadingGoals } from "@/components/profile/ReadingGoals";
+import { AvatarUpload } from "@/components/profile/AvatarUpload";
+import { ProfileBadges } from "@/components/profile/ProfileBadges";
+import { PrivacySettings } from "@/components/profile/PrivacySettings";
+import { ReadingHeatmap } from "@/components/profile/ReadingHeatmap";
+import { ProfileWidgets } from "@/components/profile/ProfileWidgets";
 
 export const Route = createFileRoute("/_authenticated/profile")({
   head: () => ({ meta: [{ title: "Profile — 0Verse" }] }),
@@ -159,15 +166,11 @@ function ProfilePage() {
         <div className="flex flex-col gap-6 md:flex-row md:items-start">
           {/* Avatar */}
           <div className="relative flex-shrink-0">
-            <div className="h-32 w-32 overflow-hidden rounded-full border-4 border-violet-500/20 bg-gradient-to-br from-violet-500/20 to-purple-500/20">
-              {avatarUrl ? (
-                <img src={avatarUrl} alt={username} className="h-full w-full object-cover" />
-              ) : (
-                <div className="flex h-full w-full items-center justify-center text-4xl font-bold text-violet-500">
-                  {username?.charAt(0)?.toUpperCase() || "?"}
-                </div>
-              )}
-            </div>
+            <AvatarUpload
+              currentAvatarUrl={avatarUrl}
+              username={username}
+              onAvatarUpdated={(url) => setAvatarUrl(url)}
+            />
             {profile.data?.is_vip && (
               <div className="absolute -bottom-2 -right-2 rounded-full bg-gradient-to-r from-yellow-400 to-yellow-600 p-2">
                 <Crown className="h-5 w-5 text-white" />
@@ -277,18 +280,30 @@ function ProfilePage() {
 
       {/* Tabs */}
       <Tabs defaultValue="edit" className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="edit">
-            <Settings className="mr-2 h-4 w-4" />
-            Edit Profile
+        <TabsList className="grid w-full grid-cols-3 lg:grid-cols-6 h-auto">
+          <TabsTrigger value="edit" className="gap-2">
+            <Settings className="h-4 w-4" />
+            <span className="hidden sm:inline">Edit</span>
           </TabsTrigger>
-          <TabsTrigger value="achievements">
-            <Trophy className="mr-2 h-4 w-4" />
-            Achievements
+          <TabsTrigger value="goals" className="gap-2">
+            <Target className="h-4 w-4" />
+            <span className="hidden sm:inline">Goals</span>
           </TabsTrigger>
-          <TabsTrigger value="stats">
-            <TrendingUp className="mr-2 h-4 w-4" />
-            Statistics
+          <TabsTrigger value="badges" className="gap-2">
+            <Award className="h-4 w-4" />
+            <span className="hidden sm:inline">Badges</span>
+          </TabsTrigger>
+          <TabsTrigger value="achievements" className="gap-2">
+            <Trophy className="h-4 w-4" />
+            <span className="hidden sm:inline">Achievements</span>
+          </TabsTrigger>
+          <TabsTrigger value="stats" className="gap-2">
+            <TrendingUp className="h-4 w-4" />
+            <span className="hidden sm:inline">Stats</span>
+          </TabsTrigger>
+          <TabsTrigger value="privacy" className="gap-2">
+            <Shield className="h-4 w-4" />
+            <span className="hidden sm:inline">Privacy</span>
           </TabsTrigger>
         </TabsList>
 
@@ -362,6 +377,20 @@ function ProfilePage() {
           </Card>
         </TabsContent>
 
+        {/* Reading Goals Tab */}
+        <TabsContent value="goals">
+          <Card className="p-6">
+            <ReadingGoals />
+          </Card>
+        </TabsContent>
+
+        {/* Profile Badges Tab */}
+        <TabsContent value="badges">
+          <Card className="p-6">
+            <ProfileBadges />
+          </Card>
+        </TabsContent>
+
         {/* Achievements Tab */}
         <TabsContent value="achievements">
           <Card className="p-6">
@@ -412,9 +441,14 @@ function ProfilePage() {
 
         {/* Statistics Tab */}
         <TabsContent value="stats">
-          <Card className="p-6">
-            <h2 className="mb-4 text-xl font-bold">Your Statistics</h2>
-            <div className="space-y-6">
+          <div className="space-y-6">
+            {/* Reading Heatmap */}
+            <ReadingHeatmap />
+
+            {/* Original Stats */}
+            <Card className="p-6">
+              <h2 className="mb-4 text-xl font-bold">Your Statistics</h2>
+              <div className="space-y-6">
               {/* Reading Activity */}
               <div>
                 <h3 className="mb-3 font-semibold">Reading Activity</h3>
@@ -505,9 +539,44 @@ function ProfilePage() {
                 </div>
               </div>
             </div>
+            </Card>
+          </div>
+        </TabsContent>
+
+        {/* Privacy Settings Tab */}
+        <TabsContent value="privacy">
+          <Card className="p-6">
+            <PrivacySettings />
+          </Card>
+        </TabsContent>
+
+        {/* Profile Widgets Tab - Hidden by default, can be accessed via direct link */}
+        <TabsContent value="widgets">
+          <Card className="p-6">
+            <ProfileWidgets />
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Widget Link (below tabs) */}
+      <div className="mt-4">
+        <Button
+          variant="outline"
+          size="sm"
+          className="gap-2"
+          onClick={() => {
+            const tabsElement = document.querySelector('[role="tablist"]');
+            const widgetButton = document.querySelector('[value="widgets"]') as HTMLElement;
+            if (widgetButton) {
+              widgetButton.click();
+              tabsElement?.scrollIntoView({ behavior: "smooth" });
+            }
+          }}
+        >
+          <Code className="h-4 w-4" />
+          Generate Profile Widget
+        </Button>
+      </div>
     </div>
   );
 }

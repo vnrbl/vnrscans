@@ -1,6 +1,6 @@
 import { Link, useNavigate, useRouter } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
-import { Menu, X, Search, BookOpen, User as UserIcon, LogOut, ShieldCheck, Library, TrendingUp, Home, Settings, Sparkles, Trophy, Shuffle, Tag } from "lucide-react";
+import { Menu, X, Search, BookOpen, User as UserIcon, LogOut, ShieldCheck, Library, TrendingUp, Home, Sparkles, Trophy, Shuffle, Tag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth, useIsAdmin } from "@/hooks/useAuth";
@@ -307,9 +307,6 @@ export function Navbar() {
                   )}
                   <DropdownMenuItem onClick={() => navigate({ to: "/profile" })}>
                     <UserIcon className="mr-2 h-4 w-4" /> Profile
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => navigate({ to: "/settings" })}>
-                    <Settings className="mr-2 h-4 w-4" /> Settings
                   </DropdownMenuItem>
                   {isAdmin && (
                     <>

@@ -1,0 +1,9 @@
+{
+  "handler": "index.mjs",
+  "launcherType": "Nodejs",
+  "shouldAddHelpers": false,
+  "supportsResponseStreaming": true,
+  "memory": 1024,
+  "maxDuration": 10,
+  "runtime": "nodejs24.x"
+}
