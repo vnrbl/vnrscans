@@ -9,7 +9,10 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as TagsRouteImport } from './routes/tags'
 import { Route as SearchRouteImport } from './routes/search'
+import { Route as RecommendationsRouteImport } from './routes/recommendations'
+import { Route as RankingsRouteImport } from './routes/rankings'
 import { Route as HomeRouteImport } from './routes/home'
 import { Route as DmcaRouteImport } from './routes/dmca'
 import { Route as ContactRouteImport } from './routes/contact'
@@ -19,19 +22,43 @@ import { Route as AboutRouteImport } from './routes/about'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as TitleSlugRouteImport } from './routes/title.$slug'
+import { Route as TagsSlugRouteImport } from './routes/tags.$slug'
+import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
 import { Route as AuthenticatedProfileRouteImport } from './routes/_authenticated/profile'
 import { Route as AuthenticatedLibraryRouteImport } from './routes/_authenticated/library'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin/index'
 import { Route as TitleTitleSlugChapterSlugRouteImport } from './routes/title.$titleSlug.$chapterSlug'
 import { Route as AuthenticatedAdminUsersRouteImport } from './routes/_authenticated/admin/users'
+import { Route as AuthenticatedAdminTagsRouteImport } from './routes/_authenticated/admin/tags'
 import { Route as AuthenticatedAdminSeriesRouteImport } from './routes/_authenticated/admin/series'
 import { Route as AuthenticatedAdminReportsRouteImport } from './routes/_authenticated/admin/reports'
+import { Route as AuthenticatedAdminPermissionsRouteImport } from './routes/_authenticated/admin/permissions'
+import { Route as AuthenticatedAdminModerationRouteImport } from './routes/_authenticated/admin/moderation'
+import { Route as AuthenticatedAdminGamificationRouteImport } from './routes/_authenticated/admin/gamification'
 import { Route as AuthenticatedAdminCommentsRouteImport } from './routes/_authenticated/admin/comments'
+import { Route as AuthenticatedAdminBannersRouteImport } from './routes/_authenticated/admin/banners'
+import { Route as AuthenticatedAdminAnnouncementsRouteImport } from './routes/_authenticated/admin/announcements'
+import { Route as AuthenticatedAdminAnalyticsRouteImport } from './routes/_authenticated/admin/analytics'
 
+const TagsRoute = TagsRouteImport.update({
+  id: '/tags',
+  path: '/tags',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SearchRoute = SearchRouteImport.update({
   id: '/search',
   path: '/search',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RecommendationsRoute = RecommendationsRouteImport.update({
+  id: '/recommendations',
+  path: '/recommendations',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RankingsRoute = RankingsRouteImport.update({
+  id: '/rankings',
+  path: '/rankings',
   getParentRoute: () => rootRouteImport,
 } as any)
 const HomeRoute = HomeRouteImport.update({
@@ -78,6 +105,16 @@ const TitleSlugRoute = TitleSlugRouteImport.update({
   path: '/title/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
+const TagsSlugRoute = TagsSlugRouteImport.update({
+  id: '/$slug',
+  path: '/$slug',
+  getParentRoute: () => TagsRoute,
+} as any)
+const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
 const AuthenticatedProfileRoute = AuthenticatedProfileRouteImport.update({
   id: '/profile',
   path: '/profile',
@@ -109,6 +146,11 @@ const AuthenticatedAdminUsersRoute = AuthenticatedAdminUsersRouteImport.update({
   path: '/users',
   getParentRoute: () => AuthenticatedAdminRoute,
 } as any)
+const AuthenticatedAdminTagsRoute = AuthenticatedAdminTagsRouteImport.update({
+  id: '/tags',
+  path: '/tags',
+  getParentRoute: () => AuthenticatedAdminRoute,
+} as any)
 const AuthenticatedAdminSeriesRoute =
   AuthenticatedAdminSeriesRouteImport.update({
     id: '/series',
@@ -121,10 +163,46 @@ const AuthenticatedAdminReportsRoute =
     path: '/reports',
     getParentRoute: () => AuthenticatedAdminRoute,
   } as any)
+const AuthenticatedAdminPermissionsRoute =
+  AuthenticatedAdminPermissionsRouteImport.update({
+    id: '/permissions',
+    path: '/permissions',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
+const AuthenticatedAdminModerationRoute =
+  AuthenticatedAdminModerationRouteImport.update({
+    id: '/moderation',
+    path: '/moderation',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
+const AuthenticatedAdminGamificationRoute =
+  AuthenticatedAdminGamificationRouteImport.update({
+    id: '/gamification',
+    path: '/gamification',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
 const AuthenticatedAdminCommentsRoute =
   AuthenticatedAdminCommentsRouteImport.update({
     id: '/comments',
     path: '/comments',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
+const AuthenticatedAdminBannersRoute =
+  AuthenticatedAdminBannersRouteImport.update({
+    id: '/banners',
+    path: '/banners',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
+const AuthenticatedAdminAnnouncementsRoute =
+  AuthenticatedAdminAnnouncementsRouteImport.update({
+    id: '/announcements',
+    path: '/announcements',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
+const AuthenticatedAdminAnalyticsRoute =
+  AuthenticatedAdminAnalyticsRouteImport.update({
+    id: '/analytics',
+    path: '/analytics',
     getParentRoute: () => AuthenticatedAdminRoute,
   } as any)
 
@@ -136,14 +214,26 @@ export interface FileRoutesByFullPath {
   '/contact': typeof ContactRoute
   '/dmca': typeof DmcaRoute
   '/home': typeof HomeRoute
+  '/rankings': typeof RankingsRoute
+  '/recommendations': typeof RecommendationsRoute
   '/search': typeof SearchRoute
+  '/tags': typeof TagsRouteWithChildren
   '/admin': typeof AuthenticatedAdminRouteWithChildren
   '/library': typeof AuthenticatedLibraryRoute
   '/profile': typeof AuthenticatedProfileRoute
+  '/settings': typeof AuthenticatedSettingsRoute
+  '/tags/$slug': typeof TagsSlugRoute
   '/title/$slug': typeof TitleSlugRoute
+  '/admin/analytics': typeof AuthenticatedAdminAnalyticsRoute
+  '/admin/announcements': typeof AuthenticatedAdminAnnouncementsRoute
+  '/admin/banners': typeof AuthenticatedAdminBannersRoute
   '/admin/comments': typeof AuthenticatedAdminCommentsRoute
+  '/admin/gamification': typeof AuthenticatedAdminGamificationRoute
+  '/admin/moderation': typeof AuthenticatedAdminModerationRoute
+  '/admin/permissions': typeof AuthenticatedAdminPermissionsRoute
   '/admin/reports': typeof AuthenticatedAdminReportsRoute
   '/admin/series': typeof AuthenticatedAdminSeriesRoute
+  '/admin/tags': typeof AuthenticatedAdminTagsRoute
   '/admin/users': typeof AuthenticatedAdminUsersRoute
   '/title/$titleSlug/$chapterSlug': typeof TitleTitleSlugChapterSlugRoute
   '/admin/': typeof AuthenticatedAdminIndexRoute
@@ -156,13 +246,25 @@ export interface FileRoutesByTo {
   '/contact': typeof ContactRoute
   '/dmca': typeof DmcaRoute
   '/home': typeof HomeRoute
+  '/rankings': typeof RankingsRoute
+  '/recommendations': typeof RecommendationsRoute
   '/search': typeof SearchRoute
+  '/tags': typeof TagsRouteWithChildren
   '/library': typeof AuthenticatedLibraryRoute
   '/profile': typeof AuthenticatedProfileRoute
+  '/settings': typeof AuthenticatedSettingsRoute
+  '/tags/$slug': typeof TagsSlugRoute
   '/title/$slug': typeof TitleSlugRoute
+  '/admin/analytics': typeof AuthenticatedAdminAnalyticsRoute
+  '/admin/announcements': typeof AuthenticatedAdminAnnouncementsRoute
+  '/admin/banners': typeof AuthenticatedAdminBannersRoute
   '/admin/comments': typeof AuthenticatedAdminCommentsRoute
+  '/admin/gamification': typeof AuthenticatedAdminGamificationRoute
+  '/admin/moderation': typeof AuthenticatedAdminModerationRoute
+  '/admin/permissions': typeof AuthenticatedAdminPermissionsRoute
   '/admin/reports': typeof AuthenticatedAdminReportsRoute
   '/admin/series': typeof AuthenticatedAdminSeriesRoute
+  '/admin/tags': typeof AuthenticatedAdminTagsRoute
   '/admin/users': typeof AuthenticatedAdminUsersRoute
   '/title/$titleSlug/$chapterSlug': typeof TitleTitleSlugChapterSlugRoute
   '/admin': typeof AuthenticatedAdminIndexRoute
@@ -177,14 +279,26 @@ export interface FileRoutesById {
   '/contact': typeof ContactRoute
   '/dmca': typeof DmcaRoute
   '/home': typeof HomeRoute
+  '/rankings': typeof RankingsRoute
+  '/recommendations': typeof RecommendationsRoute
   '/search': typeof SearchRoute
+  '/tags': typeof TagsRouteWithChildren
   '/_authenticated/admin': typeof AuthenticatedAdminRouteWithChildren
   '/_authenticated/library': typeof AuthenticatedLibraryRoute
   '/_authenticated/profile': typeof AuthenticatedProfileRoute
+  '/_authenticated/settings': typeof AuthenticatedSettingsRoute
+  '/tags/$slug': typeof TagsSlugRoute
   '/title/$slug': typeof TitleSlugRoute
+  '/_authenticated/admin/analytics': typeof AuthenticatedAdminAnalyticsRoute
+  '/_authenticated/admin/announcements': typeof AuthenticatedAdminAnnouncementsRoute
+  '/_authenticated/admin/banners': typeof AuthenticatedAdminBannersRoute
   '/_authenticated/admin/comments': typeof AuthenticatedAdminCommentsRoute
+  '/_authenticated/admin/gamification': typeof AuthenticatedAdminGamificationRoute
+  '/_authenticated/admin/moderation': typeof AuthenticatedAdminModerationRoute
+  '/_authenticated/admin/permissions': typeof AuthenticatedAdminPermissionsRoute
   '/_authenticated/admin/reports': typeof AuthenticatedAdminReportsRoute
   '/_authenticated/admin/series': typeof AuthenticatedAdminSeriesRoute
+  '/_authenticated/admin/tags': typeof AuthenticatedAdminTagsRoute
   '/_authenticated/admin/users': typeof AuthenticatedAdminUsersRoute
   '/title/$titleSlug/$chapterSlug': typeof TitleTitleSlugChapterSlugRoute
   '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute
@@ -199,14 +313,26 @@ export interface FileRouteTypes {
     | '/contact'
     | '/dmca'
     | '/home'
+    | '/rankings'
+    | '/recommendations'
     | '/search'
+    | '/tags'
     | '/admin'
     | '/library'
     | '/profile'
+    | '/settings'
+    | '/tags/$slug'
     | '/title/$slug'
+    | '/admin/analytics'
+    | '/admin/announcements'
+    | '/admin/banners'
     | '/admin/comments'
+    | '/admin/gamification'
+    | '/admin/moderation'
+    | '/admin/permissions'
     | '/admin/reports'
     | '/admin/series'
+    | '/admin/tags'
     | '/admin/users'
     | '/title/$titleSlug/$chapterSlug'
     | '/admin/'
@@ -219,13 +345,25 @@ export interface FileRouteTypes {
     | '/contact'
     | '/dmca'
     | '/home'
+    | '/rankings'
+    | '/recommendations'
     | '/search'
+    | '/tags'
     | '/library'
     | '/profile'
+    | '/settings'
+    | '/tags/$slug'
     | '/title/$slug'
+    | '/admin/analytics'
+    | '/admin/announcements'
+    | '/admin/banners'
     | '/admin/comments'
+    | '/admin/gamification'
+    | '/admin/moderation'
+    | '/admin/permissions'
     | '/admin/reports'
     | '/admin/series'
+    | '/admin/tags'
     | '/admin/users'
     | '/title/$titleSlug/$chapterSlug'
     | '/admin'
@@ -239,14 +377,26 @@ export interface FileRouteTypes {
     | '/contact'
     | '/dmca'
     | '/home'
+    | '/rankings'
+    | '/recommendations'
     | '/search'
+    | '/tags'
     | '/_authenticated/admin'
     | '/_authenticated/library'
     | '/_authenticated/profile'
+    | '/_authenticated/settings'
+    | '/tags/$slug'
     | '/title/$slug'
+    | '/_authenticated/admin/analytics'
+    | '/_authenticated/admin/announcements'
+    | '/_authenticated/admin/banners'
     | '/_authenticated/admin/comments'
+    | '/_authenticated/admin/gamification'
+    | '/_authenticated/admin/moderation'
+    | '/_authenticated/admin/permissions'
     | '/_authenticated/admin/reports'
     | '/_authenticated/admin/series'
+    | '/_authenticated/admin/tags'
     | '/_authenticated/admin/users'
     | '/title/$titleSlug/$chapterSlug'
     | '/_authenticated/admin/'
@@ -261,18 +411,42 @@ export interface RootRouteChildren {
   ContactRoute: typeof ContactRoute
   DmcaRoute: typeof DmcaRoute
   HomeRoute: typeof HomeRoute
+  RankingsRoute: typeof RankingsRoute
+  RecommendationsRoute: typeof RecommendationsRoute
   SearchRoute: typeof SearchRoute
+  TagsRoute: typeof TagsRouteWithChildren
   TitleSlugRoute: typeof TitleSlugRoute
   TitleTitleSlugChapterSlugRoute: typeof TitleTitleSlugChapterSlugRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/tags': {
+      id: '/tags'
+      path: '/tags'
+      fullPath: '/tags'
+      preLoaderRoute: typeof TagsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/search': {
       id: '/search'
       path: '/search'
       fullPath: '/search'
       preLoaderRoute: typeof SearchRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/recommendations': {
+      id: '/recommendations'
+      path: '/recommendations'
+      fullPath: '/recommendations'
+      preLoaderRoute: typeof RecommendationsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/rankings': {
+      id: '/rankings'
+      path: '/rankings'
+      fullPath: '/rankings'
+      preLoaderRoute: typeof RankingsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/home': {
@@ -338,6 +512,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TitleSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/tags/$slug': {
+      id: '/tags/$slug'
+      path: '/$slug'
+      fullPath: '/tags/$slug'
+      preLoaderRoute: typeof TagsSlugRouteImport
+      parentRoute: typeof TagsRoute
+    }
+    '/_authenticated/settings': {
+      id: '/_authenticated/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof AuthenticatedSettingsRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/profile': {
       id: '/_authenticated/profile'
       path: '/profile'
@@ -380,6 +568,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminUsersRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
     }
+    '/_authenticated/admin/tags': {
+      id: '/_authenticated/admin/tags'
+      path: '/tags'
+      fullPath: '/admin/tags'
+      preLoaderRoute: typeof AuthenticatedAdminTagsRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
     '/_authenticated/admin/series': {
       id: '/_authenticated/admin/series'
       path: '/series'
@@ -394,6 +589,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminReportsRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
     }
+    '/_authenticated/admin/permissions': {
+      id: '/_authenticated/admin/permissions'
+      path: '/permissions'
+      fullPath: '/admin/permissions'
+      preLoaderRoute: typeof AuthenticatedAdminPermissionsRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
+    '/_authenticated/admin/moderation': {
+      id: '/_authenticated/admin/moderation'
+      path: '/moderation'
+      fullPath: '/admin/moderation'
+      preLoaderRoute: typeof AuthenticatedAdminModerationRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
+    '/_authenticated/admin/gamification': {
+      id: '/_authenticated/admin/gamification'
+      path: '/gamification'
+      fullPath: '/admin/gamification'
+      preLoaderRoute: typeof AuthenticatedAdminGamificationRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
     '/_authenticated/admin/comments': {
       id: '/_authenticated/admin/comments'
       path: '/comments'
@@ -401,21 +617,56 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminCommentsRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
     }
+    '/_authenticated/admin/banners': {
+      id: '/_authenticated/admin/banners'
+      path: '/banners'
+      fullPath: '/admin/banners'
+      preLoaderRoute: typeof AuthenticatedAdminBannersRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
+    '/_authenticated/admin/announcements': {
+      id: '/_authenticated/admin/announcements'
+      path: '/announcements'
+      fullPath: '/admin/announcements'
+      preLoaderRoute: typeof AuthenticatedAdminAnnouncementsRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
+    '/_authenticated/admin/analytics': {
+      id: '/_authenticated/admin/analytics'
+      path: '/analytics'
+      fullPath: '/admin/analytics'
+      preLoaderRoute: typeof AuthenticatedAdminAnalyticsRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
   }
 }
 
 interface AuthenticatedAdminRouteChildren {
+  AuthenticatedAdminAnalyticsRoute: typeof AuthenticatedAdminAnalyticsRoute
+  AuthenticatedAdminAnnouncementsRoute: typeof AuthenticatedAdminAnnouncementsRoute
+  AuthenticatedAdminBannersRoute: typeof AuthenticatedAdminBannersRoute
   AuthenticatedAdminCommentsRoute: typeof AuthenticatedAdminCommentsRoute
+  AuthenticatedAdminGamificationRoute: typeof AuthenticatedAdminGamificationRoute
+  AuthenticatedAdminModerationRoute: typeof AuthenticatedAdminModerationRoute
+  AuthenticatedAdminPermissionsRoute: typeof AuthenticatedAdminPermissionsRoute
   AuthenticatedAdminReportsRoute: typeof AuthenticatedAdminReportsRoute
   AuthenticatedAdminSeriesRoute: typeof AuthenticatedAdminSeriesRoute
+  AuthenticatedAdminTagsRoute: typeof AuthenticatedAdminTagsRoute
   AuthenticatedAdminUsersRoute: typeof AuthenticatedAdminUsersRoute
   AuthenticatedAdminIndexRoute: typeof AuthenticatedAdminIndexRoute
 }
 
 const AuthenticatedAdminRouteChildren: AuthenticatedAdminRouteChildren = {
+  AuthenticatedAdminAnalyticsRoute: AuthenticatedAdminAnalyticsRoute,
+  AuthenticatedAdminAnnouncementsRoute: AuthenticatedAdminAnnouncementsRoute,
+  AuthenticatedAdminBannersRoute: AuthenticatedAdminBannersRoute,
   AuthenticatedAdminCommentsRoute: AuthenticatedAdminCommentsRoute,
+  AuthenticatedAdminGamificationRoute: AuthenticatedAdminGamificationRoute,
+  AuthenticatedAdminModerationRoute: AuthenticatedAdminModerationRoute,
+  AuthenticatedAdminPermissionsRoute: AuthenticatedAdminPermissionsRoute,
   AuthenticatedAdminReportsRoute: AuthenticatedAdminReportsRoute,
   AuthenticatedAdminSeriesRoute: AuthenticatedAdminSeriesRoute,
+  AuthenticatedAdminTagsRoute: AuthenticatedAdminTagsRoute,
   AuthenticatedAdminUsersRoute: AuthenticatedAdminUsersRoute,
   AuthenticatedAdminIndexRoute: AuthenticatedAdminIndexRoute,
 }
@@ -427,17 +678,29 @@ interface AuthenticatedRouteChildren {
   AuthenticatedAdminRoute: typeof AuthenticatedAdminRouteWithChildren
   AuthenticatedLibraryRoute: typeof AuthenticatedLibraryRoute
   AuthenticatedProfileRoute: typeof AuthenticatedProfileRoute
+  AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedAdminRoute: AuthenticatedAdminRouteWithChildren,
   AuthenticatedLibraryRoute: AuthenticatedLibraryRoute,
   AuthenticatedProfileRoute: AuthenticatedProfileRoute,
+  AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
 }
 
 const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
   AuthenticatedRouteChildren,
 )
+
+interface TagsRouteChildren {
+  TagsSlugRoute: typeof TagsSlugRoute
+}
+
+const TagsRouteChildren: TagsRouteChildren = {
+  TagsSlugRoute: TagsSlugRoute,
+}
+
+const TagsRouteWithChildren = TagsRoute._addFileChildren(TagsRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
@@ -448,7 +711,10 @@ const rootRouteChildren: RootRouteChildren = {
   ContactRoute: ContactRoute,
   DmcaRoute: DmcaRoute,
   HomeRoute: HomeRoute,
+  RankingsRoute: RankingsRoute,
+  RecommendationsRoute: RecommendationsRoute,
   SearchRoute: SearchRoute,
+  TagsRoute: TagsRouteWithChildren,
   TitleSlugRoute: TitleSlugRoute,
   TitleTitleSlugChapterSlugRoute: TitleTitleSlugChapterSlugRoute,
 }

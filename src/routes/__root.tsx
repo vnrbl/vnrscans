@@ -18,6 +18,8 @@ import { Toaster } from "@/components/ui/sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { isReaderLayoutPath } from "@/lib/layout";
+import { ThemeProvider } from "@/contexts/ThemeContext";
+import { ReaderSettingsProvider } from "@/contexts/ReaderSettingsContext";
 
 function NotFoundComponent() {
   return (
@@ -128,7 +130,11 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <AppShell />
+      <ThemeProvider>
+        <ReaderSettingsProvider>
+          <AppShell />
+        </ReaderSettingsProvider>
+      </ThemeProvider>
     </QueryClientProvider>
   );
 }

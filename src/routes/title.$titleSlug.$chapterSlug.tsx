@@ -42,49 +42,6 @@ function Reader() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [controlsVisible, setControlsVisible] = useState(true);
 
-  // Scroll position management
-  const scrollPositionKey = `scroll-${titleSlug}-${chapterSlug}`;
-
-  // Save scroll position periodically
-  useEffect(() => {
-    const saveScrollPosition = () => {
-      const scrollY = window.scrollY;
-      localStorage.setItem(scrollPositionKey, scrollY.toString());
-    };
-
-    const handleScroll = () => {
-      // Throttle scroll saving to avoid too many localStorage writes
-      clearTimeout((window as any).scrollSaveTimeout);
-      (window as any).scrollSaveTimeout = setTimeout(saveScrollPosition, 500);
-    };
-
-    window.addEventListener('scroll', handleScroll);
-    
-    // Save on page unload
-    window.addEventListener('beforeunload', saveScrollPosition);
-
-    return () => {
-      window.removeEventListener('scroll', handleScroll);
-      window.removeEventListener('beforeunload', saveScrollPosition);
-      clearTimeout((window as any).scrollSaveTimeout);
-    };
-  }, [scrollPositionKey]);
-
-  // Restore scroll position when chapter loads
-  useEffect(() => {
-    if (chapterQ.data) {
-      const savedPosition = localStorage.getItem(scrollPositionKey);
-      if (savedPosition) {
-        const scrollY = parseInt(savedPosition, 10);
-        // Small delay to ensure content is rendered
-        setTimeout(() => {
-          window.scrollTo({ top: scrollY, behavior: 'smooth' });
-          console.log(`Restored scroll position to ${scrollY}px for ${titleSlug}/${chapterSlug}`);
-        }, 100);
-      }
-    }
-  }, [chapterQ.data, scrollPositionKey, titleSlug, chapterSlug]);
-
   const chapterQ = useQuery({
     queryKey: ["chapter", titleSlug, chapterSlug],
     queryFn: async () => {
@@ -165,23 +122,59 @@ function Reader() {
     enabled: !!chapterQ.data?.series?.id,
   });
 
-  // Save reading history
+  // Save reading history with scroll progress
   useEffect(() => {
     if (!user || !chapterQ.data) return;
     
-    // Save reading progress with scroll position
-    const currentScrollPosition = window.scrollY;
-    
+    // Save initial reading history entry
     supabase.from("reading_history").upsert(
       {
         user_id: user.id,
         series_id: chapterQ.data.series_id,
         chapter_id: chapterQ.data.id,
-        progress: currentScrollPosition, // Store scroll position as progress
+        progress: 0,
         updated_at: new Date().toISOString(),
       },
       { onConflict: "user_id,chapter_id" } as any
     ).then(() => {});
+
+    // Update reading progress based on scroll position
+    const updateProgress = () => {
+      const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+      const scrollHeight = document.documentElement.scrollHeight - window.innerHeight;
+      const progress = scrollHeight > 0 ? Math.min(Math.round((scrollTop / scrollHeight) * 100), 100) : 0;
+      
+      // Only update if progress has changed significantly (every 5%)
+      const lastProgress = parseInt(localStorage.getItem(`chapter-progress-${chapterQ.data.id}`) || '0');
+      if (Math.abs(progress - lastProgress) >= 5) {
+        localStorage.setItem(`chapter-progress-${chapterQ.data.id}`, progress.toString());
+        supabase.from("reading_history").upsert(
+          {
+            user_id: user.id,
+            series_id: chapterQ.data.series_id,
+            chapter_id: chapterQ.data.id,
+            progress: progress,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "user_id,chapter_id" } as any
+        ).then(() => {});
+      }
+    };
+
+    let progressTimeout: NodeJS.Timeout;
+    const handleProgressUpdate = () => {
+      clearTimeout(progressTimeout);
+      progressTimeout = setTimeout(updateProgress, 500);
+    };
+
+    window.addEventListener('scroll', handleProgressUpdate);
+
+    return () => {
+      clearTimeout(progressTimeout);
+      window.removeEventListener('scroll', handleProgressUpdate);
+      // Final progress update when leaving
+      updateProgress();
+    };
   }, [user, chapterQ.data]);
 
   useEffect(() => {
@@ -208,19 +201,15 @@ function Reader() {
       }
 
       if (e.key === "ArrowLeft" && prev) {
-        // Clear current scroll position before navigating
-        localStorage.removeItem(scrollPositionKey);
         navigate({ to: "/title/$titleSlug/$chapterSlug", params: { titleSlug: seriesSlug, chapterSlug: prev.slug } });
       } else if (e.key === "ArrowRight" && next) {
-        // Clear current scroll position before navigating
-        localStorage.removeItem(scrollPositionKey);
         navigate({ to: "/title/$titleSlug/$chapterSlug", params: { titleSlug: seriesSlug, chapterSlug: next.slug } });
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [prev, next, navigate, seriesSlug, scrollPositionKey]);
+  }, [prev, next, navigate, seriesSlug]);
 
   // Fullscreen management
   useEffect(() => {
@@ -380,7 +369,6 @@ function Reader() {
           isNovel={isNovel}
           allChapters={siblingsQ.data ?? []}
           currentChapterSlug={chapterSlug}
-          scrollPositionKey={scrollPositionKey}
         />
       </div>
 
@@ -388,7 +376,7 @@ function Reader() {
         {/* Main content */}
         <div className="flex-1">
           {isNovel ? (
-            <NovelView content={c.novel_content ?? ""} />
+            <NovelView content={c.novel_content ?? ""} chapterId={c.id} />
           ) : (
             <ImageView pages={pagesQ.data} loading={pagesQ.isLoading} chapterId={c.id} />
           )}
@@ -406,25 +394,14 @@ function Reader() {
           toggleFullscreen={toggleFullscreen}
           hasPrev={!!prev}
           hasNext={!!next}
-          onPrev={() => {
-            if (prev) {
-              localStorage.removeItem(scrollPositionKey);
-              navigate({ to: "/title/$titleSlug/$chapterSlug", params: { titleSlug: seriesSlug, chapterSlug: prev.slug } });
-            }
-          }}
-          onNext={() => {
-            if (next) {
-              localStorage.removeItem(scrollPositionKey);
-              navigate({ to: "/title/$titleSlug/$chapterSlug", params: { titleSlug: seriesSlug, chapterSlug: next.slug } });
-            }
-          }}
+          onPrev={() => prev && navigate({ to: "/title/$titleSlug/$chapterSlug", params: { titleSlug: seriesSlug, chapterSlug: prev.slug } })}
+          onNext={() => next && navigate({ to: "/title/$titleSlug/$chapterSlug", params: { titleSlug: seriesSlug, chapterSlug: next.slug } })}
           seriesSlug={seriesSlug}
           allChapters={siblingsQ.data ?? []}
           currentChapterSlug={chapterSlug}
           chapterId={c.id}
           seriesId={c.series_id}
           seriesTitle={c.series?.title ?? ""}
-          scrollPositionKey={scrollPositionKey}
         />
       </div>
 
@@ -440,12 +417,7 @@ function Reader() {
               variant="outline"
               size="sm"
               disabled={!prev}
-              onClick={() => {
-                if (prev) {
-                  localStorage.removeItem(scrollPositionKey);
-                  navigate({ to: "/title/$titleSlug/$chapterSlug", params: { titleSlug: seriesSlug, chapterSlug: prev.slug } });
-                }
-              }}
+              onClick={() => prev && navigate({ to: "/title/$titleSlug/$chapterSlug", params: { titleSlug: seriesSlug, chapterSlug: prev.slug } })}
             >
               <ChevronLeft className="mr-1 h-4 w-4" />Prev
             </Button>
@@ -479,12 +451,7 @@ function Reader() {
             <Button
               size="sm"
               disabled={!next}
-              onClick={() => {
-                if (next) {
-                  localStorage.removeItem(scrollPositionKey);
-                  navigate({ to: "/title/$titleSlug/$chapterSlug", params: { titleSlug: seriesSlug, chapterSlug: next.slug } });
-                }
-              }}
+              onClick={() => next && navigate({ to: "/title/$titleSlug/$chapterSlug", params: { titleSlug: seriesSlug, chapterSlug: next.slug } })}
             >
               Next<ChevronRight className="ml-1 h-4 w-4" />
             </Button>
@@ -501,8 +468,7 @@ function ReaderTopBar({
   seriesSlug, 
   isNovel, 
   allChapters, 
-  currentChapterSlug,
-  scrollPositionKey
+  currentChapterSlug 
 }: { 
   title: string; 
   seriesTitle: string; 
@@ -510,7 +476,6 @@ function ReaderTopBar({
   isNovel: boolean;
   allChapters: Array<{ id: string; slug: string; chapter_number: number }>;
   currentChapterSlug: string;
-  scrollPositionKey: string;
 }) {
   const navigate = useNavigate();
 
@@ -528,10 +493,7 @@ function ReaderTopBar({
           {allChapters.length > 0 && (
             <Select 
               value={currentChapterSlug} 
-              onValueChange={(slug) => {
-                localStorage.removeItem(scrollPositionKey);
-                navigate({ to: "/title/$titleSlug/$chapterSlug", params: { titleSlug: seriesSlug, chapterSlug: slug } });
-              }}
+              onValueChange={(slug) => navigate({ to: "/title/$titleSlug/$chapterSlug", params: { titleSlug: seriesSlug, chapterSlug: slug } })}
             >
               <SelectTrigger className="w-[180px]">
                 <List className="mr-2 h-4 w-4" />
@@ -556,6 +518,7 @@ function ImageView({ pages, loading, chapterId }: { pages?: any[]; loading: bool
   const [zoomLevel, setZoomLevel] = useState(100);
   const [isMobile, setIsMobile] = useState(false);
   const { user } = useAuth();
+  const containerRef = useRef<HTMLDivElement>(null);
 
   // Detect mobile screen size
   useEffect(() => {
@@ -567,6 +530,70 @@ function ImageView({ pages, loading, chapterId }: { pages?: any[]; loading: bool
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
+
+  // Scroll position restoration
+  useEffect(() => {
+    if (!chapterId || loading || !pages?.length) return;
+
+    const scrollKey = `chapter-scroll-${chapterId}`;
+    
+    // Restore scroll position after pages load
+    const restoreScroll = () => {
+      const savedPosition = localStorage.getItem(scrollKey);
+      if (savedPosition) {
+        const position = parseInt(savedPosition, 10);
+        setTimeout(() => {
+          window.scrollTo({ top: position, behavior: 'instant' });
+        }, 100); // Small delay to ensure images are rendered
+      }
+    };
+
+    // Save scroll position periodically
+    const saveScrollPosition = () => {
+      const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+      localStorage.setItem(scrollKey, scrollTop.toString());
+    };
+
+    // Throttled scroll handler
+    let scrollTimeout: NodeJS.Timeout;
+    const handleScroll = () => {
+      clearTimeout(scrollTimeout);
+      scrollTimeout = setTimeout(saveScrollPosition, 150);
+    };
+
+    // Restore scroll position when pages are loaded
+    restoreScroll();
+
+    // Add scroll listener
+    window.addEventListener('scroll', handleScroll);
+
+    // Save scroll position when leaving the page
+    const handleBeforeUnload = () => {
+      saveScrollPosition();
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    return () => {
+      clearTimeout(scrollTimeout);
+      window.removeEventListener('scroll', handleScroll);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [chapterId, loading, pages?.length]);
+
+  // Clean up old scroll positions (keep only last 10 chapters per user)
+  useEffect(() => {
+    const cleanupOldScrollPositions = () => {
+      const keys = Object.keys(localStorage).filter(key => key.startsWith('chapter-scroll-'));
+      if (keys.length > 10) {
+        // Sort by timestamp (assuming newer items were added later)
+        keys.sort().slice(0, keys.length - 10).forEach(key => {
+          localStorage.removeItem(key);
+        });
+      }
+    };
+
+    cleanupOldScrollPositions();
+  }, [chapterId]);
 
   if (loading) {
     return <div className="container mx-auto max-w-3xl px-2 py-6 space-y-2">{Array.from({ length: 4 }).map((_, i) => <div key={i} className="aspect-[2/3] animate-pulse rounded bg-secondary" />)}</div>;
@@ -642,7 +669,56 @@ function ImageView({ pages, loading, chapterId }: { pages?: any[]; loading: bool
   );
 }
 
-function NovelView({ content }: { content: string }) {
+function NovelView({ content, chapterId }: { content: string; chapterId: string }) {
+  // Scroll position restoration for novels
+  useEffect(() => {
+    if (!chapterId || !content) return;
+
+    const scrollKey = `chapter-scroll-${chapterId}`;
+    
+    // Restore scroll position after content loads
+    const restoreScroll = () => {
+      const savedPosition = localStorage.getItem(scrollKey);
+      if (savedPosition) {
+        const position = parseInt(savedPosition, 10);
+        setTimeout(() => {
+          window.scrollTo({ top: position, behavior: 'instant' });
+        }, 100);
+      }
+    };
+
+    // Save scroll position periodically
+    const saveScrollPosition = () => {
+      const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+      localStorage.setItem(scrollKey, scrollTop.toString());
+    };
+
+    // Throttled scroll handler
+    let scrollTimeout: NodeJS.Timeout;
+    const handleScroll = () => {
+      clearTimeout(scrollTimeout);
+      scrollTimeout = setTimeout(saveScrollPosition, 150);
+    };
+
+    // Restore scroll position when content is loaded
+    restoreScroll();
+
+    // Add scroll listener
+    window.addEventListener('scroll', handleScroll);
+
+    // Save scroll position when leaving the page
+    const handleBeforeUnload = () => {
+      saveScrollPosition();
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    return () => {
+      clearTimeout(scrollTimeout);
+      window.removeEventListener('scroll', handleScroll);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [chapterId, content]);
+
   return (
     <article
       className="mx-auto max-w-2xl px-4 py-10 text-foreground"

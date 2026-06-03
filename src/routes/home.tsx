@@ -35,6 +35,8 @@ function HomePage() {
       if (error) throw error;
       return data ?? [];
     },
+    staleTime: 1000 * 60 * 5, // 5 minutes
+    gcTime: 1000 * 60 * 10, // 10 minutes (formerly cacheTime)
   });
 
   // Recently added chapters
@@ -50,6 +52,8 @@ function HomePage() {
       if (error) throw error;
       return data ?? [];
     },
+    staleTime: 1000 * 60 * 2, // 2 minutes
+    gcTime: 1000 * 60 * 5, // 5 minutes
   });
 
   const readingHistory = useQuery({
@@ -67,6 +71,8 @@ function HomePage() {
       return data ?? [];
     },
     enabled: !!user,
+    staleTime: 1000 * 60, // 1 minute
+    gcTime: 1000 * 60 * 5, // 5 minutes
   });
 
   const followedChapters = useQuery({
@@ -91,6 +97,8 @@ function HomePage() {
       return data ?? [];
     },
     enabled: !!user,
+    staleTime: 1000 * 60 * 2, // 2 minutes
+    gcTime: 1000 * 60 * 5, // 5 minutes
   });
 
   // Popular manhwa
@@ -105,6 +113,8 @@ function HomePage() {
       if (error) throw error;
       return data ?? [];
     },
+    staleTime: 1000 * 60 * 10, // 10 minutes
+    gcTime: 1000 * 60 * 30, // 30 minutes
   });
 
   // High score manhwa
@@ -119,13 +129,15 @@ function HomePage() {
       if (error) throw error;
       return data ?? [];
     },
+    staleTime: 1000 * 60 * 10, // 10 minutes
+    gcTime: 1000 * 60 * 30, // 30 minutes
   });
 
   return (
     <div className="min-h-screen">
       {/* Featured Section */}
       {featured.data && featured.data.length > 0 && (
-        <section className="container mx-auto px-8 py-8">
+        <section className="container mx-auto px-8 py-4">
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             {featured.data.map((series) => (
               <Link key={series.id} to="/title/$slug" params={{ slug: series.slug }}>
@@ -259,8 +271,8 @@ function ChapterCarouselSection({
   const { scrollRef, scrollBy, dragHandlers } = useDragScroll<HTMLDivElement>();
 
   return (
-    <section className="container mx-auto px-8 py-8">
-      <div className="mb-6 flex items-center justify-between">
+    <section className="container mx-auto px-8 py-4">
+      <div className="mb-4 flex items-center justify-between">
         <div>
           <div className="flex items-center gap-2">
             {icon}
@@ -351,8 +363,8 @@ function SeriesCarouselSection({
   const { scrollRef, scrollBy, dragHandlers } = useDragScroll<HTMLDivElement>();
 
   return (
-    <section className="container mx-auto px-8 py-8">
-      <div className="mb-6 flex items-center justify-between">
+    <section className="container mx-auto px-8 py-4">
+      <div className="mb-4 flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold">{title}</h2>
           {description && (
@@ -470,8 +482,8 @@ function ChapterFeedSection({
   linkVariant: "split" | "seriesOnly";
 }) {
   return (
-    <section className="container mx-auto px-8 py-8">
-      <div className="mb-6">
+    <section className="container mx-auto px-8 py-4">
+      <div className="mb-4">
         <div className="flex items-center gap-2">
           {icon}
           <h2 className="text-2xl font-bold">{title}</h2>

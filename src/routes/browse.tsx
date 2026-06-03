@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { Search, LayoutGrid, List, Star } from "lucide-react";
+import { Search, LayoutGrid, List, Star, X, BookOpen, Check } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { SeriesGrid } from "@/components/SeriesGrid";
 import { Input } from "@/components/ui/input";
@@ -14,6 +14,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Command, CommandGroup, CommandItem } from "@/components/ui/command";
 
 export const Route = createFileRoute("/browse")({
   head: () => ({
@@ -27,26 +33,64 @@ export const Route = createFileRoute("/browse")({
 
 function BrowsePage() {
   const [searchQuery, setSearchQuery] = useState("");
-  const [typeFilter, setTypeFilter] = useState("all");
+  const [typeFilters, setTypeFilters] = useState<string[]>([]);
   const [statusFilter, setStatusFilter] = useState("all");
   const [contentRating, setContentRating] = useState("all");
-  const [genreFilter, setGenreFilter] = useState("all");
+  const [genreFilters, setGenreFilters] = useState<string[]>([]);
   const [sortBy, setSortBy] = useState("latest");
   const [duration, setDuration] = useState("all");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
 
-  // Fetch genres
+  // Fetch genres from tags table
   const genres = useQuery({
-    queryKey: ["genres"],
+    queryKey: ["tags-as-genres"],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("genres")
-        .select("id,name,slug")
+        .from("tags")
+        .select("id,name,slug,color,icon")
         .order("name");
       if (error) throw error;
       return data ?? [];
     },
   });
+
+  // Toggle type filter
+  const toggleType = (type: string) => {
+    setTypeFilters(prev => 
+      prev.includes(type) 
+        ? prev.filter(t => t !== type)
+        : [...prev, type]
+    );
+  };
+
+  // Toggle genre filter
+  const toggleGenre = (slug: string) => {
+    setGenreFilters(prev => 
+      prev.includes(slug) 
+        ? prev.filter(g => g !== slug)
+        : [...prev, slug]
+    );
+  };
+
+  // Clear all filters
+  const clearFilters = () => {
+    setTypeFilters([]);
+    setGenreFilters([]);
+    setStatusFilter("all");
+    setContentRating("all");
+    setDuration("all");
+  };
+
+  const hasActiveFilters = typeFilters.length > 0 || genreFilters.length > 0 || 
+    statusFilter !== "all" || contentRating !== "all" || duration !== "all";
+
+  // Type options
+  const typeOptions = [
+    { value: "manga", label: "MANGA" },
+    { value: "manhwa", label: "MANHWA" },
+    { value: "manhua", label: "MANHUA" },
+    { value: "novel", label: "NOVEL" },
+  ];
 
   // Calculate date filter for duration
   const getDateFilter = () => {
@@ -66,16 +110,18 @@ function BrowsePage() {
 
   // All manhwa
   const allManhwa = useQuery({
-    queryKey: ["browse-manhwa", typeFilter, statusFilter, contentRating, genreFilter, sortBy, duration, searchQuery],
+    queryKey: ["browse-manhwa", typeFilters, statusFilter, contentRating, genreFilters, sortBy, duration, searchQuery],
     queryFn: async () => {
       let query = supabase
         .from("series")
-        .select("id,slug,title,alternative_titles,description,cover_url,type,rating_average,status,author,artist,release_year,created_at,updated_at,view_count,content_rating,series_genres(genre:genres(id,name,slug))");
+        .select("id,slug,title,alternative_titles,description,cover_url,type,rating_average,status,author,artist,release_year,created_at,updated_at,view_count,content_rating,chapter_count,series_tags(tag:tags(id,name,slug,color,icon))");
 
-      // Apply filters
-      if (typeFilter !== "all") {
-        query = query.eq("type", typeFilter);
+      // Apply type filters (multiple selection)
+      if (typeFilters.length > 0) {
+        query = query.in("type", typeFilters);
       }
+      
+      // Apply other filters
       if (statusFilter !== "all") {
         query = query.eq("status", statusFilter);
       }
@@ -118,12 +164,41 @@ function BrowsePage() {
       const { data, error } = await query;
       if (error) throw error;
       
-      // Filter by genre if selected
-      let filtered = data ?? [];
-      if (genreFilter !== "all" && filtered.length > 0) {
-        filtered = filtered.filter((series: any) => 
-          series.series_genres?.some((sg: any) => sg.genre?.slug === genreFilter)
-        );
+      // Calculate chapter count for series without manual count
+      const seriesWithChapters = await Promise.all(
+        (data ?? []).map(async (s: any) => {
+          // If chapter_count is manually set and > 0, use it
+          if (s.chapter_count && s.chapter_count > 0) {
+            return s;
+          }
+          
+          // Otherwise, calculate from actual chapters
+          const { data: chapters } = await supabase
+            .from("chapters")
+            .select("chapter_number")
+            .eq("series_id", s.id)
+            .eq("status", "published");
+          
+          // Get unique base chapter numbers
+          const uniqueChapters = new Set(
+            (chapters ?? []).map((ch) => Math.floor(ch.chapter_number))
+          );
+          
+          return {
+            ...s,
+            chapter_count: uniqueChapters.size,
+          };
+        })
+      );
+      
+      // Filter by genres (tags) if selected - series must have ALL selected genres
+      let filtered = seriesWithChapters;
+      if (genreFilters.length > 0 && filtered.length > 0) {
+        filtered = filtered.filter((series: any) => {
+          const seriesGenres = series.series_tags?.map((st: any) => st.tag?.slug).filter(Boolean) || [];
+          // Check if series has ALL selected genres
+          return genreFilters.every(selectedGenre => seriesGenres.includes(selectedGenre));
+        });
       }
       
       return filtered;
@@ -153,21 +228,95 @@ function BrowsePage() {
           </div>
         </div>
 
-        {/* Filters */}
+        {/* All Filters in One Row */}
         <div className="mb-6 flex flex-wrap items-center gap-3">
-          <Select value={typeFilter} onValueChange={setTypeFilter}>
-            <SelectTrigger className="h-9 w-[140px]">
-              <SelectValue placeholder="Type" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Types</SelectItem>
-              <SelectItem value="manga">MANGA</SelectItem>
-              <SelectItem value="manhwa">MANHWA</SelectItem>
-              <SelectItem value="manhua">MANHUA</SelectItem>
-              <SelectItem value="novel">NOVEL</SelectItem>
-            </SelectContent>
-          </Select>
+          {/* Type Multi-Select Dropdown */}
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" className="h-9 min-w-[140px] justify-start">
+                {typeFilters.length > 0 ? (
+                  <span className="truncate">
+                    Type ({typeFilters.length})
+                  </span>
+                ) : (
+                  "Type"
+                )}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-[200px] p-0" align="start">
+              <Command>
+                <CommandGroup>
+                  {typeOptions.map((type) => (
+                    <CommandItem
+                      key={type.value}
+                      onSelect={() => toggleType(type.value)}
+                      className="cursor-pointer"
+                    >
+                      <div className="flex items-center gap-2">
+                        <div className={`flex h-4 w-4 items-center justify-center rounded border ${
+                          typeFilters.includes(type.value) 
+                            ? "border-violet-600 bg-violet-600" 
+                            : "border-input"
+                        }`}>
+                          {typeFilters.includes(type.value) && (
+                            <Check className="h-3 w-3 text-white" />
+                          )}
+                        </div>
+                        <span>{type.label}</span>
+                      </div>
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              </Command>
+            </PopoverContent>
+          </Popover>
 
+          {/* Genre Multi-Select Dropdown */}
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" className="h-9 min-w-[140px] justify-start">
+                {genreFilters.length > 0 ? (
+                  <span className="truncate">
+                    Genre ({genreFilters.length})
+                  </span>
+                ) : (
+                  "Genre"
+                )}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-[700px] p-3" align="start">
+              <div className="mb-2 text-sm font-medium">Select Genres</div>
+              {genres.isLoading ? (
+                <div className="p-2 text-sm text-muted-foreground">Loading...</div>
+              ) : (
+                <div className="grid grid-cols-5 gap-1">
+                  {genres.data?.map((genre) => (
+                    <div
+                      key={genre.id}
+                      onClick={() => toggleGenre(genre.slug)}
+                      className="flex items-center gap-1.5 rounded-md px-2 py-1.5 hover:bg-secondary cursor-pointer transition-colors"
+                    >
+                      <div 
+                        className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border`}
+                        style={{
+                          borderColor: genreFilters.includes(genre.slug) ? genre.color : undefined,
+                          backgroundColor: genreFilters.includes(genre.slug) ? genre.color : undefined,
+                        }}
+                      >
+                        {genreFilters.includes(genre.slug) && (
+                          <Check className="h-3 w-3 text-white" />
+                        )}
+                      </div>
+                      {genre.icon && <span className="text-sm">{genre.icon}</span>}
+                      <span className="text-xs truncate">{genre.name}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </PopoverContent>
+          </Popover>
+
+          {/* Status Filter */}
           <Select value={statusFilter} onValueChange={setStatusFilter}>
             <SelectTrigger className="h-9 w-[140px]">
               <SelectValue placeholder="Status" />
@@ -180,20 +329,7 @@ function BrowsePage() {
             </SelectContent>
           </Select>
 
-          <Select value={genreFilter} onValueChange={setGenreFilter}>
-            <SelectTrigger className="h-9 w-[140px]">
-              <SelectValue placeholder="Genre" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Genres</SelectItem>
-              {genres.data?.map((genre) => (
-                <SelectItem key={genre.id} value={genre.slug}>
-                  {genre.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
+          {/* Content Rating Filter */}
           <Select value={contentRating} onValueChange={setContentRating}>
             <SelectTrigger className="h-9 w-[140px]">
               <SelectValue placeholder="Rating" />
@@ -207,7 +343,7 @@ function BrowsePage() {
             </SelectContent>
           </Select>
 
-          <Select value={duration} onValueChange={setDuration}>
+          {/* Duration Filter */}          <Select value={duration} onValueChange={setDuration}>
             <SelectTrigger className="h-9 w-[140px]">
               <SelectValue placeholder="Duration" />
             </SelectTrigger>
@@ -231,13 +367,33 @@ function BrowsePage() {
               <SelectItem value="oldest">Oldest</SelectItem>
             </SelectContent>
           </Select>
+
+          {hasActiveFilters && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={clearFilters}
+              className="h-9 text-muted-foreground hover:text-foreground"
+            >
+              Clear Filters
+            </Button>
+          )}
         </div>
 
         {/* Results Count */}
         <div className="mb-6 flex items-center justify-between">
-          <p className="text-sm text-muted-foreground">
-            {allManhwa.data?.length || 0} manga found
-          </p>
+          <div>
+            <p className="text-sm text-muted-foreground">
+              {allManhwa.data?.length || 0} manga found
+            </p>
+            {(typeFilters.length > 0 || genreFilters.length > 0) && (
+              <p className="mt-1 text-xs text-muted-foreground">
+                {typeFilters.length > 0 && `${typeFilters.length} type${typeFilters.length > 1 ? 's' : ''}`}
+                {typeFilters.length > 0 && genreFilters.length > 0 && ' • '}
+                {genreFilters.length > 0 && `${genreFilters.length} genre${genreFilters.length > 1 ? 's' : ''}`} selected
+              </p>
+            )}
+          </div>
           <div className="flex items-center gap-2">
             <Button 
               variant={viewMode === "grid" ? "default" : "ghost"} 
@@ -264,7 +420,7 @@ function BrowsePage() {
             items={allManhwa.data} 
             loading={allManhwa.isLoading} 
             emptyMessage="No manga found. Try adjusting your filters or search query."
-            showRank={true}
+            showRank={sortBy === "popular" || sortBy === "rating"}
           />
         ) : (
           <SeriesList 
@@ -315,12 +471,12 @@ function SeriesList({ items, loading }: { items?: any[]; loading: boolean }) {
           </div>
 
           {/* Cover Image */}
-          <div className="w-20 shrink-0 overflow-hidden rounded-lg bg-secondary shadow-md">
+          <div className="w-32 shrink-0 overflow-hidden rounded-lg bg-secondary shadow-md lg:w-40">
             {s.cover_url ? (
-              <img src={s.cover_url} alt={s.title} className="h-28 w-full object-cover" />
+              <img src={s.cover_url} alt={s.title} className="h-48 w-full object-cover lg:h-60" />
             ) : (
-              <div className="flex h-28 items-center justify-center text-muted-foreground">
-                <span className="text-xs">No Cover</span>
+              <div className="flex h-48 lg:h-60 items-center justify-center text-muted-foreground">
+                <BookOpen className="h-10 w-10" />
               </div>
             )}
           </div>
@@ -360,19 +516,37 @@ function SeriesList({ items, loading }: { items?: any[]; loading: boolean }) {
               )}
             </div>
 
-            {/* Description or metadata */}
+            {/* Metadata with icons */}
             <div className="flex items-center gap-4 text-sm text-muted-foreground">
-              {s.author && (
+              {s.chapter_count && s.chapter_count > 0 && (
                 <span className="flex items-center gap-1">
-                  <span className="font-medium">Author:</span> {s.author}
+                  <BookOpen className="h-3.5 w-3.5" />
+                  <span className="font-medium">{s.chapter_count}</span>
+                  <span>chapters</span>
                 </span>
               )}
-              {s.artist && s.artist !== s.author && (
+              {s.view_count && s.view_count > 0 && (
                 <span className="flex items-center gap-1">
-                  <span className="font-medium">Artist:</span> {s.artist}
+                  <span className="font-medium">Views:</span> {s.view_count.toLocaleString()}
                 </span>
               )}
             </div>
+
+            {/* Author/Artist */}
+            {(s.author || s.artist) && (
+              <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                {s.author && (
+                  <span className="flex items-center gap-1">
+                    <span className="font-medium">Author:</span> {s.author}
+                  </span>
+                )}
+                {s.artist && s.artist !== s.author && (
+                  <span className="flex items-center gap-1">
+                    <span className="font-medium">Artist:</span> {s.artist}
+                  </span>
+                )}
+              </div>
+            )}
 
             {/* Description */}
             {s.description && (
@@ -381,12 +555,22 @@ function SeriesList({ items, loading }: { items?: any[]; loading: boolean }) {
               </p>
             )}
 
-            {/* Genres */}
+            {/* Genres (Tags) */}
             <div className="flex flex-wrap gap-1">
-              {(s.series_genres as any[])?.slice(0, 5).map((sg) =>
-                sg.genre ? (
-                  <Badge key={sg.genre.id} variant="secondary" className="text-xs hover:bg-violet-600/20">
-                    {sg.genre.name}
+              {(s.series_tags as any[])?.slice(0, 5).map((st) =>
+                st.tag ? (
+                  <Badge 
+                    key={st.tag.id} 
+                    variant="secondary" 
+                    className="text-xs hover:bg-violet-600/20"
+                    style={{
+                      borderColor: st.tag.color,
+                      backgroundColor: `${st.tag.color}10`,
+                      color: st.tag.color,
+                    }}
+                  >
+                    {st.tag.icon && <span className="mr-1">{st.tag.icon}</span>}
+                    {st.tag.name}
                   </Badge>
                 ) : null
               )}

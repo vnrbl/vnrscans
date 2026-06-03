@@ -51,7 +51,7 @@ function SeriesDetail() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("series")
-        .select("*,series_genres(genre:genres(id,name,slug))")
+        .select("*,series_genres(genre:genres(id,name,slug)),series_tags(tag:tags(id,name,slug,color,icon))")
         .eq("slug", slug)
         .maybeSingle();
       if (error) throw error;
@@ -350,6 +350,9 @@ function SeriesDetail() {
   const genres = ((s.series_genres as any[]) ?? [])
     .map((sg) => sg.genre)
     .filter(Boolean) as Array<{ id: string; name: string; slug: string }>;
+  const tags = ((s.series_tags as any[]) ?? [])
+    .map((st: any) => st.tag)
+    .filter(Boolean) as Array<{ id: string; name: string; slug: string; color: string; icon: string }>;
   const authors = splitNames(s.author);
   const artists = splitNames(s.artist);
   const contentRating = (s as { content_rating?: string }).content_rating;
@@ -531,6 +534,26 @@ function SeriesDetail() {
                   <MetaPill key={genre.id} href="/browse" search={{ genre: genre.slug }}>
                     {genre.name}
                   </MetaPill>
+                ))}
+              </MetaSection>
+            )}
+
+            {tags.length > 0 && (
+              <MetaSection label="Genres">
+                {tags.map((tag) => (
+                  <Badge
+                    key={tag.id}
+                    variant="outline"
+                    className="cursor-default gap-1"
+                    style={{
+                      borderColor: tag.color,
+                      backgroundColor: `${tag.color}15`,
+                      color: tag.color,
+                    }}
+                  >
+                    {tag.icon && <span>{tag.icon}</span>}
+                    {tag.name}
+                  </Badge>
                 ))}
               </MetaSection>
             )}
