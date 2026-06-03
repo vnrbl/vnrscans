@@ -597,9 +597,15 @@ function ImageView({ pages, loading, chapterId, zoomLevel, hasPrev, hasNext, onP
   onNext: () => void;
   seriesSlug: string;
 }) {
+  // ALL HOOKS MUST BE AT THE TOP - BEFORE ANY CONDITIONAL RETURNS
   const [isMobile, setIsMobile] = useState(false);
   const { user } = useAuth();
   const containerRef = useRef<HTMLDivElement>(null);
+  
+  // Image error handling state - moved to top
+  const [imageErrors, setImageErrors] = useState<Record<string, boolean>>({});
+  const [imageRetries, setImageRetries] = useState<Record<string, number>>({});
+  const [imageLoading, setImageLoading] = useState<Record<string, boolean>>({});
 
   // Detect mobile screen size
   useEffect(() => {
@@ -676,6 +682,7 @@ function ImageView({ pages, loading, chapterId, zoomLevel, hasPrev, hasNext, onP
     cleanupOldScrollPositions();
   }, [chapterId]);
 
+  // NOW safe to have conditional returns - all hooks are declared above
   if (loading) {
     return <div className="container mx-auto max-w-3xl px-2 py-6 space-y-2">{Array.from({ length: 4 }).map((_, i) => <div key={i} className="aspect-[2/3] animate-pulse rounded bg-secondary" />)}</div>;
   }
@@ -694,11 +701,6 @@ function ImageView({ pages, loading, chapterId, zoomLevel, hasPrev, hasNext, onP
   const handleZoomReset = () => {
     setZoomLevel(100);
   };
-
-  // Image error handling state
-  const [imageErrors, setImageErrors] = useState<Record<string, boolean>>({});
-  const [imageRetries, setImageRetries] = useState<Record<string, number>>({});
-  const [imageLoading, setImageLoading] = useState<Record<string, boolean>>({});
 
   const handleImageError = (pageId: string, imageUrl: string) => {
     setImageLoading(prev => ({ ...prev, [pageId]: false }));
