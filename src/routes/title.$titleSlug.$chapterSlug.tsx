@@ -694,19 +694,95 @@ function ImageView({ pages, loading, chapterId, zoomLevel, hasPrev, hasNext, onP
     setZoomLevel(100);
   };
 
+  // Image error handling state
+  const [imageErrors, setImageErrors] = useState<Record<string, boolean>>({});
+  const [imageRetries, setImageRetries] = useState<Record<string, number>>({});
+  const [imageLoading, setImageLoading] = useState<Record<string, boolean>>({});
+
+  const handleImageError = (pageId: string, imageUrl: string) => {
+    setImageLoading(prev => ({ ...prev, [pageId]: false }));
+    const retryCount = imageRetries[pageId] || 0;
+    
+    // Try up to 2 retries
+    if (retryCount < 2) {
+      setImageRetries(prev => ({ ...prev, [pageId]: retryCount + 1 }));
+      // Force reload by adding timestamp
+      const img = document.querySelector(`img[data-page-id="${pageId}"]`) as HTMLImageElement;
+      if (img) {
+        setTimeout(() => {
+          setImageLoading(prev => ({ ...prev, [pageId]: true }));
+          img.src = imageUrl + (imageUrl.includes('?') ? '&' : '?') + `retry=${retryCount + 1}&t=${Date.now()}`;
+        }, 1000 * (retryCount + 1)); // Progressive delay: 1s, 2s
+      }
+    } else {
+      // Mark as failed after retries
+      setImageErrors(prev => ({ ...prev, [pageId]: true }));
+    }
+  };
+
+  const handleImageLoad = (pageId: string) => {
+    setImageLoading(prev => ({ ...prev, [pageId]: false }));
+  };
+
   return (
     <>
       {/* Pages with Zoom (Desktop) / Normal (Mobile) */}
       <div className="mx-auto max-w-3xl px-2 py-4">
         {pages.map((p) => (
-          <img
-            key={p.id}
-            src={p.image_url}
-            alt={`Page ${p.page_number}`}
-            loading="lazy"
-            className="mx-auto block w-full transition-transform duration-200"
-            style={{ transform: isMobile ? 'scale(1)' : `scale(${zoomLevel / 100})`, transformOrigin: 'top center' }}
-          />
+          <div key={p.id} className="relative">
+            {imageErrors[p.id] ? (
+              // Error fallback UI
+              <div className="mx-auto flex aspect-[2/3] w-full flex-col items-center justify-center rounded-lg border-2 border-dashed border-border bg-secondary/50 text-center">
+                <div className="rounded-full bg-destructive/20 p-4 text-destructive">
+                  <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                </div>
+                <p className="mt-4 text-sm font-medium text-foreground">Failed to load Page {p.page_number}</p>
+                <p className="mt-1 text-xs text-muted-foreground">Image URL may be broken or expired</p>
+                <button
+                  onClick={() => {
+                    setImageErrors(prev => {
+                      const updated = { ...prev };
+                      delete updated[p.id];
+                      return updated;
+                    });
+                    setImageRetries(prev => {
+                      const updated = { ...prev };
+                      delete updated[p.id];
+                      return updated;
+                    });
+                    setImageLoading(prev => ({ ...prev, [p.id]: true }));
+                  }}
+                  className="mt-4 rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground hover:bg-primary/90"
+                >
+                  Retry
+                </button>
+              </div>
+            ) : (
+              <>
+                {imageLoading[p.id] && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-secondary/80">
+                    <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
+                  </div>
+                )}
+                <img
+                  data-page-id={p.id}
+                  src={p.image_url}
+                  alt={`Page {p.page_number}`}
+                  loading="lazy"
+                  className="mx-auto block w-full transition-transform duration-200"
+                  style={{ 
+                    transform: isMobile ? 'scale(1)' : `scale(${zoomLevel / 100})`, 
+                    transformOrigin: 'top center',
+                    opacity: imageLoading[p.id] ? 0.3 : 1
+                  }}
+                  onLoad={() => handleImageLoad(p.id)}
+                  onError={() => handleImageError(p.id, p.image_url)}
+                />
+              </>
+            )}
+          </div>
         ))}
 
         {/* Chapter Navigation Buttons - Above Reactions */}
