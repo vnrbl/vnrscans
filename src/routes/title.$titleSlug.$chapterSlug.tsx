@@ -46,6 +46,66 @@ function Reader() {
   const [scrollingDown, setScrollingDown] = useState(false);
   const [showChapters, setShowChapters] = useState(false);
   const [showSpeedControl, setShowSpeedControl] = useState(false);
+  const [autoScrollEnabled, setAutoScrollEnabled] = useState(false);
+  const [scrollSpeed, setScrollSpeed] = useState(3);
+  const scrollIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Auto-scroll logic for mobile
+  useEffect(() => {
+    if (autoScrollEnabled) {
+      // Clear any existing interval
+      if (scrollIntervalRef.current) {
+        clearInterval(scrollIntervalRef.current);
+      }
+
+      // Calculate scroll amount based on speed (1-10 scale)
+      const scrollAmount = scrollSpeed * 0.5;
+      
+      scrollIntervalRef.current = setInterval(() => {
+        window.scrollBy({ top: scrollAmount, behavior: 'auto' });
+        
+        // Stop if reached bottom
+        if ((window.innerHeight + window.pageYOffset) >= document.documentElement.scrollHeight) {
+          setAutoScrollEnabled(false);
+        }
+      }, 16); // ~60fps
+
+      return () => {
+        if (scrollIntervalRef.current) {
+          clearInterval(scrollIntervalRef.current);
+        }
+      };
+    } else {
+      if (scrollIntervalRef.current) {
+        clearInterval(scrollIntervalRef.current);
+      }
+    }
+  }, [autoScrollEnabled, scrollSpeed]);
+
+  // Stop auto-scroll on manual scroll or interaction
+  useEffect(() => {
+    const handleUserScroll = (e: WheelEvent | TouchEvent) => {
+      if (autoScrollEnabled) {
+        setAutoScrollEnabled(false);
+      }
+    };
+
+    const handleKeyPress = (e: KeyboardEvent) => {
+      if (autoScrollEnabled && ['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Space'].includes(e.key)) {
+        setAutoScrollEnabled(false);
+      }
+    };
+
+    window.addEventListener('wheel', handleUserScroll, { passive: true });
+    window.addEventListener('touchmove', handleUserScroll, { passive: true });
+    window.addEventListener('keydown', handleKeyPress);
+
+    return () => {
+      window.removeEventListener('wheel', handleUserScroll);
+      window.removeEventListener('touchmove', handleUserScroll);
+      window.removeEventListener('keydown', handleKeyPress);
+    };
+  }, [autoScrollEnabled]);
 
   const chapterQ = useQuery({
     queryKey: ["chapter", titleSlug, chapterSlug],
@@ -445,9 +505,9 @@ function Reader() {
         </div>
       </div>
 
-      {/* Floating Controls Sidebar - Scroll-based visibility */}
+      {/* Floating Controls Sidebar - Always visible on desktop, scroll-based on mobile */}
       <div 
-        className={`transition-opacity duration-300 ${
+        className={`transition-opacity duration-300 md:opacity-100 ${
           controlsVisible ? "opacity-100" : "opacity-0 pointer-events-none"
         }`}
       >
@@ -503,6 +563,16 @@ function Reader() {
                   <BookOpen className="h-4 w-4" />
                 </Button>
               </Link>
+              {/* Auto Scroll Toggle - Mobile */}
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={() => setAutoScrollEnabled(prev => !prev)}
+                title={autoScrollEnabled ? "Pause Auto Scroll" : "Start Auto Scroll"}
+                className={autoScrollEnabled ? "bg-violet-600 text-white hover:bg-violet-700 hover:text-white" : ""}
+              >
+                {autoScrollEnabled ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+              </Button>
               {/* Fullscreen Button - Mobile */}
               <Button 
                 variant="ghost" 
