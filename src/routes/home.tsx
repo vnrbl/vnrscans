@@ -1,12 +1,18 @@
-import type { ReactNode } from "react";
+import React, { type ReactNode } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { BookOpen, Clock, History, ChevronLeft, ChevronRight, Star } from "lucide-react";
+import { BookOpen, Clock, History, ChevronLeft, ChevronRight, Star, MoreVertical, EyeOff } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useDragScroll, DRAG_SCROLL_CONTAINER_CLASS } from "@/hooks/useDragScroll";
 import { TITLE_CARD_WIDTH, TITLE_COVER_CLASS } from "@/components/titleCardStyles";
 import { HomeHeroCarousel } from "@/components/HomeHeroCarousel";
@@ -23,6 +29,28 @@ export const Route = createFileRoute("/home")({
 
 function HomePage() {
   const { user } = useAuth();
+  
+  // Hidden sections state (stored in localStorage)
+  const [hiddenSections, setHiddenSections] = React.useState<Set<string>>(() => {
+    const saved = localStorage.getItem('hiddenHomeSections');
+    return saved ? new Set(JSON.parse(saved)) : new Set();
+  });
+
+  // Save hidden sections to localStorage
+  const toggleSection = (sectionId: string) => {
+    setHiddenSections(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(sectionId)) {
+        newSet.delete(sectionId);
+      } else {
+        newSet.add(sectionId);
+      }
+      localStorage.setItem('hiddenHomeSections', JSON.stringify(Array.from(newSet)));
+      return newSet;
+    });
+  };
+
+  const isSectionHidden = (sectionId: string) => hiddenSections.has(sectionId);
 
   // Featured manhwa carousel
   const featured = useQuery({
@@ -233,55 +261,113 @@ function HomePage() {
 
       {user && (
         <>
-          <ChapterCarouselSection
-            title="New Chapters from Followed"
-            description="Latest uploads from series you follow"
-            loading={followedChapters.isLoading}
-            emptyMessage="Follow series to get new chapter updates here."
-            chapters={(followedChapters.data ?? []) as RecentChapter[]}
-            timeField="created"
-            linkVariant="split"
-          />
+          {!isSectionHidden('followed-chapters') && (
+            <ChapterCarouselSection
+              sectionId="followed-chapters"
+              onHide={() => toggleSection('followed-chapters')}
+              title="New Chapters from Followed"
+              description="Latest uploads from series you follow"
+              loading={followedChapters.isLoading}
+              emptyMessage="Follow series to get new chapter updates here."
+              chapters={(followedChapters.data ?? []) as RecentChapter[]}
+              timeField="created"
+              linkVariant="split"
+            />
+          )}
 
-          <ChapterCarouselSection
-            title="Reading History"
-            description="Pick up where you left off"
-            icon={<History className="h-5 w-5" />}
-            loading={readingHistory.isLoading}
-            emptyMessage="No reading history yet. Start a series to see it here."
-            chapters={mapHistoryToChapters(readingHistory.data)}
-            timeField="updated"
-            linkVariant="seriesOnly"
-          />
+          {!isSectionHidden('reading-history') && (
+            <ChapterCarouselSection
+              sectionId="reading-history"
+              onHide={() => toggleSection('reading-history')}
+              title="Reading History"
+              description="Pick up where you left off"
+              icon={<History className="h-5 w-5" />}
+              loading={readingHistory.isLoading}
+              emptyMessage="No reading history yet. Start a series to see it here."
+              chapters={mapHistoryToChapters(readingHistory.data)}
+              timeField="updated"
+              linkVariant="seriesOnly"
+            />
+          )}
         </>
       )}
 
       {/* Latest Updates Section */}
-      <LatestUpdatesSection
-        title="Latest Updates"
-        description="Recently updated series with new chapters"
-        series={latestUpdates.data ?? []}
-        loading={latestUpdates.isLoading}
-        userId={user?.id}
-      />
+      {!isSectionHidden('latest-updates') && (
+        <LatestUpdatesSection
+          sectionId="latest-updates"
+          onHide={() => toggleSection('latest-updates')}
+          title="Latest Updates"
+          description="Recently updated series with new chapters"
+          series={latestUpdates.data ?? []}
+          loading={latestUpdates.isLoading}
+          userId={user?.id}
+        />
+      )}
 
       {/* Popular Manhwa Section */}
-      <SeriesCarouselSection
-        title="Popular Manhwa"
-        description="Discover the most read manhwa series ranked by our community"
-        series={popular.data ?? []}
-        loading={popular.isLoading}
-      />
+      {!isSectionHidden('popular') && (
+        <SeriesCarouselSection
+          sectionId="popular"
+          onHide={() => toggleSection('popular')}
+          title="Popular Manhwa"
+          description="Discover the most read manhwa series ranked by our community"
+          series={popular.data ?? []}
+          loading={popular.isLoading}
+        />
+      )}
 
       {/* High Score Manhwa Section */}
-      <SeriesCarouselSection
-        title="High Score Manhwa"
-        description="Discover the highest rated manhwa series"
-        series={highScore.data ?? []}
-        loading={highScore.isLoading}
-      />
+      {!isSectionHidden('high-score') && (
+        <SeriesCarouselSection
+          sectionId="high-score"
+          onHide={() => toggleSection('high-score')}
+          title="High Score Manhwa"
+          description="Discover the highest rated manhwa series"
+          series={highScore.data ?? []}
+          loading={highScore.isLoading}
+        />
+      )}
+
+      {/* Show Hidden Sections Button */}
+      {hiddenSections.size > 0 && (
+        <section className="container mx-auto px-8 md:px-12 lg:px-16 py-4">
+          <div className="rounded-lg border border-border/40 bg-card p-6 text-center">
+            <p className="mb-4 text-sm text-muted-foreground">
+              {hiddenSections.size} section{hiddenSections.size > 1 ? 's' : ''} hidden
+            </p>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline">
+                  <EyeOff className="mr-2 h-4 w-4" />
+                  Show Hidden Sections
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="center">
+                {Array.from(hiddenSections).map((sectionId) => (
+                  <DropdownMenuItem key={sectionId} onClick={() => toggleSection(sectionId)}>
+                    {getSectionTitle(sectionId)}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </section>
+      )}
     </div>
   );
+}
+
+// Helper function to get section title from ID
+function getSectionTitle(sectionId: string): string {
+  const titles: Record<string, string> = {
+    'followed-chapters': 'New Chapters from Followed',
+    'reading-history': 'Reading History',
+    'latest-updates': 'Latest Updates',
+    'popular': 'Popular Manhwa',
+    'high-score': 'High Score Manhwa',
+  };
+  return titles[sectionId] || sectionId;
 }
 
 type RecentChapter = {
@@ -323,6 +409,8 @@ function ChapterCarouselSection({
   chapters,
   timeField,
   linkVariant,
+  sectionId,
+  onHide,
 }: {
   title: string;
   description?: string;
@@ -332,6 +420,8 @@ function ChapterCarouselSection({
   chapters: RecentChapter[];
   timeField: "created" | "updated";
   linkVariant: "split" | "seriesOnly";
+  sectionId?: string;
+  onHide?: () => void;
 }) {
   const { scrollRef, scrollBy, dragHandlers } = useDragScroll<HTMLDivElement>();
 
@@ -347,26 +437,43 @@ function ChapterCarouselSection({
             <p className="mt-1 text-sm text-muted-foreground">{description}</p>
           )}
         </div>
-        {chapters.length > 0 && (
-          <div className="hidden gap-2 md:flex">
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => scrollBy("left")}
-              className="h-8 w-8"
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => scrollBy("right")}
-              className="h-8 w-8"
-            >
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          </div>
-        )}
+        <div className="flex items-center gap-2">
+          {chapters.length > 0 && (
+            <div className="hidden gap-2 md:flex">
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => scrollBy("left")}
+                className="h-8 w-8"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => scrollBy("right")}
+                className="h-8 w-8"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
+          {sectionId && onHide && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8">
+                  <MoreVertical className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={onHide}>
+                  <EyeOff className="mr-2 h-4 w-4" />
+                  Hide this section
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+        </div>
       </div>
 
       {loading ? (
@@ -412,6 +519,8 @@ function SeriesCarouselSection({
   description,
   series,
   loading,
+  sectionId,
+  onHide,
 }: {
   title: string;
   description?: string;
@@ -424,6 +533,8 @@ function SeriesCarouselSection({
     rating_average: number | null;
   }>;
   loading: boolean;
+  sectionId?: string;
+  onHide?: () => void;
 }) {
   const { scrollRef, scrollBy, dragHandlers } = useDragScroll<HTMLDivElement>();
 
@@ -436,26 +547,43 @@ function SeriesCarouselSection({
             <p className="mt-1 text-sm text-muted-foreground">{description}</p>
           )}
         </div>
-        {series.length > 0 && (
-          <div className="hidden gap-2 md:flex">
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => scrollBy("left")}
-              className="h-8 w-8"
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => scrollBy("right")}
-              className="h-8 w-8"
-            >
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          </div>
-        )}
+        <div className="flex items-center gap-2">
+          {series.length > 0 && (
+            <div className="hidden gap-2 md:flex">
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => scrollBy("left")}
+                className="h-8 w-8"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => scrollBy("right")}
+                className="h-8 w-8"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
+          {sectionId && onHide && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8">
+                  <MoreVertical className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={onHide}>
+                  <EyeOff className="mr-2 h-4 w-4" />
+                  Hide this section
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+        </div>
       </div>
 
       {loading ? (
@@ -533,6 +661,8 @@ function LatestUpdatesSection({
   series,
   loading,
   userId,
+  sectionId,
+  onHide,
 }: {
   title: string;
   description?: string;
@@ -552,6 +682,8 @@ function LatestUpdatesSection({
   }>;
   loading: boolean;
   userId?: string;
+  sectionId?: string;
+  onHide?: () => void;
 }) {
   // Fetch reading history to determine read status
   const readingHistoryQuery = useQuery({
@@ -589,6 +721,21 @@ function LatestUpdatesSection({
             <p className="mt-1 text-sm text-muted-foreground">{description}</p>
           )}
         </div>
+        {sectionId && onHide && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-8 w-8">
+                <MoreVertical className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={onHide}>
+                <EyeOff className="mr-2 h-4 w-4" />
+                Hide this section
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
       </div>
 
       {loading ? (

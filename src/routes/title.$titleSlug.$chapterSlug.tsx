@@ -677,6 +677,18 @@ function Reader() {
                 +
               </Button>
             </div>
+            {/* Divider */}
+            <div className="h-6 w-px bg-border"></div>
+            {/* Pause Button */}
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 w-7 p-0"
+              onClick={toggleAutoScroll}
+              title="Pause Auto-scroll"
+            >
+              <Pause className="h-4 w-4" />
+            </Button>
           </div>
         </div>
       )}
