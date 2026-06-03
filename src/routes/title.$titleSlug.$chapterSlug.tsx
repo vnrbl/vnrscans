@@ -60,7 +60,15 @@ function Reader() {
 
   // Auto-scroll logic for mobile
   useEffect(() => {
-    if (!isMounted || !autoScrollEnabled) return;
+    if (typeof window === 'undefined') return;
+    
+    if (!autoScrollEnabled) {
+      if (scrollIntervalRef.current) {
+        clearInterval(scrollIntervalRef.current);
+        scrollIntervalRef.current = null;
+      }
+      return;
+    }
     
     // Clear any existing interval
     if (scrollIntervalRef.current) {
@@ -82,13 +90,14 @@ function Reader() {
     return () => {
       if (scrollIntervalRef.current) {
         clearInterval(scrollIntervalRef.current);
+        scrollIntervalRef.current = null;
       }
     };
-  }, [autoScrollEnabled, scrollSpeed, isMounted]);
+  }, [autoScrollEnabled, scrollSpeed]);
 
   // Stop auto-scroll on manual scroll or interaction
   useEffect(() => {
-    if (!isMounted) return;
+    if (typeof window === 'undefined') return;
     
     const handleUserScroll = (e: WheelEvent | TouchEvent) => {
       if (autoScrollEnabled) {
@@ -111,7 +120,7 @@ function Reader() {
       window.removeEventListener('touchmove', handleUserScroll);
       window.removeEventListener('keydown', handleKeyPress);
     };
-  }, [autoScrollEnabled, isMounted]);
+  }, [autoScrollEnabled]);
 
   const chapterQ = useQuery({
     queryKey: ["chapter", titleSlug, chapterSlug],
