@@ -573,9 +573,11 @@ function LatestUpdatesSection({
 
   // Helper function to determine if chapter is newly added (within 24 hours)
   const isNewChapter = (createdAt: string) => {
-    const oneDayAgo = new Date();
-    oneDayAgo.setHours(oneDayAgo.getHours() - 24);
-    return new Date(createdAt) > oneDayAgo;
+    const now = new Date();
+    const chapterDate = new Date(createdAt);
+    const oneDayInMs = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+    const timeDiff = now.getTime() - chapterDate.getTime();
+    return timeDiff < oneDayInMs && timeDiff >= 0; // Less than 24 hours old
   };
 
   return (

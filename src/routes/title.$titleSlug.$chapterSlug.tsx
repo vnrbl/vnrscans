@@ -42,6 +42,10 @@ function Reader() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [controlsVisible, setControlsVisible] = useState(true);
   const [zoomLevel, setZoomLevel] = useState(100);
+  const [lastScrollY, setLastScrollY] = useState(0);
+  const [scrollingDown, setScrollingDown] = useState(false);
+  const [showChapters, setShowChapters] = useState(false);
+  const [showSpeedControl, setShowSpeedControl] = useState(false);
 
   const chapterQ = useQuery({
     queryKey: ["chapter", titleSlug, chapterSlug],
@@ -212,6 +216,38 @@ function Reader() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [prev, next, navigate, seriesSlug]);
 
+  // Scroll direction detection - hide controls on scroll down, show on scroll up
+  useEffect(() => {
+    let ticking = false;
+
+    const handleScroll = () => {
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          const currentScrollY = window.scrollY;
+          
+          // Only update if scrolled more than 10px to avoid jitter
+          if (Math.abs(currentScrollY - lastScrollY) > 10) {
+            const isScrollingDown = currentScrollY > lastScrollY;
+            setScrollingDown(isScrollingDown);
+            setLastScrollY(currentScrollY);
+            
+            // Show controls when scrolling up, hide when scrolling down
+            // But don't hide if panels are open
+            if (!showChapters && !showSpeedControl) {
+              setControlsVisible(!isScrollingDown || currentScrollY < 100);
+            }
+          }
+          
+          ticking = false;
+        });
+        ticking = true;
+      }
+    };
+
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, [lastScrollY, showChapters, showSpeedControl]);
+
   // Fullscreen management
   useEffect(() => {
     const handleFullscreenChange = () => {
@@ -246,18 +282,25 @@ function Reader() {
     setControlsVisible(true);
     controlsVisibleRef.current = true;
     if (hideTimeoutRef.current) clearTimeout(hideTimeoutRef.current);
-    hideTimeoutRef.current = setTimeout(() => {
-      setControlsVisible(false);
-      controlsVisibleRef.current = false;
-    }, 3000);
-  }, []);
+    
+    // Only auto-hide on mobile, keep visible on desktop
+    if (window.innerWidth < 768) {
+      hideTimeoutRef.current = setTimeout(() => {
+        // Don't hide if panels are open
+        if (!showChapters && !showSpeedControl) {
+          setControlsVisible(false);
+          controlsVisibleRef.current = false;
+        }
+      }, 3000);
+    }
+  }, [showChapters, showSpeedControl]);
 
   useEffect(() => {
     showControls();
     return () => {
       if (hideTimeoutRef.current) clearTimeout(hideTimeoutRef.current);
     };
-  }, []);
+  }, [showControls]);
 
   // Show controls on mouse movement or touch
   useEffect(() => {
@@ -377,22 +420,35 @@ function Reader() {
         {/* Main content */}
         <div className="flex-1">
           {isNovel ? (
-            <NovelView content={c.novel_content ?? ""} chapterId={c.id} />
+            <NovelView 
+              content={c.novel_content ?? ""} 
+              chapterId={c.id}
+              hasPrev={!!prev}
+              hasNext={!!next}
+              onPrev={() => prev && navigate({ to: "/title/$titleSlug/$chapterSlug", params: { titleSlug: seriesSlug, chapterSlug: prev.slug } })}
+              onNext={() => next && navigate({ to: "/title/$titleSlug/$chapterSlug", params: { titleSlug: seriesSlug, chapterSlug: next.slug } })}
+              seriesSlug={seriesSlug}
+            />
           ) : (
             <ImageView 
               pages={pagesQ.data} 
               loading={pagesQ.isLoading} 
               chapterId={c.id}
               zoomLevel={zoomLevel}
+              hasPrev={!!prev}
+              hasNext={!!next}
+              onPrev={() => prev && navigate({ to: "/title/$titleSlug/$chapterSlug", params: { titleSlug: seriesSlug, chapterSlug: prev.slug } })}
+              onNext={() => next && navigate({ to: "/title/$titleSlug/$chapterSlug", params: { titleSlug: seriesSlug, chapterSlug: next.slug } })}
+              seriesSlug={seriesSlug}
             />
           )}
         </div>
       </div>
 
-      {/* Floating Controls Sidebar - Always visible on desktop, auto-hide on mobile */}
+      {/* Floating Controls Sidebar - Scroll-based visibility */}
       <div 
         className={`transition-opacity duration-300 ${
-          controlsVisible ? "opacity-100" : "md:opacity-100 opacity-0 pointer-events-none md:pointer-events-auto"
+          controlsVisible ? "opacity-100" : "opacity-0 pointer-events-none"
         }`}
       >
         <FloatingControls
@@ -413,6 +469,10 @@ function Reader() {
           onZoomIn={() => setZoomLevel(prev => Math.min(prev + 25, 200))}
           onZoomOut={() => setZoomLevel(prev => Math.max(prev - 25, 50))}
           onZoomReset={() => setZoomLevel(100)}
+          showChapters={showChapters}
+          setShowChapters={setShowChapters}
+          showSpeedControl={showSpeedControl}
+          setShowSpeedControl={setShowSpeedControl}
         />
       </div>
 
@@ -525,7 +585,17 @@ function ReaderTopBar({
   );
 }
 
-function ImageView({ pages, loading, chapterId, zoomLevel }: { pages?: any[]; loading: boolean; chapterId: string; zoomLevel: number }) {
+function ImageView({ pages, loading, chapterId, zoomLevel, hasPrev, hasNext, onPrev, onNext, seriesSlug }: { 
+  pages?: any[]; 
+  loading: boolean; 
+  chapterId: string; 
+  zoomLevel: number;
+  hasPrev: boolean;
+  hasNext: boolean;
+  onPrev: () => void;
+  onNext: () => void;
+  seriesSlug: string;
+}) {
   const [isMobile, setIsMobile] = useState(false);
   const { user } = useAuth();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -639,6 +709,15 @@ function ImageView({ pages, loading, chapterId, zoomLevel }: { pages?: any[]; lo
           />
         ))}
 
+        {/* Chapter Navigation Buttons - Above Reactions */}
+        <ChapterNavigation 
+          hasPrev={hasPrev}
+          hasNext={hasNext}
+          onPrev={onPrev}
+          onNext={onNext}
+          seriesSlug={seriesSlug}
+        />
+
         {/* Reactions & Comments Section */}
         <ChapterReactions chapterId={chapterId} />
       </div>
@@ -646,7 +725,15 @@ function ImageView({ pages, loading, chapterId, zoomLevel }: { pages?: any[]; lo
   );
 }
 
-function NovelView({ content, chapterId }: { content: string; chapterId: string }) {
+function NovelView({ content, chapterId, hasPrev, hasNext, onPrev, onNext, seriesSlug }: { 
+  content: string; 
+  chapterId: string;
+  hasPrev: boolean;
+  hasNext: boolean;
+  onPrev: () => void;
+  onNext: () => void;
+  seriesSlug: string;
+}) {
   // Scroll position restoration for novels
   useEffect(() => {
     if (!chapterId || !content) return;
@@ -697,17 +784,98 @@ function NovelView({ content, chapterId }: { content: string; chapterId: string 
   }, [chapterId, content]);
 
   return (
-    <article
-      className="mx-auto max-w-2xl px-4 py-10 text-foreground"
-      style={{ fontSize: "var(--novel-font-size, 18px)", lineHeight: "var(--novel-line-height, 1.7)" }}
-    >
-      {content.split(/\n{2,}/).map((p, i) => (
-        <p key={i} className="mb-4 whitespace-pre-wrap">{p}</p>
-      ))}
-    </article>
+    <div className="mx-auto max-w-2xl px-4 py-10">
+      <article
+        className="text-foreground"
+        style={{ fontSize: "var(--novel-font-size, 18px)", lineHeight: "var(--novel-line-height, 1.7)" }}
+      >
+        {content.split(/\n{2,}/).map((p, i) => (
+          <p key={i} className="mb-4 whitespace-pre-wrap">{p}</p>
+        ))}
+      </article>
+
+      {/* Chapter Navigation Buttons - Above Reactions */}
+      <ChapterNavigation 
+        hasPrev={hasPrev}
+        hasNext={hasNext}
+        onPrev={onPrev}
+        onNext={onNext}
+        seriesSlug={seriesSlug}
+      />
+    </div>
   );
 }
 
+
+// Chapter Navigation Component
+function ChapterNavigation({ 
+  hasPrev, 
+  hasNext, 
+  onPrev, 
+  onNext,
+  seriesSlug 
+}: { 
+  hasPrev: boolean; 
+  hasNext: boolean; 
+  onPrev: () => void; 
+  onNext: () => void;
+  seriesSlug?: string;
+}) {
+  return (
+    <div className="my-8 flex items-center justify-between gap-3">
+      {/* Previous Chapter Button */}
+      <Button
+        variant="outline"
+        size="lg"
+        disabled={!hasPrev}
+        onClick={onPrev}
+        className="flex-1"
+      >
+        <ChevronLeft className="mr-2 h-5 w-5" />
+        <span className="hidden sm:inline">Previous</span>
+        <span className="sm:hidden">Prev</span>
+      </Button>
+
+      {/* Series Info Button (Middle) */}
+      {seriesSlug && (
+        <Link to="/title/$slug" params={{ slug: seriesSlug }}>
+          <Button
+            variant="secondary"
+            size="lg"
+            className="px-6"
+            title="Series Info"
+          >
+            <BookOpen className="h-5 w-5" />
+          </Button>
+        </Link>
+      )}
+
+      {/* Next Chapter or Home Button */}
+      {hasNext ? (
+        <Button
+          size="lg"
+          onClick={onNext}
+          className="flex-1"
+        >
+          <span className="hidden sm:inline">Next</span>
+          <span className="sm:hidden">Next</span>
+          <ChevronRight className="ml-2 h-5 w-5" />
+        </Button>
+      ) : (
+        <Link to="/home" className="flex-1">
+          <Button
+            size="lg"
+            className="w-full"
+          >
+            <Home className="mr-2 h-5 w-5" />
+            <span className="hidden sm:inline">Home</span>
+            <span className="sm:hidden">Home</span>
+          </Button>
+        </Link>
+      )}
+    </div>
+  );
+}
 
 // Floating Controls Sidebar (like in the image)
 function FloatingControls({
@@ -728,6 +896,10 @@ function FloatingControls({
   onZoomIn,
   onZoomOut,
   onZoomReset,
+  showChapters,
+  setShowChapters,
+  showSpeedControl,
+  setShowSpeedControl,
 }: {
   isFullscreen: boolean;
   toggleFullscreen: () => void;
@@ -746,13 +918,15 @@ function FloatingControls({
   onZoomIn?: () => void;
   onZoomOut?: () => void;
   onZoomReset?: () => void;
+  showChapters: boolean;
+  setShowChapters: (show: boolean) => void;
+  showSpeedControl: boolean;
+  setShowSpeedControl: (show: boolean) => void;
 }) {
   const navigate = useNavigate();
-  const [showChapters, setShowChapters] = useState(false);
   const [showReport, setShowReport] = useState(false);
   const [autoScrollEnabled, setAutoScrollEnabled] = useState(false);
   const [scrollSpeed, setScrollSpeed] = useState(3); // 1-10 scale, 3 = slow
-  const [showSpeedControl, setShowSpeedControl] = useState(false);
   const scrollIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Auto-scroll logic

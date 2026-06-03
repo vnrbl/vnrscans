@@ -5,160 +5,279 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 
-type Banner = {
+type CarouselItem = {
   id: string;
-  title: string;
-  description: string | null;
-  image_url: string | null;
-  link_url: string | null;
-  link_text: string | null;
-  background_color: string | null;
-  text_color: string | null;
-  target_series_id: string | null;
-  series?: { slug: string } | null;
+  series: {
+    id: string;
+    title: string;
+    slug: string;
+    cover_url: string | null;
+    description: string | null;
+    type: string;
+  };
 };
 
-const SWIPE_THRESHOLD = 50;
-
 export function HomeHeroCarousel() {
-  const [index, setIndex] = useState(0);
-  const touchStart = useRef({ x: 0, y: 0 });
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const [showLeftArrow, setShowLeftArrow] = useState(false);
+  const [showRightArrow, setShowRightArrow] = useState(true);
+  const [isAutoScrolling, setIsAutoScrolling] = useState(true);
+  const [isPaused, setIsPaused] = useState(false);
+  const autoScrollIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  const banners = useQuery({
-    queryKey: ["banners", "hero"],
+  // Fetch carousel series items
+  const carouselSeries = useQuery({
+    queryKey: ["carousel", "series"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("banners")
-        .select("*, series:target_series_id(slug)")
-        .eq("position", "hero")
-        .eq("is_active", true)
-        .order("priority", { ascending: false });
-      if (error) throw error;
-      return (data ?? []) as Banner[];
+      try {
+        const { data, error } = await supabase
+          .from("carousel_items")
+          .select(`
+            id,
+            series:series_id(
+              id,
+              title,
+              slug,
+              cover_url,
+              description,
+              type
+            )
+          `)
+          .eq("is_active", true)
+          .order("position", { ascending: true });
+        
+        if (error) {
+          if (error.code === '42P01') {
+            console.log("carousel_items table doesn't exist yet");
+            return [];
+          }
+          throw error;
+        }
+        
+        return (data ?? []).filter(item => item.series) as CarouselItem[];
+      } catch (err) {
+        console.error("Error fetching carousel items:", err);
+        return [];
+      }
     },
+    retry: false,
   });
 
-  const items = banners.data ?? [];
+  const items = carouselSeries.data ?? [];
+  // Triple the items for infinite loop effect
+  const loopedItems = items.length > 0 ? [...items, ...items, ...items] : [];
 
-  useEffect(() => {
-    if (!items.length) return;
-    const id = items[index]?.id;
-    if (id) supabase.rpc("increment_banner_view", { banner_id: id });
-  }, [index, items]);
+  const updateArrows = () => {
+    if (!scrollContainerRef.current) return;
+    const { scrollLeft, scrollWidth, clientWidth } = scrollContainerRef.current;
+    setShowLeftArrow(scrollLeft > 10);
+    setShowRightArrow(scrollLeft < scrollWidth - clientWidth - 10);
+  };
 
+  // Infinite loop scroll logic
   useEffect(() => {
-    if (items.length <= 1) return;
-    const timer = setInterval(() => setIndex((i) => (i + 1) % items.length), 6000);
-    return () => clearInterval(timer);
+    const container = scrollContainerRef.current;
+    if (!container || items.length === 0) return;
+
+    const handleScroll = () => {
+      const { scrollLeft, scrollWidth, clientWidth } = container;
+      const itemWidth = 196; // 180px card + 16px gap
+      const sectionWidth = items.length * itemWidth;
+      
+      // Reset to middle section when reaching edges
+      if (scrollLeft <= itemWidth) {
+        container.scrollLeft = sectionWidth + itemWidth;
+      } else if (scrollLeft >= scrollWidth - clientWidth - itemWidth) {
+        container.scrollLeft = sectionWidth - clientWidth + itemWidth;
+      }
+      
+      updateArrows();
+    };
+
+    container.addEventListener('scroll', handleScroll);
+    return () => container.removeEventListener('scroll', handleScroll);
   }, [items.length]);
 
-  if (banners.isLoading || items.length === 0) return null;
+  // Initialize scroll to middle section
+  useEffect(() => {
+    if (scrollContainerRef.current && items.length > 0) {
+      const itemWidth = 196;
+      const sectionWidth = items.length * itemWidth;
+      scrollContainerRef.current.scrollLeft = sectionWidth;
+      updateArrows();
+    }
+  }, [items.length]);
 
-  const current = items[index];
-  const href =
-    current.link_url ||
-    (current.series?.slug ? `/title/${current.series.slug}` : null);
-  const isExternal = href?.startsWith("http");
+  // Auto-scroll animation
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container || items.length === 0 || isPaused || !isAutoScrolling) return;
 
-  const trackClick = () => {
-    supabase.rpc("increment_banner_click", { banner_id: current.id });
+    const startAutoScroll = () => {
+      autoScrollIntervalRef.current = setInterval(() => {
+        if (container && !isPaused) {
+          // Smooth continuous scroll (1px every 30ms = ~33px per second)
+          container.scrollLeft += 1;
+        }
+      }, 30);
+    };
+
+    startAutoScroll();
+
+    return () => {
+      if (autoScrollIntervalRef.current) {
+        clearInterval(autoScrollIntervalRef.current);
+      }
+    };
+  }, [items.length, isPaused, isAutoScrolling]);
+
+  const scroll = (direction: 'left' | 'right') => {
+    if (!scrollContainerRef.current) return;
+    
+    // Pause auto-scroll when user interacts
+    setIsPaused(true);
+    
+    const scrollAmount = 800;
+    const newScrollLeft = scrollContainerRef.current.scrollLeft + (direction === 'left' ? -scrollAmount : scrollAmount);
+    
+    scrollContainerRef.current.scrollTo({ left: newScrollLeft, behavior: 'smooth' });
+    
+    // Resume auto-scroll after 5 seconds of no interaction
+    setTimeout(() => setIsPaused(false), 5000);
   };
 
-  const inner = (
-    <div
-      className="relative flex min-h-[220px] flex-col justify-end overflow-hidden rounded-xl border border-border/40 p-8 md:min-h-[280px]"
-      style={{
-        backgroundColor: current.background_color ?? "#8B5CF6",
-        color: current.text_color ?? "#FFFFFF",
-      }}
-    >
-      {current.image_url && (
-        <img
-          src={current.image_url}
-          alt=""
-          className="absolute inset-0 h-full w-full object-cover opacity-40"
-        />
-      )}
-      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent" />
-      <div className="relative z-10 max-w-2xl">
-        <h2 className="text-2xl font-bold md:text-3xl">{current.title}</h2>
-        {current.description && (
-          <p className="mt-2 text-sm opacity-90 md:text-base">{current.description}</p>
-        )}
-        {href && (
-          <span className="mt-4 inline-block rounded-md bg-white/20 px-4 py-2 text-sm font-medium backdrop-blur">
-            {current.link_text ?? "Learn More"}
-          </span>
-        )}
-      </div>
-    </div>
-  );
-
-  const onTouchStart = (e: React.TouchEvent) => {
-    const t = e.touches[0];
-    if (!t) return;
-    touchStart.current = { x: t.clientX, y: t.clientY };
+  const handleMouseEnter = () => {
+    setIsPaused(true);
   };
 
-  const onTouchEnd = (e: React.TouchEvent) => {
-    const t = e.changedTouches[0];
-    if (!t || items.length <= 1) return;
-    const dx = t.clientX - touchStart.current.x;
-    const dy = t.clientY - touchStart.current.y;
-    if (Math.abs(dx) < SWIPE_THRESHOLD || Math.abs(dx) < Math.abs(dy)) return;
-    if (dx < 0) setIndex((i) => (i + 1) % items.length);
-    else setIndex((i) => (i - 1 + items.length) % items.length);
+  const handleMouseLeave = () => {
+    setIsPaused(false);
   };
+
+  if (carouselSeries.isLoading || items.length === 0) return null;
 
   return (
-    <section className="container mx-auto px-8 py-4">
-      <div className="relative" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
-        {href ? (
-          isExternal ? (
-            <a href={href} onClick={trackClick} target="_blank" rel="noopener noreferrer">
-              {inner}
-            </a>
-          ) : (
-            <Link to={href} onClick={trackClick}>
-              {inner}
-            </Link>
-          )
-        ) : (
-          inner
-        )}
+    <section className="relative w-full overflow-hidden bg-gradient-to-b from-background via-background/95 to-background/90 py-6 mt-8">
+      <div className="container mx-auto px-4 md:px-8">
+        {/* Scrollable Container */}
+        <div 
+          className="relative group"
+          onMouseEnter={handleMouseEnter}
+          onMouseLeave={handleMouseLeave}
+        >
+          {/* Left Arrow */}
+          {showLeftArrow && (
+            <Button
+              variant="secondary"
+              size="icon"
+              className="absolute left-0 top-1/2 z-20 -translate-y-1/2 h-12 w-12 rounded-full bg-black/80 hover:bg-black/90 text-white shadow-xl opacity-0 group-hover:opacity-100 transition-opacity"
+              onClick={() => scroll('left')}
+            >
+              <ChevronLeft className="h-6 w-6" />
+            </Button>
+          )}
 
-        {items.length > 1 && (
-          <>
+          {/* Carousel Items */}
+          <div
+            ref={scrollContainerRef}
+            className="flex gap-4 overflow-x-auto scrollbar-hide pb-2"
+            style={{
+              scrollbarWidth: 'none',
+              msOverflowStyle: 'none',
+              scrollBehavior: 'auto',
+            }}
+          >
+            {loopedItems.map((item, index) => (
+              <Link
+                key={`${item.id}-${index}`}
+                to={`/title/${item.series.slug}`}
+                className="group/card flex-shrink-0"
+              >
+                <div className="relative w-[140px] h-[200px] md:w-[160px] md:h-[230px] lg:w-[180px] lg:h-[260px] rounded-lg overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-300 hover:scale-105">
+                  {/* Cover Image */}
+                  {item.series.cover_url ? (
+                    <img
+                      src={item.series.cover_url}
+                      alt={item.series.title}
+                      className="w-full h-full object-cover"
+                      loading="lazy"
+                    />
+                  ) : (
+                    <div className="w-full h-full bg-gradient-to-br from-violet-900/20 to-violet-600/20 flex items-center justify-center">
+                      <span className="text-muted-foreground text-sm">No Cover</span>
+                    </div>
+                  )}
+                  
+                  {/* Glass Reflection Effect */}
+                  <div className="absolute inset-0 opacity-0 group-hover/card:opacity-100 transition-opacity duration-500 pointer-events-none">
+                    {/* Animated glass reflection sweep */}
+                    <div className="absolute inset-0 overflow-hidden">
+                      <div className="absolute -inset-full animate-shine bg-gradient-to-r from-transparent via-white/30 to-transparent skew-x-12" />
+                    </div>
+                    
+                    {/* Glass overlay */}
+                    <div className="absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-transparent backdrop-blur-[1px]" />
+                    
+                    {/* Subtle shimmer */}
+                    <div className="absolute top-0 left-0 right-0 h-1/3 bg-gradient-to-b from-white/20 to-transparent" />
+                  </div>
+                  
+                  {/* Dark Gradient Overlay on Hover */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover/card:opacity-100 transition-opacity duration-300" />
+                  
+                  {/* Title on Hover */}
+                  <div className="absolute bottom-0 left-0 right-0 p-3 transform translate-y-full group-hover/card:translate-y-0 transition-transform duration-300">
+                    <h3 className="text-white text-sm font-semibold line-clamp-2 drop-shadow-lg">
+                      {item.series.title}
+                    </h3>
+                    <p className="text-white/80 text-xs mt-1">
+                      {item.series.type}
+                    </p>
+                  </div>
+
+                  {/* Subtle Border with glass effect */}
+                  <div className="absolute inset-0 border border-white/20 rounded-lg pointer-events-none group-hover/card:border-white/40 transition-colors" />
+                  
+                  {/* Corner highlights for glass effect */}
+                  <div className="absolute top-0 left-0 w-16 h-16 bg-gradient-to-br from-white/30 to-transparent opacity-0 group-hover/card:opacity-100 transition-opacity rounded-tl-lg" />
+                  <div className="absolute bottom-0 right-0 w-16 h-16 bg-gradient-to-tl from-white/20 to-transparent opacity-0 group-hover/card:opacity-100 transition-opacity rounded-br-lg" />
+                </div>
+              </Link>
+            ))}
+          </div>
+
+          {/* Right Arrow */}
+          {showRightArrow && (
             <Button
               variant="secondary"
               size="icon"
-              className="absolute left-2 top-1/2 z-20 -translate-y-1/2 rounded-full opacity-80"
-              onClick={() => setIndex((i) => (i - 1 + items.length) % items.length)}
+              className="absolute right-0 top-1/2 z-20 -translate-y-1/2 h-12 w-12 rounded-full bg-black/80 hover:bg-black/90 text-white shadow-xl opacity-0 group-hover:opacity-100 transition-opacity"
+              onClick={() => scroll('right')}
             >
-              <ChevronLeft className="h-4 w-4" />
+              <ChevronRight className="h-6 w-6" />
             </Button>
-            <Button
-              variant="secondary"
-              size="icon"
-              className="absolute right-2 top-1/2 z-20 -translate-y-1/2 rounded-full opacity-80"
-              onClick={() => setIndex((i) => (i + 1) % items.length)}
-            >
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-            <div className="mt-3 flex justify-center gap-1.5">
-              {items.map((b, i) => (
-                <button
-                  key={b.id}
-                  type="button"
-                  className={`h-2 rounded-full transition-all ${i === index ? "w-6 bg-primary" : "w-2 bg-muted-foreground/40"}`}
-                  onClick={() => setIndex(i)}
-                  aria-label={`Go to slide ${i + 1}`}
-                />
-              ))}
-            </div>
-          </>
-        )}
+          )}
+        </div>
       </div>
+
+      <style>{`
+        .scrollbar-hide::-webkit-scrollbar {
+          display: none;
+        }
+        
+        @keyframes shine {
+          0% {
+            transform: translateX(-100%) skewX(-12deg);
+          }
+          100% {
+            transform: translateX(200%) skewX(-12deg);
+          }
+        }
+        
+        .animate-shine {
+          animation: shine 1.5s ease-in-out;
+        }
+      `}</style>
     </section>
   );
 }

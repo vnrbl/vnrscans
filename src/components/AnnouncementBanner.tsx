@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { X } from "lucide-react";
+import { X, Crown } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -91,34 +91,61 @@ export function AnnouncementBanner() {
   const top = visible[0];
   if (!top) return null;
 
-  const typeStyles: Record<string, string> = {
-    info: "border-primary/40 bg-primary/10",
-    warning: "border-yellow-500/40 bg-yellow-500/10",
-    success: "border-green-500/40 bg-green-500/10",
-    error: "border-destructive/40 bg-destructive/10",
-    event: "border-accent/40 bg-accent/10",
-  };
-
   return (
-    <div
-      className={`border-b px-4 py-3 ${typeStyles[top.type] ?? typeStyles.info}`}
-      style={top.banner_color ? { borderColor: top.banner_color, backgroundColor: `${top.banner_color}15` } : undefined}
-    >
-      <div className="container mx-auto flex items-start gap-3">
-        {top.icon && <span className="text-xl leading-none">{top.icon}</span>}
-        <div className="min-w-0 flex-1">
-          <p className="font-semibold text-sm">{top.title}</p>
-          <p className="mt-0.5 text-sm text-muted-foreground">{top.content}</p>
+    <div className="relative overflow-hidden border-b border-border/50 bg-gradient-to-r from-gray-900 via-purple-900/20 to-gray-900">
+      {/* Background pattern */}
+      <div className="absolute inset-0 bg-[linear-gradient(to_right,#4f4f4f2e_1px,transparent_1px),linear-gradient(to_bottom,#4f4f4f2e_1px,transparent_1px)] bg-[size:14px_24px] opacity-20" />
+      
+      <div className="container relative mx-auto px-6 py-3">
+        <div className="flex items-center justify-between gap-4">
+          {/* Left: Icon and Content */}
+          <div className="flex items-center gap-3 min-w-0 flex-1">
+            {/* Icon */}
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-violet-600/20 ring-1 ring-violet-600/40">
+              {top.icon ? (
+                <span className="text-2xl">{top.icon}</span>
+              ) : (
+                <Crown className="h-5 w-5 text-violet-400" />
+              )}
+            </div>
+
+            {/* Title and Description */}
+            <div className="min-w-0 flex-1">
+              <h3 className="text-sm font-bold text-white">{top.title}</h3>
+              <p className="mt-0.5 truncate text-xs text-gray-300">{top.content}</p>
+            </div>
+          </div>
+
+          {/* Center: Price Badge (if available) */}
+          <div className="hidden shrink-0 items-center gap-2 md:flex">
+            <div className="rounded-lg bg-orange-600/20 px-4 py-1.5 ring-1 ring-orange-500/40">
+              <div className="flex items-baseline gap-1">
+                <span className="text-2xl font-bold text-orange-400">$2.99</span>
+                <span className="text-xs text-orange-300">/month</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Right: Action Button and Close */}
+          <div className="flex shrink-0 items-center gap-2">
+            <Button
+              size="sm"
+              className="bg-violet-600 font-semibold text-white hover:bg-violet-700"
+            >
+              Subscribe Now
+            </Button>
+
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 shrink-0 text-gray-400 hover:bg-white/10 hover:text-white"
+              onClick={() => dismiss.mutate(top.id)}
+              aria-label="Dismiss announcement"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-8 w-8 shrink-0"
-          onClick={() => dismiss.mutate(top.id)}
-          aria-label="Dismiss announcement"
-        >
-          <X className="h-4 w-4" />
-        </Button>
       </div>
     </div>
   );

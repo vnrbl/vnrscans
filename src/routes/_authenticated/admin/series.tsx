@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
-import { Plus, Trash2, Eye, EyeOff, Upload, ExternalLink, X, Pencil, Download, Layers } from "lucide-react";
+import { Plus, Trash2, Eye, EyeOff, Upload, ExternalLink, X, Pencil, Download, Layers, Search } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { $extractChaptersFromUrl, $extractImagesFromUrl } from "@/lib/api/scraper.functions";
@@ -104,6 +104,10 @@ function AdminSeries() {
   const { user } = useAuth();
   const [selectedSeries, setSelectedSeries] = useState<string | null>(null);
   const [editingSeries, setEditingSeries] = useState<any | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [typeFilter, setTypeFilter] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [visibilityFilter, setVisibilityFilter] = useState<string>("all");
   
   const list = useQuery({
     queryKey: ["admin", "series"],
@@ -145,6 +149,29 @@ function AdminSeries() {
       
       return seriesWithChapters;
     },
+  });
+
+  // Filter the series based on search and filters
+  const filteredSeries = (list.data ?? []).filter((s: any) => {
+    // Search filter
+    const matchesSearch = searchQuery === "" || 
+      s.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (s.alternative_titles && s.alternative_titles.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (s.author && s.author.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (s.artist && s.artist.toLowerCase().includes(searchQuery.toLowerCase()));
+    
+    // Type filter
+    const matchesType = typeFilter === "all" || s.type === typeFilter;
+    
+    // Status filter
+    const matchesStatus = statusFilter === "all" || s.status === statusFilter;
+    
+    // Visibility filter
+    const matchesVisibility = visibilityFilter === "all" ||
+      (visibilityFilter === "visible" && !s.is_hidden) ||
+      (visibilityFilter === "hidden" && s.is_hidden);
+    
+    return matchesSearch && matchesType && matchesStatus && matchesVisibility;
   });
 
   const [open, setOpen] = useState(false);
@@ -205,7 +232,7 @@ function AdminSeries() {
 
   return (
     <div>
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold tracking-tight">Titles</h1>
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild><Button><Plus className="mr-1 h-4 w-4" />New title</Button></DialogTrigger>
@@ -219,9 +246,99 @@ function AdminSeries() {
         </Dialog>
       </div>
 
+      {/* Search and Filters */}
+      <div className="mb-6 space-y-4">
+        {/* Search Bar */}
+        <div className="relative">
+          <Input
+            type="text"
+            placeholder="Search by title, alternative titles, author, or artist..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="h-11 pl-4 pr-10"
+          />
+          {searchQuery && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2"
+              onClick={() => setSearchQuery("")}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          )}
+        </div>
+
+        {/* Filter Row */}
+        <div className="flex flex-wrap items-center gap-3">
+          <Select value={typeFilter} onValueChange={setTypeFilter}>
+            <SelectTrigger className="w-[140px]">
+              <SelectValue placeholder="Type" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Types</SelectItem>
+              <SelectItem value="manga">MANGA</SelectItem>
+              <SelectItem value="manhwa">MANHWA</SelectItem>
+              <SelectItem value="manhua">MANHUA</SelectItem>
+              <SelectItem value="novel">NOVEL</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="w-[140px]">
+              <SelectValue placeholder="Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Status</SelectItem>
+              <SelectItem value="ongoing">Ongoing</SelectItem>
+              <SelectItem value="completed">Completed</SelectItem>
+              <SelectItem value="hiatus">Hiatus</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Select value={visibilityFilter} onValueChange={setVisibilityFilter}>
+            <SelectTrigger className="w-[140px]">
+              <SelectValue placeholder="Visibility" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All</SelectItem>
+              <SelectItem value="visible">Visible</SelectItem>
+              <SelectItem value="hidden">Hidden</SelectItem>
+            </SelectContent>
+          </Select>
+
+          {(searchQuery || typeFilter !== "all" || statusFilter !== "all" || visibilityFilter !== "all") && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setSearchQuery("");
+                setTypeFilter("all");
+                setStatusFilter("all");
+                setVisibilityFilter("all");
+              }}
+              className="text-muted-foreground"
+            >
+              Clear Filters
+            </Button>
+          )}
+
+          <div className="ml-auto text-sm text-muted-foreground">
+            Showing {filteredSeries.length} of {list.data?.length || 0} titles
+          </div>
+        </div>
+      </div>
+
       <div className="mt-6 divide-y divide-border/40 rounded-lg border border-border/40 bg-card">
         {list.isLoading && <div className="p-6 text-sm text-muted-foreground">Loading…</div>}
-        {(list.data ?? []).map((s) => (
+        {filteredSeries.length === 0 && !list.isLoading && (
+          <div className="p-8 text-center text-muted-foreground">
+            {searchQuery || typeFilter !== "all" || statusFilter !== "all" || visibilityFilter !== "all" 
+              ? "No titles match your filters" 
+              : "No titles found"}
+          </div>
+        )}
+        {filteredSeries.map((s: any) => (
           <div key={s.id} className="flex items-center gap-3 p-3">
             {s.cover_url ? <img src={s.cover_url} alt="" className="h-14 w-10 rounded object-cover" /> : <div className="h-14 w-10 rounded bg-secondary" />}
             <div className="min-w-0 flex-1">
