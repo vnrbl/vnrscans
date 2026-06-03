@@ -49,10 +49,13 @@ function Reader() {
   const [showChapters, setShowChapters] = useState(false);
   const [showSpeedControl, setShowSpeedControl] = useState(false);
   const [showScrollTop, setShowScrollTop] = useState(false);
+  const [isAutoScrolling, setIsAutoScrolling] = useState(false);
+  const [autoScrollSpeed, setAutoScrollSpeed] = useState(2);
   const hideTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const controlsVisibleRef = useRef(true);
   const lastTapRef = useRef(0);
   const isDoubleTapToggleRef = useRef(false);
+  const autoScrollIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const chapterQ = useQuery({
     queryKey: ["chapter", titleSlug, chapterSlug],
@@ -235,9 +238,6 @@ function Reader() {
         window.requestAnimationFrame(() => {
           const currentScrollY = window.scrollY;
           
-          // Show scroll-to-top button when scrolled down more than 300px
-          setShowScrollTop(currentScrollY > 300);
-          
           // Only update if scrolled more than 10px to avoid jitter
           if (Math.abs(currentScrollY - lastScrollY) > 10) {
             const isScrollingDown = currentScrollY > lastScrollY;
@@ -248,9 +248,17 @@ function Reader() {
             // But ONLY on mobile - always show on desktop
             if (isMobile && !showChapters && !showSpeedControl) {
               setControlsVisible(!isScrollingDown || currentScrollY < 100);
+              // Hide scroll-to-top on scroll down, show on scroll up (mobile only)
+              if (currentScrollY > 300) {
+                setShowScrollTop(!isScrollingDown);
+              } else {
+                setShowScrollTop(false);
+              }
             } else if (!isMobile) {
               // Always visible on desktop
               setControlsVisible(true);
+              // Always show scroll-to-top when scrolled >300px (desktop)
+              setShowScrollTop(currentScrollY > 300);
             }
           }
           
@@ -286,6 +294,45 @@ function Reader() {
   const scrollToTop = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
+
+  const toggleAutoScroll = () => {
+    setIsAutoScrolling(!isAutoScrolling);
+  };
+
+  // Auto-scroll effect (mobile only)
+  useEffect(() => {
+    if (!isAutoScrolling) {
+      if (autoScrollIntervalRef.current) {
+        clearInterval(autoScrollIntervalRef.current);
+        autoScrollIntervalRef.current = null;
+      }
+      return;
+    }
+
+    // Only enable on mobile
+    const isMobile = window.innerWidth < 768;
+    if (!isMobile) {
+      setIsAutoScrolling(false);
+      return;
+    }
+
+    // Start auto-scrolling
+    autoScrollIntervalRef.current = setInterval(() => {
+      window.scrollBy({ top: autoScrollSpeed, behavior: 'auto' });
+      
+      // Stop if reached bottom
+      if (window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 10) {
+        setIsAutoScrolling(false);
+      }
+    }, 16); // ~60fps
+
+    return () => {
+      if (autoScrollIntervalRef.current) {
+        clearInterval(autoScrollIntervalRef.current);
+        autoScrollIntervalRef.current = null;
+      }
+    };
+  }, [isAutoScrolling, autoScrollSpeed]);
 
   // Auto-hide controls after 3 seconds of inactivity
   const showControls = useCallback(() => {
@@ -514,7 +561,7 @@ function Reader() {
       <nav className={`fixed bottom-0 left-0 right-0 z-30 border-t border-border/50 bg-background/90 backdrop-blur md:hidden transition-transform duration-300 ${
         controlsVisible ? "translate-y-0" : "translate-y-full"
       }`}>
-        <div className="container mx-auto flex items-center justify-between gap-2 px-8 py-3">
+        <div className="container mx-auto flex items-center justify-between gap-2 px-4 py-3">
           <Button
             variant="outline"
             size="sm"
@@ -523,7 +570,7 @@ function Reader() {
           >
             <ChevronLeft className="mr-1 h-4 w-4" />Prev
           </Button>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1">
             <Link to="/home">
               <Button variant="ghost" size="sm" title="Home">
                 <Home className="h-4 w-4" />
@@ -534,6 +581,15 @@ function Reader() {
                 <BookOpen className="h-4 w-4" />
               </Button>
             </Link>
+            {/* Auto-scroll Button - Mobile only */}
+            <Button 
+              variant={isAutoScrolling ? "default" : "ghost"}
+              size="sm" 
+              onClick={toggleAutoScroll}
+              title={isAutoScrolling ? "Stop Auto-scroll" : "Start Auto-scroll"}
+            >
+              {isAutoScrolling ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+            </Button>
             {/* Fullscreen Button - Mobile */}
             <Button 
               variant="ghost" 
@@ -559,6 +615,38 @@ function Reader() {
           </Button>
         </div>
       </nav>
+
+      {/* Auto-scroll Speed Control - Mobile only */}
+      {isAutoScrolling && (
+        <div className="fixed bottom-16 left-1/2 z-40 -translate-x-1/2 rounded-full bg-background/95 px-4 py-2 shadow-lg backdrop-blur md:hidden">
+          <div className="flex items-center gap-3">
+            <span className="text-xs text-muted-foreground">Speed:</span>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 w-7 p-0"
+                onClick={() => setAutoScrollSpeed(prev => Math.max(1, prev - 0.5))}
+                disabled={autoScrollSpeed <= 1}
+              >
+                -
+              </Button>
+              <span className="min-w-[3ch] text-center text-sm font-medium">
+                {autoScrollSpeed.toFixed(1)}x
+              </span>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 w-7 p-0"
+                onClick={() => setAutoScrollSpeed(prev => Math.min(10, prev + 0.5))}
+                disabled={autoScrollSpeed >= 10}
+              >
+                +
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Scroll to Top Button - Both Mobile and Desktop */}
       <button
