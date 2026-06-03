@@ -1,0 +1,1 @@
+import{j as t}from"./index-CgycXQ4l.js";const r=({error:e})=>t.jsxs("div",{className:"container mx-auto px-8 py-16 text-center text-muted-foreground",children:["Couldn't load this series: ",e.message]});export{r as errorComponent};

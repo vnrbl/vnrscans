@@ -22,7 +22,6 @@ import { useQueryClient } from "@tanstack/react-query";
 import { isReaderLayoutPath } from "@/lib/layout";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { ReaderSettingsProvider } from "@/contexts/ReaderSettingsContext";
-import { Analytics } from "@vercel/analytics/react";
 
 function NotFoundComponent() {
   return (
@@ -162,7 +161,6 @@ function AppShell() {
       <>
         <Outlet />
         <Toaster />
-        <Analytics />
       </>
     );
   }
@@ -175,7 +173,6 @@ function AppShell() {
       </main>
       <Footer />
       <Toaster />
-      <Analytics />
     </div>
   );
 }

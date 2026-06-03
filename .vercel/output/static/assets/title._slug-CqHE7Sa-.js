@@ -1,1 +1,0 @@
-import{j as o,L as t}from"./index-DMyjNxjE.js";const n=()=>o.jsxs("div",{className:"container mx-auto px-8 py-16 text-center",children:[o.jsx("h1",{className:"text-2xl font-bold",children:"Series not found"}),o.jsx(t,{to:"/browse",className:"text-primary",children:"Back to browse"})]});export{n as notFoundComponent};
