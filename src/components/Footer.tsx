@@ -7,7 +7,7 @@ export function Footer() {
         <div className="flex flex-col items-center justify-center gap-4 text-center">
           <Link to="/home" className="flex items-center gap-2 transition-transform hover:scale-105">
             <div className="relative grid h-10 w-10 place-items-center rounded-lg bg-violet-600">
-              <span className="text-lg font-bold text-white">0V</span>
+              <span className="text-lg font-bold text-white">VS</span>
             </div>
             <span className="text-xl font-bold text-violet-600">
               VNRScans

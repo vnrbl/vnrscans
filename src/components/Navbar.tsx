@@ -139,7 +139,7 @@ export function Navbar() {
         {/* Logo */}
         <Link to="/home" className="flex shrink-0 items-center gap-2 transition-transform hover:scale-105">
           <div className="relative grid h-10 w-10 place-items-center rounded-lg bg-primary">
-            <span className="text-lg font-bold text-primary-foreground">0V</span>
+            <span className="text-lg font-bold text-primary-foreground">VS</span>
           </div>
           <span className="hidden text-xl font-bold tracking-tight text-primary sm:inline">
             VNRScans

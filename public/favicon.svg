@@ -7,5 +7,5 @@
       <stop offset="100%" stop-color="#6366F1"/>
     </linearGradient>
   </defs>
-  <text x="32" y="42" font-family="Arial, sans-serif" font-size="28" font-weight="bold" fill="white" text-anchor="middle">0V</text>
+  <text x="32" y="42" font-family="Arial, sans-serif" font-size="28" font-weight="bold" fill="white" text-anchor="middle">VS</text>
 </svg>
