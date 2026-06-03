@@ -24,7 +24,7 @@ import { Command, CommandGroup, CommandItem } from "@/components/ui/command";
 export const Route = createFileRoute("/browse")({
   head: () => ({
     meta: [
-      { title: "Browse Manga — VNRScans" },
+      { title: "Browse Manga — vnrscans" },
       { name: "description", content: "Discover your next favorite series" },
     ],
   }),

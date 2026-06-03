@@ -78,7 +78,7 @@ INSERT INTO announcements (
   target_audience,
   icon
 ) VALUES (
-  '👋 Welcome to VNRScans!',
+  '👋 Welcome to vnrscans!',
   'New here? Start with our top-rated series and join our growing community of manga lovers!',
   'info',
   70,

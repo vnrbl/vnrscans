@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 
 export const Route = createFileRoute("/tags")({
-  head: () => ({ meta: [{ title: "Browse Tags — VNRScans" }] }),
+  head: () => ({ meta: [{ title: "Browse Tags — vnrscans" }] }),
   component: TagsPage,
 });
 

@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/contact")({
-  head: () => ({ meta: [{ title: "Contact — VNRScans" }] }),
+  head: () => ({ meta: [{ title: "Contact — vnrscans" }] }),
   component: () => (
     <div className="container mx-auto max-w-3xl px-8 py-12">
       <h1 className="text-3xl font-bold tracking-tight">Contact</h1>

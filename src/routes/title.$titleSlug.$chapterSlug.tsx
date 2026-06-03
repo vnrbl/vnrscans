@@ -24,7 +24,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/title/$titleSlug/$chapterSlug")({
-  head: ({ params }) => ({ meta: [{ title: `Read ${params.chapterSlug} — VNRScans` }] }),
+  head: ({ params }) => ({ meta: [{ title: `Read ${params.chapterSlug} — vnrscans` }] }),
   component: Reader,
   errorComponent: ({ error }) => (
     <div className="grid min-h-screen place-items-center bg-background p-4 text-center text-muted-foreground">

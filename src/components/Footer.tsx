@@ -10,11 +10,11 @@ export function Footer() {
               <span className="text-lg font-bold text-white">VS</span>
             </div>
             <span className="text-xl font-bold text-violet-600">
-              VNRScans
+              vnrscans
             </span>
           </Link>
           <p className="max-w-md text-sm text-muted-foreground">
-            © {new Date().getFullYear()} VNRScans does not store any files on its servers, it only links to media which is hosted on 3rd party services.
+            © {new Date().getFullYear()} vnrscans does not store any files on its servers, it only links to media which is hosted on 3rd party services.
           </p>
         </div>
       </div>

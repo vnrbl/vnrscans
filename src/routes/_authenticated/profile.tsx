@@ -37,7 +37,7 @@ import { ReadingHeatmap } from "@/components/profile/ReadingHeatmap";
 import { ProfileWidgets } from "@/components/profile/ProfileWidgets";
 
 export const Route = createFileRoute("/_authenticated/profile")({
-  head: () => ({ meta: [{ title: "Profile — VNRScans" }] }),
+  head: () => ({ meta: [{ title: "Profile — vnrscans" }] }),
   component: ProfilePage,
 });
 

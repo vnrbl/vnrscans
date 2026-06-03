@@ -14,8 +14,8 @@ import { HomeHeroCarousel } from "@/components/HomeHeroCarousel";
 export const Route = createFileRoute("/home")({
   head: () => ({
     meta: [
-      { title: "Home — VNRScans" },
-      { name: "description", content: "Discover and read the latest manhwa series with VNRScans." },
+      { title: "Home — vnrscans" },
+      { name: "description", content: "Discover and read the latest manhwa series with vnrscans." },
     ],
   }),
   component: HomePage,
