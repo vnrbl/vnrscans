@@ -50,10 +50,12 @@ function Reader() {
   const [scrollSpeed, setScrollSpeed] = useState(3);
   const scrollIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const [isMounted, setIsMounted] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
 
   // Handle client-side mounting
   useEffect(() => {
     setIsMounted(true);
+    setIsMobile(window.innerWidth < 768);
   }, []);
 
   // Auto-scroll logic for mobile
@@ -286,8 +288,10 @@ function Reader() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [prev, next, navigate, seriesSlug]);
 
-  // Scroll direction detection - hide controls on scroll down, show on scroll up
+  // Scroll direction detection - hide controls on scroll down, show on scroll up (mobile only)
   useEffect(() => {
+    if (!isMounted) return;
+    
     let ticking = false;
 
     const handleScroll = () => {
@@ -301,9 +305,8 @@ function Reader() {
             setScrollingDown(isScrollingDown);
             setLastScrollY(currentScrollY);
             
-            // Show controls when scrolling up, hide when scrolling down
-            // But don't hide if panels are open
-            if (!showChapters && !showSpeedControl) {
+            // Only hide/show on mobile, keep visible on desktop
+            if (isMobile && !showChapters && !showSpeedControl) {
               setControlsVisible(!isScrollingDown || currentScrollY < 100);
             }
           }
@@ -316,16 +319,18 @@ function Reader() {
 
     window.addEventListener("scroll", handleScroll, { passive: true });
     return () => window.removeEventListener("scroll", handleScroll);
-  }, [lastScrollY, showChapters, showSpeedControl]);
+  }, [lastScrollY, showChapters, showSpeedControl, isMounted, isMobile]);
 
   // Fullscreen management
   useEffect(() => {
+    if (!isMounted) return;
+    
     const handleFullscreenChange = () => {
       setIsFullscreen(!!document.fullscreenElement);
     };
     document.addEventListener("fullscreenchange", handleFullscreenChange);
     return () => document.removeEventListener("fullscreenchange", handleFullscreenChange);
-  }, []);
+  }, [isMounted]);
 
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {
@@ -344,6 +349,8 @@ function Reader() {
   const isDoubleTapToggleRef = useRef(false);
 
   const showControls = useCallback(() => {
+    if (!isMounted) return;
+    
     // Skip auto-show if this was triggered right after a double-tap toggle-off
     if (isDoubleTapToggleRef.current) {
       isDoubleTapToggleRef.current = false;
@@ -354,7 +361,7 @@ function Reader() {
     if (hideTimeoutRef.current) clearTimeout(hideTimeoutRef.current);
     
     // Only auto-hide on mobile, keep visible on desktop
-    if (window.innerWidth < 768) {
+    if (isMobile) {
       hideTimeoutRef.current = setTimeout(() => {
         // Don't hide if panels are open
         if (!showChapters && !showSpeedControl) {
@@ -363,7 +370,7 @@ function Reader() {
         }
       }, 3000);
     }
-  }, [showChapters, showSpeedControl]);
+  }, [showChapters, showSpeedControl, isMounted, isMobile]);
 
   useEffect(() => {
     showControls();
@@ -374,6 +381,8 @@ function Reader() {
 
   // Show controls on mouse movement or touch
   useEffect(() => {
+    if (!isMounted) return;
+    
     const handleMouseActivity = () => showControls();
     const handleScrollActivity = () => showControls();
     
@@ -429,7 +438,7 @@ function Reader() {
       document.removeEventListener("touchstart", handleDoubleTap);
       document.removeEventListener("scroll", handleScrollActivity);
     };
-  }, [showControls]);
+  }, [showControls, isMounted]);
 
   if (chapterQ.isLoading) {
     return <div className="grid min-h-screen place-items-center bg-background text-muted-foreground">Loading chapter…</div>;
@@ -546,14 +555,14 @@ function Reader() {
         />
       </div>
 
-      {/* Bottom Nav - Auto-hide */}
+      {/* Bottom Nav - Sticky with scroll-based visibility on mobile */}
       <div 
         className={`transition-transform duration-300 ${
           controlsVisible ? "translate-y-0" : "translate-y-full"
         }`}
       >
         <nav className="sticky bottom-0 z-30 border-t border-border/50 bg-background/90 backdrop-blur md:hidden">
-          <div className="container mx-auto flex items-center justify-between gap-2 px-8 py-3">
+          <div className="container mx-auto flex items-center justify-between gap-2 px-4 py-3">
             <Button
               variant="outline"
               size="sm"
@@ -562,14 +571,55 @@ function Reader() {
             >
               <ChevronLeft className="mr-1 h-4 w-4" />Prev
             </Button>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1">
+              {/* Zoom Out - Mobile */}
+              {!isNovel && (
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={() => setZoomLevel(prev => Math.max(prev - 25, 50))}
+                  disabled={zoomLevel <= 50}
+                  title="Zoom Out"
+                  className="px-2"
+                >
+                  <ZoomOut className="h-4 w-4" />
+                </Button>
+              )}
+              
+              {/* Zoom Level Display */}
+              {!isNovel && (
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={() => setZoomLevel(100)}
+                  title="Reset Zoom"
+                  className="px-2 text-xs font-semibold min-w-[45px]"
+                >
+                  {zoomLevel}%
+                </Button>
+              )}
+              
+              {/* Zoom In - Mobile */}
+              {!isNovel && (
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={() => setZoomLevel(prev => Math.min(prev + 25, 200))}
+                  disabled={zoomLevel >= 200}
+                  title="Zoom In"
+                  className="px-2"
+                >
+                  <ZoomIn className="h-4 w-4" />
+                </Button>
+              )}
+              
               <Link to="/home">
-                <Button variant="ghost" size="sm" title="Home">
+                <Button variant="ghost" size="sm" title="Home" className="px-2">
                   <Home className="h-4 w-4" />
                 </Button>
               </Link>
               <Link to="/title/$slug" params={{ slug: seriesSlug }}>
-                <Button variant="ghost" size="sm" title="Back to title">
+                <Button variant="ghost" size="sm" title="Back to title" className="px-2">
                   <BookOpen className="h-4 w-4" />
                 </Button>
               </Link>
@@ -579,7 +629,7 @@ function Reader() {
                 size="sm" 
                 onClick={() => setAutoScrollEnabled(prev => !prev)}
                 title={autoScrollEnabled ? "Pause Auto Scroll" : "Start Auto Scroll"}
-                className={autoScrollEnabled ? "bg-violet-600 text-white hover:bg-violet-700 hover:text-white" : ""}
+                className={`px-2 ${autoScrollEnabled ? "bg-violet-600 text-white hover:bg-violet-700 hover:text-white" : ""}`}
               >
                 {autoScrollEnabled ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
               </Button>
@@ -589,6 +639,7 @@ function Reader() {
                 size="sm" 
                 onClick={toggleFullscreen}
                 title={isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
+                className="px-2"
               >
                 {isFullscreen ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
               </Button>
@@ -806,7 +857,7 @@ function ImageView({ pages, loading, chapterId, zoomLevel, hasPrev, hasNext, onP
 
   return (
     <>
-      {/* Pages with Zoom (Desktop) / Normal (Mobile) */}
+      {/* Pages with Zoom - Now enabled on both mobile and desktop */}
       <div className="mx-auto max-w-3xl px-2 py-4">
         {pages.map((p) => (
           <div key={p.id} className="relative">
@@ -849,11 +900,11 @@ function ImageView({ pages, loading, chapterId, zoomLevel, hasPrev, hasNext, onP
                 <img
                   data-page-id={p.id}
                   src={p.image_url}
-                  alt={`Page {p.page_number}`}
+                  alt={`Page ${p.page_number}`}
                   loading="lazy"
                   className="mx-auto block w-full transition-transform duration-200"
                   style={{ 
-                    transform: isMobile ? 'scale(1)' : `scale(${zoomLevel / 100})`, 
+                    transform: `scale(${zoomLevel / 100})`, 
                     transformOrigin: 'top center',
                     opacity: imageLoading[p.id] ? 0.3 : 1
                   }}
@@ -865,6 +916,7 @@ function ImageView({ pages, loading, chapterId, zoomLevel, hasPrev, hasNext, onP
           </div>
         ))}
 
+        {/* Chapter Navigation Buttons - Above Reactions */}
         {/* Chapter Navigation Buttons - Above Reactions */}
         <ChapterNavigation 
           hasPrev={hasPrev}
