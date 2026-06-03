@@ -87,7 +87,7 @@ export function ProfileWidgets() {
     if (!profile.data) return "";
     const username = profile.data.username || "user";
     const baseUrl = window.location.origin;
-    return `[![0Verse Profile](${baseUrl}/widget/${username}?type=${widgetType}&theme=${widgetTheme})](${baseUrl}/profile)`;
+    return `[![VNRScans Profile](${baseUrl}/widget/${username}?type=${widgetType}&theme=${widgetTheme})](${baseUrl}/profile)`;
   };
 
   const handleCopy = (text: string) => {
@@ -147,7 +147,7 @@ export function ProfileWidgets() {
               <p className={`text-sm ${colors.secondary}`}>Level {user_level}</p>
             </div>
             <div className="text-right">
-              <p className={`text-sm ${colors.secondary}`}>0Verse</p>
+              <p className={`text-sm ${colors.secondary}`}>VNRScans</p>
             </div>
           </div>
         </div>
@@ -222,7 +222,7 @@ export function ProfileWidgets() {
             </div>
           </div>
 
-          <p className={`text-xs mt-4 ${colors.secondary}`}>0Verse • Profile Widget</p>
+          <p className={`text-xs mt-4 ${colors.secondary}`}>VNRScans • Profile Widget</p>
         </div>
       </div>
     );

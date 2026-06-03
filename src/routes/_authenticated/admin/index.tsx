@@ -4,7 +4,7 @@ import { Library, BookOpen, Users, MessageSquare, Flag } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/_authenticated/admin/")({
-  head: () => ({ meta: [{ title: "Admin — 0Verse" }] }),
+  head: () => ({ meta: [{ title: "Admin — VNRScans" }] }),
   component: AdminHome,
 });
 

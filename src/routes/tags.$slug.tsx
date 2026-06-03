@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 
 export const Route = createFileRoute("/tags/$slug")({
   head: ({ params }) => ({ 
-    meta: [{ title: `${params.slug} — Browse Tags — 0Verse` }] 
+    meta: [{ title: `${params.slug} — Browse Tags — VNRScans` }] 
   }),
   component: TagDetailPage,
 });

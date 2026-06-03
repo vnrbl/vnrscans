@@ -10,7 +10,7 @@ type SearchParams = { q?: string };
 
 export const Route = createFileRoute("/search")({
   validateSearch: (s: Record<string, unknown>): SearchParams => ({ q: (s.q as string) || "" }),
-  head: () => ({ meta: [{ title: "Search — 0Verse" }] }),
+  head: () => ({ meta: [{ title: "Search — VNRScans" }] }),
   component: SearchPage,
 });
 

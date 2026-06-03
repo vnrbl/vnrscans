@@ -9,7 +9,7 @@ import { Card } from "@/components/ui/card";
 export const Route = createFileRoute("/rankings")({
   head: () => ({
     meta: [
-      { title: "Rankings — 0Verse" },
+      { title: "Rankings — VNRScans" },
       { name: "description", content: "Top ranked manga, manhwa, and manhua series" },
     ],
   }),
@@ -110,7 +110,7 @@ function RankingsPage() {
             <h1 className="text-3xl font-bold">Rankings</h1>
           </div>
           <p className="mt-2 text-muted-foreground">
-            Discover the top-rated and most popular series on 0Verse
+            Discover the top-rated and most popular series on VNRScans
           </p>
         </div>
 

@@ -142,7 +142,7 @@ export function Navbar() {
             <span className="text-lg font-bold text-primary-foreground">0V</span>
           </div>
           <span className="hidden text-xl font-bold tracking-tight text-primary sm:inline">
-            0Verse
+            VNRScans
           </span>
         </Link>
 

@@ -15,7 +15,7 @@ import {
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/library")({
-  head: () => ({ meta: [{ title: "My Library — 0Verse" }] }),
+  head: () => ({ meta: [{ title: "My Library — VNRScans" }] }),
   component: LibraryPage,
 });
 

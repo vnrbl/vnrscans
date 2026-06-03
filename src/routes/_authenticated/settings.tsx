@@ -8,7 +8,7 @@ import { Slider } from "@/components/ui/slider";
 import { Separator } from "@/components/ui/separator";
 
 export const Route = createFileRoute("/_authenticated/settings")({
-  head: () => ({ meta: [{ title: "Settings — 0Verse" }] }),
+  head: () => ({ meta: [{ title: "Settings — VNRScans" }] }),
   component: SettingsPage,
 });
 

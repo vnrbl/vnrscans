@@ -1,1 +1,0 @@
-import{j as r}from"./index-CgycXQ4l.js";const o=({error:e})=>r.jsxs("div",{className:"grid min-h-screen place-items-center bg-background p-4 text-center text-muted-foreground",children:["Couldn't open this chapter: ",e.message]});export{o as errorComponent};

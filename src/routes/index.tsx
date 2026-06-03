@@ -6,9 +6,9 @@ import { Button } from "@/components/ui/button";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "0Verse — Discover Manhwa Stories" },
+      { title: "VNRScans — Discover Manhwa Stories" },
       { name: "description", content: "Follow your favorite manhwa series, track new chapters, and dive into worlds created by talented artists." },
-      { property: "og:title", content: "0Verse" },
+      { property: "og:title", content: "VNRScans" },
       { property: "og:description", content: "Discover manhwa stories drawn by imagination." },
     ],
   }),
@@ -39,7 +39,7 @@ function Home() {
         <div className="container relative mx-auto px-8 text-center">
           <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-violet-500/20 bg-violet-500/10 px-4 py-2 backdrop-blur-sm">
             <div className="h-2 w-2 animate-pulse rounded-full bg-violet-400" />
-            <span className="text-sm font-medium text-violet-400">Welcome to 0Verse</span>
+            <span className="text-sm font-medium text-violet-400">Welcome to VNRScans</span>
           </div>
           
           <h1 className="text-4xl font-extrabold tracking-tight md:text-6xl lg:text-7xl">
