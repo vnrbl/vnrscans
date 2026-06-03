@@ -60,36 +60,30 @@ function Reader() {
 
   // Auto-scroll logic for mobile
   useEffect(() => {
-    if (!isMounted) return;
+    if (!isMounted || !autoScrollEnabled) return;
     
-    if (autoScrollEnabled) {
-      // Clear any existing interval
-      if (scrollIntervalRef.current) {
-        clearInterval(scrollIntervalRef.current);
-      }
-
-      // Calculate scroll amount based on speed (1-10 scale)
-      const scrollAmount = scrollSpeed * 0.5;
-      
-      scrollIntervalRef.current = setInterval(() => {
-        window.scrollBy({ top: scrollAmount, behavior: 'auto' });
-        
-        // Stop if reached bottom
-        if ((window.innerHeight + window.pageYOffset) >= document.documentElement.scrollHeight) {
-          setAutoScrollEnabled(false);
-        }
-      }, 16); // ~60fps
-
-      return () => {
-        if (scrollIntervalRef.current) {
-          clearInterval(scrollIntervalRef.current);
-        }
-      };
-    } else {
-      if (scrollIntervalRef.current) {
-        clearInterval(scrollIntervalRef.current);
-      }
+    // Clear any existing interval
+    if (scrollIntervalRef.current) {
+      clearInterval(scrollIntervalRef.current);
     }
+
+    // Calculate scroll amount based on speed (1-10 scale)
+    const scrollAmount = scrollSpeed * 0.5;
+    
+    scrollIntervalRef.current = setInterval(() => {
+      window.scrollBy({ top: scrollAmount, behavior: 'auto' });
+      
+      // Stop if reached bottom
+      if ((window.innerHeight + window.pageYOffset) >= document.documentElement.scrollHeight) {
+        setAutoScrollEnabled(false);
+      }
+    }, 16); // ~60fps
+
+    return () => {
+      if (scrollIntervalRef.current) {
+        clearInterval(scrollIntervalRef.current);
+      }
+    };
   }, [autoScrollEnabled, scrollSpeed, isMounted]);
 
   // Stop auto-scroll on manual scroll or interaction
@@ -290,7 +284,7 @@ function Reader() {
 
   // Scroll direction detection - hide controls on scroll down, show on scroll up (mobile only)
   useEffect(() => {
-    if (!isMounted) return;
+    if (typeof window === 'undefined') return;
     
     let ticking = false;
 
@@ -319,18 +313,18 @@ function Reader() {
 
     window.addEventListener("scroll", handleScroll, { passive: true });
     return () => window.removeEventListener("scroll", handleScroll);
-  }, [lastScrollY, showChapters, showSpeedControl, isMounted, isMobile]);
+  }, [lastScrollY, showChapters, showSpeedControl, isMobile]);
 
   // Fullscreen management
   useEffect(() => {
-    if (!isMounted) return;
+    if (typeof window === 'undefined' || typeof document === 'undefined') return;
     
     const handleFullscreenChange = () => {
       setIsFullscreen(!!document.fullscreenElement);
     };
     document.addEventListener("fullscreenchange", handleFullscreenChange);
     return () => document.removeEventListener("fullscreenchange", handleFullscreenChange);
-  }, [isMounted]);
+  }, []);
 
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {
@@ -349,7 +343,7 @@ function Reader() {
   const isDoubleTapToggleRef = useRef(false);
 
   const showControls = useCallback(() => {
-    if (!isMounted) return;
+    if (typeof window === 'undefined') return;
     
     // Skip auto-show if this was triggered right after a double-tap toggle-off
     if (isDoubleTapToggleRef.current) {
@@ -370,7 +364,7 @@ function Reader() {
         }
       }, 3000);
     }
-  }, [showChapters, showSpeedControl, isMounted, isMobile]);
+  }, [showChapters, showSpeedControl, isMobile]);
 
   useEffect(() => {
     showControls();
@@ -381,7 +375,7 @@ function Reader() {
 
   // Show controls on mouse movement or touch
   useEffect(() => {
-    if (!isMounted) return;
+    if (typeof window === 'undefined' || typeof document === 'undefined') return;
     
     const handleMouseActivity = () => showControls();
     const handleScrollActivity = () => showControls();
@@ -438,7 +432,7 @@ function Reader() {
       document.removeEventListener("touchstart", handleDoubleTap);
       document.removeEventListener("scroll", handleScrollActivity);
     };
-  }, [showControls, isMounted]);
+  }, [showControls]);
 
   if (chapterQ.isLoading) {
     return <div className="grid min-h-screen place-items-center bg-background text-muted-foreground">Loading chapter…</div>;
