@@ -49,9 +49,17 @@ function Reader() {
   const [autoScrollEnabled, setAutoScrollEnabled] = useState(false);
   const [scrollSpeed, setScrollSpeed] = useState(3);
   const scrollIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const [isMounted, setIsMounted] = useState(false);
+
+  // Handle client-side mounting
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   // Auto-scroll logic for mobile
   useEffect(() => {
+    if (!isMounted) return;
+    
     if (autoScrollEnabled) {
       // Clear any existing interval
       if (scrollIntervalRef.current) {
@@ -80,10 +88,12 @@ function Reader() {
         clearInterval(scrollIntervalRef.current);
       }
     }
-  }, [autoScrollEnabled, scrollSpeed]);
+  }, [autoScrollEnabled, scrollSpeed, isMounted]);
 
   // Stop auto-scroll on manual scroll or interaction
   useEffect(() => {
+    if (!isMounted) return;
+    
     const handleUserScroll = (e: WheelEvent | TouchEvent) => {
       if (autoScrollEnabled) {
         setAutoScrollEnabled(false);
@@ -105,7 +115,7 @@ function Reader() {
       window.removeEventListener('touchmove', handleUserScroll);
       window.removeEventListener('keydown', handleKeyPress);
     };
-  }, [autoScrollEnabled]);
+  }, [autoScrollEnabled, isMounted]);
 
   const chapterQ = useQuery({
     queryKey: ["chapter", titleSlug, chapterSlug],
