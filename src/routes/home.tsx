@@ -68,7 +68,7 @@ function HomePage() {
         .eq("user_id", user!.id)
         .order("updated_at", { ascending: false });
       if (error) throw error;
-      
+
       // Group by series and keep only the most recent chapter per series
       const seriesMap = new Map();
       (data ?? []).forEach((item) => {
@@ -76,7 +76,7 @@ function HomePage() {
           seriesMap.set(item.series_id, item);
         }
       });
-      
+
       // Convert back to array and limit to 18
       return Array.from(seriesMap.values()).slice(0, 18);
     },
@@ -137,9 +137,9 @@ function HomePage() {
         .eq("status", "published")
         .order("created_at", { ascending: false })
         .limit(100);
-      
+
       if (error) throw error;
-      
+
       // Group by series and collect recent chapters for each
       const seriesMap = new Map();
       (data || []).forEach((ch: any) => {
@@ -164,7 +164,7 @@ function HomePage() {
           });
         }
       });
-      
+
       // Convert to array and take first 12 unique series
       return Array.from(seriesMap.values()).slice(0, 12);
     },
@@ -368,7 +368,7 @@ function ChapterCarouselSection({
           </div>
         )}
       </div>
-      
+
       {loading ? (
         <div className="flex gap-4 overflow-hidden">
           {[...Array(6)].map((_, i) => (
@@ -457,7 +457,7 @@ function SeriesCarouselSection({
           </div>
         )}
       </div>
-      
+
       {loading ? (
         <div className="flex gap-4 overflow-hidden">
           {[...Array(6)].map((_, i) => (
@@ -590,7 +590,7 @@ function LatestUpdatesSection({
           )}
         </div>
       </div>
-      
+
       {loading ? (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
           {[...Array(6)].map((_, i) => (
@@ -654,17 +654,16 @@ function LatestUpdatesSection({
                     {item.recent_chapters.map((chapter) => {
                       const isRead = readChapterIds.has(chapter.id);
                       const isNew = isNewChapter(chapter.created_at);
-                      
+
                       return (
                         <Link
                           key={chapter.id}
                           to="/title/$titleSlug/$chapterSlug"
                           params={{ titleSlug: item.slug, chapterSlug: chapter.slug }}
-                          className={`flex items-center justify-between text-sm transition-colors ${
-                            isRead 
-                              ? 'text-muted-foreground hover:text-muted-foreground/80' 
+                          className={`flex items-center justify-between text-sm transition-colors ${isRead
+                              ? 'text-muted-foreground hover:text-muted-foreground/80'
                               : 'hover:text-violet-600 font-medium'
-                          }`}
+                            }`}
                         >
                           <div className="flex min-w-0 flex-1 items-center gap-2">
                             {isRead ? (
