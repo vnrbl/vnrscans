@@ -222,11 +222,14 @@ function Reader() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [prev, next, navigate, seriesSlug]);
 
-  // Scroll direction detection - hide controls on scroll down, show on scroll up
+  // Scroll direction detection - hide controls on scroll down, show on scroll up (MOBILE ONLY)
   useEffect(() => {
     let ticking = false;
 
     const handleScroll = () => {
+      // Only apply auto-hide on mobile (screen width < 768px)
+      const isMobile = window.innerWidth < 768;
+      
       if (!ticking) {
         window.requestAnimationFrame(() => {
           const currentScrollY = window.scrollY;
@@ -238,9 +241,12 @@ function Reader() {
             setLastScrollY(currentScrollY);
             
             // Show controls when scrolling up, hide when scrolling down
-            // But don't hide if panels are open
-            if (!showChapters && !showSpeedControl) {
+            // But ONLY on mobile - always show on desktop
+            if (isMobile && !showChapters && !showSpeedControl) {
               setControlsVisible(!isScrollingDown || currentScrollY < 100);
+            } else if (!isMobile) {
+              // Always visible on desktop
+              setControlsVisible(true);
             }
           }
           
@@ -302,6 +308,25 @@ function Reader() {
       if (hideTimeoutRef.current) clearTimeout(hideTimeoutRef.current);
     };
   }, [showControls]);
+
+  // Handle window resize - ensure controls are visible on desktop
+  useEffect(() => {
+    const handleResize = () => {
+      const isDesktop = window.innerWidth >= 768;
+      if (isDesktop) {
+        setControlsVisible(true);
+        controlsVisibleRef.current = true;
+        // Clear any pending auto-hide timeout
+        if (hideTimeoutRef.current) clearTimeout(hideTimeoutRef.current);
+      }
+    };
+
+    window.addEventListener('resize', handleResize);
+    // Run once on mount to set initial state
+    handleResize();
+    
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // Show controls on mouse movement or touch
   useEffect(() => {
