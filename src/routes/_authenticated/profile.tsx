@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
@@ -33,7 +33,7 @@ import {
 } from "lucide-react";
 import { ReadingGoals } from "@/components/profile/ReadingGoals";
 import { AvatarUpload } from "@/components/profile/AvatarUpload";
-import { ProfileBadges } from "@/components/profile/ProfileBadges";
+import { ProfileBadges, enhanceBadge, BadgeIcon } from "@/components/profile/ProfileBadges";
 import { PrivacySettings } from "@/components/profile/PrivacySettings";
 import { ReadingHeatmap } from "@/components/profile/ReadingHeatmap";
 import { ProfileWidgets } from "@/components/profile/ProfileWidgets";
@@ -86,6 +86,33 @@ function ProfilePage() {
         .maybeSingle();
       if (error) throw error;
       return { ...data, email: u.user.email } as any;
+    },
+    staleTime: 2 * 60 * 1000,
+  });
+
+  // Fetch equipped badge/title
+  const equippedBadge = useQuery({
+    queryKey: ["profile", "equipped-badge"],
+    queryFn: async () => {
+      const { data: u } = await supabase.auth.getUser();
+      if (!u.user) return null;
+      const { data, error } = await supabase
+        .from("user_badges")
+        .select(`
+          *,
+          badge:badge_id(*)
+        `)
+        .eq("user_id", u.user.id)
+        .eq("is_equipped", true)
+        .maybeSingle();
+      if (error) {
+        console.error("Error fetching equipped badge:", error);
+        return null;
+      }
+      if (data && data.badge) {
+        data.badge = enhanceBadge(data.badge);
+      }
+      return data as any;
     },
     staleTime: 2 * 60 * 1000,
   });
@@ -149,6 +176,91 @@ function ProfilePage() {
     },
     staleTime: 10 * 60 * 1000,
   });
+
+  // Fetch reading history timestamps to compute streak
+  const historyQuery = useQuery({
+    queryKey: ["profile", "reading-history-dates"],
+    queryFn: async () => {
+      const { data: u } = await supabase.auth.getUser();
+      if (!u.user) return [];
+      const { data, error } = await supabase
+        .from("reading_history")
+        .select("updated_at")
+        .eq("user_id", u.user.id);
+      
+      if (error) throw error;
+      return data || [];
+    }
+  });
+
+  const streaks = useMemo(() => {
+    if (!historyQuery.data) return { current: 0, longest: 0 };
+    
+    // Extract unique dates of activity
+    const dates = Array.from(new Set(
+      historyQuery.data.map(item => new Date(item.updated_at).toISOString().split("T")[0])
+    )).sort();
+
+    if (dates.length === 0) return { current: 0, longest: 0 };
+
+    let current = 0;
+    let longest = 0;
+    let tempStreak = 0;
+
+    const todayStr = new Date().toISOString().split("T")[0];
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayStr = yesterday.toISOString().split("T")[0];
+
+    // Compute longest streak
+    for (let i = 0; i < dates.length; i++) {
+      const currentDate = new Date(dates[i]);
+      if (i === 0) {
+        tempStreak = 1;
+      } else {
+        const prevDate = new Date(dates[i - 1]);
+        const diffTime = currentDate.getTime() - prevDate.getTime();
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        if (diffDays === 1) {
+          tempStreak++;
+        } else if (diffDays > 1) {
+          tempStreak = 1;
+        }
+      }
+      longest = Math.max(longest, tempStreak);
+    }
+
+    // Compute current streak
+    let hasActivityTodayOrYesterday = dates.includes(todayStr) || dates.includes(yesterdayStr);
+    if (hasActivityTodayOrYesterday) {
+      let searchDate = dates.includes(todayStr) ? new Date() : yesterday;
+      let searchStr = searchDate.toISOString().split("T")[0];
+      
+      while (dates.includes(searchStr)) {
+        current++;
+        searchDate.setDate(searchDate.getDate() - 1);
+        searchStr = searchDate.toISOString().split("T")[0];
+      }
+    }
+
+    return { current, longest };
+  }, [historyQuery.data]);
+
+  // Synchronize streak with profiles table
+  useEffect(() => {
+    if (profile.data && historyQuery.data) {
+      const dbStreak = profile.data.reading_streak || 0;
+      if (streaks.current !== dbStreak) {
+        supabase
+          .from("profiles")
+          .update({ reading_streak: streaks.current } as any)
+          .eq("user_id", profile.data.user_id)
+          .then(() => {
+            qc.invalidateQueries({ queryKey: ["profile"] });
+          });
+      }
+    }
+  }, [profile.data, streaks.current, historyQuery.data, qc]);
 
   // Editable state
   const [username, setUsername] = useState("");
@@ -264,7 +376,18 @@ function ProfilePage() {
             {/* Name + meta */}
             <div className="flex-1 pb-2">
               <div className="flex flex-wrap items-center gap-3">
-                <h1 className="text-3xl font-extrabold tracking-tight">{username || "Loading..."}</h1>
+                <div className="flex flex-col">
+                  <h1 className="text-3xl font-extrabold tracking-tight">{username || "Loading..."}</h1>
+                  {equippedBadge.data && (
+                    <div className="flex items-center gap-1.5 mt-1 text-xs font-semibold text-violet-500">
+                      <span className="text-muted-foreground font-normal">Title:</span>
+                      <span style={{ color: equippedBadge.data.badge?.badge_color }}>
+                        <BadgeIcon icon={equippedBadge.data.badge?.icon} className="h-3.5 w-3.5" />
+                      </span>
+                      <span>{equippedBadge.data.badge?.name}</span>
+                    </div>
+                  )}
+                </div>
                 <div className="flex flex-wrap items-center gap-2">
                   {userRoles.data?.includes("admin") && (
                     <Badge
@@ -359,7 +482,7 @@ function ProfilePage() {
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <StatCard
             label="Reading Streak"
-            value={profile.data?.reading_streak || 0}
+            value={streaks.current}
             suffix=" days"
             icon={<Flame className="h-6 w-6" />}
             accentColor="#F97316"
@@ -577,7 +700,7 @@ function ProfilePage() {
                     <div className="space-y-3">
                       <StatRow icon={<BookOpen className="h-4 w-4 text-blue-500" />} label="Chapters Read" value={readingStats.data?.chapters || 0} />
                       <StatRow icon={<Star className="h-4 w-4 text-yellow-500" />} label="Series Followed" value={readingStats.data?.series || 0} />
-                      <StatRow icon={<Flame className="h-4 w-4 text-orange-500" />} label="Current Streak" value={`${profile.data?.reading_streak || 0} days`} />
+                      <StatRow icon={<Flame className="h-4 w-4 text-orange-500" />} label="Current Streak" value={`${streaks.current} days`} />
                     </div>
                   </div>
 

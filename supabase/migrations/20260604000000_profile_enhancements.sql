@@ -181,16 +181,16 @@ ORDER BY series_count DESC;
 -- Default profile badges
 INSERT INTO public.profile_badges (name, description, icon, requirement_type, requirement_value, badge_color)
 SELECT * FROM (VALUES
-  ('Top Reader', 'Read 1000+ chapters', '📚', 'chapters_read', 1000, '#3B82F6'),
-  ('Speedrunner', 'Read 50 chapters in one day', '⚡', 'daily_chapters', 50, '#FBBF24'),
-  ('Completionist', 'Completed 20+ series', '✅', 'series_completed', 20, '#10B981'),
-  ('Loyal Fan', 'Followed 50+ series', '💝', 'series_followed', 50, '#EC4899'),
-  ('Streak Master', 'Maintained 100-day streak', '🔥', 'reading_streak', 100, '#F97316'),
-  ('Early Bird', 'Read before 6 AM', '🌅', 'early_reader', 1, '#8B5CF6'),
-  ('Night Owl', 'Read after midnight', '🦉', 'night_reader', 1, '#6366F1'),
-  ('Genre Explorer', 'Read 10+ different genres', '🌍', 'genres_explored', 10, '#14B8A6'),
-  ('Commentator', 'Posted 100+ comments', '💬', 'comments_posted', 100, '#06B6D4'),
-  ('Critic', 'Rated 50+ series', '⭐', 'ratings_given', 50, '#FBBF24')
+  ('Supreme Dao Ancestor', 'Read 1000+ chapters', '🧘‍♂️', 'chapters_read', 1000, '#EF4444'),
+  ('Qi Condensation Speedrunner', 'Read 50 chapters in one day', '⚡', 'daily_chapters', 50, '#3B82F6'),
+  ('Grandmaster of Demonic Cultivation', 'Completed 20+ series', '💀', 'series_completed', 20, '#8B5CF6'),
+  ('Sword Sect Disciple', 'Followed 50+ series', '⚔️', 'series_followed', 50, '#10B981'),
+  ('Asura Demon Emperor', 'Maintained 100-day streak', '👹', 'reading_streak', 100, '#F59E0B'),
+  ('Rising Sun Qi Gatherer', 'Read before 6 AM', '🌅', 'early_reader', 1, '#FBBF24'),
+  ('Shadow Realm Wanderer', 'Read after midnight', '🌙', 'night_reader', 1, '#6366F1'),
+  ('Myriad Beast Emperor', 'Read 10+ different genres', '🦁', 'genres_explored', 10, '#14B8A6'),
+  ('Heavenly Dao Gossip Scholar', 'Posted 100+ comments', '📜', 'comments_posted', 100, '#06B6D4'),
+  ('Supreme Immortal Judge', 'Rated 50+ series', '⚖️', 'ratings_given', 50, '#EC4899')
 ) AS v(name, description, icon, requirement_type, requirement_value, badge_color)
 WHERE NOT EXISTS (SELECT 1 FROM public.profile_badges LIMIT 1);
 
