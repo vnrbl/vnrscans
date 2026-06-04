@@ -109,7 +109,7 @@ export function BannerUpload({ currentBannerUrl, accentColor = "#8B5CF6", onBann
       const filename = `banner-${userData.user.id}-${Date.now()}.jpg`;
 
       const { error: uploadError } = await supabase.storage
-        .from("banners")
+        .from("avatars")
         .upload(filename, croppedBlob, {
           contentType: "image/jpeg",
           upsert: true,
@@ -118,7 +118,7 @@ export function BannerUpload({ currentBannerUrl, accentColor = "#8B5CF6", onBann
       if (uploadError) throw uploadError;
 
       const { data: urlData } = supabase.storage
-        .from("banners")
+        .from("avatars")
         .getPublicUrl(filename);
 
       const publicUrl = urlData.publicUrl;

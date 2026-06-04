@@ -227,13 +227,13 @@ function ProfilePage() {
           <div className="relative -mt-16 flex flex-col gap-5 sm:flex-row sm:items-end sm:gap-6">
             {/* Avatar with accent ring */}
             <div
-              className="relative flex-shrink-0 rounded-full p-1"
+              className="relative h-[140px] w-[140px] flex-shrink-0 rounded-full p-1"
               style={{
                 background: `linear-gradient(135deg, ${accentColor}, ${accentColor}80)`,
                 boxShadow: `0 0 30px ${accentColor}40`,
               }}
             >
-              <div className="rounded-full bg-background p-0.5">
+              <div className="h-full w-full rounded-full bg-background p-0.5">
                 <AvatarUpload
                   currentAvatarUrl={avatarUrl}
                   username={username}
