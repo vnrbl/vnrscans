@@ -13,16 +13,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogT
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import {
-  BadgeIcon,
-  difficultyColors,
-  emojiToIconName,
-  encodeBadgeDescription,
-  normalizeProfileBadge,
-  PROFILE_BADGES_QUERY_KEY,
-  type BadgeCategory,
-  type BadgeDifficulty,
-} from "@/lib/profileBadges";
+import { BadgeIcon, emojiToIconName, enhanceBadge } from "@/components/profile/ProfileBadges";
 
 export const Route = createFileRoute("/_authenticated/admin/badges")({
   head: () => ({ meta: [{ title: "Admin · Realms & Badges" }] }),
@@ -33,8 +24,8 @@ type BadgeForm = {
   name: string;
   description: string;
   icon: string;
-  category: BadgeCategory;
-  difficulty: BadgeDifficulty;
+  category: "Title" | "Badge" | "Tag";
+  difficulty: "Easy" | "Moderate" | "Hard" | "Godly";
   requirement_type: string;
   requirement_value: string;
   badge_color: string;
@@ -53,6 +44,29 @@ const emptyForm: BadgeForm = {
   is_active: true,
 };
 
+function parseDescriptionField(rawDescription: string | null): {
+  description: string;
+  category: "Title" | "Badge" | "Tag";
+  difficulty: "Easy" | "Moderate" | "Hard" | "Godly";
+} {
+  if (!rawDescription) {
+    return { description: "", category: "Badge", difficulty: "Easy" };
+  }
+  if (rawDescription.startsWith("{")) {
+    try {
+      const parsed = JSON.parse(rawDescription);
+      return {
+        description: parsed.description || "",
+        category: parsed.category || "Badge",
+        difficulty: parsed.difficulty || "Easy",
+      };
+    } catch (e) {
+      // Fallback
+    }
+  }
+  return { description: rawDescription, category: "Badge", difficulty: "Easy" };
+}
+
 function AdminBadges() {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
@@ -60,7 +74,7 @@ function AdminBadges() {
   const [form, setForm] = useState<BadgeForm>(emptyForm);
 
   const availableBadges = useQuery({
-    queryKey: [...PROFILE_BADGES_QUERY_KEY, "admin"],
+    queryKey: ["admin", "profile-badges"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("profile_badges" as any)
@@ -70,17 +84,31 @@ function AdminBadges() {
         console.error("Error fetching badges:", error);
         throw error;
       }
-      return (data || []).map((b: any) => normalizeProfileBadge(b));
+      return (data || []).map((b: any) => {
+        const enhanced = enhanceBadge(b);
+        const parsed = parseDescriptionField(b.description);
+        const isJsonConfigured = b.description && b.description.startsWith('{');
+        
+        return {
+          ...b,
+          name: enhanced.name,
+          icon: enhanced.icon,
+          badge_color: enhanced.badge_color,
+          category: isJsonConfigured ? parsed.category : enhanced.category,
+          difficulty: isJsonConfigured ? parsed.difficulty : enhanced.difficulty,
+          actualDescription: isJsonConfigured ? parsed.description : (enhanced.description || b.description),
+        };
+      });
     },
   });
 
   const createBadge = useMutation({
     mutationFn: async () => {
-      const encodedDescription = encodeBadgeDescription(
-        form.description,
-        form.category,
-        form.difficulty
-      );
+      const encodedDescription = JSON.stringify({
+        description: form.description.trim(),
+        category: form.category,
+        difficulty: form.difficulty,
+      });
 
       const { error } = await supabase.from("profile_badges" as any).insert({
         name: form.name.trim(),
@@ -97,7 +125,8 @@ function AdminBadges() {
       toast.success("Badge/Title created successfully");
       setOpen(false);
       setForm(emptyForm);
-      qc.invalidateQueries({ queryKey: PROFILE_BADGES_QUERY_KEY });
+      qc.invalidateQueries({ queryKey: ["admin", "profile-badges"] });
+      qc.invalidateQueries({ queryKey: ["profile-badges"] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -105,11 +134,11 @@ function AdminBadges() {
   const updateBadge = useMutation({
     mutationFn: async () => {
       if (!editingBadge) throw new Error("No badge selected");
-      const encodedDescription = encodeBadgeDescription(
-        form.description,
-        form.category,
-        form.difficulty
-      );
+      const encodedDescription = JSON.stringify({
+        description: form.description.trim(),
+        category: form.category,
+        difficulty: form.difficulty,
+      });
 
       const { error } = await supabase
         .from("profile_badges" as any)
@@ -129,7 +158,8 @@ function AdminBadges() {
       toast.success("Badge/Title updated successfully");
       setEditingBadge(null);
       setForm(emptyForm);
-      qc.invalidateQueries({ queryKey: PROFILE_BADGES_QUERY_KEY });
+      qc.invalidateQueries({ queryKey: ["admin", "profile-badges"] });
+      qc.invalidateQueries({ queryKey: ["profile-badges"] });
       qc.invalidateQueries({ queryKey: ["user-badges"] });
     },
     onError: (e: Error) => toast.error(e.message),
@@ -142,10 +172,18 @@ function AdminBadges() {
     },
     onSuccess: () => {
       toast.success("Badge/Title deleted successfully");
-      qc.invalidateQueries({ queryKey: PROFILE_BADGES_QUERY_KEY });
+      qc.invalidateQueries({ queryKey: ["admin", "profile-badges"] });
+      qc.invalidateQueries({ queryKey: ["profile-badges"] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
+
+  const difficultyColors = {
+    Easy: "border-emerald-500/30 bg-emerald-500/10 text-emerald-500 dark:text-emerald-400",
+    Moderate: "border-sky-500/30 bg-sky-500/10 text-sky-500 dark:text-sky-400",
+    Hard: "border-purple-500/30 bg-purple-500/10 text-purple-500 dark:text-purple-400",
+    Godly: "border-red-500/30 bg-red-500/10 text-red-500 dark:text-red-400",
+  };
 
   const predefinedColors = [
     "#EF4444", "#F97316", "#F59E0B", "#10B981", "#14B8A6",
@@ -208,7 +246,7 @@ function AdminBadges() {
                     )}
                   </div>
                   <p className="mt-1 text-xs text-muted-foreground line-clamp-2">
-                    {item.description}
+                    {item.actualDescription}
                   </p>
                   <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
                     <span className={`text-[9px] px-1 py-0.1 rounded border font-bold ${difficultyColors[item.difficulty as keyof typeof difficultyColors]}`}>
@@ -232,7 +270,7 @@ function AdminBadges() {
                       setEditingBadge(item);
                       setForm({
                         name: item.name,
-                        description: item.description,
+                        description: item.actualDescription,
                         icon: item.icon,
                         category: item.category,
                         difficulty: item.difficulty,
@@ -400,15 +438,11 @@ function BadgeFormFields({
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="chapters_read">Chapters Read</SelectItem>
-              <SelectItem value="daily_chapters">Daily Chapters</SelectItem>
               <SelectItem value="reading_streak">Reading Streak Days</SelectItem>
               <SelectItem value="comments_posted">Comments Posted</SelectItem>
               <SelectItem value="ratings_given">Ratings Given</SelectItem>
               <SelectItem value="series_followed">Series Followed</SelectItem>
               <SelectItem value="series_completed">Series Completed</SelectItem>
-              <SelectItem value="early_reader">Early Reader</SelectItem>
-              <SelectItem value="night_reader">Night Reader</SelectItem>
-              <SelectItem value="genres_explored">Genres Explored</SelectItem>
             </SelectContent>
           </Select>
         </div>

@@ -272,7 +272,7 @@ export function normalizeProfileBadge(badge: ProfileBadgeRow): NormalizedBadge {
   const parsed = parseBadgeDescription(badge.description);
 
   const name = legacy?.name ?? badge.name;
-  const icon = legacy?.icon ?? (badge.icon || "🏅");
+  const icon = legacy?.icon ?? badge.icon || "🏅";
   const badge_color = legacy?.color ?? badge.badge_color;
   const category = parsed.isJsonConfigured ? parsed.category : legacy?.category ?? parsed.category;
   const difficulty = parsed.isJsonConfigured ? parsed.difficulty : legacy?.difficulty ?? parsed.difficulty;
