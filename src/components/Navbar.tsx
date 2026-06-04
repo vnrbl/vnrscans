@@ -1,6 +1,6 @@
 import { Link, useNavigate, useRouter } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
-import { Menu, X, Search, BookOpen, User as UserIcon, LogOut, ShieldCheck, Library, TrendingUp, Home, Sparkles, Trophy, Shuffle, Tag } from "lucide-react";
+import { Menu, X, Search, BookOpen, User as UserIcon, LogOut, ShieldCheck, Library, TrendingUp, Home, Sparkles, Trophy, Shuffle, Tag, Loader2, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth, useIsAdmin } from "@/hooks/useAuth";
@@ -23,13 +23,23 @@ import {
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
+import {
+  CommandDialog,
+  CommandInput,
+  CommandList,
+  CommandEmpty,
+  CommandGroup,
+  CommandItem,
+} from "@/components/ui/command";
 
 export function Navbar() {
   const [open, setOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [searchResults, setSearchResults] = useState<any[]>([]);
   const [searching, setSearching] = useState(false);
+  const [seriesResults, setSeriesResults] = useState<any[]>([]);
+  const [userResults, setUserResults] = useState<any[]>([]);
+  const [groupResults, setGroupResults] = useState<string[]>([]);
   const [isRolling, setIsRolling] = useState(false);
   const { user } = useAuth();
   const { isAdmin } = useIsAdmin();
@@ -88,17 +98,42 @@ export function Navbar() {
   // Search functionality with debounce
   useEffect(() => {
     const timer = setTimeout(async () => {
-      if (searchQuery.trim().length >= 2) {
+      const q = searchQuery.trim();
+      if (q.length >= 2) {
         setSearching(true);
         try {
-          const { data, error } = await supabase
-            .from("series")
-            .select("id,slug,title,cover_url,type,rating_average")
-            .or(`title.ilike.%${searchQuery}%,alternative_titles.ilike.%${searchQuery}%`)
-            .limit(8);
+          const [seriesRes, usersRes, groupsRes] = await Promise.all([
+            // 1. Search series (titles)
+            supabase
+              .from("series")
+              .select("id,slug,title,cover_url,type,rating_average")
+              .or(`title.ilike.%${q}%,alternative_titles.ilike.%${q}%`)
+              .limit(5),
+            
+            // 2. Search users (profiles)
+            supabase
+              .from("profiles")
+              .select("username,avatar_url")
+              .ilike("username", `%${q}%`)
+              .limit(5),
+
+            // 3. Search scanlation groups from chapters table
+            supabase
+              .from("chapters")
+              .select("scanlation_group")
+              .ilike("scanlation_group", `%${q}%`)
+              .not("scanlation_group", "is", null)
+              .limit(30)
+          ]);
+
+          if (seriesRes.data) setSeriesResults(seriesRes.data);
+          if (usersRes.data) setUserResults(usersRes.data);
           
-          if (!error && data) {
-            setSearchResults(data);
+          if (groupsRes.data) {
+            const uniqueGroups = Array.from(
+              new Set(groupsRes.data.map((c: any) => c.scanlation_group).filter(Boolean))
+            ) as string[];
+            setGroupResults(uniqueGroups.slice(0, 5));
           }
         } catch (err) {
           console.error("Search error:", err);
@@ -106,7 +141,9 @@ export function Navbar() {
           setSearching(false);
         }
       } else {
-        setSearchResults([]);
+        setSeriesResults([]);
+        setUserResults([]);
+        setGroupResults([]);
       }
     }, 300);
 
@@ -129,8 +166,28 @@ export function Navbar() {
   const handleSearchSelect = (slug: string) => {
     setSearchOpen(false);
     setSearchQuery("");
-    setSearchResults([]);
+    setSeriesResults([]);
+    setUserResults([]);
+    setGroupResults([]);
     navigate({ to: "/title/$slug", params: { slug } });
+  };
+
+  const handleUserSelect = (username: string) => {
+    setSearchOpen(false);
+    setSearchQuery("");
+    setSeriesResults([]);
+    setUserResults([]);
+    setGroupResults([]);
+    navigate({ to: "/user/$username", params: { username } });
+  };
+
+  const handleGroupSelect = (groupName: string) => {
+    setSearchOpen(false);
+    setSearchQuery("");
+    setSeriesResults([]);
+    setUserResults([]);
+    setGroupResults([]);
+    navigate({ to: "/browse", search: { group: groupName } });
   };
 
   return (
@@ -176,79 +233,126 @@ export function Navbar() {
             <Shuffle className={`h-5 w-5 transition-transform ${isRolling ? 'animate-spin' : ''}`} />
           </Button>
 
-          {/* Search */}
-          <Dialog open={searchOpen} onOpenChange={setSearchOpen}>
-            <DialogTrigger asChild>
-              <Button variant="ghost" size="icon" className="hidden sm:flex" title="Search (Ctrl+K)">
-                <Search className="h-5 w-5" />
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-[600px]">
-              <DialogHeader>
-                <DialogTitle>Search Series</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                  <Input
-                    placeholder="Search by title..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-9"
-                    autoFocus
-                  />
+          {/* Search Button */}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setSearchOpen(true)}
+            className="hidden sm:flex"
+            title="Search (Ctrl+K)"
+          >
+            <Search className="h-5 w-5" />
+          </Button>
+
+          {/* Command Palette Dialog */}
+          <CommandDialog open={searchOpen} onOpenChange={setSearchOpen}>
+            <CommandInput
+              placeholder="Search titles, users, or groups..."
+              value={searchQuery}
+              onValueChange={setSearchQuery}
+            />
+            <CommandList>
+              {searching && (
+                <div className="py-6 text-center text-sm text-muted-foreground flex items-center justify-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin text-primary" /> Searching...
                 </div>
-                
-                {searching && (
-                  <div className="py-8 text-center text-sm text-muted-foreground">
-                    Searching...
-                  </div>
-                )}
-                
-                {!searching && searchResults.length > 0 && (
-                  <div className="max-h-[400px] space-y-2 overflow-y-auto">
-                    {searchResults.map((series) => (
-                      <button
-                        key={series.id}
-                        onClick={() => handleSearchSelect(series.slug)}
-                        className="flex w-full items-center gap-3 rounded-lg border border-border/40 bg-card p-3 text-left transition-colors hover:border-primary/50 hover:bg-secondary"
-                      >
-                        {series.cover_url ? (
-                          <img
-                            src={series.cover_url}
-                            alt={series.title}
-                            className="h-16 w-12 rounded object-cover"
-                          />
-                        ) : (
-                          <div className="flex h-16 w-12 items-center justify-center rounded bg-secondary">
-                            <BookOpen className="h-6 w-6 text-muted-foreground" />
-                          </div>
-                        )}
-                        <div className="min-w-0 flex-1">
-                          <h3 className="truncate font-semibold">{series.title}</h3>
-                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                            <span className="uppercase">{series.type}</span>
-                            {series.rating_average && (
-                              <>
-                                <span>•</span>
-                                <span>★ {Number(series.rating_average).toFixed(1)}</span>
-                              </>
-                            )}
-                          </div>
+              )}
+
+              {!searching && searchQuery.length >= 2 && seriesResults.length === 0 && userResults.length === 0 && groupResults.length === 0 && (
+                <CommandEmpty>No results found for "{searchQuery}".</CommandEmpty>
+              )}
+
+              {/* Series Group */}
+              {seriesResults.length > 0 && (
+                <CommandGroup heading="Manga & Novels">
+                  {seriesResults.map((series) => (
+                    <CommandItem
+                      key={series.id}
+                      value={`${series.title} series`}
+                      onSelect={() => handleSearchSelect(series.slug)}
+                      className="flex items-center gap-3 cursor-pointer p-2 rounded-lg hover:bg-secondary"
+                    >
+                      {series.cover_url ? (
+                        <img
+                          src={series.cover_url}
+                          alt={series.title}
+                          className="h-10 w-7.5 rounded object-cover flex-shrink-0"
+                        />
+                      ) : (
+                        <div className="flex h-10 w-7.5 items-center justify-center rounded bg-secondary flex-shrink-0">
+                          <BookOpen className="h-4 w-4 text-muted-foreground" />
                         </div>
-                      </button>
-                    ))}
-                  </div>
-                )}
-                
-                {!searching && searchQuery.length >= 2 && searchResults.length === 0 && (
-                  <div className="py-8 text-center text-sm text-muted-foreground">
-                    No results found for "{searchQuery}"
-                  </div>
-                )}
-              </div>
-            </DialogContent>
-          </Dialog>
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate font-semibold text-xs text-foreground">{series.title}</div>
+                        <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+                          <span className="uppercase">{series.type}</span>
+                          {series.rating_average && (
+                            <>
+                              <span>•</span>
+                              <span>★ {Number(series.rating_average).toFixed(1)}</span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              )}
+
+              {/* Users Group */}
+              {userResults.length > 0 && (
+                <CommandGroup heading="Community Members">
+                  {userResults.map((userMember) => (
+                    <CommandItem
+                      key={userMember.username}
+                      value={`${userMember.username} user`}
+                      onSelect={() => handleUserSelect(userMember.username)}
+                      className="flex items-center gap-3 cursor-pointer p-2 rounded-lg hover:bg-secondary"
+                    >
+                      {userMember.avatar_url ? (
+                        <img
+                          src={userMember.avatar_url}
+                          alt={userMember.username}
+                          className="h-8 w-8 rounded-full object-cover flex-shrink-0"
+                        />
+                      ) : (
+                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-secondary flex-shrink-0 text-2xs font-bold text-foreground">
+                          {userMember.username?.charAt(0)?.toUpperCase()}
+                        </div>
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate font-semibold text-xs text-foreground">{userMember.username}</div>
+                        <div className="text-[10px] text-muted-foreground">View profile</div>
+                      </div>
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              )}
+
+              {/* Groups Group */}
+              {groupResults.length > 0 && (
+                <CommandGroup heading="Scanlation Teams">
+                  {groupResults.map((group) => (
+                    <CommandItem
+                      key={group}
+                      value={`${group} group`}
+                      onSelect={() => handleGroupSelect(group)}
+                      className="flex items-center gap-3 cursor-pointer p-2 rounded-lg hover:bg-secondary"
+                    >
+                      <div className="grid h-8 w-8 place-items-center rounded-lg bg-violet-600/10 text-primary flex-shrink-0">
+                        <Users className="h-4 w-4" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate font-semibold text-xs text-foreground">{group}</div>
+                        <div className="text-[10px] text-muted-foreground">Scanlation Group</div>
+                      </div>
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              )}
+            </CommandList>
+          </CommandDialog>
 
           {/* User Menu */}
           {user ? (

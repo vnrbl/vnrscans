@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { Search, LayoutGrid, List, Star, X, BookOpen, Check } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -6,7 +6,7 @@ import { SeriesGrid } from "@/components/SeriesGrid";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Select,
   SelectContent,
@@ -21,7 +21,18 @@ import {
 } from "@/components/ui/popover";
 import { Command, CommandGroup, CommandItem } from "@/components/ui/command";
 
+type BrowseSearch = {
+  search?: string;
+  group?: string;
+};
+
 export const Route = createFileRoute("/browse")({
+  validateSearch: (search: Record<string, unknown>): BrowseSearch => {
+    return {
+      search: (search.search as string) || undefined,
+      group: (search.group as string) || undefined,
+    };
+  },
   head: () => ({
     meta: [
       { title: "Browse Manga — vnrscans" },
@@ -32,7 +43,19 @@ export const Route = createFileRoute("/browse")({
 });
 
 function BrowsePage() {
-  const [searchQuery, setSearchQuery] = useState("");
+  const { search: urlSearch, group: urlGroup } = Route.useSearch();
+  const navigate = useNavigate();
+
+  const [searchQuery, setSearchQuery] = useState(urlSearch || "");
+  const [groupFilter, setGroupFilter] = useState(urlGroup || "");
+
+  useEffect(() => {
+    setSearchQuery(urlSearch || "");
+  }, [urlSearch]);
+
+  useEffect(() => {
+    setGroupFilter(urlGroup || "");
+  }, [urlGroup]);
   const [typeFilters, setTypeFilters] = useState<string[]>([]);
   const [statusFilter, setStatusFilter] = useState("all");
   const [contentRating, setContentRating] = useState("all");
@@ -79,10 +102,15 @@ function BrowsePage() {
     setStatusFilter("all");
     setContentRating("all");
     setDuration("all");
+    setGroupFilter("");
+    navigate({
+      to: "/browse",
+      search: (prev) => ({ ...prev, group: undefined }),
+    });
   };
 
   const hasActiveFilters = typeFilters.length > 0 || genreFilters.length > 0 || 
-    statusFilter !== "all" || contentRating !== "all" || duration !== "all";
+    statusFilter !== "all" || contentRating !== "all" || duration !== "all" || !!groupFilter;
 
   // Type options
   const typeOptions = [
@@ -110,11 +138,27 @@ function BrowsePage() {
 
   // All manhwa
   const allManhwa = useQuery({
-    queryKey: ["browse-manhwa", typeFilters, statusFilter, contentRating, genreFilters, sortBy, duration, searchQuery],
+    queryKey: ["browse-manhwa", typeFilters, statusFilter, contentRating, genreFilters, sortBy, duration, searchQuery, groupFilter],
     queryFn: async () => {
       let query = supabase
         .from("series")
         .select("id,slug,title,alternative_titles,description,cover_url,type,rating_average,status,author,artist,release_year,created_at,updated_at,view_count,content_rating,chapter_count,series_genres(genre:genres(id,name,slug))");
+
+      // Apply scanlation group filter
+      if (groupFilter) {
+        const { data: chaptersWithGroup } = await supabase
+          .from("chapters")
+          .select("series_id")
+          .ilike("scanlation_group", groupFilter);
+        
+        const seriesIds = Array.from(new Set((chaptersWithGroup || []).map((c: any) => c.series_id).filter(Boolean)));
+        if (seriesIds.length > 0) {
+          query = query.in("id", seriesIds);
+        } else {
+          // If no chapters found for group, force empty result by filtering on dummy id
+          query = query.eq("id", "00000000-0000-0000-0000-000000000000");
+        }
+      }
 
       // Apply type filters (multiple selection)
       if (typeFilters.length > 0) {
@@ -367,6 +411,22 @@ function BrowsePage() {
               <SelectItem value="oldest">Oldest</SelectItem>
             </SelectContent>
           </Select>
+
+          {groupFilter && (
+            <Badge variant="secondary" className="gap-1.5 py-1 px-2.5 bg-violet-500/10 text-primary border border-violet-500/20 text-xs font-semibold h-9 rounded-lg">
+              Group: {groupFilter}
+              <X 
+                className="h-3.5 w-3.5 cursor-pointer hover:text-foreground" 
+                onClick={() => {
+                  setGroupFilter("");
+                  navigate({
+                    to: "/browse",
+                    search: (prev) => ({ ...prev, group: undefined }),
+                  });
+                }}
+              />
+            </Badge>
+          )}
 
           {hasActiveFilters && (
             <Button
