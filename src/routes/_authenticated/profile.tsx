@@ -59,50 +59,100 @@ const keyframeStyles = `
   50% { transform: scale(1.02); }
 }
 @keyframes sweepShine {
-  0% { transform: translate(-100%, -100%) rotate(45deg); }
-  35%, 100% { transform: translate(100%, 100%) rotate(45deg); }
+  0% { transform: translate(-120%, -120%) rotate(45deg); }
+  30%, 100% { transform: translate(120%, 120%) rotate(45deg); }
+}
+@keyframes sweepShineSecondary {
+  0% { transform: translate(-120%, -120%) rotate(45deg); }
+  45%, 100% { transform: translate(120%, 120%) rotate(45deg); }
 }
 @keyframes cyberScan {
   0% { top: 0%; opacity: 0; }
-  10%, 90% { opacity: 0.8; }
+  5%, 95% { opacity: 0.8; }
   100% { top: 100%; opacity: 0; }
 }
-@keyframes fireEmbers {
-  0% { transform: translateY(10px) scale(0.6); opacity: 0; }
-  50% { opacity: 0.8; }
-  100% { transform: translateY(-30px) scale(0.3); opacity: 0; }
+@keyframes fireEmbersWavy {
+  0% { transform: translate(0, 15px) scale(0.5); opacity: 0; }
+  25% { transform: translate(-8px, -5px) scale(0.8); opacity: 0.8; }
+  50% { transform: translate(6px, -25px) scale(0.6); opacity: 0.9; }
+  75% { transform: translate(-4px, -45px) scale(0.4); opacity: 0.5; }
+  100% { transform: translate(2px, -65px) scale(0.2); opacity: 0; }
 }
-@keyframes sakuraDrift {
-  0% { transform: translate(0, -20px) rotate(0deg); opacity: 0; }
-  50% { opacity: 0.9; }
-  100% { transform: translate(-15px, 40px) rotate(180deg); opacity: 0; }
+@keyframes sakuraDrift3D {
+  0% { transform: translate3d(0, -25px, 0) rotate3d(1, 1, 0, 0deg); opacity: 0; }
+  20% { opacity: 0.9; }
+  80% { opacity: 0.8; }
+  100% { transform: translate3d(-20px, 50px, 0) rotate3d(1, 1, 1, 360deg); opacity: 0; }
 }
 @keyframes smoothBreath {
   0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.02); }
+  50% { transform: scale(1.025); }
+}
+@keyframes rotationCW {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+@keyframes rotationCCW {
+  0% { transform: rotate(360deg); }
+  100% { transform: rotate(0deg); }
+}
+@keyframes cyberGlitch {
+  0%, 100% { transform: translate(0, 0) skew(0deg); filter: hue-rotate(0deg) brightness(1); }
+  2% { transform: translate(-1px, 1px) skew(-2deg); filter: hue-rotate(90deg) brightness(1.2); }
+  4% { transform: translate(1px, -1px) skew(3deg); filter: hue-rotate(-90deg) brightness(0.9); }
+  6% { transform: translate(0, 0) skew(0deg); filter: hue-rotate(0deg) brightness(1); }
+  94% { transform: translate(0, 0) skew(0deg); filter: hue-rotate(0deg) brightness(1); }
+  96% { transform: translate(2px, -2px) skew(4deg); filter: hue-rotate(180deg) brightness(1.3); }
+  98% { transform: translate(-2px, 2px) skew(-3deg); filter: hue-rotate(-180deg) brightness(0.8); }
+}
+@keyframes lightningFlicker {
+  0%, 100% { opacity: 1; filter: brightness(1) drop-shadow(0 0 10px rgba(168,85,247,0.3)); }
+  5% { opacity: 0.85; filter: brightness(1.2) drop-shadow(0 0 15px rgba(6,182,212,0.6)); }
+  10% { opacity: 1; filter: brightness(1) drop-shadow(0 0 10px rgba(168,85,247,0.3)); }
+  35% { opacity: 1; }
+  36% { opacity: 0.9; filter: brightness(1.3) drop-shadow(0 0 20px rgba(236,72,153,0.7)); }
+  38% { opacity: 1; filter: brightness(1) drop-shadow(0 0 10px rgba(168,85,247,0.3)); }
+}
+@keyframes runeJadePulse {
+  0% { transform: scale(1) rotate(0deg); opacity: 0.7; }
+  50% { transform: scale(1.03) rotate(180deg); opacity: 1; }
+  100% { transform: scale(1) rotate(360deg); opacity: 0.7; }
+}
+@keyframes asuraRage {
+  0%, 100% { transform: scale(1); filter: brightness(1) drop-shadow(0 0 8px rgba(239,68,68,0.5)); }
+  50% { transform: scale(1.04); filter: brightness(1.25) drop-shadow(0 0 22px rgba(239,68,68,0.9)); }
+}
+@keyframes starTwinkle {
+  0%, 100% { transform: scale(0.6) rotate(0deg); opacity: 0.3; }
+  50% { transform: scale(1.1) rotate(90deg); opacity: 1; }
+}
+@keyframes shadowWispMove {
+  0% { transform: scale(1) translate(0, 0); opacity: 0.2; }
+  50% { transform: scale(1.08) translate(3px, -3px); opacity: 0.5; filter: blur(3px); }
+  100% { transform: scale(1) translate(0, 0); opacity: 0.2; }
 }
 `;
 
 const getAvatarFrameStyles = (frame: string, accent: string) => {
   switch (frame) {
     case "neon":
-      return { boxShadow: "0 0 15px oklch(0.68 0.22 305 / 0.3)" };
+      return { boxShadow: "0 0 20px rgba(168, 85, 247, 0.45), inset 0 0 10px rgba(6, 182, 212, 0.35)" };
     case "gold":
-      return { boxShadow: "0 0 15px rgba(212, 175, 55, 0.4)" };
+      return { boxShadow: "0 0 20px rgba(212, 175, 55, 0.5), inset 0 0 8px rgba(255, 255, 255, 0.25)" };
     case "cyber":
-      return { boxShadow: "0 0 15px rgba(6, 182, 212, 0.3)" };
+      return { boxShadow: "0 0 20px rgba(6, 182, 212, 0.45), inset 0 0 10px rgba(192, 132, 252, 0.25)" };
     case "fire":
-      return { boxShadow: "0 0 15px rgba(239, 68, 68, 0.4)" };
+      return { boxShadow: "0 0 20px rgba(239, 68, 68, 0.5), inset 0 0 10px rgba(249, 115, 22, 0.35)" };
     case "sakura":
-      return { boxShadow: "0 0 15px rgba(244, 114, 182, 0.4)" };
+      return { boxShadow: "0 0 20px rgba(244, 114, 182, 0.5), inset 0 0 8px rgba(253, 164, 189, 0.35)" };
     case "shadow":
-      return { boxShadow: "0 0 15px rgba(99, 102, 241, 0.4)" };
+      return { boxShadow: "0 0 20px rgba(99, 102, 241, 0.55), inset 0 0 12px rgba(30, 27, 75, 0.45)" };
     case "qi":
-      return { boxShadow: "0 0 15px rgba(16, 185, 129, 0.4)" };
+      return { boxShadow: "0 0 20px rgba(16, 185, 129, 0.5), inset 0 0 8px rgba(251, 191, 36, 0.25)" };
     case "asura":
-      return { boxShadow: "0 0 15px rgba(239, 68, 68, 0.4)" };
+      return { boxShadow: "0 0 25px rgba(239, 68, 68, 0.65), inset 0 0 12px rgba(0, 0, 0, 0.85)" };
     case "system":
-      return { boxShadow: "0 0 15px rgba(6, 182, 212, 0.4)" };
+      return { boxShadow: "0 0 22px rgba(6, 182, 212, 0.55), inset 0 0 10px rgba(6, 182, 212, 0.35)" };
     case "none":
     default:
       return {
@@ -403,43 +453,70 @@ function ProfilePage() {
                 padding: '4px',
               }}
             >
-              {/* Layer 1: Spinners & backgrounds for custom frames */}
+              {/* Layer 1: Spinners, double-rotators & backgrounds for custom frames */}
               {avatarFrame === "neon" && (
-                <div className="absolute inset-0 rounded-full overflow-hidden">
-                  <div className="absolute inset-[-50%] rounded-full bg-[conic-gradient(from_0deg,#A855F7,#06B6D4,#EC4899,#A855F7)] animate-spin" style={{ animationDuration: '4s' }} />
+                <div className="absolute inset-0 rounded-full overflow-hidden animate-[lightningFlicker_6s_ease-in-out_infinite]">
+                  {/* Double rotating rings */}
+                  <div className="absolute inset-[-50%] rounded-full bg-[conic-gradient(from_0deg,#A855F7,#06B6D4,#EC4899,#A855F7)] animate-[rotationCW_4s_linear_infinite]" />
+                  <div className="absolute inset-[2px] rounded-full bg-background z-5" />
+                  <div className="absolute inset-[2px] rounded-full overflow-hidden z-6">
+                    <div className="absolute inset-[-50%] rounded-full bg-[conic-gradient(from_180deg,#EC4899,#06B6D4,#A855F7,#EC4899)] animate-[rotationCCW_3s_linear_infinite]" />
+                  </div>
                 </div>
               )}
               {avatarFrame === "gold" && (
-                <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-[#a67c00] via-[#ffd700] to-[#ffeb99]" />
+                <>
+                  {/* Rotating golden light background ring */}
+                  <div className="absolute inset-[-2px] rounded-full bg-gradient-to-tr from-[#a67c00] via-[#ffd700] to-[#ffeb99] animate-[rotationCW_10s_linear_infinite]" />
+                  <div className="absolute inset-[1.5px] rounded-full bg-gradient-to-bl from-[#ffeb99] via-[#ffd700] to-[#aa7c11] animate-[rotationCCW_8s_linear_infinite]" />
+                </>
               )}
               {avatarFrame === "cyber" && (
                 <div className="absolute inset-0 rounded-full overflow-hidden">
-                  <div className="absolute inset-[-50%] rounded-full bg-[conic-gradient(from_0deg,#0ea5e9,transparent,#c084fc,transparent,#0ea5e9)] animate-spin" style={{ animationDuration: '8s' }} />
+                  <div className="absolute inset-[-50%] rounded-full bg-[conic-gradient(from_0deg,#0ea5e9,transparent,#c084fc,transparent,#0ea5e9)] animate-[rotationCW_6s_linear_infinite]" />
+                  <div className="absolute inset-[3px] rounded-full border border-dashed border-cyan-400/40 animate-[rotationCCW_12s_linear_infinite] z-5" />
                 </div>
               )}
               {avatarFrame === "fire" && (
                 <div className="absolute inset-0 rounded-full overflow-hidden">
-                  <div className="absolute inset-[-50%] rounded-full bg-[conic-gradient(from_0deg,#b91c1c,#f97316,#ef4444,#b91c1c)] animate-spin" style={{ animationDuration: '5s' }} />
+                  {/* Double volcanic swirl */}
+                  <div className="absolute inset-[-50%] rounded-full bg-[conic-gradient(from_0deg,#b91c1c,#f97316,#ef4444,#b91c1c)] animate-[rotationCW_3s_linear_infinite]" />
+                  <div className="absolute inset-[2.5px] rounded-full overflow-hidden z-5">
+                    <div className="absolute inset-[-50%] rounded-full bg-[conic-gradient(from_180deg,#7f1d1d,#f97316,#ef4444,#7f1d1d)] animate-[rotationCCW_4s_linear_infinite]" />
+                  </div>
                 </div>
               )}
               {avatarFrame === "sakura" && (
-                <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-[#FDA4AF] via-[#F472B6] to-[#E879F9]" style={{ animation: 'smoothBreath 5s ease-in-out infinite' }} />
+                <>
+                  <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-[#FDA4AF] via-[#F472B6] to-[#E879F9] animate-[smoothBreath_4s_ease-in-out_infinite]" />
+                  <div className="absolute inset-[2px] rounded-full bg-gradient-to-bl from-[#E879F9] via-[#F472B6] to-[#FDA4AF] animate-[rotationCW_8s_linear_infinite]" />
+                </>
               )}
               {avatarFrame === "shadow" && (
                 <div className="absolute inset-0 rounded-full overflow-hidden">
-                  <div className="absolute inset-[-50%] rounded-full bg-[conic-gradient(from_0deg,#4f46e5,#06b6d4,#1e1b4b,#4f46e5)] animate-spin" style={{ animationDuration: '6s' }} />
+                  <div className="absolute inset-[-50%] rounded-full bg-[conic-gradient(from_0deg,#4f46e5,#06b6d4,#1e1b4b,#4f46e5)] animate-[rotationCW_5s_linear_infinite]" />
+                  <div className="absolute inset-[2.5px] rounded-full overflow-hidden z-5">
+                    <div className="absolute inset-[-50%] rounded-full bg-[conic-gradient(from_180deg,#1e1b4b,#06b6d4,#4f46e5,#1e1b4b)] animate-[rotationCCW_6s_linear_infinite]" />
+                  </div>
+                  <div className="absolute inset-0 rounded-full border border-cyan-400/20 animate-[shadowWispMove_4s_ease-in-out_infinite] z-6" />
                 </div>
               )}
               {avatarFrame === "qi" && (
                 <div className="absolute inset-0 rounded-full overflow-hidden">
-                  <div className="absolute inset-[-50%] rounded-full bg-[conic-gradient(from_0deg,#059669,#10B981,#FBBF24,#059669)] animate-spin" style={{ animationDuration: '7s' }} />
+                  <div className="absolute inset-[-50%] rounded-full bg-[conic-gradient(from_0deg,#059669,#10B981,#FBBF24,#059669)] animate-[rotationCW_6s_linear_infinite]" />
+                  <div className="absolute inset-[3px] rounded-full border border-emerald-400/40 bg-emerald-950/20 animate-[runeJadePulse_8s_linear_infinite] z-5" />
                 </div>
               )}
               {avatarFrame === "asura" && (
-                <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-[#7f1d1d] via-[#b91c1c] to-[#000000]" style={{ animation: 'smoothBreath 3s ease-in-out infinite' }} />
+                <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-[#7f1d1d] via-[#b91c1c] to-[#000000] animate-[asuraRage_2.5s_ease-in-out_infinite] overflow-hidden">
+                  <div className="absolute inset-[-50%] rounded-full bg-[conic-gradient(from_0deg,#ef4444,transparent,#7f1d1d,transparent,#ef4444)] animate-[rotationCW_4s_linear_infinite] opacity-80" />
+                </div>
               )}
               {avatarFrame === "system" && (
-                <div className="absolute inset-0 rounded-full border-2 border-cyan-400 bg-cyan-950/20" />
+                <div className="absolute inset-0 rounded-full border-2 border-cyan-400 bg-cyan-950/20 animate-[asuraRage_4s_ease-in-out_infinite] overflow-hidden">
+                  {/* Rotating radar sweep */}
+                  <div className="absolute inset-[-50%] rounded-full bg-[conic-gradient(from_0deg,rgba(6,182,212,0.25),transparent_40%,transparent)] animate-[rotationCW_3s_linear_infinite]" />
+                </div>
               )}
 
               {/* Layer 2: Inner mask background to shape the 4px border */}
@@ -457,107 +534,148 @@ function ProfilePage() {
                   />
                 </div>
 
-                {/* Shimmer sweep inside avatar for gold frame */}
+                {/* Shimmer sweeps inside avatar for gold frame */}
                 {avatarFrame === "gold" && (
-                  <div 
-                    className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent -translate-x-full z-20 pointer-events-none"
-                    style={{ 
-                      animation: 'sweepShine 4s ease-in-out infinite',
-                      animationDelay: '1s'
-                    }} 
-                  />
+                  <>
+                    <div 
+                      className="absolute inset-0 bg-gradient-to-r from-transparent via-white/50 to-transparent -translate-x-full z-20 pointer-events-none"
+                      style={{ 
+                        animation: 'sweepShine 3.5s ease-in-out infinite',
+                        animationDelay: '1s'
+                      }} 
+                    />
+                    <div 
+                      className="absolute inset-0 bg-gradient-to-r from-transparent via-yellow-200/35 to-transparent -translate-x-full z-20 pointer-events-none"
+                      style={{ 
+                        animation: 'sweepShineSecondary 5s ease-in-out infinite',
+                        animationDelay: '2.5s'
+                      }} 
+                    />
+                  </>
                 )}
 
-                {/* Cyber grid scan overlay */}
+                {/* Cyber double scan overlays + matrix grid */}
                 {avatarFrame === "cyber" && (
-                  <div className="absolute inset-0 pointer-events-none z-20 overflow-hidden rounded-full">
-                    <div className="absolute left-0 right-0 h-[1.5px] bg-cyan-400/60 shadow-[0_0_6px_cyan]" style={{ animation: 'cyberScan 3s linear infinite' }} />
-                  </div>
+                  <>
+                    <div className="absolute inset-0 pointer-events-none z-20 overflow-hidden rounded-full">
+                      <div className="absolute left-0 right-0 h-[1.5px] bg-cyan-400/75 shadow-[0_0_6px_cyan]" style={{ animation: 'cyberScan 2.5s linear infinite' }} />
+                      <div className="absolute left-0 right-0 h-[1px] bg-purple-400/60 shadow-[0_0_4px_purple]" style={{ animation: 'cyberScan 3.5s linear infinite', animationDelay: '1.2s' }} />
+                    </div>
+                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_40%,rgba(6,182,212,0.15)_95%)] pointer-events-none z-15 rounded-full" />
+                  </>
                 )}
 
-                {/* System Scanline overlay */}
+                {/* System Scanline overlay + technical grid */}
                 {avatarFrame === "system" && (
-                  <div className="absolute inset-0 pointer-events-none z-20 overflow-hidden rounded-full">
-                    <div className="absolute left-0 right-0 h-[1px] bg-cyan-300/40 shadow-[0_0_4px_cyan]" style={{ animation: 'cyberScan 4s linear infinite', animationDelay: '0.5s' }} />
-                  </div>
+                  <>
+                    <div className="absolute inset-0 pointer-events-none z-20 overflow-hidden rounded-full">
+                      <div className="absolute left-0 right-0 h-[1px] bg-cyan-300/50 shadow-[0_0_5px_cyan]" style={{ animation: 'cyberScan 4s linear infinite', animationDelay: '0.5s' }} />
+                    </div>
+                    <div className="absolute inset-0 bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%),linear-gradient(90deg,rgba(255,0,0,0.03),rgba(0,255,0,0.01),rgba(0,0,255,0.03))] pointer-events-none z-15 rounded-full bg-[size:100%_4px,6px_100%]" />
+                  </>
                 )}
               </div>
 
               {/* Layer 4: Frame brackets and decorative widgets (z-20) */}
               {avatarFrame === "gold" && (
                 <div className="absolute inset-0 pointer-events-none z-20">
-                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 text-amber-400 drop-shadow-[0_2px_4px_rgba(0,0,0,0.6)] animate-bounce" style={{ animationDuration: '4s' }}>
+                  {/* Glow halo ring behind crown */}
+                  <div className="absolute -top-4 left-1/2 -translate-x-1/2 w-8 h-8 rounded-full bg-amber-400/25 blur-sm animate-pulse z-20" />
+                  <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 text-amber-400 drop-shadow-[0_2px_5px_rgba(0,0,0,0.7)] animate-[smoothBreath_3s_ease-in-out_infinite] z-25">
                     <Crown className="h-6 w-6" />
                   </div>
                   <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 z-30 text-amber-500 drop-shadow-[0_1px_3px_rgba(0,0,0,0.5)]">
                     <Trophy className="h-4.5 w-4.5" />
                   </div>
+                  {/* Floating Gold Dust */}
+                  <div className="absolute bottom-1 left-2 w-1.5 h-1.5 rounded-full bg-yellow-300 animate-[fireEmbersWavy_3s_ease-out_infinite]" />
+                  <div className="absolute bottom-3 right-4 w-1 h-1 rounded-full bg-amber-200 animate-[fireEmbersWavy_4s_ease-out_infinite_1.5s]" />
+                  <div className="absolute top-6 left-3 w-1.2 h-1.2 rounded-full bg-yellow-400 animate-[fireEmbersWavy_3.5s_ease-out_infinite_0.8s]" />
                 </div>
               )}
 
               {avatarFrame === "cyber" && (
-                <div className="absolute inset-0 pointer-events-none z-20">
-                  <div className="absolute -top-1 -left-1 h-4 w-4 border-t-2 border-l-2 border-cyan-400 rounded-tl-sm" />
-                  <div className="absolute -top-1 -right-1 h-4 w-4 border-t-2 border-r-2 border-cyan-400 rounded-tr-sm" />
-                  <div className="absolute -bottom-1 -left-1 h-4 w-4 border-b-2 border-l-2 border-cyan-400 rounded-bl-sm" />
-                  <div className="absolute -bottom-1 -right-1 h-4 w-4 border-b-2 border-r-2 border-cyan-400 rounded-br-sm" />
+                <div className="absolute inset-0 pointer-events-none z-20 animate-[cyberGlitch_8s_infinite]">
+                  <div className="absolute -top-1 -left-1 h-4 w-4 border-t-2 border-l-2 border-cyan-400 rounded-tl-sm shadow-[0_0_4px_cyan]" />
+                  <div className="absolute -top-1 -right-1 h-4 w-4 border-t-2 border-r-2 border-cyan-400 rounded-tr-sm shadow-[0_0_4px_cyan]" />
+                  <div className="absolute -bottom-1 -left-1 h-4 w-4 border-b-2 border-l-2 border-cyan-400 rounded-bl-sm shadow-[0_0_4px_cyan]" />
+                  <div className="absolute -bottom-1 -right-1 h-4 w-4 border-b-2 border-r-2 border-cyan-400 rounded-br-sm shadow-[0_0_4px_cyan]" />
                 </div>
               )}
 
               {avatarFrame === "fire" && (
                 <div className="absolute inset-0 pointer-events-none z-20">
-                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 text-orange-500 drop-shadow-[0_0_6px_#ef4444] animate-pulse">
-                    <Flame className="h-5 w-5" />
+                  <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 text-orange-500 drop-shadow-[0_0_8px_#ef4444] animate-[asuraRage_2.5s_ease-in-out_infinite] z-25">
+                    <Flame className="h-5.5 w-5.5" />
                   </div>
-                  <div className="absolute bottom-2 left-4 h-1.5 w-1.5 rounded-full bg-orange-500 shadow-[0_0_4px_#ef4444]" style={{ animation: 'fireEmbers 2s ease-out infinite' }} />
-                  <div className="absolute bottom-1 right-6 h-1 w-1 rounded-full bg-amber-400 shadow-[0_0_3px_#f97316]" style={{ animation: 'fireEmbers 2.5s ease-out infinite', animationDelay: '0.8s' }} />
+                  {/* Layered Ember Storm */}
+                  <div className="absolute bottom-1 left-4 h-1.5 w-1.5 rounded-full bg-orange-500 shadow-[0_0_4px_#ef4444]" style={{ animation: 'fireEmbersWavy 2s ease-out infinite' }} />
+                  <div className="absolute bottom-2 right-5 h-1 w-1 rounded-full bg-amber-400 shadow-[0_0_3px_#f97316]" style={{ animation: 'fireEmbersWavy 2.5s ease-out infinite', animationDelay: '0.7s' }} />
+                  <div className="absolute bottom-3 left-8 h-1.2 w-1.2 rounded-full bg-red-500 shadow-[0_0_4px_#b91c1c]" style={{ animation: 'fireEmbersWavy 3s ease-out infinite', animationDelay: '1.2s' }} />
+                  <div className="absolute bottom-2 right-10 h-0.8 w-0.8 rounded-full bg-yellow-300 shadow-[0_0_3px_white]" style={{ animation: 'fireEmbersWavy 1.8s ease-out infinite', animationDelay: '0.4s' }} />
                 </div>
               )}
 
               {avatarFrame === "sakura" && (
                 <div className="absolute inset-0 pointer-events-none z-20 overflow-hidden rounded-full">
-                  <span className="absolute top-1 left-4 text-[9px] select-none" style={{ animation: 'sakuraDrift 4s linear infinite' }}>🌸</span>
-                  <span className="absolute top-2 right-6 text-[7px] select-none" style={{ animation: 'sakuraDrift 3.5s linear infinite', animationDelay: '1.2s' }}>🌸</span>
+                  {/* Falling 3D Blossom Drift */}
+                  <span className="absolute text-[9px] select-none" style={{ animation: 'sakuraDrift3D 3.5s linear infinite', left: '16px', top: '4px' }}>🌸</span>
+                  <span className="absolute text-[7px] select-none" style={{ animation: 'sakuraDrift3D 4s linear infinite', right: '24px', top: '8px', animationDelay: '1.2s' }}>🌸</span>
+                  <span className="absolute text-[8px] select-none" style={{ animation: 'sakuraDrift3D 3.8s linear infinite', left: '40px', top: '0px', animationDelay: '0.6s' }}>🌸</span>
                 </div>
               )}
 
               {avatarFrame === "shadow" && (
                 <div className="absolute inset-0 pointer-events-none z-20">
-                  <div className="absolute bottom-2 left-6 h-2 w-2 rounded-full bg-purple-500 shadow-[0_0_5px_#6366F1]" style={{ animation: 'fireEmbers 3s ease-out infinite' }} />
-                  <div className="absolute bottom-4 right-6 h-1.5 w-1.5 rounded-full bg-cyan-400 shadow-[0_0_4px_#06b6d4]" style={{ animation: 'fireEmbers 2.5s ease-out infinite', animationDelay: '1s' }} />
+                  {/* Void Sparks */}
+                  <div className="absolute bottom-2 left-6 h-2 w-2 rounded-full bg-purple-500 shadow-[0_0_6px_#6366F1]" style={{ animation: 'fireEmbersWavy 3s ease-out infinite' }} />
+                  <div className="absolute bottom-4 right-6 h-1.5 w-1.5 rounded-full bg-cyan-400 shadow-[0_0_5px_#06b6d4]" style={{ animation: 'fireEmbersWavy 2.5s ease-out infinite', animationDelay: '1s' }} />
+                  <div className="absolute bottom-1 left-10 h-1.2 w-1.2 rounded-full bg-indigo-500 shadow-[0_0_4px_#4f46e5]" style={{ animation: 'fireEmbersWavy 3.5s ease-out infinite', animationDelay: '0.5s' }} />
                 </div>
               )}
 
               {avatarFrame === "qi" && (
                 <div className="absolute inset-0 pointer-events-none z-20">
-                  <Sparkles className="absolute -top-2 right-3 h-4.5 w-4.5 text-amber-300 animate-pulse" />
-                  <Sparkles className="absolute -bottom-1 left-3 h-3.5 w-3.5 text-emerald-300 animate-pulse" style={{ animationDelay: '1.5s' }} />
+                  <Sparkles className="absolute -top-2 right-2 h-4.5 w-4.5 text-amber-300 animate-[starTwinkle_2s_ease-in-out_infinite]" />
+                  <Sparkles className="absolute -bottom-1.5 left-2.5 h-3.5 w-3.5 text-emerald-300 animate-[starTwinkle_2.5s_ease-in-out_infinite]" style={{ animationDelay: '1.2s' }} />
+                  <Sparkles className="absolute top-4 left-0 h-3 w-3 text-yellow-200 animate-[starTwinkle_2.2s_ease-in-out_infinite]" style={{ animationDelay: '0.6s' }} />
                 </div>
               )}
 
               {avatarFrame === "asura" && (
                 <div className="absolute inset-0 pointer-events-none z-20">
-                  <div className="absolute -top-1.5 left-1/2 -translate-x-1/2 h-3.5 w-1.5 bg-red-600 rounded-b-md shadow-[0_0_6px_red]" />
-                  <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 h-3.5 w-1.5 bg-red-600 rounded-t-md shadow-[0_0_6px_red]" />
-                  <div className="absolute -left-1.5 top-1/2 -translate-y-1/2 h-1.5 w-3.5 bg-red-600 rounded-r-md shadow-[0_0_6px_red]" />
-                  <div className="absolute -right-1.5 top-1/2 -translate-y-1/2 h-1.5 w-3.5 bg-red-600 rounded-l-md shadow-[0_0_6px_red]" />
+                  {/* Demonic Eye Flash */}
+                  <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 w-2 h-2 rounded-full bg-red-500 shadow-[0_0_8px_#ef4444] animate-pulse z-30" />
+                  {/* Sword guards brackets */}
+                  <div className="absolute inset-0 animate-[smoothBreath_3s_ease-in-out_infinite]">
+                    <div className="absolute -top-1.5 left-1/2 -translate-x-1/2 h-4 w-2 bg-red-700 rounded-b-md shadow-[0_0_6px_red] border border-red-500" />
+                    <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 h-4 w-2 bg-red-700 rounded-t-md shadow-[0_0_6px_red] border border-red-500" />
+                    <div className="absolute -left-1.5 top-1/2 -translate-y-1/2 h-2 w-4 bg-red-700 rounded-r-md shadow-[0_0_6px_red] border border-red-500" />
+                    <div className="absolute -right-1.5 top-1/2 -translate-y-1/2 h-2 w-4 bg-red-700 rounded-l-md shadow-[0_0_6px_red] border border-red-500" />
+                  </div>
                 </div>
               )}
 
               {avatarFrame === "system" && (
                 <>
-                  <div className="absolute -top-2.5 -right-2.5 z-30 bg-slate-900 border border-cyan-400 text-cyan-400 text-[8px] font-bold px-1.5 py-0.5 rounded shadow-[0_0_5px_rgba(6,182,212,0.5)]">
+                  <div className="absolute -top-2.5 -right-2.5 z-30 bg-slate-950 border-2 border-cyan-400 text-cyan-400 text-[8px] font-black px-1.5 py-0.5 rounded shadow-[0_0_6px_rgba(6,182,212,0.7)] animate-[cyberGlitch_10s_infinite]">
                     S-RANK
                   </div>
-                  <div className="absolute -bottom-2 -left-2 z-30 bg-slate-900 border border-yellow-400 text-yellow-400 text-[7px] font-bold px-1 py-0.5 rounded">
+                  <div className="absolute -bottom-2 -left-2 z-30 bg-slate-950 border border-yellow-400 text-yellow-400 text-[7px] font-black px-1.5 py-0.5 rounded shadow-[0_0_4px_rgba(234,179,8,0.5)]">
                     LV.MAX
+                  </div>
+                  <div className="absolute inset-0 pointer-events-none z-20">
+                    <div className="absolute top-1 left-1 w-1.5 h-1.5 border-t border-l border-cyan-400 animate-pulse" />
+                    <div className="absolute top-1 right-1 w-1.5 h-1.5 border-t border-r border-cyan-400 animate-pulse" />
+                    <div className="absolute bottom-1 left-1 w-1.5 h-1.5 border-b border-l border-cyan-400 animate-pulse" />
+                    <div className="absolute bottom-1 right-1 w-1.5 h-1.5 border-b border-r border-cyan-400 animate-pulse" />
                   </div>
                 </>
               )}
 
               {profile.data?.is_vip && (
                 <div
-                  className="absolute -bottom-0.5 -right-0.5 rounded-full p-1.5 z-30 border border-amber-500/30 bg-zinc-900 text-amber-400"
+                  className="absolute -bottom-0.5 -right-0.5 rounded-full p-1.5 z-30 border border-amber-500/30 bg-zinc-900 text-amber-400 shadow-[0_0_8px_rgba(245,158,11,0.4)]"
                 >
                   <Crown className="h-3.5 w-3.5" />
                 </div>
@@ -854,43 +972,65 @@ function ProfilePage() {
                                 padding: '2px',
                               }}
                             >
-                              {/* Spinners */}
+                              {/* Spinners scaled down */}
                               {frame.id === "neon" && (
-                                <div className="absolute inset-0 rounded-full overflow-hidden">
-                                  <div className="absolute inset-[-50%] rounded-full bg-[conic-gradient(from_0deg,#A855F7,#06B6D4,#EC4899,#A855F7)] animate-spin" style={{ animationDuration: '4s' }} />
+                                <div className="absolute inset-0 rounded-full overflow-hidden animate-[lightningFlicker_6s_ease-in-out_infinite]">
+                                  <div className="absolute inset-[-50%] rounded-full bg-[conic-gradient(from_0deg,#A855F7,#06B6D4,#EC4899,#A855F7)] animate-[rotationCW_4s_linear_infinite]" />
+                                  <div className="absolute inset-[1px] rounded-full bg-background z-5" />
+                                  <div className="absolute inset-[1px] rounded-full overflow-hidden z-6">
+                                    <div className="absolute inset-[-50%] rounded-full bg-[conic-gradient(from_180deg,#EC4899,#06B6D4,#A855F7,#EC4899)] animate-[rotationCCW_3s_linear_infinite]" />
+                                  </div>
                                 </div>
                               )}
                               {frame.id === "gold" && (
-                                <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-[#a67c00] via-[#ffd700] to-[#ffeb99]" />
+                                <>
+                                  <div className="absolute inset-[-1px] rounded-full bg-gradient-to-tr from-[#a67c00] via-[#ffd700] to-[#ffeb99] animate-[rotationCW_10s_linear_infinite]" />
+                                  <div className="absolute inset-[1px] rounded-full bg-gradient-to-bl from-[#ffeb99] via-[#ffd700] to-[#aa7c11] animate-[rotationCCW_8s_linear_infinite]" />
+                                </>
                               )}
                               {frame.id === "cyber" && (
                                 <div className="absolute inset-0 rounded-full overflow-hidden">
-                                  <div className="absolute inset-[-50%] rounded-full bg-[conic-gradient(from_0deg,#0ea5e9,transparent,#c084fc,transparent,#0ea5e9)] animate-spin" style={{ animationDuration: '8s' }} />
+                                  <div className="absolute inset-[-50%] rounded-full bg-[conic-gradient(from_0deg,#0ea5e9,transparent,#c084fc,transparent,#0ea5e9)] animate-[rotationCW_6s_linear_infinite]" />
+                                  <div className="absolute inset-[1px] rounded-full border border-dashed border-cyan-400/40 animate-[rotationCCW_12s_linear_infinite] z-5" />
                                 </div>
                               )}
                               {frame.id === "fire" && (
                                 <div className="absolute inset-0 rounded-full overflow-hidden">
-                                  <div className="absolute inset-[-50%] rounded-full bg-[conic-gradient(from_0deg,#b91c1c,#f97316,#ef4444,#b91c1c)] animate-spin" style={{ animationDuration: '5s' }} />
+                                  <div className="absolute inset-[-50%] rounded-full bg-[conic-gradient(from_0deg,#b91c1c,#f97316,#ef4444,#b91c1c)] animate-[rotationCW_3s_linear_infinite]" />
+                                  <div className="absolute inset-[1px] rounded-full overflow-hidden z-5">
+                                    <div className="absolute inset-[-50%] rounded-full bg-[conic-gradient(from_180deg,#7f1d1d,#f97316,#ef4444,#7f1d1d)] animate-[rotationCCW_4s_linear_infinite]" />
+                                  </div>
                                 </div>
                               )}
                               {frame.id === "sakura" && (
-                                <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-[#FDA4AF] via-[#F472B6] to-[#E879F9]" />
+                                <>
+                                  <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-[#FDA4AF] via-[#F472B6] to-[#E879F9] animate-[smoothBreath_4s_ease-in-out_infinite]" />
+                                  <div className="absolute inset-[1px] rounded-full bg-gradient-to-bl from-[#E879F9] via-[#F472B6] to-[#FDA4AF] animate-[rotationCW_8s_linear_infinite]" />
+                                </>
                               )}
                               {frame.id === "shadow" && (
                                 <div className="absolute inset-0 rounded-full overflow-hidden">
-                                  <div className="absolute inset-[-50%] rounded-full bg-[conic-gradient(from_0deg,#4f46e5,#06b6d4,#1e1b4b,#4f46e5)] animate-spin" style={{ animationDuration: '6s' }} />
+                                  <div className="absolute inset-[-50%] rounded-full bg-[conic-gradient(from_0deg,#4f46e5,#06b6d4,#1e1b4b,#4f46e5)] animate-[rotationCW_5s_linear_infinite]" />
+                                  <div className="absolute inset-[1px] rounded-full overflow-hidden z-5">
+                                    <div className="absolute inset-[-50%] rounded-full bg-[conic-gradient(from_180deg,#1e1b4b,#06b6d4,#4f46e5,#1e1b4b)] animate-[rotationCCW_6s_linear_infinite]" />
+                                  </div>
                                 </div>
                               )}
                               {frame.id === "qi" && (
                                 <div className="absolute inset-0 rounded-full overflow-hidden">
-                                  <div className="absolute inset-[-50%] rounded-full bg-[conic-gradient(from_0deg,#059669,#10B981,#FBBF24,#059669)] animate-spin" style={{ animationDuration: '7s' }} />
+                                  <div className="absolute inset-[-50%] rounded-full bg-[conic-gradient(from_0deg,#059669,#10B981,#FBBF24,#059669)] animate-[rotationCW_6s_linear_infinite]" />
+                                  <div className="absolute inset-[1px] rounded-full border border-emerald-400/40 bg-emerald-950/20 animate-[runeJadePulse_8s_linear_infinite] z-5" />
                                 </div>
                               )}
                               {frame.id === "asura" && (
-                                <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-[#7f1d1d] via-[#b91c1c] to-[#000000]" />
+                                <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-[#7f1d1d] via-[#b91c1c] to-[#000000] animate-[asuraRage_2.5s_ease-in-out_infinite] overflow-hidden">
+                                  <div className="absolute inset-[-50%] rounded-full bg-[conic-gradient(from_0deg,#ef4444,transparent,#7f1d1d,transparent,#ef4444)] animate-[rotationCW_4s_linear_infinite] opacity-80" />
+                                </div>
                               )}
                               {frame.id === "system" && (
-                                <div className="absolute inset-0 rounded-full border border-cyan-400 bg-cyan-950/20" />
+                                <div className="absolute inset-0 rounded-full border border-cyan-400 bg-cyan-950/20 animate-[asuraRage_4s_ease-in-out_infinite] overflow-hidden">
+                                  <div className="absolute inset-[-50%] rounded-full bg-[conic-gradient(from_0deg,rgba(6,182,212,0.25),transparent_40%,transparent)] animate-[rotationCW_3s_linear_infinite]" />
+                                </div>
                               )}
 
                               {frame.id !== "none" && (
@@ -905,15 +1045,15 @@ function ProfilePage() {
 
                               {/* Overlays scaled down */}
                               {frame.id === "cyber" && (
-                                <div className="absolute inset-0 pointer-events-none z-20">
-                                  <div className="absolute top-0 left-0 h-1.5 w-1.5 border-t border-l border-cyan-400 rounded-tl-sm" />
-                                  <div className="absolute top-0 right-0 h-1.5 w-1.5 border-t border-r border-cyan-400 rounded-tr-sm" />
-                                  <div className="absolute bottom-0 left-0 h-1.5 w-1.5 border-b border-l border-cyan-400 rounded-bl-sm" />
-                                  <div className="absolute bottom-0 right-0 h-1.5 w-1.5 border-b border-r border-cyan-400 rounded-br-sm" />
+                                <div className="absolute inset-0 pointer-events-none z-20 animate-[cyberGlitch_8s_infinite]">
+                                  <div className="absolute top-0 left-0 h-1.5 w-1.5 border-t border-l border-cyan-400 rounded-tl-sm shadow-[0_0_3px_cyan]" />
+                                  <div className="absolute top-0 right-0 h-1.5 w-1.5 border-t border-r border-cyan-400 rounded-tr-sm shadow-[0_0_3px_cyan]" />
+                                  <div className="absolute bottom-0 left-0 h-1.5 w-1.5 border-b border-l border-cyan-400 rounded-bl-sm shadow-[0_0_3px_cyan]" />
+                                  <div className="absolute bottom-0 right-0 h-1.5 w-1.5 border-b border-r border-cyan-400 rounded-br-sm shadow-[0_0_3px_cyan]" />
                                 </div>
                               )}
                               {frame.id === "system" && (
-                                <div className="absolute -top-1 -right-1 z-30 bg-slate-900 text-cyan-400 text-[4px] font-bold px-0.5 rounded border border-cyan-500/50 scale-75 origin-top-right">
+                                <div className="absolute -top-1 -right-1 z-30 bg-slate-950 text-cyan-400 text-[4px] font-black px-0.5 rounded border border-cyan-400 shadow-[0_0_3px_cyan] scale-75 origin-top-right">
                                   S
                                 </div>
                               )}
