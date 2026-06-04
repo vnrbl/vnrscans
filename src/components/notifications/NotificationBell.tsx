@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Bell } from "lucide-react";
 import { toast } from "sonner";
@@ -110,6 +111,15 @@ export function NotificationBell() {
           onClose={() => setOpen(false)}
           isMarkingRead={markAllRead.isPending}
         />
+        <div className="border-t p-2">
+          <Link
+            to="/notifications"
+            onClick={() => setOpen(false)}
+            className="flex w-full items-center justify-center rounded-md px-3 py-2 text-xs font-medium text-violet-600 hover:bg-violet-500/10 transition-colors dark:text-violet-400"
+          >
+            View all notifications
+          </Link>
+        </div>
       </DropdownMenuContent>
     </DropdownMenu>
   );
