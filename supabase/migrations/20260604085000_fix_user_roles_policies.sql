@@ -20,3 +20,6 @@ BEGIN
   );
 END;
 $$;
+
+-- 4. Add uploader role to app_role enum if it doesn't exist
+ALTER TYPE public.app_role ADD VALUE IF NOT EXISTS 'uploader';

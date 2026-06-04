@@ -42,7 +42,18 @@ export function Navbar() {
   const [groupResults, setGroupResults] = useState<string[]>([]);
   const [isRolling, setIsRolling] = useState(false);
   const { user } = useAuth();
-  const { isAdmin } = useIsAdmin();
+  const { isAdmin, isMod, isUploader } = useIsAdmin();
+  const showPanel = isAdmin || isMod || isUploader;
+  
+  let panelLabel = "Admin Panel";
+  if (isAdmin) {
+    panelLabel = "Admin Panel";
+  } else if (isMod) {
+    panelLabel = "Moderator Panel";
+  } else if (isUploader) {
+    panelLabel = "Uploader Panel";
+  }
+
   const navigate = useNavigate();
   const router = useRouter();
 
@@ -412,11 +423,11 @@ export function Navbar() {
                   <DropdownMenuItem onClick={() => navigate({ to: "/profile" })}>
                     <UserIcon className="mr-2 h-4 w-4" /> Profile
                   </DropdownMenuItem>
-                  {isAdmin && (
+                  {showPanel && (
                     <>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem onClick={() => navigate({ to: "/admin" })} className="text-primary">
-                        <ShieldCheck className="mr-2 h-4 w-4" /> Admin Panel
+                        <ShieldCheck className="mr-2 h-4 w-4" /> {panelLabel}
                       </DropdownMenuItem>
                     </>
                   )}

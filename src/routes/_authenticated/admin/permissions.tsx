@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Plus, Pencil, Trash2, Shield, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -98,6 +98,36 @@ function AdminPermissions() {
       }));
     },
   });
+
+  const groupedUserRoles = useMemo(() => {
+    const groups: Record<string, {
+      user_id: string;
+      profile: { username: string; avatar_url?: string } | null;
+      roles: Array<{ id: string; role: string; created_at: string }>;
+    }> = {};
+
+    (userRoles.data || []).forEach((item: any) => {
+      if (!groups[item.user_id]) {
+        groups[item.user_id] = {
+          user_id: item.user_id,
+          profile: item.profile,
+          roles: [],
+        };
+      }
+      groups[item.user_id].roles.push({
+        id: item.id,
+        role: item.role,
+        created_at: item.created_at,
+      });
+    });
+
+    return Object.values(groups).sort((a, b) => {
+      const hasHigherRole = (user: typeof a) => user.roles.some((r) => r.role !== "user");
+      if (hasHigherRole(a) && !hasHigherRole(b)) return -1;
+      if (!hasHigherRole(a) && hasHigherRole(b)) return 1;
+      return (a.profile?.username || "").localeCompare(b.profile?.username || "");
+    });
+  }, [userRoles.data]);
 
   const createPermission = useMutation({
     mutationFn: async () => {
@@ -324,93 +354,50 @@ function AdminPermissions() {
         <div>
           <div className="mb-3 flex items-center justify-between">
             <h2 className="text-lg font-semibold">User Role Assignments</h2>
-            <Dialog open={roleDialogOpen} onOpenChange={setRoleDialogOpen}>
-              <DialogTrigger asChild>
-                <Button size="sm" variant="outline">
-                  <UserPlus className="mr-1 h-4 w-4" />
-                  Assign role
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Assign role to user</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-4">
-                  <div>
-                    <Label>User</Label>
-                    <Select value={assignUserId} onValueChange={setAssignUserId}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select user..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {(profiles.data ?? []).map((p) => (
-                          <SelectItem key={p.user_id} value={p.user_id || ""}>@{p.username}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label>Role</Label>
-                    <Select value={assignRole} onValueChange={(v) => setAssignRole(v as typeof assignRole)}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="admin">Admin</SelectItem>
-                        <SelectItem value="moderator">Moderator</SelectItem>
-                        <SelectItem value="user">User</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <DialogFooter>
-                  <Button
-                    onClick={() => assignUserRole.mutate()}
-                    disabled={!assignUserId || assignUserRole.isPending}
-                  >
-                    Assign
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
           </div>
           <div className="space-y-2">
             {userRoles.isLoading && <p className="text-sm text-muted-foreground">Loading...</p>}
 
-            {(userRoles.data || []).map((item) => (
+            {groupedUserRoles.map((group) => (
               <div
-                key={item.id}
+                key={group.user_id}
                 className="flex items-center justify-between rounded-lg border border-border/40 bg-card p-3"
               >
                 <div className="flex items-center gap-3">
-                  {item.profile?.avatar_url && (
+                  {group.profile?.avatar_url && (
                     <img 
-                      src={item.profile.avatar_url} 
-                      alt={item.profile.username} 
-                      className="h-8 w-8 rounded-full"
+                      src={group.profile.avatar_url} 
+                      alt={group.profile.username} 
+                      className="h-8 w-8 rounded-full border border-border/50"
                     />
                   )}
                   <div>
-                    <p className="text-sm font-medium">@{item.profile?.username}</p>
-                    <Badge variant={roleColors[item.role] as any || "outline"} className="text-xs">
-                      {item.role}
-                    </Badge>
+                    <p className="text-sm font-semibold">@{group.profile?.username || "unknown"}</p>
+                    <div className="mt-1.5 flex flex-wrap gap-1">
+                      {group.roles.map((r) => (
+                        <Badge key={r.id} variant={roleColors[r.role] as any || "outline"} className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5">
+                          {r.role}
+                        </Badge>
+                      ))}
+                    </div>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-xs text-muted-foreground">
-                    {new Date(item.created_at).toLocaleDateString()}
-                  </span>
-                  {item.role !== "user" && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 text-destructive"
-                      onClick={() => revokeRole.mutate(item)}
-                    >
-                      Revoke
-                    </Button>
-                  )}
+                  <div className="flex flex-col gap-1 items-end">
+                    {group.roles
+                      .filter((r) => r.role !== "user")
+                      .map((r) => (
+                        <Button
+                          key={r.id}
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 px-2 text-xs text-destructive hover:text-destructive hover:bg-destructive/10 font-bold uppercase tracking-wide transition-colors"
+                          onClick={() => revokeRole.mutate({ id: r.id, user_id: group.user_id, role: r.role })}
+                        >
+                          Revoke {r.role}
+                        </Button>
+                      ))}
+                  </div>
                 </div>
               </div>
             ))}
