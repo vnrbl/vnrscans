@@ -14,11 +14,13 @@ ALTER TABLE profiles
 
 -- 2. Allow public read access to profiles for public profile pages
 -- (Users can only update their own profile)
-CREATE POLICY IF NOT EXISTS "Profiles are viewable by everyone"
+DROP POLICY IF EXISTS "Profiles are viewable by everyone" ON profiles;
+CREATE POLICY "Profiles are viewable by everyone"
   ON profiles FOR SELECT
   USING (true);
 
-CREATE POLICY IF NOT EXISTS "Users can update own profile"
+DROP POLICY IF EXISTS "Users can update own profile" ON profiles;
+CREATE POLICY "Users can update own profile"
   ON profiles FOR UPDATE
   USING (auth.uid() = user_id);
 
@@ -33,21 +35,25 @@ VALUES ('banners', 'banners', true, 5242880, ARRAY['image/jpeg', 'image/png', 'i
 ON CONFLICT (id) DO NOTHING;
 
 -- Allow anyone to view banners
-CREATE POLICY IF NOT EXISTS "Banner images are publicly accessible"
+DROP POLICY IF EXISTS "Banner images are publicly accessible" ON storage.objects;
+CREATE POLICY "Banner images are publicly accessible"
   ON storage.objects FOR SELECT
   USING (bucket_id = 'banners');
 
 -- Allow authenticated users to upload banners
-CREATE POLICY IF NOT EXISTS "Authenticated users can upload banners"
+DROP POLICY IF EXISTS "Authenticated users can upload banners" ON storage.objects;
+CREATE POLICY "Authenticated users can upload banners"
   ON storage.objects FOR INSERT
   WITH CHECK (bucket_id = 'banners' AND auth.role() = 'authenticated');
 
 -- Allow users to update their own banners
-CREATE POLICY IF NOT EXISTS "Users can update own banners"
+DROP POLICY IF EXISTS "Users can update own banners" ON storage.objects;
+CREATE POLICY "Users can update own banners"
   ON storage.objects FOR UPDATE
   USING (bucket_id = 'banners' AND auth.role() = 'authenticated');
 
 -- Allow users to delete their own banners
-CREATE POLICY IF NOT EXISTS "Users can delete own banners"
+DROP POLICY IF EXISTS "Users can delete own banners" ON storage.objects;
+CREATE POLICY "Users can delete own banners"
   ON storage.objects FOR DELETE
   USING (bucket_id = 'banners' AND auth.role() = 'authenticated');

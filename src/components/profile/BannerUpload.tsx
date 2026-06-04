@@ -123,6 +123,14 @@ export function BannerUpload({ currentBannerUrl, accentColor = "#8B5CF6", onBann
 
       const publicUrl = urlData.publicUrl;
 
+      // Update database profile
+      const { error: updateError } = await supabase
+        .from("profiles")
+        .update({ banner_url: publicUrl } as any)
+        .eq("user_id", userData.user.id);
+
+      if (updateError) throw updateError;
+
       onBannerUpdated(publicUrl);
       toast.success("Banner updated!");
       setDialogOpen(false);
@@ -138,8 +146,22 @@ export function BannerUpload({ currentBannerUrl, accentColor = "#8B5CF6", onBann
   };
 
   const handleRemove = async () => {
-    onBannerUpdated("");
-    toast.success("Banner removed");
+    try {
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) throw new Error("Not authenticated");
+
+      const { error } = await supabase
+        .from("profiles")
+        .update({ banner_url: null } as any)
+        .eq("user_id", userData.user.id);
+
+      if (error) throw error;
+
+      onBannerUpdated("");
+      toast.success("Banner removed");
+    } catch (error: any) {
+      toast.error(error.message || "Failed to remove banner");
+    }
   };
 
   return (
