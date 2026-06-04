@@ -54,6 +54,69 @@ export const Route = createFileRoute("/user/$username")({
   component: PublicProfilePage,
 });
 
+/* ─── Keyframes (injected once) ─── */
+const keyframeStyles = `
+@keyframes profileFadeInUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes profileStatPulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.02); }
+}
+@keyframes sweepShine {
+  0% { transform: translate(-100%, -100%) rotate(45deg); }
+  35%, 100% { transform: translate(100%, 100%) rotate(45deg); }
+}
+@keyframes cyberScan {
+  0% { top: 0%; opacity: 0; }
+  10%, 90% { opacity: 0.8; }
+  100% { top: 100%; opacity: 0; }
+}
+@keyframes fireEmbers {
+  0% { transform: translateY(10px) scale(0.6); opacity: 0; }
+  50% { opacity: 0.8; }
+  100% { transform: translateY(-30px) scale(0.3); opacity: 0; }
+}
+@keyframes sakuraDrift {
+  0% { transform: translate(0, -20px) rotate(0deg); opacity: 0; }
+  50% { opacity: 0.9; }
+  100% { transform: translate(-15px, 40px) rotate(180deg); opacity: 0; }
+}
+@keyframes smoothBreath {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.02); }
+}
+`;
+
+const getAvatarFrameStyles = (frame: string, accent: string) => {
+  switch (frame) {
+    case "neon":
+      return { boxShadow: "0 0 15px oklch(0.68 0.22 305 / 0.3)" };
+    case "gold":
+      return { boxShadow: "0 0 15px rgba(212, 175, 55, 0.4)" };
+    case "cyber":
+      return { boxShadow: "0 0 15px rgba(6, 182, 212, 0.3)" };
+    case "fire":
+      return { boxShadow: "0 0 15px rgba(239, 68, 68, 0.4)" };
+    case "sakura":
+      return { boxShadow: "0 0 15px rgba(244, 114, 182, 0.4)" };
+    case "shadow":
+      return { boxShadow: "0 0 15px rgba(99, 102, 241, 0.4)" };
+    case "qi":
+      return { boxShadow: "0 0 15px rgba(16, 185, 129, 0.4)" };
+    case "asura":
+      return { boxShadow: "0 0 15px rgba(239, 68, 68, 0.4)" };
+    case "system":
+      return { boxShadow: "0 0 15px rgba(6, 182, 212, 0.4)" };
+    case "none":
+    default:
+      return {
+        boxShadow: `0 0 15px ${accent}25`,
+      };
+  }
+};
+
 function PublicProfilePage() {
   const { username } = Route.useParams();
   const qc = useQueryClient();
@@ -128,6 +191,13 @@ function PublicProfilePage() {
   const showAchievements = publicStats.data?.show_achievements === true;
   const showStatistics = publicStats.data?.show_statistics === true;
   const showStatsStrip = isProfilePublic && showLibraries && showAchievements && showStatistics;
+
+  useEffect(() => {
+    const style = document.createElement("style");
+    style.textContent = keyframeStyles;
+    document.head.appendChild(style);
+    return () => { style.remove(); };
+  }, []);
 
   useEffect(() => {
     const userId = profile.data?.user_id;
@@ -205,7 +275,7 @@ function PublicProfilePage() {
     queryFn: async () => {
       if (!profile.data?.user_id) return [];
       const { data, error } = await supabase
-        .from("user_achievements")
+        .from("user_achievements" as any)
         .select("*, achievement:achievement_id(name, description, icon, rarity, xp_reward)")
         .eq("user_id", profile.data.user_id)
         .order("unlocked_at", { ascending: false })
@@ -302,104 +372,231 @@ function PublicProfilePage() {
 
   return (
     <div className="min-h-screen">
-      {/* Banner */}
-      <div className="group relative h-48 w-full overflow-hidden rounded-2xl sm:h-56 md:h-64">
-        {bannerUrl ? (
-          <img
-            src={bannerUrl}
-            alt={`${username}'s banner`}
-            className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
-          />
-        ) : (
-          <div
-            className="h-full w-full"
-            style={{
-              background: `linear-gradient(135deg, ${accentColor}30, ${accentColor}10, transparent)`,
-            }}
-          />
-        )}
-        <div
-          className="absolute inset-0"
-          style={{
-            background: "linear-gradient(to top, oklch(0.21 0.006 286 / 0.8), transparent 60%)",
-          }}
-        />
-      </div>
+      {/* ─── Profile Header (No Banner) ─── */}
+      <div
+        className="relative py-10 border-b border-border/20"
+        style={{
+          background: `linear-gradient(180deg, ${accentColor}08, transparent)`,
+        }}
+      >
+        <div className="container mx-auto max-w-5xl px-4 sm:px-6 md:px-12 lg:px-16">
+          <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:gap-8">
+            {/* Avatar with accent ring / custom frame */}
+            <div
+              className="relative h-[140px] w-[140px] flex-shrink-0 rounded-full flex items-center justify-center"
+              style={{
+                ...getAvatarFrameStyles(profile.data.avatar_frame || "none", accentColor),
+                background: (profile.data.avatar_frame || "none") === "none" ? accentColor : undefined,
+                padding: '4px',
+              }}
+            >
+              {/* Layer 1: Spinners & backgrounds for custom frames */}
+              {(profile.data.avatar_frame || "none") === "neon" && (
+                <div className="absolute inset-0 rounded-full overflow-hidden">
+                  <div className="absolute inset-[-50%] rounded-full bg-[conic-gradient(from_0deg,#A855F7,#06B6D4,#EC4899,#A855F7)] animate-spin" style={{ animationDuration: '4s' }} />
+                </div>
+              )}
+              {(profile.data.avatar_frame || "none") === "gold" && (
+                <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-[#a67c00] via-[#ffd700] to-[#ffeb99]" />
+              )}
+              {(profile.data.avatar_frame || "none") === "cyber" && (
+                <div className="absolute inset-0 rounded-full overflow-hidden">
+                  <div className="absolute inset-[-50%] rounded-full bg-[conic-gradient(from_0deg,#0ea5e9,transparent,#c084fc,transparent,#0ea5e9)] animate-spin" style={{ animationDuration: '8s' }} />
+                </div>
+              )}
+              {(profile.data.avatar_frame || "none") === "fire" && (
+                <div className="absolute inset-0 rounded-full overflow-hidden">
+                  <div className="absolute inset-[-50%] rounded-full bg-[conic-gradient(from_0deg,#b91c1c,#f97316,#ef4444,#b91c1c)] animate-spin" style={{ animationDuration: '5s' }} />
+                </div>
+              )}
+              {(profile.data.avatar_frame || "none") === "sakura" && (
+                <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-[#FDA4AF] via-[#F472B6] to-[#E879F9]" style={{ animation: 'smoothBreath 5s ease-in-out infinite' }} />
+              )}
+              {(profile.data.avatar_frame || "none") === "shadow" && (
+                <div className="absolute inset-0 rounded-full overflow-hidden">
+                  <div className="absolute inset-[-50%] rounded-full bg-[conic-gradient(from_0deg,#4f46e5,#06b6d4,#1e1b4b,#4f46e5)] animate-spin" style={{ animationDuration: '6s' }} />
+                </div>
+              )}
+              {(profile.data.avatar_frame || "none") === "qi" && (
+                <div className="absolute inset-0 rounded-full overflow-hidden">
+                  <div className="absolute inset-[-50%] rounded-full bg-[conic-gradient(from_0deg,#059669,#10B981,#FBBF24,#059669)] animate-spin" style={{ animationDuration: '7s' }} />
+                </div>
+              )}
+              {(profile.data.avatar_frame || "none") === "asura" && (
+                <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-[#7f1d1d] via-[#b91c1c] to-[#000000]" style={{ animation: 'smoothBreath 3s ease-in-out infinite' }} />
+              )}
+              {(profile.data.avatar_frame || "none") === "system" && (
+                <div className="absolute inset-0 rounded-full border-2 border-cyan-400 bg-cyan-950/20" />
+              )}
 
-      {/* Avatar + Info */}
-      <div className="container mx-auto max-w-5xl px-4 sm:px-6 md:px-12 lg:px-16">
-        <div className="relative -mt-16 flex flex-col gap-5 sm:flex-row sm:items-end sm:gap-6">
-          {/* Avatar */}
-          <div
-            className="relative h-[140px] w-[140px] flex-shrink-0 rounded-full p-1"
-            style={{
-              background: `linear-gradient(135deg, ${accentColor}, ${accentColor}80)`,
-              boxShadow: `0 0 30px ${accentColor}40`,
-            }}
-          >
-            <div className="h-full w-full rounded-full bg-background p-0.5">
-              <div className="h-full w-full overflow-hidden rounded-full bg-gradient-to-br from-violet-500/20 to-purple-500/20">
-                {avatarUrl ? (
-                  <img src={avatarUrl} alt={username} className="h-full w-full object-cover" />
-                ) : (
-                  <div className="flex h-full w-full items-center justify-center text-4xl font-bold" style={{ color: accentColor }}>
-                    {username?.charAt(0)?.toUpperCase() || "?"}
+              {/* Layer 2: Inner mask background to shape the 4px border */}
+              {(profile.data.avatar_frame || "none") !== "none" && (
+                <div className="absolute inset-[4px] rounded-full bg-background z-10" />
+              )}
+
+              {/* Layer 3: Avatar image and internal animations (z-10 relative) */}
+              <div className="h-full w-full rounded-full overflow-hidden relative z-10 flex items-center justify-center">
+                <div className="h-full w-full overflow-hidden rounded-full bg-gradient-to-br from-violet-500/20 to-purple-500/20">
+                  {avatarUrl ? (
+                    <img src={avatarUrl} alt={username} className="h-full w-full object-cover" />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center text-4xl font-bold" style={{ color: accentColor }}>
+                      {username?.charAt(0)?.toUpperCase() || "?"}
+                    </div>
+                  )}
+                </div>
+
+                {/* Shimmer sweep inside avatar for gold frame */}
+                {(profile.data.avatar_frame || "none") === "gold" && (
+                  <div 
+                    className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent -translate-x-full z-20 pointer-events-none"
+                    style={{ 
+                      animation: 'sweepShine 4s ease-in-out infinite',
+                      animationDelay: '1s'
+                    }} 
+                  />
+                )}
+
+                {/* Cyber grid scan overlay */}
+                {(profile.data.avatar_frame || "none") === "cyber" && (
+                  <div className="absolute inset-0 pointer-events-none z-20 overflow-hidden rounded-full">
+                    <div className="absolute left-0 right-0 h-[1.5px] bg-cyan-400/60 shadow-[0_0_6px_cyan]" style={{ animation: 'cyberScan 3s linear infinite' }} />
+                  </div>
+                )}
+
+                {/* System Scanline overlay */}
+                {(profile.data.avatar_frame || "none") === "system" && (
+                  <div className="absolute inset-0 pointer-events-none z-20 overflow-hidden rounded-full">
+                    <div className="absolute left-0 right-0 h-[1px] bg-cyan-300/40 shadow-[0_0_4px_cyan]" style={{ animation: 'cyberScan 4s linear infinite', animationDelay: '0.5s' }} />
                   </div>
                 )}
               </div>
+
+              {/* Layer 4: Frame brackets and decorative widgets (z-20) */}
+              {(profile.data.avatar_frame || "none") === "gold" && (
+                <div className="absolute inset-0 pointer-events-none z-20">
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 text-amber-400 drop-shadow-[0_2px_4px_rgba(0,0,0,0.6)] animate-bounce" style={{ animationDuration: '4s' }}>
+                    <Crown className="h-6 w-6" />
+                  </div>
+                  <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 z-30 text-amber-500 drop-shadow-[0_1px_3px_rgba(0,0,0,0.5)]">
+                    <Trophy className="h-4.5 w-4.5" />
+                  </div>
+                </div>
+              )}
+
+              {(profile.data.avatar_frame || "none") === "cyber" && (
+                <div className="absolute inset-0 pointer-events-none z-20">
+                  <div className="absolute -top-1 -left-1 h-4 w-4 border-t-2 border-l-2 border-cyan-400 rounded-tl-sm" />
+                  <div className="absolute -top-1 -right-1 h-4 w-4 border-t-2 border-r-2 border-cyan-400 rounded-tr-sm" />
+                  <div className="absolute -bottom-1 -left-1 h-4 w-4 border-b-2 border-l-2 border-cyan-400 rounded-bl-sm" />
+                  <div className="absolute -bottom-1 -right-1 h-4 w-4 border-b-2 border-r-2 border-cyan-400 rounded-br-sm" />
+                </div>
+              )}
+
+              {(profile.data.avatar_frame || "none") === "fire" && (
+                <div className="absolute inset-0 pointer-events-none z-20">
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 text-orange-500 drop-shadow-[0_0_6px_#ef4444] animate-pulse">
+                    <Flame className="h-5 w-5" />
+                  </div>
+                  <div className="absolute bottom-2 left-4 h-1.5 w-1.5 rounded-full bg-orange-500 shadow-[0_0_4px_#ef4444]" style={{ animation: 'fireEmbers 2s ease-out infinite' }} />
+                  <div className="absolute bottom-1 right-6 h-1 w-1 rounded-full bg-amber-400 shadow-[0_0_3px_#f97316]" style={{ animation: 'fireEmbers 2.5s ease-out infinite', animationDelay: '0.8s' }} />
+                </div>
+              )}
+
+              {(profile.data.avatar_frame || "none") === "sakura" && (
+                <div className="absolute inset-0 pointer-events-none z-20 overflow-hidden rounded-full">
+                  <span className="absolute top-1 left-4 text-[9px] select-none" style={{ animation: 'sakuraDrift 4s linear infinite' }}>🌸</span>
+                  <span className="absolute top-2 right-6 text-[7px] select-none" style={{ animation: 'sakuraDrift 3.5s linear infinite', animationDelay: '1.2s' }}>🌸</span>
+                </div>
+              )}
+
+              {(profile.data.avatar_frame || "none") === "shadow" && (
+                <div className="absolute inset-0 pointer-events-none z-20">
+                  <div className="absolute bottom-2 left-6 h-2 w-2 rounded-full bg-purple-500 shadow-[0_0_5px_#6366F1]" style={{ animation: 'fireEmbers 3s ease-out infinite' }} />
+                  <div className="absolute bottom-4 right-6 h-1.5 w-1.5 rounded-full bg-cyan-400 shadow-[0_0_4px_#06b6d4]" style={{ animation: 'fireEmbers 2.5s ease-out infinite', animationDelay: '1s' }} />
+                </div>
+              )}
+
+              {(profile.data.avatar_frame || "none") === "qi" && (
+                <div className="absolute inset-0 pointer-events-none z-20">
+                  <Sparkles className="absolute -top-2 right-3 h-4.5 w-4.5 text-amber-300 animate-pulse" />
+                  <Sparkles className="absolute -bottom-1 left-3 h-3.5 w-3.5 text-emerald-300 animate-pulse" style={{ animationDelay: '1.5s' }} />
+                </div>
+              )}
+
+              {(profile.data.avatar_frame || "none") === "asura" && (
+                <div className="absolute inset-0 pointer-events-none z-20">
+                  <div className="absolute -top-1.5 left-1/2 -translate-x-1/2 h-3.5 w-1.5 bg-red-600 rounded-b-md shadow-[0_0_6px_red]" />
+                  <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 h-3.5 w-1.5 bg-red-600 rounded-t-md shadow-[0_0_6px_red]" />
+                  <div className="absolute -left-1.5 top-1/2 -translate-y-1/2 h-1.5 w-3.5 bg-red-600 rounded-r-md shadow-[0_0_6px_red]" />
+                  <div className="absolute -right-1.5 top-1/2 -translate-y-1/2 h-1.5 w-3.5 bg-red-600 rounded-l-md shadow-[0_0_6px_red]" />
+                </div>
+              )}
+
+              {(profile.data.avatar_frame || "none") === "system" && (
+                <>
+                  <div className="absolute -top-2.5 -right-2.5 z-30 bg-slate-900 border border-cyan-400 text-cyan-400 text-[8px] font-bold px-1.5 py-0.5 rounded shadow-[0_0_5px_rgba(6,182,212,0.5)]">
+                    S-RANK
+                  </div>
+                  <div className="absolute -bottom-2 -left-2 z-30 bg-slate-900 border border-yellow-400 text-yellow-400 text-[7px] font-bold px-1 py-0.5 rounded">
+                    LV.MAX
+                  </div>
+                </>
+              )}
+
+              {profile.data.is_vip && (
+                <div
+                  className="absolute -bottom-0.5 -right-0.5 rounded-full p-1.5 z-30 border border-amber-500/30 bg-zinc-900 text-amber-400"
+                >
+                  <Crown className="h-3.5 w-3.5" />
+                </div>
+              )}
             </div>
-            {profile.data.is_vip && (
-              <div
-                className="absolute -bottom-1 -right-1 rounded-full p-2"
-                style={{
-                  background: "linear-gradient(135deg, #F59E0B, #D97706)",
-                  boxShadow: "0 0 15px #F59E0B50",
-                }}
-              >
-                <Crown className="h-4 w-4 text-white" />
+
+            {/* Name + Meta */}
+            <div className="flex-1 pb-2">
+              <div className="flex flex-wrap items-center gap-3">
+                <h1 className="text-3xl font-extrabold tracking-tight">{username}</h1>
+                <div className="flex flex-wrap items-center gap-2">
+                  {roles.includes("admin") && (
+                    <Badge className="border border-red-500/20 bg-red-500/10 text-red-400 hover:bg-red-500/20">
+                      <Shield className="mr-1 h-3 w-3" /> Admin
+                    </Badge>
+                  )}
+                  {roles.includes("moderator") && (
+                    <Badge className="border border-blue-500/20 bg-blue-500/10 text-blue-400 hover:bg-blue-500/20">
+                      <Shield className="mr-1 h-3 w-3" /> Mod
+                    </Badge>
+                  )}
+                  {roles.includes("uploader") && (
+                    <Badge className="border border-emerald-500/20 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20">
+                      <Shield className="mr-1 h-3 w-3" /> Uploader
+                    </Badge>
+                  )}
+                  {profile.data.is_vip && (
+                    <Badge className="border border-amber-500/20 bg-amber-500/10 text-amber-400 hover:bg-amber-500/20">
+                      <Crown className="mr-1 h-3 w-3" /> VIP
+                    </Badge>
+                  )}
+                </div>
               </div>
-            )}
-          </div>
 
-          {/* Name + Meta */}
-          <div className="flex-1 pb-2">
-            <div className="flex flex-wrap items-center gap-3">
-              <h1 className="text-3xl font-extrabold tracking-tight">{username}</h1>
-              <div className="flex flex-wrap items-center gap-2">
-                {roles.includes("admin") && (
-                  <Badge className="border-0 text-white" style={{ background: "linear-gradient(135deg, #EF4444, #DC2626)" }}>
-                    <Shield className="mr-1 h-3 w-3" /> Admin
-                  </Badge>
-                )}
-                {roles.includes("moderator") && (
-                  <Badge className="border-0 text-white" style={{ background: "linear-gradient(135deg, #3B82F6, #2563EB)" }}>
-                    <Shield className="mr-1 h-3 w-3" /> Mod
-                  </Badge>
-                )}
-                {roles.includes("uploader") && (
-                  <Badge className="border-0 text-white" style={{ background: "linear-gradient(135deg, #10B981, #059669)" }}>
-                    <Shield className="mr-1 h-3 w-3" /> Uploader
-                  </Badge>
-                )}
-                {profile.data.is_vip && (
-                  <Badge className="border-0 text-white" style={{ background: "linear-gradient(135deg, #F59E0B, #D97706)" }}>
-                    <Crown className="mr-1 h-3 w-3" /> VIP
-                  </Badge>
-                )}
+              <div className="mt-3 flex flex-wrap items-center gap-3">
+                <SocialLinksDisplay values={socialLinks} accentColor={accentColor} />
+                <Badge variant="outline" className="text-xs border border-border/50 bg-secondary/20 text-muted-foreground shadow-sm">
+                  <Calendar className="mr-1.5 h-3.5 w-3.5" style={{ color: accentColor }} />
+                  Joined {new Date(profile.data.created_at || "").toLocaleDateString()}
+                </Badge>
               </div>
-            </div>
 
-            <div className="mt-3 flex flex-wrap items-center gap-3">
-              <SocialLinksDisplay values={socialLinks} accentColor={accentColor} />
-              <Badge variant="outline" className="text-xs">
-                <Calendar className="mr-1 h-3 w-3" />
-                Joined {new Date(profile.data.created_at || "").toLocaleDateString()}
-              </Badge>
+              {profile.data.bio && (
+                <p 
+                  className="mt-3 max-w-xl text-sm leading-relaxed text-muted-foreground border border-border/30 bg-card/25 backdrop-blur-md rounded-xl p-3.5"
+                >
+                  {profile.data.bio}
+                </p>
+              )}
             </div>
-
-            {profile.data.bio && (
-              <p className="mt-3 max-w-xl text-sm text-muted-foreground">{profile.data.bio}</p>
-            )}
           </div>
         </div>
       </div>
@@ -408,26 +605,35 @@ function PublicProfilePage() {
       {showStatistics && (
         <div className="container mx-auto max-w-5xl px-4 sm:px-6 md:px-12 lg:px-16 mt-6">
           <div
-            className="rounded-xl border border-border/40 p-4"
-            style={{ background: `linear-gradient(135deg, ${accentColor}08, transparent)` }}
+            className="rounded-xl border border-border/40 p-4 bg-card/25 backdrop-blur-md"
           >
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2">
                 <Trophy className="h-5 w-5" style={{ color: accentColor }} />
-                <span className="font-bold">Level {level}</span>
-                <Sparkles className="h-4 w-4 text-muted-foreground" />
+                {roles.includes("admin") ? (
+                  <span className="font-bold text-foreground">Maxed Out</span>
+                ) : (
+                  <span className="font-bold">Level {level}</span>
+                )}
+                <Sparkles className="h-4 w-4 text-muted-foreground/60" />
               </div>
-              <span className="text-sm text-muted-foreground">
-                {xp} / {xpForNextLevel} XP
-              </span>
+              {roles.includes("admin") ? (
+                <span className="text-sm font-semibold" style={{ color: accentColor }}>
+                  Infinite XP & Aura
+                </span>
+              ) : (
+                <span className="text-sm text-muted-foreground">
+                  {xp} / {xpForNextLevel} XP
+                </span>
+              )}
             </div>
-            <div className="relative h-3 w-full overflow-hidden rounded-full bg-secondary">
+            <div className="relative h-2 w-full overflow-hidden rounded-full bg-secondary/60">
               <div
                 className="h-full rounded-full transition-all duration-1000 ease-out"
                 style={{
-                  width: `${xpProgress}%`,
-                  background: `linear-gradient(90deg, ${accentColor}, ${accentColor}CC)`,
-                  boxShadow: `0 0 12px ${accentColor}60`,
+                  width: roles.includes("admin") ? "100%" : `${xpProgress}%`,
+                  background: accentColor,
+                  opacity: 0.9,
                 }}
               />
             </div>
@@ -472,7 +678,7 @@ function PublicProfilePage() {
             </div>
           ) : publicLibrary.data && publicLibrary.data.length > 0 ? (
             <div className="grid gap-3 sm:grid-cols-2">
-              {publicLibrary.data.map((item) => (
+              {publicLibrary.data.map((item: PublicLibraryItem) => (
                 <Link
                   key={item.library_id}
                   to="/title/$slug"

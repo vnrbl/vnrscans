@@ -67,20 +67,6 @@ const PLATFORMS = [
     color: "#000000",
   },
   {
-    key: "social_mal" as const,
-    label: "MyAnimeList",
-    icon: MALIcon,
-    placeholder: "https://myanimelist.net/profile/username",
-    color: "#2E51A2",
-  },
-  {
-    key: "social_anilist" as const,
-    label: "AniList",
-    icon: AniListIcon,
-    placeholder: "https://anilist.co/user/username",
-    color: "#02A9FF",
-  },
-  {
     key: "social_website" as const,
     label: "Website",
     icon: Globe,

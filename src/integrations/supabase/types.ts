@@ -211,6 +211,7 @@ export type Database = {
           social_anilist: string | null
           social_website: string | null
           is_vip: boolean
+          avatar_frame: string | null
         }
         Insert: {
           avatar_url?: string | null
@@ -231,6 +232,7 @@ export type Database = {
           social_anilist?: string | null
           social_website?: string | null
           is_vip?: boolean
+          avatar_frame?: string | null
         }
         Update: {
           avatar_url?: string | null
