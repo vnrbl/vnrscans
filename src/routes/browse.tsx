@@ -41,13 +41,13 @@ function BrowsePage() {
   const [duration, setDuration] = useState("all");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
 
-  // Fetch genres from tags table
+  // Fetch genres
   const genres = useQuery({
-    queryKey: ["tags-as-genres"],
+    queryKey: ["genres"],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("tags")
-        .select("id,name,slug,color,icon")
+        .from("genres")
+        .select("id,name,slug")
         .order("name");
       if (error) throw error;
       return data ?? [];
@@ -114,7 +114,7 @@ function BrowsePage() {
     queryFn: async () => {
       let query = supabase
         .from("series")
-        .select("id,slug,title,alternative_titles,description,cover_url,type,rating_average,status,author,artist,release_year,created_at,updated_at,view_count,content_rating,chapter_count,series_tags(tag:tags(id,name,slug,color,icon))");
+        .select("id,slug,title,alternative_titles,description,cover_url,type,rating_average,status,author,artist,release_year,created_at,updated_at,view_count,content_rating,chapter_count,series_genres(genre:genres(id,name,slug))");
 
       // Apply type filters (multiple selection)
       if (typeFilters.length > 0) {
@@ -191,11 +191,11 @@ function BrowsePage() {
         })
       );
       
-      // Filter by genres (tags) if selected - series must have ALL selected genres
+      // Filter by genres if selected - series must have ALL selected genres
       let filtered = seriesWithChapters;
       if (genreFilters.length > 0 && filtered.length > 0) {
         filtered = filtered.filter((series: any) => {
-          const seriesGenres = series.series_tags?.map((st: any) => st.tag?.slug).filter(Boolean) || [];
+          const seriesGenres = series.series_genres?.map((sg: any) => sg.genre?.slug).filter(Boolean) || [];
           // Check if series has ALL selected genres
           return genreFilters.every(selectedGenre => seriesGenres.includes(selectedGenre));
         });

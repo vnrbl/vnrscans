@@ -539,7 +539,7 @@ function SeriesDetail() {
             )}
 
             {tags.length > 0 && (
-              <MetaSection label="Genres">
+              <MetaSection label="Tags">
                 {tags.map((tag) => (
                   <Badge
                     key={tag.id}

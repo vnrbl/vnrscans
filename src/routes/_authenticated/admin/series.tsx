@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
-import { Plus, Trash2, Eye, EyeOff, Upload, ExternalLink, X, Pencil, Download, Layers, Search } from "lucide-react";
+import { Plus, Trash2, Eye, EyeOff, Upload, ExternalLink, X, Pencil, Download, Layers, Tag, Sparkles } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { $extractChaptersFromUrl, $extractImagesFromUrl } from "@/lib/api/scraper.functions";
@@ -43,6 +43,10 @@ type SeriesForm = {
   is_trending: boolean;
   is_hidden: boolean;
   chapter_count: string;
+  genre_ids: string[];
+  tag_ids: string[];
+  new_genres: string;
+  new_tags: string;
 };
 
 const emptySeriesForm: SeriesForm = {
@@ -59,6 +63,10 @@ const emptySeriesForm: SeriesForm = {
   is_trending: false,
   is_hidden: false,
   chapter_count: "",
+  genre_ids: [],
+  tag_ids: [],
+  new_genres: "",
+  new_tags: "",
 };
 
 function seriesToForm(series: any): SeriesForm {
@@ -76,6 +84,10 @@ function seriesToForm(series: any): SeriesForm {
     is_trending: Boolean(series.is_trending),
     is_hidden: Boolean(series.is_hidden),
     chapter_count: String(series.chapter_count || 0),
+    genre_ids: ((series.series_genres as any[]) ?? []).map((sg) => sg.genre_id).filter(Boolean),
+    tag_ids: ((series.series_tags as any[]) ?? []).map((st) => st.tag_id).filter(Boolean),
+    new_genres: "",
+    new_tags: "",
   };
 }
 
@@ -99,6 +111,77 @@ function seriesPayloadFromForm(form: SeriesForm) {
   };
 }
 
+type GenreOption = { id: string; name: string; slug: string };
+type TagOption = { id: string; name: string; slug: string; color: string | null; icon: string | null };
+
+function namesFromInput(value: string) {
+  return value
+    .split(",")
+    .map((name) => name.trim())
+    .filter(Boolean);
+}
+
+function uniqueIds(ids: string[]) {
+  return Array.from(new Set(ids.filter(Boolean)));
+}
+
+async function ensureGenres(names: string[]) {
+  const createdIds: string[] = [];
+  for (const name of names) {
+    const payload = { name, slug: slugify(name) };
+    const { data, error } = await supabase
+      .from("genres")
+      .upsert(payload, { onConflict: "slug" } as any)
+      .select("id")
+      .single();
+    if (error) throw error;
+    if (data?.id) createdIds.push(data.id);
+  }
+  return createdIds;
+}
+
+async function ensureTags(names: string[]) {
+  const createdIds: string[] = [];
+  for (const name of names) {
+    const { data, error } = await (supabase as any)
+      .from("tags")
+      .upsert({ name, slug: slugify(name), color: "#8B5CF6" }, { onConflict: "slug" })
+      .select("id")
+      .single();
+    if (error) throw error;
+    if (data?.id) createdIds.push(data.id);
+  }
+  return createdIds;
+}
+
+async function syncSeriesTaxonomy(seriesId: string, form: SeriesForm) {
+  const [newGenreIds, newTagIds] = await Promise.all([
+    ensureGenres(namesFromInput(form.new_genres)),
+    ensureTags(namesFromInput(form.new_tags)),
+  ]);
+
+  const genreIds = uniqueIds([...form.genre_ids, ...newGenreIds]);
+  const tagIds = uniqueIds([...form.tag_ids, ...newTagIds]);
+
+  const { error: deleteGenresError } = await supabase.from("series_genres").delete().eq("series_id", seriesId);
+  if (deleteGenresError) throw deleteGenresError;
+  if (genreIds.length > 0) {
+    const { error } = await supabase
+      .from("series_genres")
+      .insert(genreIds.map((genre_id) => ({ series_id: seriesId, genre_id })));
+    if (error) throw error;
+  }
+
+  const { error: deleteTagsError } = await (supabase as any).from("series_tags").delete().eq("series_id", seriesId);
+  if (deleteTagsError) throw deleteTagsError;
+  if (tagIds.length > 0) {
+    const { error } = await (supabase as any)
+      .from("series_tags")
+      .insert(tagIds.map((tag_id: string) => ({ series_id: seriesId, tag_id })));
+    if (error) throw error;
+  }
+}
+
 function AdminSeries() {
   const qc = useQueryClient();
   const { user } = useAuth();
@@ -116,7 +199,7 @@ function AdminSeries() {
     queryFn: async () => {
       let query = supabase
         .from("series")
-        .select("*", { count: "exact" })
+        .select("*,series_genres(genre_id,genre:genres(id,name,slug)),series_tags(tag_id,tag:tags(id,name,slug,color,icon))", { count: "exact" })
         .order("updated_at", { ascending: false });
       
       // Apply filters
@@ -155,16 +238,44 @@ function AdminSeries() {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<SeriesForm>(emptySeriesForm);
 
+  const genres = useQuery({
+    queryKey: ["admin", "genres", "options"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("genres").select("id,name,slug").order("name");
+      if (error) throw error;
+      return (data ?? []) as GenreOption[];
+    },
+  });
+
+  const tags = useQuery({
+    queryKey: ["admin", "tags", "options"],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from("tags")
+        .select("id,name,slug,color,icon")
+        .order("name");
+      if (error) throw error;
+      return (data ?? []) as TagOption[];
+    },
+  });
+
   const create = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.from("series").insert(seriesPayloadFromForm(form));
+      const { data, error } = await supabase
+        .from("series")
+        .insert(seriesPayloadFromForm(form))
+        .select("id")
+        .single();
       if (error) throw error;
+      await syncSeriesTaxonomy(data.id, form);
     },
     onSuccess: () => {
       toast.success("Series created");
       setOpen(false);
       setForm(emptySeriesForm);
       qc.invalidateQueries({ queryKey: ["admin", "series"] });
+      qc.invalidateQueries({ queryKey: ["admin", "genres"] });
+      qc.invalidateQueries({ queryKey: ["admin", "tags"] });
       setCurrentPage(1); // Reset to first page
     },
     onError: (e: Error) => toast.error(e.message),
@@ -178,12 +289,15 @@ function AdminSeries() {
         .update(seriesPayloadFromForm(form))
         .eq("id", editingSeries.id);
       if (error) throw error;
+      await syncSeriesTaxonomy(editingSeries.id, form);
     },
     onSuccess: () => {
       toast.success("Series updated");
       setEditingSeries(null);
       setForm(emptySeriesForm);
       qc.invalidateQueries({ queryKey: ["admin", "series"] });
+      qc.invalidateQueries({ queryKey: ["admin", "genres"] });
+      qc.invalidateQueries({ queryKey: ["admin", "tags"] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -217,7 +331,7 @@ function AdminSeries() {
           <DialogTrigger asChild><Button><Plus className="mr-1 h-4 w-4" />New title</Button></DialogTrigger>
           <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
             <DialogHeader><DialogTitle>Create title</DialogTitle></DialogHeader>
-            <SeriesFormFields form={form} setForm={setForm} />
+            <SeriesFormFields form={form} setForm={setForm} genres={genres.data ?? []} tags={tags.data ?? []} />
             <DialogFooter>
               <Button onClick={() => create.mutate()} disabled={!form.title || create.isPending}>Create</Button>
             </DialogFooter>
@@ -331,6 +445,28 @@ function AdminSeries() {
               <div className="text-xs text-muted-foreground">
                 {s.status} · {Number(s.rating_average || 0).toFixed(1)}★ · {s.view_count} views · {s.chapter_count || 0} chapters
               </div>
+              <div className="mt-1 flex flex-wrap gap-1">
+                {((s.series_genres as any[]) ?? []).map((sg) => sg.genre).filter(Boolean).slice(0, 4).map((genre) => (
+                  <Badge key={genre.id} variant="secondary" className="px-1.5 py-0 text-[10px]">
+                    {genre.name}
+                  </Badge>
+                ))}
+                {((s.series_tags as any[]) ?? [])
+                  .map((st) => st.tag)
+                  .filter(Boolean)
+                  .slice(0, 4)
+                  .map((tag) => (
+                    <Badge
+                      key={tag.id}
+                      variant="outline"
+                      className="px-1.5 py-0 text-[10px]"
+                      style={tag.color ? { borderColor: tag.color, color: tag.color } : undefined}
+                    >
+                      {tag.icon && <span className="mr-1">{tag.icon}</span>}
+                      {tag.name}
+                    </Badge>
+                  ))}
+              </div>
             </div>
             <Button variant="ghost" size="icon" onClick={() => setSelectedSeries(s.id)} title="Manage Chapters">
               <Upload className="h-4 w-4 text-violet-600" />
@@ -410,7 +546,7 @@ function AdminSeries() {
       <Dialog open={!!editingSeries} onOpenChange={(v) => { if (!v) { setEditingSeries(null); setForm(emptySeriesForm); } }}>
         <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
           <DialogHeader><DialogTitle>Edit title</DialogTitle></DialogHeader>
-          <SeriesFormFields form={form} setForm={setForm} />
+          <SeriesFormFields form={form} setForm={setForm} genres={genres.data ?? []} tags={tags.data ?? []} />
           <DialogFooter>
             <Button onClick={() => updateSeries.mutate()} disabled={!form.title || updateSeries.isPending}>
               {updateSeries.isPending ? "Saving..." : "Save changes"}
@@ -422,7 +558,21 @@ function AdminSeries() {
   );
 }
 
-function SeriesFormFields({ form, setForm }: { form: SeriesForm; setForm: (form: SeriesForm) => void }) {
+function toggleSelection(ids: string[], id: string) {
+  return ids.includes(id) ? ids.filter((item) => item !== id) : [...ids, id];
+}
+
+function SeriesFormFields({
+  form,
+  setForm,
+  genres,
+  tags,
+}: {
+  form: SeriesForm;
+  setForm: (form: SeriesForm) => void;
+  genres: GenreOption[];
+  tags: TagOption[];
+}) {
   return (
     <div className="space-y-3">
       <div><Label>Title *</Label><Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="Enter series title" /></div>
@@ -456,6 +606,68 @@ function SeriesFormFields({ form, setForm }: { form: SeriesForm; setForm: (form:
       <div><Label>Cover URL</Label><Input value={form.cover_url} onChange={(e) => setForm({ ...form, cover_url: e.target.value })} placeholder="https://example.com/cover.jpg" /></div>
       <div><Label>Alternative Titles</Label><Input value={form.alternative_titles} onChange={(e) => setForm({ ...form, alternative_titles: e.target.value })} placeholder="Alt title 1, Alt title 2" /></div>
       <div><Label>Description</Label><Textarea rows={4} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Enter title description..." /></div>
+
+      <div className="grid gap-3 rounded-md border border-border/40 p-3">
+        <div className="flex items-center gap-2 text-sm font-semibold">
+          <Sparkles className="h-4 w-4 text-violet-500" />
+          Genres
+        </div>
+        <div className="flex max-h-36 flex-wrap gap-2 overflow-y-auto">
+          {genres.length === 0 && <p className="text-xs text-muted-foreground">No genres yet. Add one below.</p>}
+          {genres.map((genre) => {
+            const selected = form.genre_ids.includes(genre.id);
+            return (
+              <button
+                key={genre.id}
+                type="button"
+                onClick={() => setForm({ ...form, genre_ids: toggleSelection(form.genre_ids, genre.id) })}
+                className={`rounded-full border px-3 py-1 text-xs font-medium transition ${
+                  selected ? "border-violet-600 bg-violet-600 text-white" : "border-border/60 bg-secondary/40 hover:border-violet-500"
+                }`}
+              >
+                {genre.name}
+              </button>
+            );
+          })}
+        </div>
+        <Input
+          value={form.new_genres}
+          onChange={(e) => setForm({ ...form, new_genres: e.target.value })}
+          placeholder="Add new genres, comma separated"
+        />
+      </div>
+
+      <div className="grid gap-3 rounded-md border border-border/40 p-3">
+        <div className="flex items-center gap-2 text-sm font-semibold">
+          <Tag className="h-4 w-4 text-violet-500" />
+          Tags
+        </div>
+        <div className="flex max-h-36 flex-wrap gap-2 overflow-y-auto">
+          {tags.length === 0 && <p className="text-xs text-muted-foreground">No tags yet. Add one below.</p>}
+          {tags.map((tag) => {
+            const selected = form.tag_ids.includes(tag.id);
+            return (
+              <button
+                key={tag.id}
+                type="button"
+                onClick={() => setForm({ ...form, tag_ids: toggleSelection(form.tag_ids, tag.id) })}
+                className={`rounded-full border px-3 py-1 text-xs font-medium transition ${
+                  selected ? "border-violet-600 bg-violet-600 text-white" : "border-border/60 bg-secondary/40 hover:border-violet-500"
+                }`}
+                style={!selected && tag.color ? { borderColor: tag.color, color: tag.color } : undefined}
+              >
+                {tag.icon && <span className="mr-1">{tag.icon}</span>}
+                {tag.name}
+              </button>
+            );
+          })}
+        </div>
+        <Input
+          value={form.new_tags}
+          onChange={(e) => setForm({ ...form, new_tags: e.target.value })}
+          placeholder="Add new tags, comma separated"
+        />
+      </div>
 
       <div className="grid gap-2 rounded-md border border-border/40 p-3 text-sm">
         <label className="flex items-center gap-2"><input type="checkbox" checked={form.is_featured} onChange={(e) => setForm({ ...form, is_featured: e.target.checked })} />Featured</label>

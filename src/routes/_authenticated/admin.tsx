@@ -37,7 +37,7 @@ function AdminLayout() {
     { to: "/admin/announcements", label: "Announcements", icon: Megaphone },
     { to: "/admin/banners", label: "Banners", icon: Image },
     { to: "/admin/series", label: "Titles", icon: Library },
-    { to: "/admin/tags", label: "Genres", icon: Tag },
+    { to: "/admin/tags", label: "Genres & Tags", icon: Tag },
     { to: "/admin/moderation", label: "Moderation", icon: Gavel },
     { to: "/admin/comments", label: "Comments", icon: MessageSquare },
     { to: "/admin/reports", label: "Reports", icon: Flag },
