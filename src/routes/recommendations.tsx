@@ -116,15 +116,20 @@ function RecommendationsPage() {
 
   if (!user) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background p-4">
-        <Card className="max-w-md p-8 text-center">
-          <Sparkles className="mx-auto mb-4 h-12 w-12 text-violet-600" />
-          <h2 className="mb-2 text-2xl font-bold">Sign In for Recommendations</h2>
-          <p className="mb-6 text-muted-foreground">
-            Get personalized series recommendations based on your reading history
+      <div className="flex min-h-screen items-center justify-center bg-background p-4 relative overflow-hidden">
+        <div className="absolute top-[20%] right-[10%] h-[300px] w-[300px] rounded-full bg-primary/5 blur-[80px] pointer-events-none" />
+        <Card className="max-w-md p-8 text-center border-border/40 bg-card/45 backdrop-blur-md relative z-10 shadow-xl">
+          <div className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-2xl border border-primary/20 bg-primary/10 text-primary shadow-lg shadow-primary/5">
+            <Sparkles className="h-6 w-6" />
+          </div>
+          <h2 className="mb-2 text-2xl font-extrabold tracking-tight">Sign In for Recommendations</h2>
+          <p className="mb-6 text-sm text-muted-foreground leading-relaxed">
+            Get personalized series suggestions and reading matches based on your story bookmarks and history.
           </p>
           <Link to="/auth">
-            <Button>Sign In</Button>
+            <Button size="lg" className="w-full bg-primary hover:bg-primary/95 text-primary-foreground font-semibold shadow-md">
+              Sign In
+            </Button>
           </Link>
         </Card>
       </div>
@@ -132,26 +137,36 @@ function RecommendationsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="container mx-auto px-8 md:px-12 lg:px-16 py-6">
-        <div className="mb-6">
+    <div className="min-h-screen bg-background relative overflow-hidden">
+      {/* Background glow */}
+      <div className="absolute top-[-10%] right-[-10%] h-[400px] w-[400px] rounded-full bg-primary/5 blur-[80px] pointer-events-none" />
+      <div className="absolute bottom-[-10%] left-[-10%] h-[450px] w-[450px] rounded-full bg-accent/5 blur-[100px] pointer-events-none" />
+
+      <div className="container mx-auto px-8 md:px-12 lg:px-16 py-8 relative">
+        <div className="mb-8">
           <div className="flex items-center gap-3">
-            <Sparkles className="h-8 w-8 text-violet-600" />
-            <h1 className="text-3xl font-bold">Recommendations</h1>
+            <div className="grid h-12 w-12 place-items-center rounded-xl border border-primary/20 bg-primary/10 text-primary shadow-lg shadow-primary/5">
+              <Sparkles className="h-6 w-6" />
+            </div>
+            <div>
+              <h1 className="text-3xl font-extrabold tracking-tight">Recommendations</h1>
+              <p className="mt-1 text-sm text-muted-foreground leading-relaxed">
+                Personalized suggestions and reading matches based on your story bookmarks and history
+              </p>
+            </div>
           </div>
-          <p className="mt-2 text-muted-foreground">
-            Personalized suggestions based on your reading history
-          </p>
         </div>
 
         {/* Main Recommendations */}
-        <section className="mb-8">
-          <h2 className="mb-4 text-xl font-semibold">For You</h2>
+        <section className="mb-10">
+          <h2 className="mb-4 text-xl font-bold tracking-tight text-foreground flex items-center gap-2">
+            <span className="h-2 w-2 rounded-full bg-primary" /> For You
+          </h2>
           {recommendations.isLoading ? (
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
               {[...Array(12)].map((_, i) => (
-                <div key={i} className="overflow-hidden rounded-lg border border-border/40 bg-card">
-                  <div className="aspect-[2/3] animate-pulse bg-secondary" />
+                <div key={i} className="overflow-hidden rounded-xl border border-border/40 bg-card/40 p-1">
+                  <div className="aspect-[2/3] animate-pulse rounded-lg bg-secondary" />
                   <div className="space-y-2 p-3">
                     <div className="h-4 w-3/4 animate-pulse rounded bg-secondary" />
                     <div className="h-3 w-1/2 animate-pulse rounded bg-secondary" />
@@ -170,12 +185,14 @@ function RecommendationsPage() {
               })}
             </div>
           ) : (
-            <Card className="p-8 text-center">
-              <p className="text-muted-foreground">
+            <Card className="p-10 text-center border-border/40 bg-card/40 backdrop-blur-sm">
+              <p className="text-muted-foreground text-sm">
                 Start reading some series to get personalized recommendations!
               </p>
               <Link to="/browse">
-                <Button className="mt-4">Browse Series</Button>
+                <Button className="mt-4 bg-primary hover:bg-primary/95 text-primary-foreground font-semibold shadow-sm">
+                  Browse Series
+                </Button>
               </Link>
             </Card>
           )}
@@ -183,12 +200,14 @@ function RecommendationsPage() {
 
         {/* Genre-Based Recommendations */}
         <section>
-          <h2 className="mb-4 text-xl font-semibold">Based on Your Favorite Genres</h2>
+          <h2 className="mb-4 text-xl font-bold tracking-tight text-foreground flex items-center gap-2">
+            <span className="h-2 w-2 rounded-full bg-accent" /> Based on Your Favorite Genres
+          </h2>
           {basedOnGenres.isLoading ? (
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
               {[...Array(12)].map((_, i) => (
-                <div key={i} className="overflow-hidden rounded-lg border border-border/40 bg-card">
-                  <div className="aspect-[2/3] animate-pulse bg-secondary" />
+                <div key={i} className="overflow-hidden rounded-xl border border-border/40 bg-card/40 p-1">
+                  <div className="aspect-[2/3] animate-pulse rounded-lg bg-secondary" />
                   <div className="space-y-2 p-3">
                     <div className="h-4 w-3/4 animate-pulse rounded bg-secondary" />
                     <div className="h-3 w-1/2 animate-pulse rounded bg-secondary" />
@@ -203,9 +222,9 @@ function RecommendationsPage() {
               ))}
             </div>
           ) : (
-            <Card className="p-8 text-center">
-              <p className="text-muted-foreground">
-                Read more series to get genre-based recommendations!
+            <Card className="p-10 text-center border-border/40 bg-card/40 backdrop-blur-sm">
+              <p className="text-muted-foreground text-sm">
+                Read more series to unlock genre-based suggestions!
               </p>
             </Card>
           )}
@@ -220,9 +239,9 @@ function SeriesCard({ series }: { series: any }) {
     <Link
       to="/title/$slug"
       params={{ slug: series.slug }}
-      className="group overflow-hidden rounded-lg border border-border/40 bg-card transition-all hover:border-primary/50 hover:shadow-lg"
+      className="group overflow-hidden rounded-xl border border-border/30 bg-card/35 p-1.5 transition-all duration-300 hover:border-primary/50 hover:bg-card/65 hover:shadow-lg hover:shadow-primary/5"
     >
-      <div className="aspect-[2/3] overflow-hidden bg-secondary">
+      <div className="aspect-[2/3] overflow-hidden rounded-lg bg-secondary relative shadow-sm border border-border/10">
         {series.cover_url ? (
           <img
             src={series.cover_url}
@@ -236,18 +255,18 @@ function SeriesCard({ series }: { series: any }) {
           </div>
         )}
         {series.rating_average && Number(series.rating_average) > 0 && (
-          <div className="absolute right-2 top-2 flex items-center gap-1 rounded-md bg-background/80 px-1.5 py-0.5 text-xs backdrop-blur">
-            <Star className="h-3 w-3 fill-violet-600 text-violet-600" />
+          <div className="absolute right-2 top-2 flex items-center gap-1 rounded-md bg-background/85 px-1.5 py-0.5 text-xs font-bold backdrop-blur border border-border/40">
+            <Star className="h-3 w-3 fill-primary text-primary" />
             {Number(series.rating_average).toFixed(1)}
           </div>
         )}
       </div>
-      <div className="p-3">
-        <h3 className="line-clamp-2 text-sm font-semibold leading-tight group-hover:text-primary">
+      <div className="p-2.5">
+        <h3 className="line-clamp-2 text-sm font-bold leading-tight group-hover:text-primary transition-colors min-h-[2.5rem]">
           {series.title}
         </h3>
         <div className="mt-2 flex items-center gap-2">
-          <Badge variant="outline" className="text-xs uppercase">
+          <Badge variant="outline" className="text-3xs uppercase tracking-wider font-semibold border-border/50">
             {series.type}
           </Badge>
         </div>

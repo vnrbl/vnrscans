@@ -358,12 +358,27 @@ function SeriesDetail() {
   const contentRating = (s as { content_rating?: string }).content_rating;
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="container mx-auto px-8 md:px-12 lg:px-16 py-6 lg:py-8">
+    <div className="min-h-screen bg-background relative overflow-hidden">
+      {/* Blurred cover backdrop */}
+      {s.cover_url && (
+        <div className="absolute top-0 left-0 w-full h-[380px] pointer-events-none overflow-hidden z-0 select-none">
+          <img
+            src={s.cover_url}
+            alt=""
+            className="w-full h-full object-cover blur-[75px] opacity-[0.14] saturate-[1.6] scale-110"
+          />
+          <div className="absolute inset-0 bg-gradient-to-b from-transparent via-background/60 to-background" />
+        </div>
+      )}
+
+      {/* Background glow in other areas */}
+      <div className="absolute bottom-[-10%] right-[-10%] h-[400px] w-[400px] rounded-full bg-primary/5 blur-[80px] pointer-events-none" />
+
+      <div className="container mx-auto px-8 md:px-12 lg:px-16 py-6 lg:py-8 relative z-10">
         <div className="flex flex-col gap-8 lg:flex-row lg:gap-10">
           {/* Left sidebar — cover & actions */}
           <aside className="mx-auto w-full max-w-[220px] shrink-0 lg:mx-0">
-            <div className="overflow-hidden rounded-lg border border-border/50 bg-secondary shadow-xl">
+            <div className="overflow-hidden rounded-xl border border-border/40 bg-secondary shadow-2xl transition-all duration-300 hover:border-primary/30">
               {s.cover_url ? (
                 <img src={s.cover_url} alt={s.title} className="aspect-[2/3] w-full object-cover" />
               ) : (
@@ -380,7 +395,7 @@ function SeriesDetail() {
                   params={{ titleSlug: slug, chapterSlug: readChapterSlug }}
                   className="block"
                 >
-                  <Button className="h-11 w-full bg-violet-600 text-base font-semibold hover:bg-violet-700">
+                  <Button className="h-11 w-full bg-primary text-base font-semibold hover:bg-primary/95 text-primary-foreground shadow-md shadow-primary/10">
                     <BookOpen className="mr-2 h-4 w-4" />
                     {readButtonText}
                   </Button>
@@ -389,7 +404,7 @@ function SeriesDetail() {
 
               {user && !isFollowing.data && (
                 <Button
-                  className="h-11 w-full bg-violet-600/90 font-semibold hover:bg-violet-700"
+                  className="h-11 w-full bg-primary/90 font-semibold hover:bg-primary text-primary-foreground"
                   onClick={() => toggleFollow.mutate()}
                 >
                   <UserPlus className="mr-2 h-4 w-4" />
@@ -402,7 +417,7 @@ function SeriesDetail() {
                   value={libraryStatus.data ?? "reading"}
                   onValueChange={(v) => setStatus.mutate(v)}
                 >
-                  <SelectTrigger className="h-11 w-full border-violet-600/40 bg-violet-600/10 font-semibold text-violet-400">
+                  <SelectTrigger className="h-11 w-full border-primary/40 bg-primary/10 font-semibold text-primary">
                     <div className="flex items-center gap-2">
                       <Bookmark className="h-4 w-4" />
                       <SelectValue placeholder="Reading" />
@@ -430,14 +445,14 @@ function SeriesDetail() {
             </div>
 
             {user && (
-              <div className="mt-5 flex justify-center gap-1">
+              <div className="mt-5 flex justify-center gap-1.5">
                 {[1, 2, 3, 4, 5].map((n) => (
                   <button key={n} onClick={() => rate.mutate(n)} aria-label={`Rate ${n}`}>
                     <Star
-                      className={`h-5 w-5 transition ${
+                      className={`h-5 w-5 transition duration-200 ${
                         (myRating.data ?? 0) >= n
-                          ? "fill-violet-500 text-violet-500"
-                          : "text-muted-foreground hover:text-violet-400"
+                          ? "fill-primary text-primary filter drop-shadow-[0_0_4px_rgba(236,72,153,0.2)]"
+                          : "text-muted-foreground hover:text-primary"
                       }`}
                     />
                   </button>
@@ -448,23 +463,23 @@ function SeriesDetail() {
 
           {/* Right — metadata */}
           <main className="min-w-0 flex-1">
-            <nav className="mb-3 flex items-center gap-1.5 text-xs uppercase tracking-wide text-muted-foreground">
-              <Link to="/home" className="hover:text-violet-400">
+            <nav className="mb-3 flex items-center gap-1.5 text-xs uppercase tracking-wider text-muted-foreground font-semibold">
+              <Link to="/home" className="hover:text-primary transition-colors">
                 Home
               </Link>
               <span>/</span>
-              <Link to="/browse" search={{ type: s.type }} className="hover:text-violet-400">
+              <Link to="/browse" search={{ type: s.type }} className="hover:text-primary transition-colors">
                 {s.type}
               </Link>
             </nav>
 
             <div className="mb-3 flex flex-wrap items-center gap-2">
-              <Badge variant="secondary" className="rounded-md uppercase">
+              <Badge variant="secondary" className="rounded-md uppercase text-3xs font-semibold tracking-wider p-1 bg-secondary/50">
                 {s.type}
               </Badge>
               {contentRating && (
                 <Badge
-                  className={`rounded-md uppercase ${
+                  className={`rounded-md uppercase text-3xs font-semibold tracking-wider p-1 ${
                     contentRating === "safe"
                       ? "bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600/30"
                       : contentRating === "suggestive"
@@ -476,49 +491,49 @@ function SeriesDetail() {
                 </Badge>
               )}
               {s.release_year && (
-                <Badge variant="outline" className="rounded-md">
+                <Badge variant="outline" className="rounded-md text-3xs font-semibold p-1 border-border/50">
                   {s.release_year}
                 </Badge>
               )}
-              <Badge variant="outline" className="gap-1.5 rounded-md capitalize">
+              <Badge variant="outline" className="gap-1.5 rounded-md capitalize text-3xs font-semibold p-1 border-border/50">
                 {s.status === "ongoing" && (
-                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
                 )}
                 {statusLabel(s.status)}
               </Badge>
             </div>
 
-            <h1 className="text-3xl font-bold tracking-tight md:text-4xl lg:text-[2.75rem] lg:leading-tight">
+            <h1 className="text-3xl font-black tracking-tight md:text-4xl lg:text-[2.75rem] lg:leading-tight text-foreground">
               {s.title}
             </h1>
 
             {s.alternative_titles && (
-              <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{s.alternative_titles}</p>
+              <p className="mt-2 text-sm leading-relaxed text-muted-foreground font-medium">{s.alternative_titles}</p>
             )}
 
             <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
               {seriesRank.data && (
-                <span className="inline-flex items-center gap-1.5 rounded-md bg-violet-600/15 px-2.5 py-1 font-semibold text-violet-400">
+                <span className="inline-flex items-center gap-1.5 rounded-md bg-primary/15 px-2.5 py-1 font-semibold text-primary shadow-sm shadow-primary/5">
                   <Trophy className="h-4 w-4" />
                   #{seriesRank.data.toLocaleString()}
                 </span>
               )}
               <span className="inline-flex items-center gap-1.5 text-muted-foreground">
-                <Star className="h-4 w-4 fill-violet-500 text-violet-500" />
-                <span className="font-medium text-foreground">
+                <Star className="h-4 w-4 fill-primary text-primary" />
+                <span className="font-bold text-foreground">
                   {Number(s.rating_average || 0).toFixed(1)}
                 </span>
                 by {ratingsCount.data?.toLocaleString() ?? 0} users
               </span>
               <span className="inline-flex items-center gap-1.5 text-muted-foreground">
                 <Users className="h-4 w-4" />
-                <span className="font-medium text-foreground">
+                <span className="font-semibold text-foreground">
                   {followersCount.data?.toLocaleString() ?? 0}
                 </span>{" "}
                 followed
               </span>
               <span className="text-muted-foreground">
-                <span className="font-medium text-foreground">{Number(s.view_count || 0).toLocaleString()}</span> views
+                <span className="font-semibold text-foreground">{Number(s.view_count || 0).toLocaleString()}</span> views
               </span>
             </div>
 
@@ -544,7 +559,7 @@ function SeriesDetail() {
                   <Badge
                     key={tag.id}
                     variant="outline"
-                    className="cursor-default gap-1"
+                    className="cursor-default gap-1 text-3xs font-semibold px-2 py-0.5 border-border/50"
                     style={{
                       borderColor: tag.color,
                       backgroundColor: `${tag.color}15`,

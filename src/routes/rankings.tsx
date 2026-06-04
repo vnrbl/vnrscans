@@ -102,51 +102,59 @@ function RankingsPage() {
   });
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="container mx-auto px-8 md:px-12 lg:px-16 py-6">
-        <div className="mb-6">
+    <div className="min-h-screen bg-background relative overflow-hidden">
+      {/* Background glow */}
+      <div className="absolute top-[-10%] right-[-10%] h-[400px] w-[400px] rounded-full bg-primary/5 blur-[80px] pointer-events-none" />
+      <div className="absolute bottom-[-10%] left-[-10%] h-[450px] w-[450px] rounded-full bg-accent/5 blur-[100px] pointer-events-none" />
+
+      <div className="container mx-auto px-8 md:px-12 lg:px-16 py-8 relative">
+        <div className="mb-8">
           <div className="flex items-center gap-3">
-            <Trophy className="h-8 w-8 text-violet-600" />
-            <h1 className="text-3xl font-bold">Rankings</h1>
+            <div className="grid h-12 w-12 place-items-center rounded-xl border border-primary/20 bg-primary/10 text-primary shadow-lg shadow-primary/5">
+              <Trophy className="h-6 w-6" />
+            </div>
+            <div>
+              <h1 className="text-3xl font-extrabold tracking-tight">Rankings</h1>
+              <p className="mt-1 text-sm text-muted-foreground leading-relaxed">
+                Discover the top-rated and most popular series on vnrscans
+              </p>
+            </div>
           </div>
-          <p className="mt-2 text-muted-foreground">
-            Discover the top-rated and most popular series on vnrscans
-          </p>
         </div>
 
         <Tabs defaultValue="top-rated" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-2 lg:grid-cols-4">
-            <TabsTrigger value="top-rated">
+          <TabsList className="grid w-full grid-cols-2 lg:grid-cols-4 p-1 bg-secondary/30 border border-border/30 backdrop-blur-md rounded-xl">
+            <TabsTrigger value="top-rated" className="rounded-lg data-[state=active]:bg-primary/25 data-[state=active]:text-primary data-[state=active]:shadow-sm">
               <Star className="mr-2 h-4 w-4" />
               Top Rated
             </TabsTrigger>
-            <TabsTrigger value="trending">
+            <TabsTrigger value="trending" className="rounded-lg data-[state=active]:bg-primary/25 data-[state=active]:text-primary data-[state=active]:shadow-sm">
               <TrendingUp className="mr-2 h-4 w-4" />
               Trending
             </TabsTrigger>
-            <TabsTrigger value="most-viewed">
+            <TabsTrigger value="most-viewed" className="rounded-lg data-[state=active]:bg-primary/25 data-[state=active]:text-primary data-[state=active]:shadow-sm">
               <Eye className="mr-2 h-4 w-4" />
               Most Viewed
             </TabsTrigger>
-            <TabsTrigger value="most-followed">
+            <TabsTrigger value="most-followed" className="rounded-lg data-[state=active]:bg-primary/25 data-[state=active]:text-primary data-[state=active]:shadow-sm">
               <Heart className="mr-2 h-4 w-4" />
               Most Followed
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="top-rated" className="space-y-4">
+          <TabsContent value="top-rated" className="space-y-4 focus-visible:outline-none">
             <RankingList data={topRated.data ?? []} loading={topRated.isLoading} type="rating" />
           </TabsContent>
 
-          <TabsContent value="trending" className="space-y-4">
+          <TabsContent value="trending" className="space-y-4 focus-visible:outline-none">
             <RankingList data={trending.data ?? []} loading={trending.isLoading} type="trending" />
           </TabsContent>
 
-          <TabsContent value="most-viewed" className="space-y-4">
+          <TabsContent value="most-viewed" className="space-y-4 focus-visible:outline-none">
             <RankingList data={mostViewed.data ?? []} loading={mostViewed.isLoading} type="views" />
           </TabsContent>
 
-          <TabsContent value="most-followed" className="space-y-4">
+          <TabsContent value="most-followed" className="space-y-4 focus-visible:outline-none">
             <RankingList data={mostFollowed.data ?? []} loading={mostFollowed.isLoading} type="followers" />
           </TabsContent>
         </Tabs>
@@ -168,7 +176,7 @@ function RankingList({
     return (
       <div className="space-y-3">
         {[...Array(10)].map((_, i) => (
-          <div key={i} className="flex items-center gap-4 rounded-lg border border-border/40 bg-card p-4">
+          <div key={i} className="flex items-center gap-4 rounded-xl border border-border/40 bg-card/40 p-4">
             <div className="h-8 w-8 animate-pulse rounded bg-secondary" />
             <div className="h-20 w-14 animate-pulse rounded bg-secondary" />
             <div className="flex-1 space-y-2">
@@ -183,11 +191,18 @@ function RankingList({
 
   if (data.length === 0) {
     return (
-      <Card className="p-8 text-center">
+      <Card className="p-8 text-center border-border/40 bg-card/40 backdrop-blur-sm">
         <p className="text-muted-foreground">No rankings available yet.</p>
       </Card>
     );
   }
+
+  // Helper classes for top 3 badges
+  const rankBadges = [
+    "bg-gradient-to-br from-amber-400 via-yellow-300 to-amber-500 shadow-[0_0_15px_rgba(250,204,21,0.25)] text-amber-950 border border-yellow-300/30",
+    "bg-gradient-to-br from-slate-300 via-gray-100 to-slate-400 shadow-[0_0_15px_rgba(241,245,249,0.2)] text-slate-900 border border-slate-200/20",
+    "bg-gradient-to-br from-amber-700 via-amber-600 to-orange-800 shadow-[0_0_15px_rgba(194,65,12,0.15)] text-amber-50 border border-amber-600/20",
+  ];
 
   return (
     <div className="space-y-3">
@@ -196,24 +211,24 @@ function RankingList({
           key={series.id}
           to="/title/$slug"
           params={{ slug: series.slug }}
-          className="group flex items-center gap-4 rounded-lg border border-border/40 bg-card p-4 transition-all hover:border-primary/50 hover:shadow-lg"
+          className="group flex items-center gap-4 rounded-xl border border-border/30 bg-card/35 p-4 transition-all duration-300 hover:border-primary/50 hover:bg-card/65 hover:shadow-lg hover:shadow-primary/5 hover:translate-x-1"
         >
           {/* Rank */}
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-violet-600 to-purple-600 text-sm font-bold text-white">
+          <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-extrabold ${index < 3 ? rankBadges[index] : 'bg-secondary/40 text-muted-foreground border border-border/40'}`}>
             {index < 3 ? (
-              <Trophy className={`h-5 w-5 ${index === 0 ? 'text-yellow-300' : index === 1 ? 'text-gray-300' : 'text-orange-300'}`} />
+              <Trophy className="h-4.5 w-4.5" />
             ) : (
               index + 1
             )}
           </div>
 
           {/* Cover */}
-          <div className="h-20 w-14 shrink-0 overflow-hidden rounded bg-secondary">
+          <div className="h-20 w-14 shrink-0 overflow-hidden rounded-lg bg-secondary shadow-md border border-border/20">
             {series.cover_url ? (
               <img
                 src={series.cover_url}
                 alt={series.title}
-                className="h-full w-full object-cover transition-transform group-hover:scale-110"
+                className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
                 loading="lazy"
               />
             ) : (
@@ -225,15 +240,15 @@ function RankingList({
 
           {/* Info */}
           <div className="min-w-0 flex-1">
-            <h3 className="truncate text-base font-semibold group-hover:text-primary">
+            <h3 className="truncate text-base font-bold group-hover:text-primary transition-colors">
               {series.title}
             </h3>
             <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-              <Badge variant="outline" className="text-xs uppercase">
+              <Badge variant="outline" className="text-3xs uppercase tracking-wider font-semibold border-border/50">
                 {series.type}
               </Badge>
               {series.status && (
-                <Badge variant="secondary" className="text-xs capitalize">
+                <Badge variant="secondary" className="text-3xs capitalize font-medium">
                   {series.status}
                 </Badge>
               )}
@@ -241,34 +256,34 @@ function RankingList({
           </div>
 
           {/* Stats */}
-          <div className="hidden shrink-0 text-right sm:block">
+          <div className="hidden shrink-0 text-right sm:block pr-2">
             {type === "rating" && series.rating_average && (
-              <div className="flex items-center gap-1 text-lg font-bold text-violet-600">
-                <Star className="h-5 w-5 fill-violet-600" />
+              <div className="flex items-center gap-1 text-lg font-black text-primary">
+                <Star className="h-5 w-5 fill-primary text-primary" />
                 {Number(series.rating_average).toFixed(2)}
               </div>
             )}
             {type === "views" && (
-              <div className="flex items-center gap-1 text-sm font-semibold">
-                <Eye className="h-4 w-4" />
+              <div className="flex items-center gap-1 text-sm font-semibold text-foreground">
+                <Eye className="h-4 w-4 text-accent" />
                 {Number(series.view_count || 0).toLocaleString()}
               </div>
             )}
             {type === "followers" && series.follower_count && (
-              <div className="flex items-center gap-1 text-sm font-semibold">
-                <Heart className="h-4 w-4" />
+              <div className="flex items-center gap-1 text-sm font-semibold text-foreground">
+                <Heart className="h-4 w-4 text-rose-500 fill-rose-500/20" />
                 {Number(series.follower_count).toLocaleString()}
               </div>
             )}
             {type === "trending" && series.recentChapters && (
-              <div className="flex items-center gap-1 text-sm font-semibold text-violet-600">
+              <div className="flex items-center gap-1 text-sm font-semibold text-primary">
                 <TrendingUp className="h-4 w-4" />
                 {series.recentChapters} new
               </div>
             )}
             {series.rating_average && type !== "rating" && (
-              <div className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
-                <Star className="h-3 w-3 fill-current" />
+              <div className="mt-1 flex items-center gap-1 justify-end text-xs text-muted-foreground font-medium">
+                <Star className="h-3 w-3 fill-primary text-primary" />
                 {Number(series.rating_average).toFixed(1)}
               </div>
             )}
