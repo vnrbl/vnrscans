@@ -36,7 +36,7 @@ function DmcaPage() {
             DMCA & Copyright Policy
           </h1>
           <p className="mt-4 text-sm text-muted-foreground leading-relaxed max-w-2xl">
-            vnrscans respects the intellectual property rights of others. We host only creator-submitted, public domain, or licensed content. We strictly enforce a prompt takedown workflow for copyright infringements.
+            vnrscans does not store any files on its servers. We only link to media hosted on third-party services. If you have copyright concerns, please submit a formal removal request below.
           </p>
         </div>
 
@@ -44,9 +44,9 @@ function DmcaPage() {
         <div className="flex gap-4 p-5 rounded-2xl border border-amber-500/10 bg-amber-500/5 mb-10">
           <AlertTriangle className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
           <div className="space-y-1">
-            <h4 className="text-xs font-bold text-amber-500 uppercase tracking-wide">Important Notice for Rights Holders</h4>
+            <h4 className="text-xs font-bold text-amber-500 uppercase tracking-wide">Important Notice</h4>
             <p className="text-xs text-muted-foreground leading-relaxed">
-              We only accept formal, digital DMCA notices containing all required items. Please review the checklist below to ensure your request can be processed without delay.
+              vnrscans does not store any files on its servers. All contents are links pointing to media hosted on third-party services. We only accept formal, digital DMCA notices containing all required items to handle the removal of these links.
             </p>
           </div>
         </div>

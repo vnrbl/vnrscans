@@ -63,7 +63,7 @@ function AboutPage() {
             </div>
             <h3 className="text-lg font-bold">Safe & Compliant</h3>
             <p className="text-xs text-muted-foreground leading-relaxed">
-              We respect creators. Every piece of content published on vnrscans is verified to be either public domain, creator-submitted, or officially licensed.
+              We respect creators. vnrscans does not store any files on its servers and only links to media hosted on third-party services.
             </p>
           </Card>
         </div>
@@ -77,11 +77,11 @@ function AboutPage() {
 
           <h2 className="text-xl font-bold text-foreground mt-8">Rights & Licensing</h2>
           <p>
-            We do not endorse or support unauthorized scans of copyrighted works. We maintain active partnerships with independent web novel writers, digital illustrators, and licensed translation teams to help them showcase their stories directly to a global audience.
+            vnrscans does not store any files on its servers. We only link to media hosted on third-party services. If you have copyright concerns, please visit our DMCA registry page.
           </p>
 
           <p>
-            If you are a rights holder and have found unauthorized uploads, please file a quick inquiry on our dedicated <Link to="/dmca" className="text-primary hover:underline font-semibold">DMCA Copyright page</Link>. We pride ourselves on rapid verification and removal.
+            If you are a rights holder and have found copyright concerns, please file a quick inquiry on our dedicated <Link to="/dmca" className="text-primary hover:underline font-semibold">DMCA Copyright page</Link>. We pride ourselves on rapid verification and link removal.
           </p>
         </div>
 

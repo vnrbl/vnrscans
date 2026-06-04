@@ -398,7 +398,7 @@ function Home() {
                 A Legitimate, Law-Abiding Reading Community
               </h2>
               <p className="mt-4 text-sm text-muted-foreground leading-relaxed">
-                vnrscans is committed to respecting legal boundaries, protecting user privacy, and fostering partnerships with official copyright holders. We host only creator-submitted works, licensed titles, and public-domain content.
+                vnrscans is committed to respecting legal boundaries and protecting user privacy. vnrscans does not store any files on its servers. We only link to media hosted on third-party services. If you have copyright concerns, please visit our DMCA registry page.
               </p>
 
               <div className="mt-8 space-y-4">
@@ -502,7 +502,7 @@ function Home() {
                 Where does vnrscans get its content?
               </AccordionTrigger>
               <AccordionContent className="text-xs text-muted-foreground leading-relaxed">
-                vnrscans operates on a compliance-first registry model. We host only creator-submitted web novels, public domain series, and officially licensed translation works. We enforce strict policies against unauthorized copyright redistribution.
+                vnrscans does not store any files on its servers. We only link to media hosted on third-party services. If you have copyright concerns, please visit our DMCA registry page.
               </AccordionContent>
             </AccordionItem>
 
