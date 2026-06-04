@@ -138,6 +138,7 @@ function PublicProfilePage() {
   const level = profile.data.user_level || 1;
   const xpForNextLevel = Math.pow((level + 1) * 2, 2);
   const xpProgress = ((xp % xpForNextLevel) / xpForNextLevel) * 100;
+  const roles = userRoles.data ?? [];
 
   const socialLinks = {
     social_discord: profile.data.social_discord || "",
@@ -151,12 +152,12 @@ function PublicProfilePage() {
   return (
     <div className="min-h-screen">
       {/* Banner */}
-      <div className="relative h-48 w-full overflow-hidden sm:h-56 md:h-64">
+      <div className="group relative h-48 w-full overflow-hidden rounded-2xl sm:h-56 md:h-64">
         {bannerUrl ? (
           <img
             src={bannerUrl}
             alt={`${username}'s banner`}
-            className="h-full w-full object-cover"
+            className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
           />
         ) : (
           <div
@@ -175,18 +176,18 @@ function PublicProfilePage() {
       </div>
 
       {/* Avatar + Info */}
-      <div className="container mx-auto max-w-5xl px-8 md:px-12 lg:px-16">
+      <div className="container mx-auto max-w-5xl px-4 sm:px-6 md:px-12 lg:px-16">
         <div className="relative -mt-16 flex flex-col gap-5 sm:flex-row sm:items-end sm:gap-6">
           {/* Avatar */}
           <div
-            className="relative flex-shrink-0 rounded-full p-1"
+            className="relative h-[140px] w-[140px] flex-shrink-0 rounded-full p-1"
             style={{
               background: `linear-gradient(135deg, ${accentColor}, ${accentColor}80)`,
               boxShadow: `0 0 30px ${accentColor}40`,
             }}
           >
-            <div className="rounded-full bg-background p-0.5">
-              <div className="h-32 w-32 overflow-hidden rounded-full border-4 border-transparent bg-gradient-to-br from-violet-500/20 to-purple-500/20">
+            <div className="h-full w-full rounded-full bg-background p-0.5">
+              <div className="h-full w-full overflow-hidden rounded-full bg-gradient-to-br from-violet-500/20 to-purple-500/20">
                 {avatarUrl ? (
                   <img src={avatarUrl} alt={username} className="h-full w-full object-cover" />
                 ) : (
@@ -214,14 +215,19 @@ function PublicProfilePage() {
             <div className="flex flex-wrap items-center gap-3">
               <h1 className="text-3xl font-extrabold tracking-tight">{username}</h1>
               <div className="flex flex-wrap items-center gap-2">
-                {userRoles.data?.includes("admin") && (
+                {roles.includes("admin") && (
                   <Badge className="border-0 text-white" style={{ background: "linear-gradient(135deg, #EF4444, #DC2626)" }}>
                     <Shield className="mr-1 h-3 w-3" /> Admin
                   </Badge>
                 )}
-                {userRoles.data?.includes("moderator") && (
+                {roles.includes("moderator") && (
                   <Badge className="border-0 text-white" style={{ background: "linear-gradient(135deg, #3B82F6, #2563EB)" }}>
                     <Shield className="mr-1 h-3 w-3" /> Mod
+                  </Badge>
+                )}
+                {roles.includes("uploader") && (
+                  <Badge className="border-0 text-white" style={{ background: "linear-gradient(135deg, #10B981, #059669)" }}>
+                    <Shield className="mr-1 h-3 w-3" /> Uploader
                   </Badge>
                 )}
                 {profile.data.is_vip && (
@@ -248,7 +254,7 @@ function PublicProfilePage() {
       </div>
 
       {/* Level bar */}
-      <div className="container mx-auto max-w-5xl px-8 md:px-12 lg:px-16 mt-6">
+      <div className="container mx-auto max-w-5xl px-4 sm:px-6 md:px-12 lg:px-16 mt-6">
         <div
           className="rounded-xl border border-border/40 p-4"
           style={{ background: `linear-gradient(135deg, ${accentColor}08, transparent)` }}
@@ -259,11 +265,13 @@ function PublicProfilePage() {
               <span className="font-bold">Level {level}</span>
               <Sparkles className="h-4 w-4 text-muted-foreground" />
             </div>
-            <span className="text-sm text-muted-foreground">{xp} XP</span>
+            <span className="text-sm text-muted-foreground">
+              {xp} / {xpForNextLevel} XP
+            </span>
           </div>
           <div className="relative h-3 w-full overflow-hidden rounded-full bg-secondary">
             <div
-              className="h-full rounded-full"
+              className="h-full rounded-full transition-all duration-1000 ease-out"
               style={{
                 width: `${xpProgress}%`,
                 background: `linear-gradient(90deg, ${accentColor}, ${accentColor}CC)`,
@@ -275,7 +283,7 @@ function PublicProfilePage() {
       </div>
 
       {/* Stats */}
-      <div className="container mx-auto max-w-5xl px-8 md:px-12 lg:px-16 mt-6">
+      <div className="container mx-auto max-w-5xl px-4 sm:px-6 md:px-12 lg:px-16 mt-6">
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <PublicStatCard label="Reading Streak" value={profile.data.reading_streak || 0} suffix=" days" icon={<Flame className="h-6 w-6" />} color="#F97316" />
           <PublicStatCard label="Chapters Read" value={readingStats.data?.chapters || 0} icon={<BookOpen className="h-6 w-6" />} color="#3B82F6" />
@@ -286,7 +294,7 @@ function PublicProfilePage() {
 
       {/* Achievements */}
       {achievements.data && achievements.data.length > 0 && (
-        <div className="container mx-auto max-w-5xl px-8 md:px-12 lg:px-16 mt-8 pb-12">
+        <div className="container mx-auto max-w-5xl px-4 sm:px-6 md:px-12 lg:px-16 mt-8 pb-12">
           <h2 className="mb-4 text-xl font-bold">Recent Achievements</h2>
           <div className="grid gap-3 sm:grid-cols-2">
             {achievements.data.map((item: any) => (

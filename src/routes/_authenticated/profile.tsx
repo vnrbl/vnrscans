@@ -282,6 +282,14 @@ function ProfilePage() {
                       <Shield className="mr-1 h-3 w-3" /> Mod
                     </Badge>
                   )}
+                  {userRoles.data?.includes("uploader") && (
+                    <Badge
+                      className="border-0 text-white"
+                      style={{ background: `linear-gradient(135deg, #10B981, #059669)` }}
+                    >
+                      <Shield className="mr-1 h-3 w-3" /> Uploader
+                    </Badge>
+                  )}
                   {profile.data?.is_vip && (
                     <Badge
                       className="border-0 text-white"
