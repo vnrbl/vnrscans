@@ -19,6 +19,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { fallbackBadgeRows } from "@/lib/profileBadges";
 
 type ProfileBadge = {
   id: string;
@@ -574,29 +575,12 @@ export function ProfileBadges() {
           .order("name");
 
         if (error || !data || data.length === 0) {
-          // Fallback: If DB query fails or has no records, generate list from badgeMetadataMap
-          return Object.keys(badgeMetadataMap).map((key, index) => ({
-            id: `fallback-${index}-${key.replace(/\s+/g, '-')}`,
-            name: badgeMetadataMap[key].name,
-            description: `Unlock by achieving ${key} realm milestone.`,
-            icon: badgeMetadataMap[key].icon,
-            badge_color: badgeMetadataMap[key].color,
-            requirement_type: key.toLowerCase().replace(/ /g, "_"),
-            requirement_value: 100,
-          })) as ProfileBadge[];
+          return fallbackBadgeRows() as ProfileBadge[];
         }
         return data as ProfileBadge[];
       } catch (e) {
         console.error("Error fetching available badges:", e);
-        return Object.keys(badgeMetadataMap).map((key, index) => ({
-          id: `fallback-${index}-${key.replace(/\s+/g, '-')}`,
-          name: badgeMetadataMap[key].name,
-          description: `Unlock by achieving ${key} realm milestone.`,
-          icon: badgeMetadataMap[key].icon,
-          badge_color: badgeMetadataMap[key].color,
-          requirement_type: key.toLowerCase().replace(/ /g, "_"),
-          requirement_value: 100,
-        })) as ProfileBadge[];
+        return fallbackBadgeRows() as ProfileBadge[];
       }
     },
   });

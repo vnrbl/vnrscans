@@ -237,6 +237,20 @@ export function encodeBadgeDescription(
   });
 }
 
+/** Fallback rows when `profile_badges` is empty or unreachable — matches DB JSON shape. */
+export function fallbackBadgeRows(): ProfileBadgeRow[] {
+  return CANONICAL_PROFILE_BADGES.map((b, index) => ({
+    id: `fallback-${index}-${b.name.replace(/\s+/g, "-")}`,
+    name: b.name,
+    description: encodeBadgeDescription(b.description, b.category, b.difficulty),
+    icon: b.icon,
+    badge_color: b.badge_color,
+    requirement_type: b.requirement_type,
+    requirement_value: b.requirement_value,
+    is_active: true,
+  }));
+}
+
 export function parseBadgeDescription(rawDescription: string | null): {
   description: string;
   category: BadgeCategory;
@@ -272,7 +286,7 @@ export function normalizeProfileBadge(badge: ProfileBadgeRow): NormalizedBadge {
   const parsed = parseBadgeDescription(badge.description);
 
   const name = legacy?.name ?? badge.name;
-  const icon = legacy?.icon ?? badge.icon || "🏅";
+  const icon = legacy?.icon ?? (badge.icon || "🏅");
   const badge_color = legacy?.color ?? badge.badge_color;
   const category = parsed.isJsonConfigured ? parsed.category : legacy?.category ?? parsed.category;
   const difficulty = parsed.isJsonConfigured ? parsed.difficulty : legacy?.difficulty ?? parsed.difficulty;
