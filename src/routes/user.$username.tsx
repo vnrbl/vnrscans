@@ -120,9 +120,10 @@ function PublicProfilePage() {
     staleTime: 5 * 60 * 1000,
   });
 
-  const showReadingHistory = publicStats.data?.show_reading_history ?? false;
-  const showAchievements = publicStats.data?.show_achievements ?? false;
-  const showStatistics = publicStats.data?.show_statistics ?? false;
+  const isProfilePublic = (profile.data?.profile_visibility ?? "public") === "public";
+  const showReadingHistory = isProfilePublic && profile.data?.show_reading_history !== false;
+  const showAchievements = isProfilePublic && profile.data?.show_achievements !== false;
+  const showStatistics = isProfilePublic && profile.data?.show_statistics !== false;
 
   const publicReadingHistory = useQuery({
     queryKey: ["public-profile-reading-history", profile.data?.user_id],
