@@ -18,7 +18,7 @@ export function Footer() {
               </span>
             </Link>
             <p className="text-xs leading-relaxed max-w-xs">
-              A premium, lightning-fast scanlation reading platform designed for the community. Fast loading, secure, and ad-free.
+              A premium, lightning-fast scanlation reading platform designed for the community. Fast loading, secure, and fully optimized.
             </p>
             {/* Safe / Trusted Badge */}
             <div className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-500/5 border border-emerald-500/10 px-2.5 py-1 text-emerald-500 text-3xs font-bold uppercase tracking-wider">

@@ -36,12 +36,12 @@ export const Route = createFileRoute("/")({
       { title: "vnrscans — Discover Manhwa Stories" },
       {
         name: "description",
-        content: "Follow your favorite manhwa series, track new chapters, and dive into worlds created by talented artists. Dark-themed, fast, and completely distraction-free.",
+        content: "Follow your favorite manhwa series, track new chapters, and dive into worlds created by talented artists. Dark-themed, fast, and completely optimized.",
       },
       { property: "og:title", content: "vnrscans" },
       {
         property: "og:description",
-        content: "Discover manhwa stories drawn by imagination. Fast, free, and ad-free reading experience.",
+        content: "Discover manhwa stories drawn by imagination. Fast, free, and premium reading experience.",
       },
     ],
   }),
@@ -168,7 +168,7 @@ function Home() {
           </h1>
 
           <p className="mx-auto mt-8 max-w-2xl text-base text-muted-foreground sm:text-lg md:text-xl leading-relaxed">
-            Follow your favorite manhwa, track new releases, level up your reader rank, and explore creator-first web novels in a premium, ad-free environment.
+            Follow your favorite manhwa, track new releases, level up your reader rank, and explore creator-first web novels in a premium reading environment.
           </p>
 
           <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
@@ -184,7 +184,7 @@ function Home() {
               <Button
                 variant="outline"
                 size="lg"
-                className="h-13 px-8 text-sm font-bold rounded-xl border-border bg-card/40 backdrop-blur hover:bg-card/85 transition-all hover:translate-y-[-2px]"
+                className="h-13 px-8 text-sm font-bold rounded-xl border-border bg-card/40 backdrop-blur hover:bg-card/85 hover:text-white transition-all hover:translate-y-[-2px]"
               >
                 Explore Library
               </Button>
@@ -349,9 +349,9 @@ function Home() {
                 textColor: "text-cyan-400 border-cyan-500/20 bg-cyan-500/5 group-hover:bg-cyan-500/10",
               },
               {
-                title: "Distraction Free",
-                desc: "Zero redirects, zero popups, and no intrusive ads. Just pure high-definition manga art.",
-                icon: EyeOff,
+                title: "Fluid Reading",
+                desc: "Designed for seamless scrolling. Swipe through high-definition chapters with zero lag.",
+                icon: BookOpen,
                 textColor: "text-violet-400 border-violet-500/20 bg-violet-500/5 group-hover:bg-violet-500/10",
               },
               {
@@ -449,14 +449,14 @@ function Home() {
                 <p className="mt-3 text-xs text-muted-foreground leading-relaxed">
                   We believe that the future of scanlation lies in legal partnership. If you are an artist, translator, or writer looking to publish your story, vnrscans provides the tools, traffic, and community to launch your career.
                 </p>
-                <div className="mt-6 flex flex-wrap gap-3">
+                <div className="mt-6 flex flex-wrap gap-4">
                   <Link to="/about">
-                    <Button variant="outline" size="sm" className="text-2xs font-semibold rounded-lg">
+                    <Button variant="outline" className="h-10 px-5 text-xs font-bold rounded-xl border border-primary/25 bg-primary/5 text-primary hover:bg-primary hover:text-white hover:shadow-[0_0_15px_rgba(174,103,250,0.2)] transition-all hover:translate-y-[-1px] cursor-pointer">
                       Our Policy Details
                     </Button>
                   </Link>
                   <Link to="/contact">
-                    <Button variant="secondary" size="sm" className="text-2xs font-semibold rounded-lg">
+                    <Button className="h-10 px-5 text-xs font-bold rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 hover:shadow-[0_0_15px_rgba(174,103,250,0.3)] transition-all hover:translate-y-[-1px] cursor-pointer border-0 shadow-sm">
                       Submit Your Work
                     </Button>
                   </Link>

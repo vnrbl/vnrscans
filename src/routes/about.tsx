@@ -41,7 +41,7 @@ function AboutPage() {
             </span>
           </h1>
           <p className="mt-4 text-sm text-muted-foreground leading-relaxed max-w-2xl">
-            vnrscans is a fast, clean, ad-free reader built by manga lovers, for manga lovers. We focus on lightweight rendering, social community features, and strict compliance with creator copyright.
+            vnrscans is a fast, clean, and modern reader built by manga lovers, for manga lovers. We focus on lightweight rendering, social community features, and strict compliance with creator copyright.
           </p>
         </div>
 

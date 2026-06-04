@@ -72,12 +72,30 @@ function AdminPermissions() {
   const userRoles = useQuery({
     queryKey: ["admin", "user_roles"],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data: rolesData, error: rolesError } = await supabase
         .from("user_roles")
-        .select("*, profile:profiles!user_id(username, avatar_url)")
+        .select("*")
         .order("created_at", { ascending: false });
-      if (error) throw error;
-      return data || [];
+      
+      if (rolesError) throw rolesError;
+      if (!rolesData || rolesData.length === 0) return [];
+
+      const userIds = rolesData.map((r) => r.user_id).filter(Boolean);
+      const { data: profilesData, error: profilesError } = await supabase
+        .from("profiles")
+        .select("user_id, username, avatar_url")
+        .in("user_id", userIds);
+
+      if (profilesError) throw profilesError;
+
+      const profilesMap = new Map(
+        (profilesData ?? []).map((p) => [p.user_id, p])
+      );
+
+      return rolesData.map((r) => ({
+        ...r,
+        profile: profilesMap.get(r.user_id) || null,
+      }));
     },
   });
 

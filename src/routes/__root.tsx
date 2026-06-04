@@ -89,7 +89,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: "vnrscans — Read Manga, Manhwa, Manhua & Novels" },
-      { name: "description", content: "Discover manhwa stories drawn by imagination. Fast, free, and ad-free reading experience." },
+      { name: "description", content: "Discover manhwa stories drawn by imagination. Fast, free, and premium reading experience." },
       { property: "og:title", content: "vnrscans" },
       { property: "og:description", content: "Read manga, manhwa, manhua, and novels on vnrscans." },
       { property: "og:type", content: "website" },
