@@ -1,0 +1,367 @@
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { pageTitle } from "@/lib/brand";
+import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
+import {
+  Trophy,
+  Flame,
+  BookOpen,
+  Star,
+  Calendar,
+  Shield,
+  Crown,
+  Award,
+  Sparkles,
+  UserX,
+  ArrowLeft,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { SocialLinksDisplay } from "@/components/profile/SocialLinks";
+
+export const Route = createFileRoute("/user/$username")({
+  head: ({ params }) => ({
+    meta: [{ title: pageTitle(params.username) }],
+  }),
+  component: PublicProfilePage,
+});
+
+function PublicProfilePage() {
+  const { username } = Route.useParams();
+
+  // Fetch public profile by username
+  const profile = useQuery({
+    queryKey: ["public-profile", username],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("username", username)
+        .maybeSingle();
+      if (error) throw error;
+      return data as any;
+    },
+    staleTime: 2 * 60 * 1000,
+  });
+
+  // Fetch user roles
+  const userRoles = useQuery({
+    queryKey: ["public-profile-roles", profile.data?.user_id],
+    queryFn: async () => {
+      if (!profile.data?.user_id) return [];
+      const { data, error } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", profile.data.user_id);
+      if (error) return [];
+      return (data || []).map((r) => r.role);
+    },
+    enabled: !!profile.data?.user_id,
+    staleTime: 10 * 60 * 1000,
+  });
+
+  // Fetch reading stats
+  const readingStats = useQuery({
+    queryKey: ["public-profile-stats", profile.data?.user_id],
+    queryFn: async () => {
+      if (!profile.data?.user_id) return { chapters: 0, series: 0 };
+      const [chaptersRead, seriesFollowed] = await Promise.all([
+        supabase.from("reading_history").select("*", { count: "exact", head: true }).eq("user_id", profile.data.user_id),
+        supabase.from("series_follows").select("*", { count: "exact", head: true }).eq("user_id", profile.data.user_id),
+      ]);
+      return {
+        chapters: chaptersRead.count || 0,
+        series: seriesFollowed.count || 0,
+      };
+    },
+    enabled: !!profile.data?.user_id,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  // Fetch achievements
+  const achievements = useQuery({
+    queryKey: ["public-profile-achievements", profile.data?.user_id],
+    queryFn: async () => {
+      if (!profile.data?.user_id) return [];
+      const { data, error } = await supabase
+        .from("user_achievements")
+        .select("*, achievement:achievement_id(name, description, icon, rarity, xp_reward)")
+        .eq("user_id", profile.data.user_id)
+        .order("unlocked_at", { ascending: false })
+        .limit(8);
+      if (error) return [];
+      return data || [];
+    },
+    enabled: !!profile.data?.user_id,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  // Loading state
+  if (profile.isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center space-y-3">
+          <div className="h-10 w-10 animate-spin rounded-full border-4 border-primary border-t-transparent mx-auto" />
+          <p className="text-sm text-muted-foreground">Loading profile...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Not found
+  if (!profile.data) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <UserX className="h-16 w-16 text-muted-foreground/50 mx-auto" />
+          <h1 className="text-2xl font-bold">User not found</h1>
+          <p className="text-muted-foreground">
+            No user with the username "{username}" exists.
+          </p>
+          <Link to="/home">
+            <Button variant="outline" className="gap-2">
+              <ArrowLeft className="h-4 w-4" />
+              Back to home
+            </Button>
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  const accentColor = profile.data.accent_color || "#8B5CF6";
+  const bannerUrl = profile.data.banner_url || "";
+  const avatarUrl = profile.data.avatar_url || "";
+  const xp = profile.data.experience_points || 0;
+  const level = profile.data.user_level || 1;
+  const xpForNextLevel = Math.pow((level + 1) * 2, 2);
+  const xpProgress = ((xp % xpForNextLevel) / xpForNextLevel) * 100;
+
+  const socialLinks = {
+    social_discord: profile.data.social_discord || "",
+    social_twitter: profile.data.social_twitter || "",
+    social_mal: profile.data.social_mal || "",
+    social_anilist: profile.data.social_anilist || "",
+    social_website: profile.data.social_website || "",
+  };
+
+  return (
+    <div className="min-h-screen">
+      {/* Banner */}
+      <div className="relative h-48 w-full overflow-hidden sm:h-56 md:h-64">
+        {bannerUrl ? (
+          <img
+            src={bannerUrl}
+            alt={`${username}'s banner`}
+            className="h-full w-full object-cover"
+          />
+        ) : (
+          <div
+            className="h-full w-full"
+            style={{
+              background: `linear-gradient(135deg, ${accentColor}30, ${accentColor}10, transparent)`,
+            }}
+          />
+        )}
+        <div
+          className="absolute inset-0"
+          style={{
+            background: "linear-gradient(to top, oklch(0.21 0.006 286 / 0.8), transparent 60%)",
+          }}
+        />
+      </div>
+
+      {/* Avatar + Info */}
+      <div className="container mx-auto max-w-5xl px-8 md:px-12 lg:px-16">
+        <div className="relative -mt-16 flex flex-col gap-5 sm:flex-row sm:items-end sm:gap-6">
+          {/* Avatar */}
+          <div
+            className="relative flex-shrink-0 rounded-full p-1"
+            style={{
+              background: `linear-gradient(135deg, ${accentColor}, ${accentColor}80)`,
+              boxShadow: `0 0 30px ${accentColor}40`,
+            }}
+          >
+            <div className="rounded-full bg-background p-0.5">
+              <div className="h-32 w-32 overflow-hidden rounded-full border-4 border-transparent bg-gradient-to-br from-violet-500/20 to-purple-500/20">
+                {avatarUrl ? (
+                  <img src={avatarUrl} alt={username} className="h-full w-full object-cover" />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center text-4xl font-bold" style={{ color: accentColor }}>
+                    {username?.charAt(0)?.toUpperCase() || "?"}
+                  </div>
+                )}
+              </div>
+            </div>
+            {profile.data.is_vip && (
+              <div
+                className="absolute -bottom-1 -right-1 rounded-full p-2"
+                style={{
+                  background: "linear-gradient(135deg, #F59E0B, #D97706)",
+                  boxShadow: "0 0 15px #F59E0B50",
+                }}
+              >
+                <Crown className="h-4 w-4 text-white" />
+              </div>
+            )}
+          </div>
+
+          {/* Name + Meta */}
+          <div className="flex-1 pb-2">
+            <div className="flex flex-wrap items-center gap-3">
+              <h1 className="text-3xl font-extrabold tracking-tight">{username}</h1>
+              <div className="flex flex-wrap items-center gap-2">
+                {userRoles.data?.includes("admin") && (
+                  <Badge className="border-0 text-white" style={{ background: "linear-gradient(135deg, #EF4444, #DC2626)" }}>
+                    <Shield className="mr-1 h-3 w-3" /> Admin
+                  </Badge>
+                )}
+                {userRoles.data?.includes("moderator") && (
+                  <Badge className="border-0 text-white" style={{ background: "linear-gradient(135deg, #3B82F6, #2563EB)" }}>
+                    <Shield className="mr-1 h-3 w-3" /> Mod
+                  </Badge>
+                )}
+                {profile.data.is_vip && (
+                  <Badge className="border-0 text-white" style={{ background: "linear-gradient(135deg, #F59E0B, #D97706)" }}>
+                    <Crown className="mr-1 h-3 w-3" /> VIP
+                  </Badge>
+                )}
+              </div>
+            </div>
+
+            <div className="mt-3 flex flex-wrap items-center gap-3">
+              <SocialLinksDisplay values={socialLinks} accentColor={accentColor} />
+              <Badge variant="outline" className="text-xs">
+                <Calendar className="mr-1 h-3 w-3" />
+                Joined {new Date(profile.data.created_at || "").toLocaleDateString()}
+              </Badge>
+            </div>
+
+            {profile.data.bio && (
+              <p className="mt-3 max-w-xl text-sm text-muted-foreground">{profile.data.bio}</p>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Level bar */}
+      <div className="container mx-auto max-w-5xl px-8 md:px-12 lg:px-16 mt-6">
+        <div
+          className="rounded-xl border border-border/40 p-4"
+          style={{ background: `linear-gradient(135deg, ${accentColor}08, transparent)` }}
+        >
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <Trophy className="h-5 w-5" style={{ color: accentColor }} />
+              <span className="font-bold">Level {level}</span>
+              <Sparkles className="h-4 w-4 text-muted-foreground" />
+            </div>
+            <span className="text-sm text-muted-foreground">{xp} XP</span>
+          </div>
+          <div className="relative h-3 w-full overflow-hidden rounded-full bg-secondary">
+            <div
+              className="h-full rounded-full"
+              style={{
+                width: `${xpProgress}%`,
+                background: `linear-gradient(90deg, ${accentColor}, ${accentColor}CC)`,
+                boxShadow: `0 0 12px ${accentColor}60`,
+              }}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Stats */}
+      <div className="container mx-auto max-w-5xl px-8 md:px-12 lg:px-16 mt-6">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <PublicStatCard label="Reading Streak" value={profile.data.reading_streak || 0} suffix=" days" icon={<Flame className="h-6 w-6" />} color="#F97316" />
+          <PublicStatCard label="Chapters Read" value={readingStats.data?.chapters || 0} icon={<BookOpen className="h-6 w-6" />} color="#3B82F6" />
+          <PublicStatCard label="Series Followed" value={readingStats.data?.series || 0} icon={<Star className="h-6 w-6" />} color="#F59E0B" />
+          <PublicStatCard label="Achievements" value={achievements.data?.length || 0} icon={<Award className="h-6 w-6" />} color={accentColor} />
+        </div>
+      </div>
+
+      {/* Achievements */}
+      {achievements.data && achievements.data.length > 0 && (
+        <div className="container mx-auto max-w-5xl px-8 md:px-12 lg:px-16 mt-8 pb-12">
+          <h2 className="mb-4 text-xl font-bold">Recent Achievements</h2>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {achievements.data.map((item: any) => (
+              <div
+                key={item.id}
+                className="flex gap-3 rounded-lg border border-border/40 bg-card p-4"
+                style={{ background: `linear-gradient(135deg, ${accentColor}05, transparent)` }}
+              >
+                <div className="flex-shrink-0">
+                  <div
+                    className="flex h-12 w-12 items-center justify-center rounded-lg text-2xl"
+                    style={{ backgroundColor: `${accentColor}20` }}
+                  >
+                    {item.achievement?.icon || "🏆"}
+                  </div>
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-semibold">{item.achievement?.name || "Achievement"}</h3>
+                    <Badge variant="outline" className="text-xs">
+                      {item.achievement?.rarity || "common"}
+                    </Badge>
+                  </div>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {item.achievement?.description || "No description"}
+                  </p>
+                  <p className="mt-2 text-xs" style={{ color: accentColor }}>
+                    Unlocked {new Date(item.unlocked_at).toLocaleDateString()}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Bottom padding if no achievements */}
+      {(!achievements.data || achievements.data.length === 0) && <div className="h-12" />}
+    </div>
+  );
+}
+
+function PublicStatCard({
+  label,
+  value,
+  suffix = "",
+  icon,
+  color,
+}: {
+  label: string;
+  value: number;
+  suffix?: string;
+  icon: React.ReactNode;
+  color: string;
+}) {
+  return (
+    <Card className="group relative overflow-hidden p-4" style={{ borderColor: `${color}20` }}>
+      <div
+        className="pointer-events-none absolute -right-4 -top-4 h-20 w-20 rounded-full opacity-20 blur-2xl"
+        style={{ background: color }}
+      />
+      <div className="relative flex items-center justify-between">
+        <div>
+          <p className="text-sm text-muted-foreground">{label}</p>
+          <p className="text-2xl font-bold">
+            {value}
+            {suffix && <span className="text-base font-normal text-muted-foreground">{suffix}</span>}
+          </p>
+        </div>
+        <div
+          className="grid h-12 w-12 place-items-center rounded-xl"
+          style={{ backgroundColor: `${color}15`, color }}
+        >
+          {icon}
+        </div>
+      </div>
+    </Card>
+  );
+}

@@ -25,9 +25,11 @@ import {
   Target,
   TrendingUp,
   Award,
-  Eye,
   Camera,
-  Code
+  Code,
+  Palette,
+  Link2,
+  Sparkles,
 } from "lucide-react";
 import { ReadingGoals } from "@/components/profile/ReadingGoals";
 import { AvatarUpload } from "@/components/profile/AvatarUpload";
@@ -35,16 +37,43 @@ import { ProfileBadges } from "@/components/profile/ProfileBadges";
 import { PrivacySettings } from "@/components/profile/PrivacySettings";
 import { ReadingHeatmap } from "@/components/profile/ReadingHeatmap";
 import { ProfileWidgets } from "@/components/profile/ProfileWidgets";
+import { BannerUpload } from "@/components/profile/BannerUpload";
+import { AccentColorPicker } from "@/components/profile/AccentColorPicker";
+import { SocialLinksEditor, SocialLinksDisplay, type SocialLinksData } from "@/components/profile/SocialLinks";
 
 export const Route = createFileRoute("/_authenticated/profile")({
   head: () => ({ meta: [{ title: "Profile — vnrscans" }] }),
   component: ProfilePage,
 });
 
+/* ─── Keyframes (injected once) ─── */
+const keyframeStyles = `
+@keyframes profileFadeInUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes profileStatPulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.04); }
+}
+@keyframes profileXpGlow {
+  0%, 100% { box-shadow: 0 0 8px var(--xp-color, #8B5CF6); }
+  50% { box-shadow: 0 0 20px var(--xp-color, #8B5CF6); }
+}
+`;
+
 function ProfilePage() {
   const qc = useQueryClient();
   
-  // Fetch profile with all stats
+  // Inject keyframes once
+  useEffect(() => {
+    const style = document.createElement("style");
+    style.textContent = keyframeStyles;
+    document.head.appendChild(style);
+    return () => { style.remove(); };
+  }, []);
+
+  // Fetch profile with all data
   const profile = useQuery({
     queryKey: ["profile", "me"],
     queryFn: async () => {
@@ -56,7 +85,7 @@ function ProfilePage() {
         .eq("user_id", u.user.id)
         .maybeSingle();
       if (error) throw error;
-      return { ...data, email: u.user.email };
+      return { ...data, email: u.user.email } as any;
     },
     staleTime: 2 * 60 * 1000,
   });
@@ -121,15 +150,34 @@ function ProfilePage() {
     staleTime: 10 * 60 * 1000,
   });
 
+  // Editable state
   const [username, setUsername] = useState("");
   const [bio, setBio] = useState("");
   const [avatarUrl, setAvatarUrl] = useState("");
+  const [bannerUrl, setBannerUrl] = useState("");
+  const [accentColor, setAccentColor] = useState("#8B5CF6");
+  const [socialLinks, setSocialLinks] = useState<SocialLinksData>({
+    social_discord: "",
+    social_twitter: "",
+    social_mal: "",
+    social_anilist: "",
+    social_website: "",
+  });
 
   useEffect(() => {
     if (profile.data) {
       setUsername(profile.data.username ?? "");
       setBio(profile.data.bio ?? "");
       setAvatarUrl(profile.data.avatar_url ?? "");
+      setBannerUrl(profile.data.banner_url ?? "");
+      setAccentColor(profile.data.accent_color ?? "#8B5CF6");
+      setSocialLinks({
+        social_discord: profile.data.social_discord ?? "",
+        social_twitter: profile.data.social_twitter ?? "",
+        social_mal: profile.data.social_mal ?? "",
+        social_anilist: profile.data.social_anilist ?? "",
+        social_website: profile.data.social_website ?? "",
+      });
     }
   }, [profile.data]);
 
@@ -143,7 +191,14 @@ function ProfilePage() {
           username, 
           bio, 
           avatar_url: avatarUrl || null,
-        })
+          banner_url: bannerUrl || null,
+          accent_color: accentColor,
+          social_discord: socialLinks.social_discord || null,
+          social_twitter: socialLinks.social_twitter || null,
+          social_mal: socialLinks.social_mal || null,
+          social_anilist: socialLinks.social_anilist || null,
+          social_website: socialLinks.social_website || null,
+        } as any)
         .eq("user_id", u.user.id);
       if (error) throw error;
     },
@@ -160,423 +215,513 @@ function ProfilePage() {
   const xpProgress = ((xp % xpForNextLevel) / xpForNextLevel) * 100;
 
   return (
-    <div className="container mx-auto max-w-5xl px-8 md:px-12 lg:px-16 py-8">
-      {/* Profile Header */}
-      <div className="mb-8">
-        <div className="flex flex-col gap-6 md:flex-row md:items-start">
-          {/* Avatar */}
-          <div className="relative flex-shrink-0">
-            <AvatarUpload
-              currentAvatarUrl={avatarUrl}
-              username={username}
-              onAvatarUpdated={(url) => setAvatarUrl(url)}
-            />
-            {profile.data?.is_vip && (
-              <div className="absolute -bottom-2 -right-2 rounded-full bg-gradient-to-r from-yellow-400 to-yellow-600 p-2">
-                <Crown className="h-5 w-5 text-white" />
-              </div>
-            )}
-          </div>
+    <div className="min-h-screen">
+      {/* ─── Banner + Avatar Header ─── */}
+      <div
+        className="relative"
+        style={{ animation: "profileFadeInUp 0.5s ease-out both" }}
+      >
+        <BannerUpload
+          currentBannerUrl={bannerUrl}
+          accentColor={accentColor}
+          onBannerUpdated={setBannerUrl}
+        />
 
-          {/* Profile Info */}
-          <div className="flex-1">
-            <div className="flex items-start justify-between">
-              <div>
-                <h1 className="text-3xl font-bold tracking-tight">{username || "Loading..."}</h1>
-                <p className="text-sm text-muted-foreground">{profile.data?.email}</p>
-                
-                {/* Roles & Badges */}
-                <div className="mt-2 flex flex-wrap items-center gap-2">
+        {/* Avatar floating over banner */}
+        <div className="container mx-auto max-w-5xl px-8 md:px-12 lg:px-16">
+          <div className="relative -mt-16 flex flex-col gap-5 sm:flex-row sm:items-end sm:gap-6">
+            {/* Avatar with accent ring */}
+            <div
+              className="relative flex-shrink-0 rounded-full p-1"
+              style={{
+                background: `linear-gradient(135deg, ${accentColor}, ${accentColor}80)`,
+                boxShadow: `0 0 30px ${accentColor}40`,
+              }}
+            >
+              <div className="rounded-full bg-background p-0.5">
+                <AvatarUpload
+                  currentAvatarUrl={avatarUrl}
+                  username={username}
+                  onAvatarUpdated={(url) => setAvatarUrl(url)}
+                />
+              </div>
+              {profile.data?.is_vip && (
+                <div
+                  className="absolute -bottom-1 -right-1 rounded-full p-2"
+                  style={{
+                    background: "linear-gradient(135deg, #F59E0B, #D97706)",
+                    boxShadow: "0 0 15px #F59E0B50",
+                  }}
+                >
+                  <Crown className="h-4 w-4 text-white" />
+                </div>
+              )}
+            </div>
+
+            {/* Name + meta */}
+            <div className="flex-1 pb-2">
+              <div className="flex flex-wrap items-center gap-3">
+                <h1 className="text-3xl font-extrabold tracking-tight">{username || "Loading..."}</h1>
+                <div className="flex flex-wrap items-center gap-2">
                   {userRoles.data?.includes("admin") && (
-                    <Badge className="bg-red-500/10 text-red-500 hover:bg-red-500/20">
-                      <Shield className="mr-1 h-3 w-3" />
-                      Admin
+                    <Badge
+                      className="border-0 text-white"
+                      style={{ background: `linear-gradient(135deg, #EF4444, #DC2626)` }}
+                    >
+                      <Shield className="mr-1 h-3 w-3" /> Admin
                     </Badge>
                   )}
                   {userRoles.data?.includes("moderator") && (
-                    <Badge className="bg-blue-500/10 text-blue-500 hover:bg-blue-500/20">
-                      <Shield className="mr-1 h-3 w-3" />
-                      Moderator
+                    <Badge
+                      className="border-0 text-white"
+                      style={{ background: `linear-gradient(135deg, #3B82F6, #2563EB)` }}
+                    >
+                      <Shield className="mr-1 h-3 w-3" /> Mod
                     </Badge>
                   )}
                   {profile.data?.is_vip && (
-                    <Badge className="bg-gradient-to-r from-yellow-500/10 to-yellow-600/10 text-yellow-600 hover:from-yellow-500/20 hover:to-yellow-600/20">
-                      <Crown className="mr-1 h-3 w-3" />
-                      VIP
+                    <Badge
+                      className="border-0 text-white"
+                      style={{ background: "linear-gradient(135deg, #F59E0B, #D97706)" }}
+                    >
+                      <Crown className="mr-1 h-3 w-3" /> VIP
                     </Badge>
                   )}
-                  <Badge variant="outline">
-                    <Calendar className="mr-1 h-3 w-3" />
-                    Joined {new Date(profile.data?.created_at || "").toLocaleDateString()}
-                  </Badge>
                 </div>
               </div>
-            </div>
 
-            {/* Level & XP */}
-            <div className="mt-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Trophy className="h-5 w-5 text-violet-500" />
-                  <span className="font-semibold">Level {level}</span>
-                </div>
-                <span className="text-sm text-muted-foreground">
-                  {xp} / {xpForNextLevel} XP
-                </span>
+              <p className="mt-1 text-sm text-muted-foreground">{profile.data?.email}</p>
+
+              {/* Social links + join date row */}
+              <div className="mt-3 flex flex-wrap items-center gap-3">
+                <SocialLinksDisplay values={socialLinks} accentColor={accentColor} />
+                <Badge variant="outline" className="text-xs">
+                  <Calendar className="mr-1 h-3 w-3" />
+                  Joined {new Date(profile.data?.created_at || "").toLocaleDateString()}
+                </Badge>
               </div>
-              <Progress value={xpProgress} className="mt-2 h-2" />
-            </div>
 
-            {/* Bio */}
-            {bio && (
-              <p className="mt-4 text-sm text-muted-foreground">{bio}</p>
-            )}
+              {bio && (
+                <p className="mt-3 max-w-xl text-sm text-muted-foreground">{bio}</p>
+              )}
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Stats Cards */}
-      <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Card className="p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-muted-foreground">Reading Streak</p>
-              <p className="text-2xl font-bold">{profile.data?.reading_streak || 0}</p>
-            </div>
-            <Flame className="h-8 w-8 text-orange-500" />
-          </div>
-        </Card>
-
-        <Card className="p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-muted-foreground">Chapters Read</p>
-              <p className="text-2xl font-bold">{readingStats.data?.chapters || 0}</p>
-            </div>
-            <BookOpen className="h-8 w-8 text-blue-500" />
-          </div>
-        </Card>
-
-        <Card className="p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-muted-foreground">Series Followed</p>
-              <p className="text-2xl font-bold">{readingStats.data?.series || 0}</p>
-            </div>
-            <Star className="h-8 w-8 text-yellow-500" />
-          </div>
-        </Card>
-
-        <Card className="p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-muted-foreground">Achievements</p>
-              <p className="text-2xl font-bold">{achievements.data?.length || 0}</p>
-            </div>
-            <Award className="h-8 w-8 text-purple-500" />
-          </div>
-        </Card>
-      </div>
-
-      {/* Tabs */}
-      <Tabs defaultValue="edit" className="w-full">
-        <TabsList className="grid w-full grid-cols-3 lg:grid-cols-6 h-auto">
-          <TabsTrigger value="edit" className="gap-2">
-            <Settings className="h-4 w-4" />
-            <span className="hidden sm:inline">Edit</span>
-          </TabsTrigger>
-          <TabsTrigger value="goals" className="gap-2">
-            <Target className="h-4 w-4" />
-            <span className="hidden sm:inline">Goals</span>
-          </TabsTrigger>
-          <TabsTrigger value="badges" className="gap-2">
-            <Award className="h-4 w-4" />
-            <span className="hidden sm:inline">Badges</span>
-          </TabsTrigger>
-          <TabsTrigger value="achievements" className="gap-2">
-            <Trophy className="h-4 w-4" />
-            <span className="hidden sm:inline">Achievements</span>
-          </TabsTrigger>
-          <TabsTrigger value="stats" className="gap-2">
-            <TrendingUp className="h-4 w-4" />
-            <span className="hidden sm:inline">Stats</span>
-          </TabsTrigger>
-          <TabsTrigger value="privacy" className="gap-2">
-            <Shield className="h-4 w-4" />
-            <span className="hidden sm:inline">Privacy</span>
-          </TabsTrigger>
-        </TabsList>
-
-        {/* Edit Profile Tab */}
-        <TabsContent value="edit">
-          <Card className="p-6">
-            <form onSubmit={(e) => { e.preventDefault(); save.mutate(); }} className="space-y-6">
-              <div>
-                <Label htmlFor="email">Email</Label>
-                <div className="relative mt-1">
-                  <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                  <Input 
-                    id="email" 
-                    value={profile.data?.email ?? ""} 
-                    disabled 
-                    className="pl-10"
-                  />
-                </div>
-                <p className="mt-1 text-xs text-muted-foreground">Email cannot be changed</p>
-              </div>
-
-              <div>
-                <Label htmlFor="username">Username *</Label>
-                <div className="relative mt-1">
-                  <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                  <Input 
-                    id="username"
-                    value={username} 
-                    onChange={(e) => setUsername(e.target.value)} 
-                    minLength={3} 
-                    required 
-                    className="pl-10"
-                    placeholder="Your username"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <Label htmlFor="avatar">Avatar URL</Label>
-                <div className="relative mt-1">
-                  <Camera className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                  <Input 
-                    id="avatar"
-                    value={avatarUrl} 
-                    onChange={(e) => setAvatarUrl(e.target.value)} 
-                    className="pl-10"
-                    placeholder="https://example.com/avatar.jpg"
-                  />
-                </div>
-                <p className="mt-1 text-xs text-muted-foreground">Enter a URL to your profile picture</p>
-              </div>
-
-              <div>
-                <Label htmlFor="bio">Bio</Label>
-                <Textarea 
-                  id="bio"
-                  value={bio} 
-                  onChange={(e) => setBio(e.target.value)} 
-                  rows={4}
-                  placeholder="Tell us about yourself..."
-                  className="resize-none"
-                  maxLength={500}
-                />
-                <p className="mt-1 text-xs text-muted-foreground">{bio.length}/500 characters</p>
-              </div>
-
-              <Button type="submit" disabled={save.isPending} className="w-full">
-                {save.isPending ? "Saving..." : "Save Changes"}
-              </Button>
-            </form>
-          </Card>
-        </TabsContent>
-
-        {/* Reading Goals Tab */}
-        <TabsContent value="goals">
-          <Card className="p-6">
-            <ReadingGoals />
-          </Card>
-        </TabsContent>
-
-        {/* Profile Badges Tab */}
-        <TabsContent value="badges">
-          <Card className="p-6">
-            <ProfileBadges />
-          </Card>
-        </TabsContent>
-
-        {/* Achievements Tab */}
-        <TabsContent value="achievements">
-          <Card className="p-6">
-            <h2 className="mb-4 text-xl font-bold">Unlocked Achievements</h2>
-            {achievements.isLoading ? (
-              <p className="text-sm text-muted-foreground">Loading achievements...</p>
-            ) : achievements.data && achievements.data.length > 0 ? (
-              <div className="grid gap-3 sm:grid-cols-2">
-                {achievements.data.map((item: any) => (
-                  <div
-                    key={item.id}
-                    className="flex gap-3 rounded-lg border border-border/40 bg-card p-4"
-                  >
-                    <div className="flex-shrink-0">
-                      <div 
-                        className="flex h-12 w-12 items-center justify-center rounded-lg text-2xl"
-                        style={{ backgroundColor: item.achievement?.badge_color ? `${item.achievement.badge_color}20` : '#8B5CF620' }}
-                      >
-                        {item.achievement?.icon || "🏆"}
-                      </div>
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <h3 className="font-semibold">{item.achievement?.name || "Achievement"}</h3>
-                        <Badge variant="outline" className="text-xs">
-                          {item.achievement?.rarity || "common"}
-                        </Badge>
-                      </div>
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        {item.achievement?.description || "No description"}
-                      </p>
-                      <p className="mt-2 text-xs text-violet-500">
-                        +{item.achievement?.xp_reward || 0} XP • Unlocked {new Date(item.unlocked_at).toLocaleDateString()}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="rounded-lg border border-dashed border-border/40 p-8 text-center">
-                <Trophy className="mx-auto h-12 w-12 text-muted-foreground/50" />
-                <p className="mt-2 text-sm text-muted-foreground">No achievements unlocked yet</p>
-                <p className="mt-1 text-xs text-muted-foreground">Start reading to earn achievements!</p>
-              </div>
-            )}
-          </Card>
-        </TabsContent>
-
-        {/* Statistics Tab */}
-        <TabsContent value="stats">
-          <div className="space-y-6">
-            {/* Reading Heatmap */}
-            <ReadingHeatmap />
-
-            {/* Original Stats */}
-            <Card className="p-6">
-              <h2 className="mb-4 text-xl font-bold">Your Statistics</h2>
-              <div className="space-y-6">
-              {/* Reading Activity */}
-              <div>
-                <h3 className="mb-3 font-semibold">Reading Activity</h3>
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <BookOpen className="h-4 w-4 text-blue-500" />
-                      <span className="text-sm">Chapters Read</span>
-                    </div>
-                    <span className="font-semibold">{readingStats.data?.chapters || 0}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Star className="h-4 w-4 text-yellow-500" />
-                      <span className="text-sm">Series Followed</span>
-                    </div>
-                    <span className="font-semibold">{readingStats.data?.series || 0}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Flame className="h-4 w-4 text-orange-500" />
-                      <span className="text-sm">Current Streak</span>
-                    </div>
-                    <span className="font-semibold">{profile.data?.reading_streak || 0} days</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Community Engagement */}
-              <div>
-                <h3 className="mb-3 font-semibold">Community Engagement</h3>
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Target className="h-4 w-4 text-green-500" />
-                      <span className="text-sm">Comments Posted</span>
-                    </div>
-                    <span className="font-semibold">{readingStats.data?.comments || 0}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Star className="h-4 w-4 text-purple-500" />
-                      <span className="text-sm">Ratings Given</span>
-                    </div>
-                    <span className="font-semibold">{readingStats.data?.ratings || 0}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Award className="h-4 w-4 text-violet-500" />
-                      <span className="text-sm">Achievements Unlocked</span>
-                    </div>
-                    <span className="font-semibold">{achievements.data?.length || 0}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Level Progress */}
-              <div>
-                <h3 className="mb-3 font-semibold">Level Progress</h3>
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Trophy className="h-4 w-4 text-violet-500" />
-                      <span className="text-sm">Current Level</span>
-                    </div>
-                    <span className="font-semibold">Level {level}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <TrendingUp className="h-4 w-4 text-blue-500" />
-                      <span className="text-sm">Total XP</span>
-                    </div>
-                    <span className="font-semibold">{xp}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Target className="h-4 w-4 text-green-500" />
-                      <span className="text-sm">Next Level</span>
-                    </div>
-                    <span className="font-semibold">{xpForNextLevel - xp} XP needed</span>
-                  </div>
-                  <div className="mt-2">
-                    <Progress value={xpProgress} className="h-2" />
-                    <p className="mt-1 text-center text-xs text-muted-foreground">
-                      {xpProgress.toFixed(1)}% to Level {level + 1}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-            </Card>
-          </div>
-        </TabsContent>
-
-        {/* Privacy Settings Tab */}
-        <TabsContent value="privacy">
-          <Card className="p-6">
-            <PrivacySettings />
-          </Card>
-        </TabsContent>
-
-        {/* Profile Widgets Tab - Hidden by default, can be accessed via direct link */}
-        <TabsContent value="widgets">
-          <Card className="p-6">
-            <ProfileWidgets />
-          </Card>
-        </TabsContent>
-      </Tabs>
-
-      {/* Widget Link (below tabs) */}
-      <div className="mt-4">
-        <Button
-          variant="outline"
-          size="sm"
-          className="gap-2"
-          onClick={() => {
-            const tabsElement = document.querySelector('[role="tablist"]');
-            const widgetButton = document.querySelector('[value="widgets"]') as HTMLElement;
-            if (widgetButton) {
-              widgetButton.click();
-              tabsElement?.scrollIntoView({ behavior: "smooth" });
-            }
+      {/* ─── Level bar ─── */}
+      <div className="container mx-auto max-w-5xl px-8 md:px-12 lg:px-16 mt-6">
+        <div
+          className="rounded-xl border border-border/40 p-4"
+          style={{
+            background: `linear-gradient(135deg, ${accentColor}08, transparent)`,
           }}
         >
-          <Code className="h-4 w-4" />
-          Generate Profile Widget
-        </Button>
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <Trophy className="h-5 w-5" style={{ color: accentColor }} />
+              <span className="font-bold">Level {level}</span>
+              <Sparkles className="h-4 w-4 text-muted-foreground" />
+            </div>
+            <span className="text-sm text-muted-foreground">
+              {xp} / {xpForNextLevel} XP
+            </span>
+          </div>
+          <div className="relative h-3 w-full overflow-hidden rounded-full bg-secondary">
+            <div
+              className="h-full rounded-full transition-all duration-1000 ease-out"
+              style={{
+                width: `${xpProgress}%`,
+                background: `linear-gradient(90deg, ${accentColor}, ${accentColor}CC)`,
+                boxShadow: `0 0 12px ${accentColor}60`,
+              }}
+            />
+          </div>
+        </div>
       </div>
+
+      {/* ─── Stats Cards ─── */}
+      <div
+        className="container mx-auto max-w-5xl px-8 md:px-12 lg:px-16 mt-6"
+        style={{ animation: "profileFadeInUp 0.6s ease-out 0.1s both" }}
+      >
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <StatCard
+            label="Reading Streak"
+            value={profile.data?.reading_streak || 0}
+            suffix=" days"
+            icon={<Flame className="h-6 w-6" />}
+            accentColor="#F97316"
+          />
+          <StatCard
+            label="Chapters Read"
+            value={readingStats.data?.chapters || 0}
+            icon={<BookOpen className="h-6 w-6" />}
+            accentColor="#3B82F6"
+          />
+          <StatCard
+            label="Series Followed"
+            value={readingStats.data?.series || 0}
+            icon={<Star className="h-6 w-6" />}
+            accentColor="#F59E0B"
+          />
+          <StatCard
+            label="Achievements"
+            value={achievements.data?.length || 0}
+            icon={<Award className="h-6 w-6" />}
+            accentColor={accentColor}
+          />
+        </div>
+      </div>
+
+      {/* ─── Tabs ─── */}
+      <div
+        className="container mx-auto max-w-5xl px-8 md:px-12 lg:px-16 mt-8 pb-12"
+        style={{ animation: "profileFadeInUp 0.6s ease-out 0.2s both" }}
+      >
+        <Tabs defaultValue="edit" className="w-full">
+          <TabsList className="grid w-full grid-cols-3 lg:grid-cols-6 h-auto">
+            <TabsTrigger value="edit" className="gap-2">
+              <Settings className="h-4 w-4" />
+              <span className="hidden sm:inline">Edit</span>
+            </TabsTrigger>
+            <TabsTrigger value="goals" className="gap-2">
+              <Target className="h-4 w-4" />
+              <span className="hidden sm:inline">Goals</span>
+            </TabsTrigger>
+            <TabsTrigger value="badges" className="gap-2">
+              <Award className="h-4 w-4" />
+              <span className="hidden sm:inline">Badges</span>
+            </TabsTrigger>
+            <TabsTrigger value="achievements" className="gap-2">
+              <Trophy className="h-4 w-4" />
+              <span className="hidden sm:inline">Achievements</span>
+            </TabsTrigger>
+            <TabsTrigger value="stats" className="gap-2">
+              <TrendingUp className="h-4 w-4" />
+              <span className="hidden sm:inline">Stats</span>
+            </TabsTrigger>
+            <TabsTrigger value="privacy" className="gap-2">
+              <Shield className="h-4 w-4" />
+              <span className="hidden sm:inline">Privacy</span>
+            </TabsTrigger>
+          </TabsList>
+
+          {/* ─── Edit Profile Tab ─── */}
+          <TabsContent value="edit">
+            <Card className="p-6">
+              <form onSubmit={(e) => { e.preventDefault(); save.mutate(); }} className="space-y-8">
+                {/* Basic Info Section */}
+                <div className="space-y-4">
+                  <h3 className="flex items-center gap-2 text-lg font-bold">
+                    <User className="h-5 w-5" style={{ color: accentColor }} />
+                    Basic Info
+                  </h3>
+
+                  <div>
+                    <Label htmlFor="email">Email</Label>
+                    <div className="relative mt-1">
+                      <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                      <Input id="email" value={profile.data?.email ?? ""} disabled className="pl-10" />
+                    </div>
+                    <p className="mt-1 text-xs text-muted-foreground">Email cannot be changed</p>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="username">Username *</Label>
+                    <div className="relative mt-1">
+                      <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                      <Input 
+                        id="username"
+                        value={username} 
+                        onChange={(e) => setUsername(e.target.value)} 
+                        minLength={3} 
+                        required 
+                        className="pl-10"
+                        placeholder="Your username"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="avatar">Avatar URL</Label>
+                    <div className="relative mt-1">
+                      <Camera className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                      <Input 
+                        id="avatar"
+                        value={avatarUrl} 
+                        onChange={(e) => setAvatarUrl(e.target.value)} 
+                        className="pl-10"
+                        placeholder="https://example.com/avatar.jpg"
+                      />
+                    </div>
+                    <p className="mt-1 text-xs text-muted-foreground">Or use the avatar uploader above</p>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="bio">Bio</Label>
+                    <Textarea 
+                      id="bio"
+                      value={bio} 
+                      onChange={(e) => setBio(e.target.value)} 
+                      rows={4}
+                      placeholder="Tell us about yourself..."
+                      className="resize-none"
+                      maxLength={500}
+                    />
+                    <p className="mt-1 text-xs text-muted-foreground">{bio.length}/500 characters</p>
+                  </div>
+                </div>
+
+                {/* Divider */}
+                <div className="h-px w-full bg-border/50" />
+
+                {/* Accent Color Section */}
+                <AccentColorPicker value={accentColor} onChange={setAccentColor} />
+
+                {/* Divider */}
+                <div className="h-px w-full bg-border/50" />
+
+                {/* Social Links Section */}
+                <SocialLinksEditor
+                  values={socialLinks}
+                  onChange={(key, value) =>
+                    setSocialLinks((prev) => ({ ...prev, [key]: value }))
+                  }
+                />
+
+                <Button
+                  type="submit"
+                  disabled={save.isPending}
+                  className="w-full h-12 text-sm font-bold rounded-xl"
+                  style={{
+                    background: `linear-gradient(135deg, ${accentColor}, ${accentColor}CC)`,
+                    color: "white",
+                    boxShadow: `0 4px 20px ${accentColor}35`,
+                  }}
+                >
+                  {save.isPending ? "Saving..." : "Save All Changes"}
+                </Button>
+              </form>
+            </Card>
+          </TabsContent>
+
+          {/* ─── Reading Goals Tab ─── */}
+          <TabsContent value="goals">
+            <Card className="p-6">
+              <ReadingGoals />
+            </Card>
+          </TabsContent>
+
+          {/* ─── Profile Badges Tab ─── */}
+          <TabsContent value="badges">
+            <Card className="p-6">
+              <ProfileBadges />
+            </Card>
+          </TabsContent>
+
+          {/* ─── Achievements Tab ─── */}
+          <TabsContent value="achievements">
+            <Card className="p-6">
+              <h2 className="mb-4 text-xl font-bold">Unlocked Achievements</h2>
+              {achievements.isLoading ? (
+                <p className="text-sm text-muted-foreground">Loading achievements...</p>
+              ) : achievements.data && achievements.data.length > 0 ? (
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {achievements.data.map((item: any) => (
+                    <div
+                      key={item.id}
+                      className="flex gap-3 rounded-lg border border-border/40 bg-card p-4 transition-all hover:border-border"
+                      style={{
+                        background: `linear-gradient(135deg, ${accentColor}05, transparent)`,
+                      }}
+                    >
+                      <div className="flex-shrink-0">
+                        <div 
+                          className="flex h-12 w-12 items-center justify-center rounded-lg text-2xl"
+                          style={{ backgroundColor: item.achievement?.badge_color ? `${item.achievement.badge_color}20` : `${accentColor}20` }}
+                        >
+                          {item.achievement?.icon || "🏆"}
+                        </div>
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-semibold">{item.achievement?.name || "Achievement"}</h3>
+                          <Badge variant="outline" className="text-xs">
+                            {item.achievement?.rarity || "common"}
+                          </Badge>
+                        </div>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {item.achievement?.description || "No description"}
+                        </p>
+                        <p className="mt-2 text-xs" style={{ color: accentColor }}>
+                          +{item.achievement?.xp_reward || 0} XP • Unlocked {new Date(item.unlocked_at).toLocaleDateString()}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="rounded-lg border border-dashed border-border/40 p-8 text-center">
+                  <Trophy className="mx-auto h-12 w-12 text-muted-foreground/50" />
+                  <p className="mt-2 text-sm text-muted-foreground">No achievements unlocked yet</p>
+                  <p className="mt-1 text-xs text-muted-foreground">Start reading to earn achievements!</p>
+                </div>
+              )}
+            </Card>
+          </TabsContent>
+
+          {/* ─── Statistics Tab ─── */}
+          <TabsContent value="stats">
+            <div className="space-y-6">
+              <ReadingHeatmap />
+
+              <Card className="p-6">
+                <h2 className="mb-4 text-xl font-bold">Your Statistics</h2>
+                <div className="space-y-6">
+                  {/* Reading Activity */}
+                  <div>
+                    <h3 className="mb-3 font-semibold">Reading Activity</h3>
+                    <div className="space-y-3">
+                      <StatRow icon={<BookOpen className="h-4 w-4 text-blue-500" />} label="Chapters Read" value={readingStats.data?.chapters || 0} />
+                      <StatRow icon={<Star className="h-4 w-4 text-yellow-500" />} label="Series Followed" value={readingStats.data?.series || 0} />
+                      <StatRow icon={<Flame className="h-4 w-4 text-orange-500" />} label="Current Streak" value={`${profile.data?.reading_streak || 0} days`} />
+                    </div>
+                  </div>
+
+                  {/* Community Engagement */}
+                  <div>
+                    <h3 className="mb-3 font-semibold">Community Engagement</h3>
+                    <div className="space-y-3">
+                      <StatRow icon={<Target className="h-4 w-4 text-green-500" />} label="Comments Posted" value={readingStats.data?.comments || 0} />
+                      <StatRow icon={<Star className="h-4 w-4 text-purple-500" />} label="Ratings Given" value={readingStats.data?.ratings || 0} />
+                      <StatRow icon={<Award className="h-4 w-4" style={{ color: accentColor }} />} label="Achievements Unlocked" value={achievements.data?.length || 0} />
+                    </div>
+                  </div>
+
+                  {/* Level Progress */}
+                  <div>
+                    <h3 className="mb-3 font-semibold">Level Progress</h3>
+                    <div className="space-y-3">
+                      <StatRow icon={<Trophy className="h-4 w-4" style={{ color: accentColor }} />} label="Current Level" value={`Level ${level}`} />
+                      <StatRow icon={<TrendingUp className="h-4 w-4 text-blue-500" />} label="Total XP" value={xp} />
+                      <StatRow icon={<Target className="h-4 w-4 text-green-500" />} label="Next Level" value={`${xpForNextLevel - xp} XP needed`} />
+                      <div className="mt-2">
+                        <Progress value={xpProgress} className="h-2" />
+                        <p className="mt-1 text-center text-xs text-muted-foreground">
+                          {xpProgress.toFixed(1)}% to Level {level + 1}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </Card>
+            </div>
+          </TabsContent>
+
+          {/* ─── Privacy Settings Tab ─── */}
+          <TabsContent value="privacy">
+            <Card className="p-6">
+              <PrivacySettings />
+            </Card>
+          </TabsContent>
+
+          {/* ─── Profile Widgets Tab (hidden, accessed via button) ─── */}
+          <TabsContent value="widgets">
+            <Card className="p-6">
+              <ProfileWidgets />
+            </Card>
+          </TabsContent>
+        </Tabs>
+
+        {/* Widget Link */}
+        <div className="mt-4">
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-2"
+            onClick={() => {
+              const widgetButton = document.querySelector('[value="widgets"]') as HTMLElement;
+              if (widgetButton) {
+                widgetButton.click();
+                widgetButton.scrollIntoView({ behavior: "smooth" });
+              }
+            }}
+          >
+            <Code className="h-4 w-4" />
+            Generate Profile Widget
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─── Reusable sub-components ─── */
+
+function StatCard({
+  label,
+  value,
+  suffix = "",
+  icon,
+  accentColor,
+}: {
+  label: string;
+  value: number;
+  suffix?: string;
+  icon: React.ReactNode;
+  accentColor: string;
+}) {
+  return (
+    <Card
+      className="group relative overflow-hidden p-4 transition-all duration-300 hover:shadow-lg"
+      style={{
+        borderColor: `${accentColor}20`,
+      }}
+    >
+      {/* Subtle accent glow */}
+      <div
+        className="pointer-events-none absolute -right-4 -top-4 h-20 w-20 rounded-full opacity-20 blur-2xl transition-opacity group-hover:opacity-40"
+        style={{ background: accentColor }}
+      />
+      <div className="relative flex items-center justify-between">
+        <div>
+          <p className="text-sm text-muted-foreground">{label}</p>
+          <p className="text-2xl font-bold">
+            {value}
+            {suffix && <span className="text-base font-normal text-muted-foreground">{suffix}</span>}
+          </p>
+        </div>
+        <div
+          className="grid h-12 w-12 place-items-center rounded-xl transition-transform duration-300 group-hover:scale-110"
+          style={{
+            backgroundColor: `${accentColor}15`,
+            color: accentColor,
+          }}
+        >
+          {icon}
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+function StatRow({
+  icon,
+  label,
+  value,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string | number;
+}) {
+  return (
+    <div className="flex items-center justify-between">
+      <div className="flex items-center gap-2">
+        {icon}
+        <span className="text-sm">{label}</span>
+      </div>
+      <span className="font-semibold">{value}</span>
     </div>
   );
 }

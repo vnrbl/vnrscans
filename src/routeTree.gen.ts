@@ -21,6 +21,7 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AboutRouteImport } from './routes/about'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as UserUsernameRouteImport } from './routes/user.$username'
 import { Route as TitleSlugRouteImport } from './routes/title.$slug'
 import { Route as TagsSlugRouteImport } from './routes/tags.$slug'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
@@ -99,6 +100,11 @@ const AuthenticatedRoute = AuthenticatedRouteImport.update({
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const UserUsernameRoute = UserUsernameRouteImport.update({
+  id: '/user/$username',
+  path: '/user/$username',
   getParentRoute: () => rootRouteImport,
 } as any)
 const TitleSlugRoute = TitleSlugRouteImport.update({
@@ -230,6 +236,7 @@ export interface FileRoutesByFullPath {
   '/settings': typeof AuthenticatedSettingsRoute
   '/tags/$slug': typeof TagsSlugRoute
   '/title/$slug': typeof TitleSlugRoute
+  '/user/$username': typeof UserUsernameRoute
   '/admin/analytics': typeof AuthenticatedAdminAnalyticsRoute
   '/admin/announcements': typeof AuthenticatedAdminAnnouncementsRoute
   '/admin/banners': typeof AuthenticatedAdminBannersRoute
@@ -262,6 +269,7 @@ export interface FileRoutesByTo {
   '/settings': typeof AuthenticatedSettingsRoute
   '/tags/$slug': typeof TagsSlugRoute
   '/title/$slug': typeof TitleSlugRoute
+  '/user/$username': typeof UserUsernameRoute
   '/admin/analytics': typeof AuthenticatedAdminAnalyticsRoute
   '/admin/announcements': typeof AuthenticatedAdminAnnouncementsRoute
   '/admin/banners': typeof AuthenticatedAdminBannersRoute
@@ -297,6 +305,7 @@ export interface FileRoutesById {
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
   '/tags/$slug': typeof TagsSlugRoute
   '/title/$slug': typeof TitleSlugRoute
+  '/user/$username': typeof UserUsernameRoute
   '/_authenticated/admin/analytics': typeof AuthenticatedAdminAnalyticsRoute
   '/_authenticated/admin/announcements': typeof AuthenticatedAdminAnnouncementsRoute
   '/_authenticated/admin/banners': typeof AuthenticatedAdminBannersRoute
@@ -332,6 +341,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/tags/$slug'
     | '/title/$slug'
+    | '/user/$username'
     | '/admin/analytics'
     | '/admin/announcements'
     | '/admin/banners'
@@ -364,6 +374,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/tags/$slug'
     | '/title/$slug'
+    | '/user/$username'
     | '/admin/analytics'
     | '/admin/announcements'
     | '/admin/banners'
@@ -398,6 +409,7 @@ export interface FileRouteTypes {
     | '/_authenticated/settings'
     | '/tags/$slug'
     | '/title/$slug'
+    | '/user/$username'
     | '/_authenticated/admin/analytics'
     | '/_authenticated/admin/announcements'
     | '/_authenticated/admin/banners'
@@ -428,6 +440,7 @@ export interface RootRouteChildren {
   SearchRoute: typeof SearchRoute
   TagsRoute: typeof TagsRouteWithChildren
   TitleSlugRoute: typeof TitleSlugRoute
+  UserUsernameRoute: typeof UserUsernameRoute
   TitleTitleSlugChapterSlugRoute: typeof TitleTitleSlugChapterSlugRoute
 }
 
@@ -515,6 +528,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/user/$username': {
+      id: '/user/$username'
+      path: '/user/$username'
+      fullPath: '/user/$username'
+      preLoaderRoute: typeof UserUsernameRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/title/$slug': {
@@ -737,6 +757,7 @@ const rootRouteChildren: RootRouteChildren = {
   SearchRoute: SearchRoute,
   TagsRoute: TagsRouteWithChildren,
   TitleSlugRoute: TitleSlugRoute,
+  UserUsernameRoute: UserUsernameRoute,
   TitleTitleSlugChapterSlugRoute: TitleTitleSlugChapterSlugRoute,
 }
 export const routeTree = rootRouteImport
