@@ -217,7 +217,7 @@
     <priority>0.5</priority>
   </url>
   <url>
-    <loc>https://www.vnrscans.com/title/i-am-the-fated-villain/chapter-6</loc>
+    <loc>https://www.vnrscans.com/title/i-am-the-fated-villain/chapter-1</loc>
     <lastmod>2026-06-03</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
@@ -331,12 +331,6 @@
     <priority>0.5</priority>
   </url>
   <url>
-    <loc>https://www.vnrscans.com/title/i-am-the-fated-villain/chapter-1</loc>
-    <lastmod>2026-06-03</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.5</priority>
-  </url>
-  <url>
     <loc>https://www.vnrscans.com/title/i-am-the-fated-villain/chapter-4</loc>
     <lastmod>2026-06-03</lastmod>
     <changefreq>monthly</changefreq>
@@ -399,6 +393,12 @@
   <url>
     <loc>https://www.vnrscans.com/title/i-am-the-fated-villain/chapter-14</loc>
     <lastmod>2026-06-04</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://www.vnrscans.com/title/i-am-the-fated-villain/chapter-6</loc>
+    <lastmod>2026-06-03</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url>

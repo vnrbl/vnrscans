@@ -13,6 +13,7 @@ import {
   ShieldCheck,
   Trophy,
   Gavel,
+  Award,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -42,7 +43,8 @@ export const Route = createFileRoute("/_authenticated/admin")({
       "/admin/comments",
       "/admin/reports",
       "/admin/users",
-      "/admin/gamification"
+      "/admin/gamification",
+      "/admin/badges"
     ];
 
     if (adminOnlyPaths.some(p => path.startsWith(p)) && !isAdmin) {
@@ -88,6 +90,7 @@ function AdminLayout() {
     { to: "/admin/users", label: "Users", icon: Users, roles: ["admin", "moderator"] },
     { to: "/admin/permissions", label: "Roles", icon: ShieldCheck, roles: ["admin", "moderator", "uploader"] },
     { to: "/admin/gamification", label: "Gamification", icon: Trophy, roles: ["admin", "moderator"] },
+    { to: "/admin/badges", label: "Realms & Badges", icon: Award, roles: ["admin", "moderator"] },
     { to: "/admin/logs", label: "Security Logs", icon: Shield, roles: ["admin"] },
   ];
 
