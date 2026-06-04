@@ -271,15 +271,17 @@ export function Navbar() {
           </Button>
 
           {/* Search Button */}
-          <Button
-            variant="ghost"
-            size="icon"
+          <button
             onClick={() => setSearchOpen(true)}
-            className="hidden sm:flex"
             title="Search (Ctrl+K)"
+            className="hidden sm:flex items-center gap-2 min-w-[200px] lg:min-w-[260px] h-9 rounded-lg border border-border/60 bg-secondary/50 px-3 text-sm text-muted-foreground transition-all hover:border-border hover:bg-secondary hover:text-foreground focus:outline-none"
           >
-            <Search className="h-5 w-5" />
-          </Button>
+            <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
+            <span className="flex-1 text-left truncate">Search titles, authors…</span>
+            <kbd className="hidden lg:inline-flex items-center rounded border border-border/60 bg-background/60 px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground">
+              Ctrl K
+            </kbd>
+          </button>
 
           {/* Random Button with Dice Animation */}
           <Button
@@ -501,6 +503,15 @@ export function Navbar() {
                 <Library className="h-5 w-5" />
               </Button>
 
+              {/* Mobile Search Icon (left of notifications) */}
+              <button
+                className="flex sm:hidden items-center justify-center h-9 w-9 rounded-lg text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors"
+                onClick={() => setSearchOpen(true)}
+                aria-label="Search"
+              >
+                <Search className="h-5 w-5" />
+              </button>
+
               {/* Notifications Bell */}
               <NotificationBell />
 
@@ -579,18 +590,6 @@ export function Navbar() {
       {open && (
         <div className="border-t border-border/50 md:hidden">
           <nav className="container mx-auto flex flex-col px-4 py-2">
-            {/* Mobile Search */}
-            <button
-              onClick={() => {
-                setSearchOpen(true);
-                setOpen(false);
-              }}
-              className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-secondary hover:text-foreground"
-            >
-              <Search className="h-4 w-4" />
-              Search
-            </button>
-
             {/* Mobile Random */}
             <button
               onClick={() => {
