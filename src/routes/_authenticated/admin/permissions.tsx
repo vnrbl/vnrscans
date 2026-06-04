@@ -129,7 +129,7 @@ function AdminPermissions() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("profiles")
-        .select("id, username")
+        .select("id, user_id, username")
         .order("username")
         .limit(500);
       if (error) throw error;
@@ -326,7 +326,7 @@ function AdminPermissions() {
                       </SelectTrigger>
                       <SelectContent>
                         {(profiles.data ?? []).map((p) => (
-                          <SelectItem key={p.id} value={p.id}>@{p.username}</SelectItem>
+                          <SelectItem key={p.user_id} value={p.user_id || ""}>@{p.username}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>

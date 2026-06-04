@@ -98,7 +98,7 @@ function Home() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("series")
-        .select("id, title, cover_url, description, type, status, view_count")
+        .select("id, slug, title, cover_url, description, type, status, view_count")
         .limit(3);
       if (error) throw error;
       return data || [];
@@ -109,6 +109,7 @@ function Home() {
   const mockSeries = [
     {
       id: "mock-1",
+      slug: "solo-leveling-ragnarok",
       title: "Solo Leveling: Ragnarok",
       description: "The official sequel to Solo Leveling. Earth's peace is shattered once again, and Sung Suho must rise to save humanity.",
       cover_url: "https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?w=500&auto=format&fit=crop&q=80",
@@ -118,6 +119,7 @@ function Home() {
     },
     {
       id: "mock-2",
+      slug: "omniscient-readers-viewpoint",
       title: "Omniscient Reader's Viewpoint",
       description: "Only one reader knows the ending of the novel that has suddenly become reality. Can he survive the scenarios?",
       cover_url: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=500&auto=format&fit=crop&q=80",
@@ -127,6 +129,7 @@ function Home() {
     },
     {
       id: "mock-3",
+      slug: "return-of-the-mount-hua-sect",
       title: "Return of the Mount Hua Sect",
       description: "Chung Myung, the 13th Disciple of the Mount Hua Sect, wakes up 100 years in the future to find his sect in ruins.",
       cover_url: "https://images.unsplash.com/photo-1578632767115-351597cf2477?w=500&auto=format&fit=crop&q=80",
@@ -266,7 +269,7 @@ function Home() {
             {displaySeries.map((series) => (
               <Card
                 key={series.id}
-                className="group overflow-hidden border-border/40 bg-card/35 hover:bg-card/60 hover:border-border/80 transition-all duration-300 flex flex-col h-full rounded-2xl"
+                className="group overflow-hidden border-border/30 bg-card/25 hover:bg-card/45 hover:border-primary/50 hover:shadow-lg hover:shadow-primary/5 transition-all duration-300 flex flex-col h-full rounded-2xl"
               >
                 {/* Cover Image Container */}
                 <div className="relative aspect-[16/10] overflow-hidden">
@@ -277,17 +280,16 @@ function Home() {
                     className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
                   />
                   <div className="absolute top-3 left-3 z-20 flex gap-2">
-                    <Badge variant="secondary" className="capitalize text-2xs font-semibold backdrop-blur bg-black/40 text-white">
+                    <Badge variant="secondary" className="capitalize text-3xs font-semibold backdrop-blur bg-black/45 text-white border-border/10">
                       {series.type}
                     </Badge>
                     <Badge
-                      className="capitalize text-2xs font-semibold text-white border-0"
-                      style={{
-                        background:
-                          series.status === "ongoing"
-                            ? "linear-gradient(135deg, #10B981, #059669)"
-                            : "linear-gradient(135deg, #6B7280, #4B5563)",
-                      }}
+                      variant="outline"
+                      className={`capitalize text-3xs font-semibold ${
+                        series.status === "ongoing"
+                          ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400"
+                          : "bg-zinc-500/10 border-zinc-500/30 text-zinc-400"
+                      }`}
                     >
                       {series.status}
                     </Badge>
@@ -297,7 +299,7 @@ function Home() {
                 {/* Body Content */}
                 <div className="p-5 flex-1 flex flex-col justify-between">
                   <div>
-                    <h3 className="text-lg font-bold group-hover:text-primary transition-colors line-clamp-1">
+                    <h3 className="text-base font-extrabold group-hover:text-primary transition-colors line-clamp-1">
                       {series.title}
                     </h3>
                     <p className="mt-2 text-xs text-muted-foreground line-clamp-3 leading-relaxed">
@@ -305,13 +307,13 @@ function Home() {
                     </p>
                   </div>
 
-                  <div className="mt-5 pt-4 border-t border-border/30 flex items-center justify-between text-2xs font-bold text-muted-foreground uppercase tracking-wider">
+                  <div className="mt-5 pt-4 border-t border-border/20 flex items-center justify-between text-3xs font-bold text-muted-foreground uppercase tracking-wider">
                     <span className="flex items-center gap-1">
-                      <Eye className="h-3.5 w-3.5" />
+                      <Eye className="h-3.5 w-3.5 text-accent" />
                       {series.view_count?.toLocaleString() || "0"} Views
                     </span>
-                    <Link to={`/title/${series.id}` as any}>
-                      <span className="flex items-center gap-0.5 text-primary cursor-pointer hover:underline">
+                    <Link to="/title/$slug" params={{ slug: series.slug || series.id }}>
+                      <span className="flex items-center gap-0.5 text-primary hover:text-primary-active cursor-pointer hover:underline">
                         Read Now <ArrowRight className="h-3 w-3" />
                       </span>
                     </Link>
@@ -344,40 +346,39 @@ function Home() {
                 title: "Lightning Speed",
                 desc: "Images load instantly. Next chapters are intelligently pre-loaded in the background.",
                 icon: Zap,
-                color: "oklch(0.78 0.16 200)", // Cyan
+                textColor: "text-cyan-400 border-cyan-500/20 bg-cyan-500/5 group-hover:bg-cyan-500/10",
               },
               {
                 title: "Distraction Free",
                 desc: "Zero redirects, zero popups, and no intrusive ads. Just pure high-definition manga art.",
                 icon: EyeOff,
-                color: "oklch(0.68 0.22 305)", // Purple
+                textColor: "text-violet-400 border-violet-500/20 bg-violet-500/5 group-hover:bg-violet-500/10",
               },
               {
                 title: "Gamified Reading",
                 desc: "Earn XP, unlock rare achievements, climb streaks, and customize your profile badges.",
                 icon: Trophy,
-                color: "#F59E0B", // Amber
+                textColor: "text-amber-400 border-amber-500/20 bg-amber-500/5 group-hover:bg-amber-500/10",
               },
               {
                 title: "Instant Releases",
                 desc: "Follow your favorite creators and get instant push notifications the second a chapter drops.",
                 icon: Bell,
-                color: "#EF4444", // Red
+                textColor: "text-rose-400 border-rose-500/20 bg-rose-500/5 group-hover:bg-rose-500/10",
               },
             ].map((prop, i) => {
               const Icon = prop.icon;
               return (
                 <div
                   key={i}
-                  className="group relative rounded-2xl border border-border/30 bg-card p-6.5 transition-all hover:translate-y-[-4px] hover:border-border/60 hover:bg-card/90"
+                  className="group relative rounded-2xl border border-border/30 bg-card/25 p-6.5 transition-all hover:translate-y-[-4px] hover:border-primary/50 hover:bg-card/45 hover:shadow-lg hover:shadow-primary/5"
                 >
                   <div
-                    className="mb-4 grid h-12 w-12 place-items-center rounded-xl bg-background border border-border/40 transition-transform group-hover:scale-110"
-                    style={{ color: prop.color, boxShadow: `0 4px 20px ${prop.color}15` }}
+                    className={`mb-4 grid h-12 w-12 place-items-center rounded-xl border transition-transform group-hover:scale-110 ${prop.textColor}`}
                   >
                     <Icon className="h-6 w-6" />
                   </div>
-                  <h3 className="text-base font-bold mb-2">{prop.title}</h3>
+                  <h3 className="text-base font-bold mb-2 group-hover:text-primary transition-colors">{prop.title}</h3>
                   <p className="text-xs text-muted-foreground leading-relaxed">{prop.desc}</p>
                 </div>
               );
