@@ -2,7 +2,6 @@ import { Link, useNavigate, useRouter } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import { Menu, X, Search, BookOpen, User as UserIcon, LogOut, ShieldCheck, Library, TrendingUp, Home, Sparkles, Trophy, Shuffle, Tag, Loader2, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { useAuth, useIsAdmin } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
@@ -17,9 +16,6 @@ import {
 import {
   Dialog,
   DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
@@ -32,10 +28,22 @@ import {
   CommandItem,
 } from "@/components/ui/command";
 
+type SearchTab = "comics" | "users" | "groups";
+
+const seriesTypeLabels: Record<string, string> = {
+  manga: "Manga",
+  manhwa: "Manhwa",
+  manhua: "Manhua",
+  novel: "Novels",
+};
+
+const readingTypeOrder = ["manga", "manhwa", "manhua", "novel"];
+
 export function Navbar() {
   const [open, setOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [activeSearchTab, setActiveSearchTab] = useState<SearchTab>("comics");
   const [searching, setSearching] = useState(false);
   const [seriesResults, setSeriesResults] = useState<any[]>([]);
   const [userResults, setUserResults] = useState<any[]>([]);
@@ -63,6 +71,23 @@ export function Navbar() {
     { to: "/rankings", label: "Rankings", icon: Trophy },
     { to: "/recommendations", label: "For You", icon: Sparkles },
   ];
+
+  const hotSeries = useQuery({
+    queryKey: ["navbar-hot-series"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("series")
+        .select("id,slug,title,cover_url,type,rating_average,view_count,is_trending")
+        .eq("is_hidden", false)
+        .order("is_trending", { ascending: false })
+        .order("view_count", { ascending: false })
+        .limit(24);
+      if (error) throw error;
+      return data ?? [];
+    },
+    enabled: searchOpen,
+    staleTime: 10 * 60 * 1000,
+  });
 
   // Get user stats
   const userStats = useQuery({
@@ -117,16 +142,17 @@ export function Navbar() {
             // 1. Search series (titles)
             supabase
               .from("series")
-              .select("id,slug,title,cover_url,type,rating_average")
-              .or(`title.ilike.%${q}%,alternative_titles.ilike.%${q}%`)
-              .limit(5),
+              .select("id,slug,title,cover_url,type,rating_average,author,description,view_count,is_trending")
+              .eq("is_hidden", false)
+              .or(`title.ilike.%${q}%,alternative_titles.ilike.%${q}%,author.ilike.%${q}%,description.ilike.%${q}%`)
+              .limit(24),
             
             // 2. Search users (profiles)
             supabase
               .from("profiles")
               .select("username,avatar_url")
               .ilike("username", `%${q}%`)
-              .limit(5),
+              .limit(12),
 
             // 3. Search scanlation groups from chapters table
             supabase
@@ -144,7 +170,7 @@ export function Navbar() {
             const uniqueGroups = Array.from(
               new Set(groupsRes.data.map((c: any) => c.scanlation_group).filter(Boolean))
             ) as string[];
-            setGroupResults(uniqueGroups.slice(0, 5));
+            setGroupResults(uniqueGroups.slice(0, 12));
           }
         } catch (err) {
           console.error("Search error:", err);
@@ -238,7 +264,7 @@ export function Navbar() {
             size="icon"
             onClick={handleRandom}
             disabled={isRolling}
-            className="hidden sm:flex"
+            className="hidden"
             title="Random Series"
           >
             <Shuffle className={`h-5 w-5 transition-transform ${isRolling ? 'animate-spin' : ''}`} />
@@ -255,8 +281,104 @@ export function Navbar() {
             <Search className="h-5 w-5" />
           </Button>
 
+          {/* Random Button with Dice Animation */}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={handleRandom}
+            disabled={isRolling}
+            className="hidden sm:flex"
+            title="Random Series"
+          >
+            <Shuffle className={`h-5 w-5 transition-transform ${isRolling ? 'animate-spin' : ''}`} />
+          </Button>
+
+          {/* Search Dialog */}
+          <Dialog open={searchOpen} onOpenChange={setSearchOpen}>
+            <DialogContent className="top-[12vh] max-h-[78vh] w-[calc(100vw-1.5rem)] max-w-[620px] translate-y-0 overflow-hidden rounded-md border-border/70 bg-[#202024] p-0 shadow-2xl sm:top-[14vh] [&>button]:hidden">
+              <div className="border-b border-border/60 p-3">
+                <div className="flex items-center gap-3">
+                  <div className="flex min-w-0 flex-1 items-center gap-2 rounded-lg border border-red-500/70 bg-[#151519] px-3 shadow-[0_0_0_1px_rgba(239,68,68,0.08)] focus-within:border-red-500 focus-within:shadow-[0_0_0_1px_rgba(239,68,68,0.35)]">
+                    <Search className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
+                    <input
+                      value={searchQuery}
+                      onChange={(event) => setSearchQuery(event.target.value)}
+                      autoFocus
+                      placeholder="Search manga by title, author or synopsis..."
+                      className="h-10 min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
+                    />
+                    {searching && <Loader2 className="h-4 w-4 animate-spin text-red-500" />}
+                  </div>
+                  <kbd className="hidden rounded border border-border bg-[#2b2b31] px-2 py-1 text-[10px] font-semibold text-muted-foreground sm:inline-flex">
+                    ESC
+                  </kbd>
+                  <button
+                    type="button"
+                    onClick={() => setSearchOpen(false)}
+                    className="grid h-8 w-8 place-items-center rounded-md text-muted-foreground transition hover:bg-secondary hover:text-foreground"
+                    aria-label="Close search"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+
+              <div className="border-b border-border/50 p-3">
+                <div className="grid h-9 grid-cols-3 gap-2 rounded-md bg-[#17171b] p-1">
+                  <SearchTabButton
+                    active={activeSearchTab === "comics"}
+                    icon={<BookOpen className="h-3.5 w-3.5" />}
+                    label="Comics"
+                    onClick={() => setActiveSearchTab("comics")}
+                  />
+                  <SearchTabButton
+                    active={activeSearchTab === "users"}
+                    icon={<UserIcon className="h-3.5 w-3.5" />}
+                    label="Users"
+                    onClick={() => setActiveSearchTab("users")}
+                  />
+                  <SearchTabButton
+                    active={activeSearchTab === "groups"}
+                    icon={<Users className="h-3.5 w-3.5" />}
+                    label="Groups"
+                    onClick={() => setActiveSearchTab("groups")}
+                  />
+                </div>
+              </div>
+
+              <div className="max-h-[54vh] overflow-y-auto px-3 py-4">
+                {activeSearchTab === "comics" && (
+                  <SeriesSearchPanel
+                    query={searchQuery}
+                    loading={searching || hotSeries.isLoading}
+                    items={searchQuery.trim().length >= 2 ? seriesResults : hotSeries.data ?? []}
+                    onSelect={handleSearchSelect}
+                  />
+                )}
+
+                {activeSearchTab === "users" && (
+                  <UserSearchPanel
+                    query={searchQuery}
+                    loading={searching}
+                    items={userResults}
+                    onSelect={handleUserSelect}
+                  />
+                )}
+
+                {activeSearchTab === "groups" && (
+                  <GroupSearchPanel
+                    query={searchQuery}
+                    loading={searching}
+                    items={groupResults}
+                    onSelect={handleGroupSelect}
+                  />
+                )}
+              </div>
+            </DialogContent>
+          </Dialog>
+
           {/* Command Palette Dialog */}
-          <CommandDialog open={searchOpen} onOpenChange={setSearchOpen}>
+          {false && <CommandDialog open={searchOpen} onOpenChange={setSearchOpen}>
             <CommandInput
               placeholder="Search titles, users, or groups..."
               value={searchQuery}
@@ -363,7 +485,7 @@ export function Navbar() {
                 </CommandGroup>
               )}
             </CommandList>
-          </CommandDialog>
+          </CommandDialog>}
 
           {/* User Menu */}
           {user ? (
@@ -497,5 +619,220 @@ export function Navbar() {
         </div>
       )}
     </header>
+  );
+}
+
+function SearchTabButton({
+  active,
+  icon,
+  label,
+  onClick,
+}: {
+  active: boolean;
+  icon: React.ReactNode;
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`flex min-w-0 items-center justify-center gap-2 rounded-md px-2 text-xs font-semibold transition ${
+        active
+          ? "bg-red-600 text-white shadow-[0_8px_20px_rgba(220,38,38,0.25)]"
+          : "text-muted-foreground hover:bg-secondary/80 hover:text-foreground"
+      }`}
+    >
+      {icon}
+      <span className="truncate">{label}</span>
+    </button>
+  );
+}
+
+function SeriesSearchPanel({
+  query,
+  loading,
+  items,
+  onSelect,
+}: {
+  query: string;
+  loading: boolean;
+  items: any[];
+  onSelect: (slug: string) => void;
+}) {
+  const grouped = readingTypeOrder
+    .map((type) => ({
+      type,
+      items: items.filter((item) => item.type === type).slice(0, 6),
+    }))
+    .filter((group) => group.items.length > 0);
+
+  if (loading) return <SearchLoading />;
+
+  if (query.trim().length >= 2 && items.length === 0) {
+    return <SearchEmpty message={`No comics found for "${query}".`} />;
+  }
+
+  if (!loading && items.length === 0) {
+    return <SearchEmpty message="No comics available yet." />;
+  }
+
+  return (
+    <div className="space-y-5">
+      {grouped.map((group) => (
+        <section key={group.type} className="space-y-2">
+          <div className="flex items-center gap-2">
+            <Badge className="h-5 rounded bg-zinc-600 px-1.5 text-[10px] font-bold uppercase text-white hover:bg-zinc-600">
+              Hot
+            </Badge>
+            <h3 className="text-xs font-bold text-zinc-200">
+              {seriesTypeLabels[group.type] ?? group.type}
+            </h3>
+          </div>
+          <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
+            {group.items.map((series) => (
+              <button
+                key={series.id}
+                type="button"
+                onClick={() => onSelect(series.slug)}
+                className="group min-w-0 text-left"
+              >
+                <div className="relative aspect-[2/3] overflow-hidden rounded-md bg-[#151519] shadow-sm ring-1 ring-border/40 transition group-hover:ring-red-500/70">
+                  {series.cover_url ? (
+                    <img
+                      src={series.cover_url}
+                      alt={series.title}
+                      className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
+                      loading="lazy"
+                    />
+                  ) : (
+                    <div className="grid h-full w-full place-items-center text-muted-foreground">
+                      <BookOpen className="h-6 w-6" />
+                    </div>
+                  )}
+                  <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/55 to-transparent p-1.5">
+                    <p className="line-clamp-2 text-[10px] font-bold leading-tight text-white">
+                      {series.title}
+                    </p>
+                  </div>
+                </div>
+              </button>
+            ))}
+          </div>
+        </section>
+      ))}
+    </div>
+  );
+}
+
+function UserSearchPanel({
+  query,
+  loading,
+  items,
+  onSelect,
+}: {
+  query: string;
+  loading: boolean;
+  items: any[];
+  onSelect: (username: string) => void;
+}) {
+  if (query.trim().length < 2) {
+    return <SearchEmpty message="Type at least 2 characters to search users." />;
+  }
+
+  if (loading) return <SearchLoading />;
+
+  if (items.length === 0) {
+    return <SearchEmpty message={`No users found for "${query}".`} />;
+  }
+
+  return (
+    <div className="grid gap-2 sm:grid-cols-2">
+      {items.map((userMember) => (
+        <button
+          key={userMember.username}
+          type="button"
+          onClick={() => onSelect(userMember.username)}
+          className="flex items-center gap-3 rounded-md bg-[#19191d] p-3 text-left transition hover:bg-[#24242a]"
+        >
+          {userMember.avatar_url ? (
+            <img
+              src={userMember.avatar_url}
+              alt={userMember.username}
+              className="h-10 w-10 rounded-full object-cover"
+              loading="lazy"
+            />
+          ) : (
+            <div className="grid h-10 w-10 place-items-center rounded-full bg-red-500/15 text-sm font-bold text-red-300">
+              {userMember.username?.charAt(0)?.toUpperCase()}
+            </div>
+          )}
+          <div className="min-w-0">
+            <p className="truncate text-sm font-semibold text-foreground">{userMember.username}</p>
+            <p className="text-xs text-muted-foreground">View profile</p>
+          </div>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function GroupSearchPanel({
+  query,
+  loading,
+  items,
+  onSelect,
+}: {
+  query: string;
+  loading: boolean;
+  items: string[];
+  onSelect: (groupName: string) => void;
+}) {
+  if (query.trim().length < 2) {
+    return <SearchEmpty message="Type at least 2 characters to search groups." />;
+  }
+
+  if (loading) return <SearchLoading />;
+
+  if (items.length === 0) {
+    return <SearchEmpty message={`No groups found for "${query}".`} />;
+  }
+
+  return (
+    <div className="grid gap-2 sm:grid-cols-2">
+      {items.map((group) => (
+        <button
+          key={group}
+          type="button"
+          onClick={() => onSelect(group)}
+          className="flex items-center gap-3 rounded-md bg-[#19191d] p-3 text-left transition hover:bg-[#24242a]"
+        >
+          <div className="grid h-10 w-10 place-items-center rounded-md bg-red-500/15 text-red-300">
+            <Users className="h-4 w-4" />
+          </div>
+          <div className="min-w-0">
+            <p className="truncate text-sm font-semibold text-foreground">{group}</p>
+            <p className="text-xs text-muted-foreground">Open group titles</p>
+          </div>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function SearchLoading() {
+  return (
+    <div className="flex items-center justify-center gap-2 py-12 text-sm text-muted-foreground">
+      <Loader2 className="h-4 w-4 animate-spin text-red-500" />
+      Searching...
+    </div>
+  );
+}
+
+function SearchEmpty({ message }: { message: string }) {
+  return (
+    <div className="rounded-md border border-dashed border-border/70 bg-[#19191d] px-4 py-10 text-center text-sm text-muted-foreground">
+      {message}
+    </div>
   );
 }
