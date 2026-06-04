@@ -19,7 +19,7 @@ export function PrivacySettings() {
   const qc = useQueryClient();
   
   const [profileVisibility, setProfileVisibility] = useState("public");
-  const [showReadingHistory, setShowReadingHistory] = useState(true);
+  const [showLibraries, setShowLibraries] = useState(true);
   const [showAchievements, setShowAchievements] = useState(true);
   const [showStatistics, setShowStatistics] = useState(true);
 
@@ -45,7 +45,7 @@ export function PrivacySettings() {
   useEffect(() => {
     if (privacySettings.data) {
       setProfileVisibility(privacySettings.data.profile_visibility || "public");
-      setShowReadingHistory(privacySettings.data.show_reading_history !== false);
+      setShowLibraries(privacySettings.data.show_reading_history !== false);
       setShowAchievements(privacySettings.data.show_achievements !== false);
       setShowStatistics(privacySettings.data.show_statistics !== false);
     }
@@ -57,21 +57,34 @@ export function PrivacySettings() {
       const { data: u } = await supabase.auth.getUser();
       if (!u.user) throw new Error("Not authenticated");
 
-      const { error } = await supabase
+      const nextSettings = {
+        profile_visibility: profileVisibility,
+        show_reading_history: showLibraries,
+        show_achievements: showAchievements,
+        show_statistics: showStatistics,
+      };
+
+      const { data, error } = await supabase
         .from("profiles")
-        .update({
-          profile_visibility: profileVisibility,
-          show_reading_history: showReadingHistory,
-          show_achievements: showAchievements,
-          show_statistics: showStatistics,
-        })
-        .eq("user_id", u.user.id);
+        .update(nextSettings as any)
+        .eq("user_id", u.user.id)
+        .select("profile_visibility, show_reading_history, show_achievements, show_statistics")
+        .maybeSingle();
 
       if (error) throw error;
+      if (!data) {
+        throw new Error("Privacy settings could not be saved. Please refresh and try again.");
+      }
+
+      return data;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      qc.setQueryData(["privacy-settings"], data);
       qc.invalidateQueries({ queryKey: ["privacy-settings"] });
       qc.invalidateQueries({ queryKey: ["profile"] });
+      qc.invalidateQueries({ queryKey: ["public-profile"] });
+      qc.invalidateQueries({ queryKey: ["public-profile-stats"] });
+      qc.invalidateQueries({ queryKey: ["public-profile-library"] });
       toast.success("Privacy settings updated");
     },
     onError: (error: Error) => {
@@ -103,6 +116,15 @@ export function PrivacySettings() {
   const selectedOption = visibilityOptions.find(
     (opt) => opt.value === profileVisibility
   );
+  const savedProfileVisibility = privacySettings.data?.profile_visibility || "public";
+  const savedShowLibraries = privacySettings.data?.show_reading_history !== false;
+  const savedShowAchievements = privacySettings.data?.show_achievements !== false;
+  const savedShowStatistics = privacySettings.data?.show_statistics !== false;
+  const hasUnsavedChanges =
+    profileVisibility !== savedProfileVisibility ||
+    showLibraries !== savedShowLibraries ||
+    showAchievements !== savedShowAchievements ||
+    showStatistics !== savedShowStatistics;
 
   return (
     <div className="space-y-6">
@@ -113,6 +135,30 @@ export function PrivacySettings() {
           Control who can see your profile information
         </p>
       </div>
+
+      {hasUnsavedChanges && (
+        <Card className="border-violet-500/30 bg-violet-500/10 p-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex gap-3 text-sm">
+              <Shield className="mt-0.5 h-4 w-4 flex-shrink-0 text-violet-500" />
+              <div>
+                <p className="font-medium">You have unsaved privacy changes</p>
+                <p className="text-muted-foreground">
+                  Save them before checking your public profile.
+                </p>
+              </div>
+            </div>
+            <Button
+              onClick={() => saveSettings.mutate()}
+              disabled={saveSettings.isPending}
+              size="sm"
+              className="sm:w-auto"
+            >
+              {saveSettings.isPending ? "Saving..." : "Save Now"}
+            </Button>
+          </div>
+        </Card>
+      )}
 
       {/* Profile Visibility */}
       <Card className="p-4 sm:p-6">
@@ -171,20 +217,20 @@ export function PrivacySettings() {
             Choose what information others can see on your profile
           </p>
 
-          {/* Reading History */}
+          {/* Libraries */}
           <div className="flex items-center justify-between gap-4">
             <div className="min-w-0 space-y-1">
-              <Label htmlFor="reading-history" className="cursor-pointer">
-                Reading History
+              <Label htmlFor="libraries" className="cursor-pointer">
+                Libraries
               </Label>
               <p className="text-xs text-muted-foreground">
-                Show chapters you've read and series you're following
+                Show series saved in your library on your public profile
               </p>
             </div>
             <Switch
-              id="reading-history"
-              checked={showReadingHistory}
-              onCheckedChange={setShowReadingHistory}
+              id="libraries"
+              checked={showLibraries}
+              onCheckedChange={setShowLibraries}
             />
           </div>
 
@@ -245,10 +291,14 @@ export function PrivacySettings() {
       {/* Save Button */}
       <Button
         onClick={() => saveSettings.mutate()}
-        disabled={saveSettings.isPending}
+        disabled={saveSettings.isPending || !hasUnsavedChanges}
         className="w-full"
       >
-        {saveSettings.isPending ? "Saving..." : "Save Privacy Settings"}
+        {saveSettings.isPending
+          ? "Saving..."
+          : hasUnsavedChanges
+            ? "Save Privacy Settings"
+            : "Privacy Settings Saved"}
       </Button>
     </div>
   );

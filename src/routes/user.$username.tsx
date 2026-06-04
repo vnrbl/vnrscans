@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { pageTitle } from "@/lib/brand";
 import { Card } from "@/components/ui/card";
@@ -18,6 +19,7 @@ import {
   UserX,
   ArrowLeft,
   Clock,
+  Lock,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SocialLinksDisplay } from "@/components/profile/SocialLinks";
@@ -31,18 +33,18 @@ type PublicProfileStats = {
   show_statistics: boolean;
 };
 
-type PublicReadingHistoryItem = {
-  history_id: string;
+type PublicLibraryItem = {
+  library_id: string;
   updated_at: string;
+  reading_status: string;
   series_id: string;
   series_slug: string;
   series_title: string;
   series_cover_url: string | null;
-  chapter_id: string;
-  chapter_slug: string;
-  chapter_number: number;
-  chapter_title: string | null;
-  progress: number;
+  series_type: string;
+  series_status: string;
+  rating_average: number;
+  view_count: number;
 };
 
 export const Route = createFileRoute("/user/$username")({
@@ -54,6 +56,7 @@ export const Route = createFileRoute("/user/$username")({
 
 function PublicProfilePage() {
   const { username } = Route.useParams();
+  const qc = useQueryClient();
 
   // Fetch public profile by username
   const profile = useQuery({
@@ -121,37 +124,78 @@ function PublicProfilePage() {
   });
 
   const isProfilePublic = (profile.data?.profile_visibility ?? "public") === "public";
-  const showReadingHistory = isProfilePublic && profile.data?.show_reading_history !== false;
-  const showAchievements = isProfilePublic && profile.data?.show_achievements !== false;
-  const showStatistics = isProfilePublic && profile.data?.show_statistics !== false;
+  const showLibraries = publicStats.data?.show_reading_history === true;
+  const showAchievements = publicStats.data?.show_achievements === true;
+  const showStatistics = publicStats.data?.show_statistics === true;
+  const showStatsStrip = isProfilePublic && showLibraries && showAchievements && showStatistics;
 
-  const publicReadingHistory = useQuery({
-    queryKey: ["public-profile-reading-history", profile.data?.user_id],
+  useEffect(() => {
+    const userId = profile.data?.user_id;
+    if (!userId) return;
+
+    const refreshPublicProfile = () => {
+      qc.invalidateQueries({ queryKey: ["public-profile", username] });
+      qc.invalidateQueries({ queryKey: ["public-profile-stats", userId] });
+      qc.invalidateQueries({ queryKey: ["public-profile-library", userId] });
+      qc.invalidateQueries({ queryKey: ["public-profile-achievements", userId] });
+    };
+
+    const channel = supabase
+      .channel(`public-profile-sync-${userId}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "profiles", filter: `user_id=eq.${userId}` },
+        refreshPublicProfile
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "reading_history", filter: `user_id=eq.${userId}` },
+        refreshPublicProfile
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "user_library", filter: `user_id=eq.${userId}` },
+        refreshPublicProfile
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "user_achievements", filter: `user_id=eq.${userId}` },
+        refreshPublicProfile
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [profile.data?.user_id, qc, username]);
+
+  const publicLibrary = useQuery({
+    queryKey: ["public-profile-library", profile.data?.user_id],
     queryFn: async () => {
-      if (!profile.data?.user_id) return [] as PublicReadingHistoryItem[];
+      if (!profile.data?.user_id) return [] as PublicLibraryItem[];
 
       const { data, error } = await (supabase as any)
-        .rpc("get_public_reading_history", {
+        .rpc("get_public_library_items", {
           _profile_user_id: profile.data.user_id,
           _limit: 12,
         });
 
       if (error) throw error;
       return (data ?? []).map((item: any) => ({
-        history_id: item.history_id,
+        library_id: item.library_id,
         updated_at: item.updated_at,
+        reading_status: item.reading_status,
         series_id: item.series_id,
         series_slug: item.series_slug,
         series_title: item.series_title,
         series_cover_url: item.series_cover_url,
-        chapter_id: item.chapter_id,
-        chapter_slug: item.chapter_slug,
-        chapter_number: Number(item.chapter_number ?? 0),
-        chapter_title: item.chapter_title,
-        progress: Number(item.progress ?? 0),
-      })) satisfies PublicReadingHistoryItem[];
+        series_type: item.series_type,
+        series_status: item.series_status,
+        rating_average: Number(item.rating_average ?? 0),
+        view_count: Number(item.view_count ?? 0),
+      })) satisfies PublicLibraryItem[];
     },
-    enabled: !!profile.data?.user_id && showReadingHistory,
+    enabled: !!profile.data?.user_id && showLibraries,
     staleTime: 5 * 60 * 1000,
   });
 
@@ -169,7 +213,7 @@ function PublicProfilePage() {
       if (error) return [];
       return data || [];
     },
-    enabled: !!profile.data?.user_id,
+    enabled: !!profile.data?.user_id && showAchievements,
     staleTime: 5 * 60 * 1000,
   });
 
@@ -214,6 +258,7 @@ function PublicProfilePage() {
   const xpForNextLevel = Math.pow((level + 1) * 2, 2);
   const xpProgress = ((xp % xpForNextLevel) / xpForNextLevel) * 100;
   const roles = userRoles.data ?? [];
+  const profileVisibility = profile.data.profile_visibility ?? "public";
 
   const socialLinks = {
     social_discord: profile.data.social_discord || "",
@@ -223,6 +268,37 @@ function PublicProfilePage() {
     social_anilist: profile.data.social_anilist || "",
     social_website: profile.data.social_website || "",
   };
+
+  if (profileVisibility !== "public") {
+    return (
+      <div className="min-h-screen">
+        <div className="container mx-auto flex min-h-[70vh] max-w-3xl items-center px-4 sm:px-6">
+          <Card className="w-full p-8 text-center">
+            <div
+              className="mx-auto grid h-14 w-14 place-items-center rounded-full"
+              style={{ backgroundColor: `${accentColor}15`, color: accentColor }}
+            >
+              <Lock className="h-6 w-6" />
+            </div>
+            <h1 className="mt-4 text-2xl font-bold">
+              {profileVisibility === "friends" ? "Profile Limited" : "Private Profile"}
+            </h1>
+            <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
+              {profileVisibility === "friends"
+                ? "This user only shares their profile with approved connections."
+                : "This user has chosen to keep their profile private."}
+            </p>
+            <Link to="/home" className="mt-6 inline-flex">
+              <Button variant="outline" className="gap-2">
+                <ArrowLeft className="h-4 w-4" />
+                Back to home
+              </Button>
+            </Link>
+          </Card>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen">
@@ -360,34 +436,26 @@ function PublicProfilePage() {
       )}
 
       {/* Stats */}
-      {(showStatistics || showReadingHistory || showAchievements) && (
+      {showStatsStrip && (
         <div className="container mx-auto max-w-5xl px-4 sm:px-6 md:px-12 lg:px-16 mt-6">
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {showStatistics && (
-              <PublicStatCard label="Reading Streak" value={profile.data.reading_streak || 0} suffix=" days" icon={<Flame className="h-6 w-6" />} color="#F97316" />
-            )}
-            {showReadingHistory && (
-              <>
-                <PublicStatCard label="Chapters Read" value={publicStats.data?.chapters_read || 0} icon={<BookOpen className="h-6 w-6" />} color="#3B82F6" />
-                <PublicStatCard label="Series Followed" value={publicStats.data?.series_followed || 0} icon={<Star className="h-6 w-6" />} color="#F59E0B" />
-              </>
-            )}
-            {showAchievements && (
-              <PublicStatCard label="Achievements" value={publicStats.data?.achievements_unlocked || 0} icon={<Award className="h-6 w-6" />} color={accentColor} />
-            )}
+            <PublicStatCard label="Reading Streak" value={profile.data.reading_streak || 0} suffix=" days" icon={<Flame className="h-6 w-6" />} color="#F97316" />
+            <PublicStatCard label="Chapters Read" value={publicStats.data?.chapters_read || 0} icon={<BookOpen className="h-6 w-6" />} color="#3B82F6" />
+            <PublicStatCard label="Series Followed" value={publicStats.data?.series_followed || 0} icon={<Star className="h-6 w-6" />} color="#F59E0B" />
+            <PublicStatCard label="Achievements" value={publicStats.data?.achievements_unlocked || 0} icon={<Award className="h-6 w-6" />} color={accentColor} />
           </div>
         </div>
       )}
 
-      {/* Reading History */}
-      {showReadingHistory && (
+      {/* Library */}
+      {showLibraries && (
         <div className="container mx-auto max-w-5xl px-4 sm:px-6 md:px-12 lg:px-16 mt-8">
           <div className="mb-4 flex items-center gap-2">
             <BookOpen className="h-5 w-5" style={{ color: accentColor }} />
-            <h2 className="text-xl font-bold">Reading History</h2>
+            <h2 className="text-xl font-bold">Library</h2>
           </div>
 
-          {publicReadingHistory.isLoading ? (
+          {publicLibrary.isLoading ? (
             <div className="grid gap-3 sm:grid-cols-2">
               {[...Array(4)].map((_, index) => (
                 <Card key={index} className="p-3">
@@ -402,13 +470,13 @@ function PublicProfilePage() {
                 </Card>
               ))}
             </div>
-          ) : publicReadingHistory.data && publicReadingHistory.data.length > 0 ? (
+          ) : publicLibrary.data && publicLibrary.data.length > 0 ? (
             <div className="grid gap-3 sm:grid-cols-2">
-              {publicReadingHistory.data.map((item) => (
+              {publicLibrary.data.map((item) => (
                 <Link
-                  key={item.history_id}
-                  to="/title/$titleSlug/$chapterSlug"
-                  params={{ titleSlug: item.series_slug, chapterSlug: item.chapter_slug }}
+                  key={item.library_id}
+                  to="/title/$slug"
+                  params={{ slug: item.series_slug }}
                   className="group rounded-lg border border-border/40 bg-card p-3 transition-all hover:border-primary/50 hover:shadow-lg"
                 >
                   <div className="flex gap-3">
@@ -430,18 +498,23 @@ function PublicProfilePage() {
                       <p className="truncate text-sm font-semibold group-hover:text-primary">
                         {item.series_title}
                       </p>
-                      <p className="mt-1 text-sm text-muted-foreground">
-                        Chapter {item.chapter_number}
-                        {item.chapter_title ? `: ${item.chapter_title}` : ""}
-                      </p>
+                      <div className="mt-1 flex flex-wrap items-center gap-2 text-xs">
+                        <Badge variant="outline" className="text-xs capitalize">
+                          {formatLibraryStatus(item.reading_status)}
+                        </Badge>
+                        <span className="text-muted-foreground capitalize">
+                          {item.series_type}
+                        </span>
+                      </div>
                       <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                         <span className="inline-flex items-center gap-1">
                           <Clock className="h-3 w-3" />
-                          {new Date(item.updated_at).toLocaleDateString()}
+                          Updated {new Date(item.updated_at).toLocaleDateString()}
                         </span>
-                        {item.progress > 0 && item.progress < 100 && (
-                          <span>{item.progress}% read</span>
-                        )}
+                        <span className="inline-flex items-center gap-1">
+                          <Star className="h-3 w-3" />
+                          {item.rating_average.toFixed(1)}
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -451,7 +524,7 @@ function PublicProfilePage() {
           ) : (
             <Card className="p-6 text-center">
               <p className="text-sm text-muted-foreground">
-                No public reading history yet.
+                No public library activity yet.
               </p>
             </Card>
           )}
@@ -501,6 +574,10 @@ function PublicProfilePage() {
       {(!achievements.data || achievements.data.length === 0) && <div className="h-12" />}
     </div>
   );
+}
+
+function formatLibraryStatus(status: string) {
+  return status.replace(/_/g, " ");
 }
 
 function PublicStatCard({

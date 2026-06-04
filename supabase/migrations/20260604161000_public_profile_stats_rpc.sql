@@ -14,7 +14,7 @@ RETURNS TABLE (
 LANGUAGE sql
 STABLE
 SECURITY DEFINER
-SET search_path = public
+SET search_path = public, pg_temp
 AS $$
   WITH profile_settings AS (
     SELECT
@@ -40,8 +40,8 @@ AS $$
     CASE
       WHEN ps.show_reading_history THEN (
         SELECT COUNT(*)
-        FROM public.series_follows sf
-        WHERE sf.user_id = ps.user_id
+        FROM public.user_library ul
+        WHERE ul.user_id = ps.user_id
       )
       ELSE 0
     END AS series_followed,
