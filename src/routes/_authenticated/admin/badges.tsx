@@ -13,7 +13,14 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogT
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { BadgeIcon, emojiToIconName, enhanceBadge } from "@/components/profile/ProfileBadges";
+import { 
+  BadgeIcon, 
+  emojiToIconName, 
+  enhanceBadge, 
+  parseBadgeDescription,
+  difficultyColors,
+  type ProfileBadgeRow 
+} from "@/lib/profileBadges";
 
 export const Route = createFileRoute("/_authenticated/admin/badges")({
   head: () => ({ meta: [{ title: "Admin · Realms & Badges" }] }),
@@ -44,29 +51,6 @@ const emptyForm: BadgeForm = {
   is_active: true,
 };
 
-function parseDescriptionField(rawDescription: string | null): {
-  description: string;
-  category: "Title" | "Badge" | "Tag";
-  difficulty: "Easy" | "Moderate" | "Hard" | "Godly";
-} {
-  if (!rawDescription) {
-    return { description: "", category: "Badge", difficulty: "Easy" };
-  }
-  if (rawDescription.startsWith("{")) {
-    try {
-      const parsed = JSON.parse(rawDescription);
-      return {
-        description: parsed.description || "",
-        category: parsed.category || "Badge",
-        difficulty: parsed.difficulty || "Easy",
-      };
-    } catch (e) {
-      // Fallback
-    }
-  }
-  return { description: rawDescription, category: "Badge", difficulty: "Easy" };
-}
-
 function AdminBadges() {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
@@ -85,18 +69,17 @@ function AdminBadges() {
         throw error;
       }
       return (data || []).map((b: any) => {
-        const enhanced = enhanceBadge(b);
-        const parsed = parseDescriptionField(b.description);
-        const isJsonConfigured = b.description && b.description.startsWith('{');
+        const enhanced = enhanceBadge(b as ProfileBadgeRow);
+        const parsed = parseBadgeDescription(b.description);
         
         return {
           ...b,
           name: enhanced.name,
           icon: enhanced.icon,
           badge_color: enhanced.badge_color,
-          category: isJsonConfigured ? parsed.category : enhanced.category,
-          difficulty: isJsonConfigured ? parsed.difficulty : enhanced.difficulty,
-          actualDescription: isJsonConfigured ? parsed.description : (enhanced.description || b.description),
+          category: enhanced.category,
+          difficulty: enhanced.difficulty,
+          actualDescription: enhanced.description,
         };
       });
     },
@@ -177,13 +160,6 @@ function AdminBadges() {
     },
     onError: (e: Error) => toast.error(e.message),
   });
-
-  const difficultyColors = {
-    Easy: "border-emerald-500/30 bg-emerald-500/10 text-emerald-500 dark:text-emerald-400",
-    Moderate: "border-sky-500/30 bg-sky-500/10 text-sky-500 dark:text-sky-400",
-    Hard: "border-purple-500/30 bg-purple-500/10 text-purple-500 dark:text-purple-400",
-    Godly: "border-red-500/30 bg-red-500/10 text-red-500 dark:text-red-400",
-  };
 
   const predefinedColors = [
     "#EF4444", "#F97316", "#F59E0B", "#10B981", "#14B8A6",

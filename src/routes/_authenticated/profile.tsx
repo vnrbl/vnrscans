@@ -33,7 +33,8 @@ import {
 } from "lucide-react";
 import { ReadingGoals } from "@/components/profile/ReadingGoals";
 import { AvatarUpload } from "@/components/profile/AvatarUpload";
-import { ProfileBadges, enhanceBadge, BadgeIcon } from "@/components/profile/ProfileBadges";
+import { ProfileBadges } from "@/components/profile/ProfileBadges";
+import { BadgeIcon, enhanceBadge, type ProfileBadgeRow } from "@/lib/profileBadges";
 import { PrivacySettings } from "@/components/profile/PrivacySettings";
 import { ReadingHeatmap } from "@/components/profile/ReadingHeatmap";
 import { ProfileWidgets } from "@/components/profile/ProfileWidgets";
@@ -57,8 +58,8 @@ const keyframeStyles = `
   50% { transform: scale(1.04); }
 }
 @keyframes profileXpGlow {
-  0%, 100% { box-shadow: 0 0 8px var(--xp-color, #8B5CF6); }
-  50% { box-shadow: 0 0 20px var(--xp-color, #8B5CF6); }
+  0%, 100% { box-shadow: 0 0 8px oklch(0.78 0.16 200 / 0.5); }
+  50% { box-shadow: 0 0 24px oklch(0.68 0.22 305 / 0.6); }
 }
 `;
 
@@ -328,6 +329,7 @@ function ProfilePage() {
   const level = profile.data?.user_level || 1;
   const xpForNextLevel = Math.pow((level + 1) * 2, 2);
   const xpProgress = ((xp % xpForNextLevel) / xpForNextLevel) * 100;
+  const isAdmin = userRoles.data?.includes("admin");
 
   return (
     <div className="min-h-screen">
@@ -375,19 +377,9 @@ function ProfilePage() {
 
             {/* Name + meta */}
             <div className="flex-1 pb-2">
+              {/* Username + role badges row */}
               <div className="flex flex-wrap items-center gap-3">
-                <div className="flex flex-col">
-                  <h1 className="text-3xl font-extrabold tracking-tight">{username || "Loading..."}</h1>
-                  {equippedBadge.data && (
-                    <div className="flex items-center gap-1.5 mt-1 text-xs font-semibold text-violet-500">
-                      <span className="text-muted-foreground font-normal">Title:</span>
-                      <span style={{ color: equippedBadge.data.badge?.badge_color }}>
-                        <BadgeIcon icon={equippedBadge.data.badge?.icon} className="h-3.5 w-3.5" />
-                      </span>
-                      <span>{equippedBadge.data.badge?.name}</span>
-                    </div>
-                  )}
-                </div>
+                <h1 className="text-3xl font-extrabold tracking-tight text-gradient">{username || "Loading..."}</h1>
                 <div className="flex flex-wrap items-center gap-2">
                   {userRoles.data?.includes("admin") && (
                     <Badge
@@ -424,19 +416,32 @@ function ProfilePage() {
                 </div>
               </div>
 
-              <p className="mt-1 text-sm text-muted-foreground">{profile.data?.email}</p>
+              {/* Title badge */}
+              {equippedBadge.data && (
+                <div className="flex items-center gap-1.5 mt-2 text-xs font-semibold w-fit" style={{ background: 'linear-gradient(135deg, oklch(0.68 0.22 305 / 0.12), oklch(0.78 0.16 200 / 0.08))', padding: '5px 12px', borderRadius: '9999px', border: '1px solid oklch(0.68 0.22 305 / 0.2)' }}>
+                  <span className="text-muted-foreground">Title:</span>
+                  <span style={{ color: equippedBadge.data.badge?.badge_color }}>
+                    <BadgeIcon icon={equippedBadge.data.badge?.icon} className="h-3.5 w-3.5" />
+                  </span>
+                  <span style={{ color: 'oklch(0.78 0.16 200)' }}>{equippedBadge.data.badge?.name}</span>
+                </div>
+              )}
+
+              {/* Email */}
+              <p className="mt-2 text-sm text-muted-foreground">{profile.data?.email}</p>
 
               {/* Social links + join date row */}
               <div className="mt-3 flex flex-wrap items-center gap-3">
                 <SocialLinksDisplay values={socialLinks} accentColor={accentColor} />
-                <Badge variant="outline" className="text-xs">
+                <Badge variant="outline" className="text-xs border-0" style={{ background: 'linear-gradient(135deg, oklch(0.68 0.22 305 / 0.9), oklch(0.78 0.16 200 / 0.9))', color: 'oklch(0.21 0.006 286)', boxShadow: '0 2px 10px oklch(0.68 0.22 305 / 0.3)' }}>
                   <Calendar className="mr-1 h-3 w-3" />
                   Joined {new Date(profile.data?.created_at || "").toLocaleDateString()}
                 </Badge>
               </div>
 
+              {/* Bio */}
               {bio && (
-                <p className="mt-3 max-w-xl text-sm text-muted-foreground">{bio}</p>
+                <p className="mt-3 max-w-xl text-sm" style={{ background: 'oklch(0.255 0.004 286 / 0.8)', backdropFilter: 'blur(12px)', border: '1px solid oklch(0.68 0.22 305 / 0.15)', borderRadius: '12px', padding: '10px 14px', color: 'oklch(0.85 0.006 286)', lineHeight: '1.6' }}>{bio}</p>
               )}
             </div>
           </div>
@@ -448,26 +453,41 @@ function ProfilePage() {
         <div
           className="rounded-xl border border-border/40 p-4"
           style={{
-            background: `linear-gradient(135deg, ${accentColor}08, transparent)`,
+            background: 'linear-gradient(135deg, oklch(0.68 0.22 305 / 0.06), oklch(0.78 0.16 200 / 0.03))',
           }}
         >
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2">
-              <Trophy className="h-5 w-5" style={{ color: accentColor }} />
-              <span className="font-bold">Level {level}</span>
-              <Sparkles className="h-4 w-4 text-muted-foreground" />
+              <Trophy className="h-5 w-5" style={{ color: isAdmin ? 'oklch(0.78 0.16 200)' : 'oklch(0.68 0.22 305)' }} />
+              {isAdmin ? (
+                <span className="font-bold text-gradient">Maxed Out</span>
+              ) : (
+                <span className="font-bold">Level {level}</span>
+              )}
+              <Sparkles className="h-4 w-4" style={{ color: isAdmin ? 'oklch(0.78 0.16 200)' : 'oklch(0.68 0.22 305)' }} />
             </div>
-            <span className="text-sm text-muted-foreground">
-              {xp} / {xpForNextLevel} XP
-            </span>
+            {isAdmin ? (
+              <span className="text-sm font-semibold text-gradient">
+                Infinite XP & Aura ✨
+              </span>
+            ) : (
+              <span className="text-sm text-muted-foreground">
+                {xp} / {xpForNextLevel} XP
+              </span>
+            )}
           </div>
           <div className="relative h-3 w-full overflow-hidden rounded-full bg-secondary">
             <div
               className="h-full rounded-full transition-all duration-1000 ease-out"
               style={{
-                width: `${xpProgress}%`,
-                background: `linear-gradient(90deg, ${accentColor}, ${accentColor}CC)`,
-                boxShadow: `0 0 12px ${accentColor}60`,
+                width: isAdmin ? '100%' : `${xpProgress}%`,
+                background: isAdmin
+                  ? 'linear-gradient(90deg, oklch(0.78 0.16 200), oklch(0.68 0.22 305), oklch(0.78 0.16 200))'
+                  : `linear-gradient(90deg, oklch(0.68 0.22 305), oklch(0.78 0.16 200))`,
+                boxShadow: isAdmin
+                  ? 'var(--glow-accent)'
+                  : 'var(--glow-primary)',
+                animation: isAdmin ? 'profileXpGlow 2s ease-in-out infinite' : undefined,
               }}
             />
           </div>

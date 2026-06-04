@@ -10,7 +10,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import * as Icons from "lucide-react";
 import { Check, Lock, Trophy, Sparkles } from "lucide-react";
 import { useState, useMemo } from "react";
 import {
@@ -19,523 +18,24 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { fallbackBadgeRows } from "@/lib/profileBadges";
+import { 
+  fallbackBadgeRows, 
+  BadgeIcon, 
+  enhanceBadge, 
+  difficultyWeights,
+  difficultyColors,
+  type ProfileBadgeRow,
+  type NormalizedBadge
+} from "@/lib/profileBadges";
 
-type ProfileBadge = {
-  id: string;
-  name: string;
-  description: string | null;
-  icon: string;
-  badge_color: string;
-  requirement_type: string;
-  requirement_value: number | null;
-};
+type ProfileBadge = ProfileBadgeRow;
 
 type UserBadge = {
   id: string;
   badge_id: string;
   earned_at: string;
   is_equipped: boolean;
-  badge: ProfileBadge;
-};
-
-const rarityColors: Record<string, string> = {
-  common: "#9CA3AF",
-  uncommon: "#10B981",
-  rare: "#3B82F6",
-  epic: "#8B5CF6",
-  legendary: "#F59E0B",
-};
-
-export const emojiToIconName: Record<string, string> = {
-  '🧘‍♂️': 'Flame',
-  '⚡': 'Zap',
-  '💀': 'Skull',
-  '⚔️': 'Swords',
-  '👹': 'Flame',
-  '🌅': 'Sun',
-  '🌙': 'Moon',
-  '🦁': 'PawPrint',
-  '📜': 'Scroll',
-  '⚖️': 'Scale',
-  '🧪': 'FlaskConical',
-  '🌌': 'Orbit',
-  '👑': 'Crown',
-  '🗡️': 'Sword',
-  '🪶': 'Feather',
-  '☯️': 'Compass',
-  '🐘': 'ShieldAlert',
-  '🐢': 'Shield',
-  '🍶': 'FlaskConical',
-  '🧙‍♂️': 'User',
-  '🧑‍🦳': 'User',
-  '👻': 'Ghost',
-  '🩸': 'Droplet',
-  '🐾': 'PawPrint',
-  '😈': 'Flame',
-  '🌸': 'Flower',
-  '🏔️': 'Mountain',
-  '🌑': 'Moon',
-  '💊': 'Pills',
-  '📿': 'Gem',
-  '🐉': 'Sparkles',
-  '🔥': 'Flame',
-  '🌱': 'Sprout',
-  '🧱': 'Layers',
-  '🟡': 'Circle',
-  '👶': 'Baby',
-  '🌿': 'Leaf',
-  '🔏': 'PenTool',
-  '💠': 'Grid',
-  '⛈️': 'CloudLightning',
-  '☁️': 'Cloud',
-  '🛡️': 'Shield',
-  '⛺': 'Tent',
-  '🏅': 'Award',
-};
-
-export function BadgeIcon({ icon, className }: { icon: string; className?: string }) {
-  const iconName = emojiToIconName[icon] || 'Award';
-  const IconComponent = (Icons as any)[iconName] || Icons.Award;
-  return <IconComponent className={className} />;
-}
-
-export const difficultyWeights = {
-  Easy: 1,
-  Moderate: 2,
-  Hard: 3,
-  Godly: 4,
-};
-
-export type EnhancedBadge = ProfileBadge & {
-  category: 'Badge' | 'Title';
-  difficulty: 'Easy' | 'Moderate' | 'Hard' | 'Godly';
-};
-
-const badgeMetadataMap: Record<string, {
-  name: string;
-  category: 'Badge' | 'Title';
-  difficulty: 'Easy' | 'Moderate' | 'Hard' | 'Godly';
-  color: string;
-  icon: string;
-}> = {
-  'Top Reader': {
-    name: 'Supreme Dao Ancestor',
-    category: 'Title',
-    difficulty: 'Godly',
-    color: '#EF4444',
-    icon: '🧘‍♂️',
-  },
-  'Speedrunner': {
-    name: 'Qi Condensation Speedrunner',
-    category: 'Badge',
-    difficulty: 'Moderate',
-    color: '#3B82F6',
-    icon: '⚡',
-  },
-  'Completionist': {
-    name: 'Grandmaster of Demonic Cultivation',
-    category: 'Title',
-    difficulty: 'Hard',
-    color: '#8B5CF6',
-    icon: '💀',
-  },
-  'Loyal Fan': {
-    name: 'Sword Sect Disciple',
-    category: 'Badge',
-    difficulty: 'Easy',
-    color: '#10B981',
-    icon: '⚔️',
-  },
-  'Streak Master': {
-    name: 'Asura Demon Emperor',
-    category: 'Title',
-    difficulty: 'Godly',
-    color: '#F59E0B',
-    icon: '👹',
-  },
-  'Early Bird': {
-    name: 'Rising Sun Qi Gatherer',
-    category: 'Badge',
-    difficulty: 'Easy',
-    color: '#FBBF24',
-    icon: '🌅',
-  },
-  'Night Owl': {
-    name: 'Shadow Realm Wanderer',
-    category: 'Badge',
-    difficulty: 'Easy',
-    color: '#6366F1',
-    icon: '🌙',
-  },
-  'Genre Explorer': {
-    name: 'Myriad Beast Emperor',
-    category: 'Title',
-    difficulty: 'Moderate',
-    color: '#14B8A6',
-    icon: '🦁',
-  },
-  'Commentator': {
-    name: 'Heavenly Dao Gossip Scholar',
-    category: 'Badge',
-    difficulty: 'Moderate',
-    color: '#06B6D4',
-    icon: '📜',
-  },
-  'Critic': {
-    name: 'Supreme Immortal Judge',
-    category: 'Title',
-    difficulty: 'Hard',
-    color: '#EC4899',
-    icon: '⚖️',
-  },
-  'Divine Alchemist': {
-    name: 'Divine Alchemist',
-    category: 'Badge',
-    difficulty: 'Moderate',
-    color: '#10B981',
-    icon: '🧪',
-  },
-  'Void Stepper': {
-    name: 'Void Stepper',
-    category: 'Badge',
-    difficulty: 'Hard',
-    color: '#8B5CF6',
-    icon: '🌌',
-  },
-  'Demonic Sovereign': {
-    name: 'Demonic Sovereign',
-    category: 'Title',
-    difficulty: 'Godly',
-    color: '#EF4444',
-    icon: '👑',
-  },
-  'Sword God': {
-    name: 'Sword God',
-    category: 'Title',
-    difficulty: 'Godly',
-    color: '#3B82F6',
-    icon: '🗡️',
-  },
-  'Nine Heavens Immortal': {
-    name: 'Nine Heavens Immortal',
-    category: 'Title',
-    difficulty: 'Godly',
-    color: '#EF4444',
-    icon: '🪶',
-  },
-  'Primordial Chaos Sage': {
-    name: 'Primordial Chaos Sage',
-    category: 'Title',
-    difficulty: 'Godly',
-    color: '#F59E0B',
-    icon: '☯️',
-  },
-  'Dragon-Elephant Warrior': {
-    name: 'Dragon-Elephant Warrior',
-    category: 'Badge',
-    difficulty: 'Hard',
-    color: '#F97316',
-    icon: '🐘',
-  },
-  'Undying Hermit': {
-    name: 'Undying Hermit',
-    category: 'Title',
-    difficulty: 'Moderate',
-    color: '#9CA3AF',
-    icon: '🐢',
-  },
-  'Elixir Master': {
-    name: 'Elixir Master',
-    category: 'Badge',
-    difficulty: 'Moderate',
-    color: '#10B981',
-    icon: '🍶',
-  },
-  'Heavenly Emperor': {
-    name: 'Heavenly Emperor',
-    category: 'Title',
-    difficulty: 'Godly',
-    color: '#EF4444',
-    icon: '👑',
-  },
-  'Reincarnated Elder': {
-    name: 'Reincarnated Elder',
-    category: 'Title',
-    difficulty: 'Hard',
-    color: '#8B5CF6',
-    icon: '🧙‍♂️',
-  },
-  'Sect Elder': {
-    name: 'Sect Elder',
-    category: 'Title',
-    difficulty: 'Moderate',
-    color: '#3B82F6',
-    icon: '🧑‍🦳',
-  },
-  'Ghost Doctor': {
-    name: 'Ghost Doctor',
-    category: 'Badge',
-    difficulty: 'Easy',
-    color: '#10B981',
-    icon: '👻',
-  },
-  'Blood Shadow Assassin': {
-    name: 'Blood Shadow Assassin',
-    category: 'Badge',
-    difficulty: 'Hard',
-    color: '#EF4444',
-    icon: '🩸',
-  },
-  'Beast Tamer': {
-    name: 'Beast Tamer',
-    category: 'Badge',
-    difficulty: 'Easy',
-    color: '#14B8A6',
-    icon: '🐾',
-  },
-  'Heavenly Demon': {
-    name: 'Heavenly Demon',
-    category: 'Title',
-    difficulty: 'Godly',
-    color: '#EF4444',
-    icon: '😈',
-  },
-  'Plum Blossom Swordmaster': {
-    name: 'Plum Blossom Swordmaster',
-    category: 'Title',
-    difficulty: 'Hard',
-    color: '#EC4899',
-    icon: '🌸',
-  },
-  'Poison Phoenix': {
-    name: 'Poison Phoenix',
-    category: 'Badge',
-    difficulty: 'Hard',
-    color: '#10B981',
-    icon: '🧪',
-  },
-  'Mount Hua Disciple': {
-    name: 'Mount Hua Disciple',
-    category: 'Title',
-    difficulty: 'Easy',
-    color: '#3B82F6',
-    icon: '🏔️',
-  },
-  'Wudang Daoist': {
-    name: 'Wudang Daoist',
-    category: 'Badge',
-    difficulty: 'Easy',
-    color: '#6366F1',
-    icon: '☯️',
-  },
-  'Dark Heaven Assassin': {
-    name: 'Dark Heaven Assassin',
-    category: 'Title',
-    difficulty: 'Hard',
-    color: '#1F2937',
-    icon: '🌑',
-  },
-  'Nine Nether Sovereign': {
-    name: 'Nine Nether Sovereign',
-    category: 'Title',
-    difficulty: 'Godly',
-    color: '#8B5CF6',
-    icon: '💀',
-  },
-  'Golden Elchemist': {
-    name: 'Golden Elchemist',
-    category: 'Badge',
-    difficulty: 'Moderate',
-    color: '#F59E0B',
-    icon: '💊',
-  },
-  'Daoist Sage': {
-    name: 'Daoist Sage',
-    category: 'Title',
-    difficulty: 'Moderate',
-    color: '#FBBF24',
-    icon: '📿',
-  },
-  'Spirit Beast Summoner': {
-    name: 'Spirit Beast Summoner',
-    category: 'Badge',
-    difficulty: 'Moderate',
-    color: '#14B8A6',
-    icon: '🐉',
-  },
-  'Grandmaster of the Flame Sect': {
-    name: 'Grandmaster of the Flame Sect',
-    category: 'Title',
-    difficulty: 'Moderate',
-    color: '#F97316',
-    icon: '🔥',
-  },
-  'Soul Devouring Demon': {
-    name: 'Soul Devouring Demon',
-    category: 'Title',
-    difficulty: 'Hard',
-    color: '#8B5CF6',
-    icon: '🌌',
-  },
-  'Immortal Venerable': {
-    name: 'Immortal Venerable',
-    category: 'Title',
-    difficulty: 'Godly',
-    color: '#EF4444',
-    icon: '📿',
-  },
-  'Qi Gathering Beginner': {
-    name: 'Qi Gathering Beginner',
-    category: 'Badge',
-    difficulty: 'Easy',
-    color: '#10B981',
-    icon: '🌱',
-  },
-  'Foundation Establishment Expert': {
-    name: 'Foundation Establishment Expert',
-    category: 'Badge',
-    difficulty: 'Moderate',
-    color: '#3B82F6',
-    icon: '🧱',
-  },
-  'Golden Core Sage': {
-    name: 'Golden Core Sage',
-    category: 'Title',
-    difficulty: 'Hard',
-    color: '#FBBF24',
-    icon: '🟡',
-  },
-  'Nascent Soul Monarch': {
-    name: 'Nascent Soul Monarch',
-    category: 'Title',
-    difficulty: 'Godly',
-    color: '#F59E0B',
-    icon: '👶',
-  },
-  'Sword Initiate': {
-    name: 'Sword Initiate',
-    category: 'Badge',
-    difficulty: 'Easy',
-    color: '#9CA3AF',
-    icon: '⚔️',
-  },
-  'Spirit Herb Gatherer': {
-    name: 'Spirit Herb Gatherer',
-    category: 'Badge',
-    difficulty: 'Easy',
-    color: '#10B981',
-    icon: '🌿',
-  },
-  'Talisman Apprentice': {
-    name: 'Talisman Apprentice',
-    category: 'Badge',
-    difficulty: 'Easy',
-    color: '#06B6D4',
-    icon: '🔏',
-  },
-  'Array Formation Specialist': {
-    name: 'Array Formation Specialist',
-    category: 'Badge',
-    difficulty: 'Moderate',
-    color: '#6366F1',
-    icon: '💠',
-  },
-  'Heavenly Tribulation Survivor': {
-    name: 'Heavenly Tribulation Survivor',
-    category: 'Badge',
-    difficulty: 'Godly',
-    color: '#EF4444',
-    icon: '⛈️',
-  },
-  'Demonic Beast Slayer': {
-    name: 'Demonic Beast Slayer',
-    category: 'Badge',
-    difficulty: 'Moderate',
-    color: '#F97316',
-    icon: '🐾',
-  },
-  'Divine Beast Tamer': {
-    name: 'Divine Beast Tamer',
-    category: 'Title',
-    difficulty: 'Hard',
-    color: '#14B8A6',
-    icon: '🐉',
-  },
-  'Pill King': {
-    name: 'Pill King',
-    category: 'Title',
-    difficulty: 'Hard',
-    color: '#FBBF24',
-    icon: '💊',
-  },
-  'Celestial Wanderer': {
-    name: 'Celestial Wanderer',
-    category: 'Title',
-    difficulty: 'Moderate',
-    color: '#3B82F6',
-    icon: '☁️',
-  },
-  'Nine Nether Ghost King': {
-    name: 'Nine Nether Ghost King',
-    category: 'Title',
-    difficulty: 'Godly',
-    color: '#1F2937',
-    icon: '👻',
-  },
-  'Mount Hua Sword Saint': {
-    name: 'Mount Hua Sword Saint',
-    category: 'Title',
-    difficulty: 'Godly',
-    color: '#EC4899',
-    icon: '🏔️',
-  },
-  'Dharma Protector': {
-    name: 'Dharma Protector',
-    category: 'Title',
-    difficulty: 'Moderate',
-    color: '#6366F1',
-    icon: '🛡️',
-  },
-  'Rogue Cultivator': {
-    name: 'Rogue Cultivator',
-    category: 'Badge',
-    difficulty: 'Easy',
-    color: '#9CA3AF',
-    icon: '⛺',
-  },
-};
-
-export const enhanceBadge = (badge: ProfileBadge): EnhancedBadge => {
-  const key = Object.keys(badgeMetadataMap).find(
-    (k) => k === badge.name || badgeMetadataMap[k].name === badge.name
-  );
-  const meta = key ? badgeMetadataMap[key] : null;
-
-  let category = meta?.category || 'Badge';
-  let difficulty = meta?.difficulty || 'Easy';
-  let description = badge.description;
-
-  if (badge.description && badge.description.startsWith('{')) {
-    try {
-      const parsed = JSON.parse(badge.description);
-      category = parsed.category || category;
-      difficulty = parsed.difficulty || difficulty;
-      description = parsed.description || description;
-    } catch (e) {
-      console.error("Error parsing description JSON:", e);
-    }
-  }
-
-  return {
-    ...badge,
-    name: meta?.name || badge.name,
-    icon: meta?.icon || badge.icon || '🏅',
-    badge_color: meta?.color || badge.badge_color,
-    category: category as any,
-    difficulty: difficulty as any,
-    description: description,
-  };
+  badge: NormalizedBadge;
 };
 
 export function ProfileBadges() {
@@ -660,13 +160,13 @@ export function ProfileBadges() {
   const equippedBadgeRaw = userBadges.data?.find((b) => b.is_equipped);
   const equippedBadge = equippedBadgeRaw ? {
     ...equippedBadgeRaw,
-    badge: enhanceBadge(equippedBadgeRaw.badge)
+    badge: enhanceBadge(equippedBadgeRaw.badge as ProfileBadgeRow)
   } : undefined;
 
   const enhancedUserBadges = useMemo(() => {
     const earned = (userBadges.data || []).map(ub => ({
       ...ub,
-      badge: enhanceBadge(ub.badge)
+      badge: enhanceBadge(ub.badge as ProfileBadgeRow)
     }));
 
     if (!isAdmin || !availableBadges.data) return earned;
@@ -679,7 +179,7 @@ export function ProfileBadges() {
         badge_id: b.id,
         earned_at: new Date().toISOString(),
         is_equipped: false,
-        badge: enhanceBadge(b)
+        badge: enhanceBadge(b as ProfileBadgeRow)
       }));
 
     return [...earned, ...pseudoEarned];
@@ -690,16 +190,9 @@ export function ProfileBadges() {
 
   const lockedBadgesRaw = isAdmin ? [] : (availableBadges.data || [])
     .filter(b => !earnedBadgeIds.has(b.id))
-    .map(b => enhanceBadge(b));
+    .map(b => enhanceBadge(b as ProfileBadgeRow));
   const lockedRealms = lockedBadgesRaw
     .sort((a, b) => difficultyWeights[a.difficulty] - difficultyWeights[b.difficulty] || a.name.localeCompare(b.name));
-
-  const difficultyColors = {
-    Easy: "border-emerald-500/30 bg-emerald-500/10 text-emerald-500 dark:text-emerald-400",
-    Moderate: "border-sky-500/30 bg-sky-500/10 text-sky-500 dark:text-sky-400",
-    Hard: "border-purple-500/30 bg-purple-500/10 text-purple-500 dark:text-purple-400",
-    Godly: "border-red-500/30 bg-red-500/10 text-red-500 dark:text-red-400",
-  };
 
   return (
     <TooltipProvider>
