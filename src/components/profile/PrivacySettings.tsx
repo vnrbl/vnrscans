@@ -108,14 +108,14 @@ export function PrivacySettings() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h2 className="text-2xl font-bold">Privacy Settings</h2>
+        <h2 className="text-xl font-bold sm:text-2xl">Privacy Settings</h2>
         <p className="text-sm text-muted-foreground">
           Control who can see your profile information
         </p>
       </div>
 
       {/* Profile Visibility */}
-      <Card className="p-6">
+      <Card className="p-4 sm:p-6">
         <div className="space-y-4">
           <div className="flex items-center gap-2">
             <Shield className="h-5 w-5 text-violet-500" />
@@ -126,17 +126,17 @@ export function PrivacySettings() {
           </p>
 
           <Select value={profileVisibility} onValueChange={setProfileVisibility}>
-            <SelectTrigger>
+            <SelectTrigger className="h-auto min-h-12 px-3 py-2 text-left">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
               {visibilityOptions.map((option) => (
                 <SelectItem key={option.value} value={option.value}>
-                  <div className="flex items-center gap-2">
-                    <option.icon className="h-4 w-4" />
-                    <div>
+                  <div className="flex min-w-0 items-center gap-2">
+                    <option.icon className="h-4 w-4 flex-shrink-0" />
+                    <div className="min-w-0">
                       <p className="font-medium">{option.label}</p>
-                      <p className="text-xs text-muted-foreground">
+                      <p className="whitespace-normal text-xs leading-snug text-muted-foreground">
                         {option.description}
                       </p>
                     </div>
@@ -148,10 +148,10 @@ export function PrivacySettings() {
 
           {selectedOption && (
             <div className="rounded-lg border border-border/40 bg-muted/50 p-3">
-              <div className="flex items-center gap-2 text-sm">
-                <selectedOption.icon className="h-4 w-4 text-violet-500" />
-                <span className="font-medium">{selectedOption.label}:</span>
-                <span className="text-muted-foreground">
+              <div className="flex min-w-0 items-start gap-2 text-sm">
+                <selectedOption.icon className="mt-0.5 h-4 w-4 flex-shrink-0 text-violet-500" />
+                <span className="min-w-0 text-muted-foreground">
+                  <span className="font-medium text-foreground">{selectedOption.label}:</span>{" "}
                   {selectedOption.description}
                 </span>
               </div>
@@ -161,7 +161,7 @@ export function PrivacySettings() {
       </Card>
 
       {/* Content Visibility */}
-      <Card className="p-6">
+      <Card className="p-4 sm:p-6">
         <div className="space-y-6">
           <div className="flex items-center gap-2">
             <Eye className="h-5 w-5 text-violet-500" />
@@ -172,8 +172,8 @@ export function PrivacySettings() {
           </p>
 
           {/* Reading History */}
-          <div className="flex items-center justify-between">
-            <div className="space-y-1">
+          <div className="flex items-center justify-between gap-4">
+            <div className="min-w-0 space-y-1">
               <Label htmlFor="reading-history" className="cursor-pointer">
                 Reading History
               </Label>
@@ -191,8 +191,8 @@ export function PrivacySettings() {
           <div className="border-t border-border/40" />
 
           {/* Achievements */}
-          <div className="flex items-center justify-between">
-            <div className="space-y-1">
+          <div className="flex items-center justify-between gap-4">
+            <div className="min-w-0 space-y-1">
               <Label htmlFor="achievements" className="cursor-pointer">
                 Achievements & Badges
               </Label>
@@ -210,8 +210,8 @@ export function PrivacySettings() {
           <div className="border-t border-border/40" />
 
           {/* Statistics */}
-          <div className="flex items-center justify-between">
-            <div className="space-y-1">
+          <div className="flex items-center justify-between gap-4">
+            <div className="min-w-0 space-y-1">
               <Label htmlFor="statistics" className="cursor-pointer">
                 Statistics & Analytics
               </Label>

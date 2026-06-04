@@ -231,7 +231,7 @@ function ProfilePage() {
         />
 
         {/* Avatar floating over banner */}
-        <div className="container mx-auto max-w-5xl px-8 md:px-12 lg:px-16">
+        <div className="container mx-auto max-w-5xl px-4 sm:px-6 md:px-12 lg:px-16">
           <div className="relative -mt-16 flex flex-col gap-5 sm:flex-row sm:items-end sm:gap-6">
             {/* Avatar with accent ring */}
             <div
@@ -313,7 +313,7 @@ function ProfilePage() {
       </div>
 
       {/* ─── Level bar ─── */}
-      <div className="container mx-auto max-w-5xl px-8 md:px-12 lg:px-16 mt-6">
+      <div className="container mx-auto max-w-5xl px-4 sm:px-6 md:px-12 lg:px-16 mt-6">
         <div
           className="rounded-xl border border-border/40 p-4"
           style={{
@@ -345,7 +345,7 @@ function ProfilePage() {
 
       {/* ─── Stats Cards ─── */}
       <div
-        className="container mx-auto max-w-5xl px-8 md:px-12 lg:px-16 mt-6"
+        className="container mx-auto max-w-5xl px-4 sm:px-6 md:px-12 lg:px-16 mt-6"
         style={{ animation: "profileFadeInUp 0.6s ease-out 0.1s both" }}
       >
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -379,32 +379,32 @@ function ProfilePage() {
 
       {/* ─── Tabs ─── */}
       <div
-        className="container mx-auto max-w-5xl px-8 md:px-12 lg:px-16 mt-8 pb-12"
+        className="container mx-auto max-w-5xl px-4 sm:px-6 md:px-12 lg:px-16 mt-6 pb-12"
         style={{ animation: "profileFadeInUp 0.6s ease-out 0.2s both" }}
       >
         <Tabs defaultValue="edit" className="w-full">
-          <TabsList className="grid w-full grid-cols-3 lg:grid-cols-6 h-auto">
-            <TabsTrigger value="edit" className="gap-2">
+          <TabsList className="grid h-11 w-full grid-cols-6 gap-1 p-1">
+            <TabsTrigger value="edit" className="h-9 min-w-0 gap-2 px-0 sm:px-3">
               <Settings className="h-4 w-4" />
               <span className="hidden sm:inline">Edit</span>
             </TabsTrigger>
-            <TabsTrigger value="goals" className="gap-2">
+            <TabsTrigger value="goals" className="h-9 min-w-0 gap-2 px-0 sm:px-3">
               <Target className="h-4 w-4" />
               <span className="hidden sm:inline">Goals</span>
             </TabsTrigger>
-            <TabsTrigger value="badges" className="gap-2">
+            <TabsTrigger value="badges" className="h-9 min-w-0 gap-2 px-0 sm:px-3">
               <Award className="h-4 w-4" />
               <span className="hidden sm:inline">Badges</span>
             </TabsTrigger>
-            <TabsTrigger value="achievements" className="gap-2">
+            <TabsTrigger value="achievements" className="h-9 min-w-0 gap-2 px-0 sm:px-3">
               <Trophy className="h-4 w-4" />
               <span className="hidden sm:inline">Achievements</span>
             </TabsTrigger>
-            <TabsTrigger value="stats" className="gap-2">
+            <TabsTrigger value="stats" className="h-9 min-w-0 gap-2 px-0 sm:px-3">
               <TrendingUp className="h-4 w-4" />
               <span className="hidden sm:inline">Stats</span>
             </TabsTrigger>
-            <TabsTrigger value="privacy" className="gap-2">
+            <TabsTrigger value="privacy" className="h-9 min-w-0 gap-2 px-0 sm:px-3">
               <Shield className="h-4 w-4" />
               <span className="hidden sm:inline">Privacy</span>
             </TabsTrigger>
@@ -412,7 +412,7 @@ function ProfilePage() {
 
           {/* ─── Edit Profile Tab ─── */}
           <TabsContent value="edit">
-            <Card className="p-6">
+            <Card className="p-4 sm:p-6">
               <form onSubmit={(e) => { e.preventDefault(); save.mutate(); }} className="space-y-8">
                 {/* Basic Info Section */}
                 <div className="space-y-4">
@@ -492,21 +492,21 @@ function ProfilePage() {
 
           {/* ─── Reading Goals Tab ─── */}
           <TabsContent value="goals">
-            <Card className="p-6">
+            <Card className="p-4 sm:p-6">
               <ReadingGoals />
             </Card>
           </TabsContent>
 
           {/* ─── Profile Badges Tab ─── */}
           <TabsContent value="badges">
-            <Card className="p-6">
+            <Card className="p-4 sm:p-6">
               <ProfileBadges />
             </Card>
           </TabsContent>
 
           {/* ─── Achievements Tab ─── */}
           <TabsContent value="achievements">
-            <Card className="p-6">
+            <Card className="p-4 sm:p-6">
               <h2 className="mb-4 text-xl font-bold">Unlocked Achievements</h2>
               {achievements.isLoading ? (
                 <p className="text-sm text-muted-foreground">Loading achievements...</p>
@@ -560,7 +560,7 @@ function ProfilePage() {
             <div className="space-y-6">
               <ReadingHeatmap />
 
-              <Card className="p-6">
+              <Card className="p-4 sm:p-6">
                 <h2 className="mb-4 text-xl font-bold">Your Statistics</h2>
                 <div className="space-y-6">
                   {/* Reading Activity */}
@@ -605,14 +605,12 @@ function ProfilePage() {
 
           {/* ─── Privacy Settings Tab ─── */}
           <TabsContent value="privacy">
-            <Card className="p-6">
-              <PrivacySettings />
-            </Card>
+            <PrivacySettings />
           </TabsContent>
 
           {/* ─── Profile Widgets Tab (hidden, accessed via button) ─── */}
           <TabsContent value="widgets">
-            <Card className="p-6">
+            <Card className="p-4 sm:p-6">
               <ProfileWidgets />
             </Card>
           </TabsContent>
