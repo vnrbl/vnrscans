@@ -443,7 +443,7 @@ export function Navbar() {
                         <div className="flex items-center justify-between">
                           <span className="flex items-center gap-2">
                             <UserIcon className="h-4 w-4" />
-                            Level {userStats.data.user_level}
+                            {isAdmin ? "Maxed Out" : `Level ${userStats.data.user_level}`}
                             {userStats.data.is_vip && <Badge className="bg-gradient-to-r from-yellow-500 to-orange-500">VIP</Badge>}
                           </span>
                         </div>
@@ -454,11 +454,13 @@ export function Navbar() {
                           <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-secondary">
                             <div
                               className="h-full bg-gradient-to-r from-violet-600 to-purple-600"
-                              style={{ width: `${((userStats.data.experience_points % 100) / 100) * 100}%` }}
+                              style={{ width: isAdmin ? "100%" : `${((userStats.data.experience_points % 100) / 100) * 100}%` }}
                             />
                           </div>
                           <div className="mt-1 text-xs">
-                            {userStats.data.experience_points % 100}/100 XP to Level {userStats.data.user_level + 1}
+                            {isAdmin
+                              ? "Infinite Aura and XP"
+                              : `${userStats.data.experience_points % 100}/100 XP to Level ${userStats.data.user_level + 1}`}
                           </div>
                         </div>
                       </DropdownMenuLabel>

@@ -25,7 +25,6 @@ import {
   Target,
   TrendingUp,
   Award,
-  Camera,
   Code,
   Palette,
   Link2,
@@ -38,7 +37,6 @@ import { BadgeIcon, enhanceBadge, type ProfileBadgeRow } from "@/lib/profileBadg
 import { PrivacySettings } from "@/components/profile/PrivacySettings";
 import { ReadingHeatmap } from "@/components/profile/ReadingHeatmap";
 import { ProfileWidgets } from "@/components/profile/ProfileWidgets";
-import { BannerUpload } from "@/components/profile/BannerUpload";
 import { AccentColorPicker } from "@/components/profile/AccentColorPicker";
 
 import { SocialLinksEditor, SocialLinksDisplay, type SocialLinksData } from "@/components/profile/SocialLinks";
@@ -365,7 +363,6 @@ function ProfilePage() {
   const [username, setUsername] = useState("");
   const [bio, setBio] = useState("");
   const [avatarUrl, setAvatarUrl] = useState("");
-  const [bannerUrl, setBannerUrl] = useState("");
   const [accentColor, setAccentColor] = useState("#8B5CF6");
   const [avatarFrame, setAvatarFrame] = useState("none");
   const [socialLinks, setSocialLinks] = useState<SocialLinksData>({
@@ -382,7 +379,6 @@ function ProfilePage() {
       setUsername(profile.data.username ?? "");
       setBio(profile.data.bio ?? "");
       setAvatarUrl(profile.data.avatar_url ?? "");
-      setBannerUrl(profile.data.banner_url ?? "");
       setAccentColor(profile.data.accent_color ?? "#8B5CF6");
       setAvatarFrame(profile.data.avatar_frame ?? "none");
       setSocialLinks({
@@ -406,7 +402,6 @@ function ProfilePage() {
           username, 
           bio, 
           avatar_url: avatarUrl || null,
-          banner_url: bannerUrl || null,
           accent_color: accentColor,
           avatar_frame: avatarFrame,
           social_discord: socialLinks.social_discord || null,
@@ -1200,13 +1195,13 @@ function ProfilePage() {
                   <div>
                     <h3 className="mb-3 font-semibold">Level Progress</h3>
                     <div className="space-y-3">
-                      <StatRow icon={<Trophy className="h-4 w-4" style={{ color: accentColor }} />} label="Current Level" value={`Level ${level}`} />
-                      <StatRow icon={<TrendingUp className="h-4 w-4 text-blue-500" />} label="Total XP" value={xp} />
-                      <StatRow icon={<Target className="h-4 w-4 text-green-500" />} label="Next Level" value={`${xpForNextLevel - xp} XP needed`} />
+                      <StatRow icon={<Trophy className="h-4 w-4" style={{ color: accentColor }} />} label="Current Level" value={isAdmin ? "Maxed Out" : `Level ${level}`} />
+                      <StatRow icon={<TrendingUp className="h-4 w-4 text-blue-500" />} label="Total XP" value={isAdmin ? "Infinite Aura and XP" : xp} />
+                      <StatRow icon={<Target className="h-4 w-4 text-green-500" />} label="Next Level" value={isAdmin ? "∞" : `${xpForNextLevel - xp} XP needed`} />
                       <div className="mt-2">
-                        <Progress value={xpProgress} className="h-2" />
+                        <Progress value={isAdmin ? 100 : xpProgress} className="h-2" />
                         <p className="mt-1 text-center text-xs text-muted-foreground">
-                          {xpProgress.toFixed(1)}% to Level {level + 1}
+                          {isAdmin ? "Infinite Aura and XP — beyond all levels" : `${xpProgress.toFixed(1)}% to Level ${level + 1}`}
                         </p>
                       </div>
                     </div>
