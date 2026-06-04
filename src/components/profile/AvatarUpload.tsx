@@ -211,17 +211,7 @@ export function AvatarUpload({ currentAvatarUrl, username, onAvatarUpdated }: Pr
         </label>
       </div>
 
-      {/* Remove button */}
-      {currentAvatarUrl && (
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={handleRemove}
-          className="mt-2 text-xs"
-        >
-          Remove Avatar
-        </Button>
-      )}
+
 
       {/* Crop Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>

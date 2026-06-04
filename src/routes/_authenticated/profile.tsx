@@ -38,7 +38,7 @@ import { PrivacySettings } from "@/components/profile/PrivacySettings";
 import { ReadingHeatmap } from "@/components/profile/ReadingHeatmap";
 import { ProfileWidgets } from "@/components/profile/ProfileWidgets";
 import { BannerUpload } from "@/components/profile/BannerUpload";
-import { AccentColorPicker } from "@/components/profile/AccentColorPicker";
+
 import { SocialLinksEditor, SocialLinksDisplay, type SocialLinksData } from "@/components/profile/SocialLinks";
 
 export const Route = createFileRoute("/_authenticated/profile")({
@@ -158,6 +158,7 @@ function ProfilePage() {
   const [accentColor, setAccentColor] = useState("#8B5CF6");
   const [socialLinks, setSocialLinks] = useState<SocialLinksData>({
     social_discord: "",
+    social_instagram: "",
     social_twitter: "",
     social_mal: "",
     social_anilist: "",
@@ -173,6 +174,7 @@ function ProfilePage() {
       setAccentColor(profile.data.accent_color ?? "#8B5CF6");
       setSocialLinks({
         social_discord: profile.data.social_discord ?? "",
+        social_instagram: profile.data.social_instagram ?? "",
         social_twitter: profile.data.social_twitter ?? "",
         social_mal: profile.data.social_mal ?? "",
         social_anilist: profile.data.social_anilist ?? "",
@@ -191,13 +193,6 @@ function ProfilePage() {
           username, 
           bio, 
           avatar_url: avatarUrl || null,
-          banner_url: bannerUrl || null,
-          accent_color: accentColor,
-          social_discord: socialLinks.social_discord || null,
-          social_twitter: socialLinks.social_twitter || null,
-          social_mal: socialLinks.social_mal || null,
-          social_anilist: socialLinks.social_anilist || null,
-          social_website: socialLinks.social_website || null,
         } as any)
         .eq("user_id", u.user.id);
       if (error) throw error;
@@ -443,20 +438,7 @@ function ProfilePage() {
                     </div>
                   </div>
 
-                  <div>
-                    <Label htmlFor="avatar">Avatar URL</Label>
-                    <div className="relative mt-1">
-                      <Camera className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                      <Input 
-                        id="avatar"
-                        value={avatarUrl} 
-                        onChange={(e) => setAvatarUrl(e.target.value)} 
-                        className="pl-10"
-                        placeholder="https://example.com/avatar.jpg"
-                      />
-                    </div>
-                    <p className="mt-1 text-xs text-muted-foreground">Or use the avatar uploader above</p>
-                  </div>
+
 
                   <div>
                     <Label htmlFor="bio">Bio</Label>
@@ -472,12 +454,6 @@ function ProfilePage() {
                     <p className="mt-1 text-xs text-muted-foreground">{bio.length}/500 characters</p>
                   </div>
                 </div>
-
-                {/* Divider */}
-                <div className="h-px w-full bg-border/50" />
-
-                {/* Accent Color Section */}
-                <AccentColorPicker value={accentColor} onChange={setAccentColor} />
 
                 {/* Divider */}
                 <div className="h-px w-full bg-border/50" />
