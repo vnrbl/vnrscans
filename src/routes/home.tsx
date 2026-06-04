@@ -52,22 +52,6 @@ function HomePage() {
 
   const isSectionHidden = (sectionId: string) => hiddenSections.has(sectionId);
 
-  // Featured manhwa carousel
-  const featured = useQuery({
-    queryKey: ["featured"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("series")
-        .select("id,slug,title,cover_url,type,rating_average,description")
-        .eq("is_featured", true)
-        .limit(6);
-      if (error) throw error;
-      return data ?? [];
-    },
-    staleTime: 1000 * 60 * 5, // 5 minutes
-    gcTime: 1000 * 60 * 10, // 10 minutes (formerly cacheTime)
-  });
-
   // Recently added chapters
   const recentChapters = useQuery({
     queryKey: ["recent-chapters"],
@@ -218,46 +202,6 @@ function HomePage() {
   return (
     <div className="min-h-screen">
       <HomeHeroCarousel />
-
-      {/* Featured Section */}
-      {featured.data && featured.data.length > 0 && (
-        <section className="container mx-auto px-8 md:px-12 lg:px-16 py-4">
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {featured.data.map((series) => (
-              <Link key={series.id} to="/title/$slug" params={{ slug: series.slug }}>
-                <Card className="group relative overflow-hidden border-border/50 bg-card transition-all hover:border-primary/50 hover:shadow-lg">
-                  <div className="absolute inset-0">
-                    {series.cover_url && (
-                      <img
-                        src={series.cover_url}
-                        alt={series.title}
-                        className="h-full w-full object-cover opacity-20 blur-sm transition-all group-hover:opacity-30"
-                      />
-                    )}
-                    <div className="absolute inset-0 bg-gradient-to-t from-background via-background/80 to-transparent" />
-                  </div>
-                  <div className="relative flex h-full min-h-[200px] flex-col justify-end p-6">
-                    <Badge variant="secondary" className="mb-2 w-fit text-xs uppercase">
-                      {series.type}
-                    </Badge>
-                    {series.rating_average && (
-                      <div className="mb-2 flex items-center gap-1 text-sm font-semibold text-primary">
-                        <span>★</span>
-                        <span>{Number(series.rating_average).toFixed(2)}</span>
-                      </div>
-                    )}
-                    <h3 className="mb-2 line-clamp-2 text-xl font-bold">{series.title}</h3>
-                    <p className="line-clamp-2 text-sm text-muted-foreground">{series.description}</p>
-                    <Button size="sm" className="mt-4 w-fit">
-                      Read
-                    </Button>
-                  </div>
-                </Card>
-              </Link>
-            ))}
-          </div>
-        </section>
-      )}
 
       {user && (
         <>
