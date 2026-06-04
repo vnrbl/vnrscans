@@ -24,6 +24,8 @@ import { Command, CommandGroup, CommandItem } from "@/components/ui/command";
 type BrowseSearch = {
   search?: string;
   group?: string;
+  genre?: string;
+  tag?: string;
 };
 
 export const Route = createFileRoute("/browse")({
@@ -31,6 +33,8 @@ export const Route = createFileRoute("/browse")({
     return {
       search: (search.search as string) || undefined,
       group: (search.group as string) || undefined,
+      genre: (search.genre as string) || undefined,
+      tag: (search.tag as string) || undefined,
     };
   },
   head: () => ({
@@ -43,7 +47,7 @@ export const Route = createFileRoute("/browse")({
 });
 
 function BrowsePage() {
-  const { search: urlSearch, group: urlGroup } = Route.useSearch();
+  const { search: urlSearch, group: urlGroup, genre: urlGenre, tag: urlTag } = Route.useSearch();
   const navigate = useNavigate();
 
   const [searchQuery, setSearchQuery] = useState(urlSearch || "");
@@ -56,13 +60,27 @@ function BrowsePage() {
   useEffect(() => {
     setGroupFilter(urlGroup || "");
   }, [urlGroup]);
+
   const [typeFilters, setTypeFilters] = useState<string[]>([]);
   const [statusFilter, setStatusFilter] = useState("all");
   const [contentRating, setContentRating] = useState("all");
-  const [genreFilters, setGenreFilters] = useState<string[]>([]);
+  const [genreFilters, setGenreFilters] = useState<string[]>(urlGenre ? [urlGenre] : []);
+  const [tagFilters, setTagFilters] = useState<string[]>(urlTag ? [urlTag] : []);
   const [sortBy, setSortBy] = useState("latest");
   const [duration, setDuration] = useState("all");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+
+  useEffect(() => {
+    if (urlGenre) {
+      setGenreFilters((prev) => (prev.includes(urlGenre) ? prev : [...prev, urlGenre]));
+    }
+  }, [urlGenre]);
+
+  useEffect(() => {
+    if (urlTag) {
+      setTagFilters((prev) => (prev.includes(urlTag) ? prev : [...prev, urlTag]));
+    }
+  }, [urlTag]);
 
   // Fetch genres
   const genres = useQuery({
@@ -74,6 +92,19 @@ function BrowsePage() {
         .order("name");
       if (error) throw error;
       return data ?? [];
+    },
+  });
+
+  // Fetch tags
+  const tags = useQuery({
+    queryKey: ["tags"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("tags")
+        .select("id,name,slug,color,icon")
+        .order("name");
+      if (error) throw error;
+      return (data ?? []) as any[];
     },
   });
 
@@ -95,21 +126,31 @@ function BrowsePage() {
     );
   };
 
+  // Toggle tag filter
+  const toggleTag = (slug: string) => {
+    setTagFilters(prev => 
+      prev.includes(slug) 
+        ? prev.filter(t => t !== slug)
+        : [...prev, slug]
+    );
+  };
+
   // Clear all filters
   const clearFilters = () => {
     setTypeFilters([]);
     setGenreFilters([]);
+    setTagFilters([]);
     setStatusFilter("all");
     setContentRating("all");
     setDuration("all");
     setGroupFilter("");
     navigate({
       to: "/browse",
-      search: (prev) => ({ ...prev, group: undefined }),
+      search: (prev) => ({ ...prev, group: undefined, genre: undefined, tag: undefined }),
     });
   };
 
-  const hasActiveFilters = typeFilters.length > 0 || genreFilters.length > 0 || 
+  const hasActiveFilters = typeFilters.length > 0 || genreFilters.length > 0 || tagFilters.length > 0 || 
     statusFilter !== "all" || contentRating !== "all" || duration !== "all" || !!groupFilter;
 
   // Type options
@@ -138,11 +179,11 @@ function BrowsePage() {
 
   // All manhwa
   const allManhwa = useQuery({
-    queryKey: ["browse-manhwa", typeFilters, statusFilter, contentRating, genreFilters, sortBy, duration, searchQuery, groupFilter],
+    queryKey: ["browse-manhwa", typeFilters, statusFilter, contentRating, genreFilters, tagFilters, sortBy, duration, searchQuery, groupFilter],
     queryFn: async () => {
       let query = supabase
         .from("series")
-        .select("id,slug,title,alternative_titles,description,cover_url,type,rating_average,status,author,artist,release_year,created_at,updated_at,view_count,content_rating,chapter_count,series_genres(genre:genres(id,name,slug))");
+        .select("id,slug,title,alternative_titles,description,cover_url,type,rating_average,status,author,artist,release_year,created_at,updated_at,view_count,content_rating,chapter_count,series_genres(genre:genres(id,name,slug)),series_tags(tag:tags(id,name,slug))");
 
       // Apply scanlation group filter
       if (groupFilter) {
@@ -242,6 +283,15 @@ function BrowsePage() {
           const seriesGenres = series.series_genres?.map((sg: any) => sg.genre?.slug).filter(Boolean) || [];
           // Check if series has ALL selected genres
           return genreFilters.every(selectedGenre => seriesGenres.includes(selectedGenre));
+        });
+      }
+
+      // Filter by tags if selected - series must have ALL selected tags
+      if (tagFilters.length > 0 && filtered.length > 0) {
+        filtered = filtered.filter((series: any) => {
+          const seriesTags = series.series_tags?.map((st: any) => st.tag?.slug).filter(Boolean) || [];
+          // Check if series has ALL selected tags
+          return tagFilters.every(selectedTag => seriesTags.includes(selectedTag));
         });
       }
       
@@ -360,6 +410,51 @@ function BrowsePage() {
             </PopoverContent>
           </Popover>
 
+          {/* Tag Multi-Select Dropdown */}
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" className="h-9 min-w-[140px] justify-start">
+                {tagFilters.length > 0 ? (
+                  <span className="truncate">
+                    Tag ({tagFilters.length})
+                  </span>
+                ) : (
+                  "Tag"
+                )}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-[700px] p-3" align="start">
+              <div className="mb-2 text-sm font-medium">Select Tags</div>
+              {tags.isLoading ? (
+                <div className="p-2 text-sm text-muted-foreground">Loading...</div>
+              ) : (
+                <div className="grid grid-cols-5 gap-1">
+                  {tags.data?.map((tag) => (
+                    <div
+                      key={tag.id}
+                      onClick={() => toggleTag(tag.slug)}
+                      className="flex items-center gap-1.5 rounded-md px-2 py-1.5 hover:bg-secondary cursor-pointer transition-colors"
+                    >
+                      <div 
+                        className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border`}
+                        style={{
+                          borderColor: tagFilters.includes(tag.slug) ? (tag.color || "#8b5cf6") : undefined,
+                          backgroundColor: tagFilters.includes(tag.slug) ? (tag.color || "#8b5cf6") : undefined,
+                        }}
+                      >
+                        {tagFilters.includes(tag.slug) && (
+                          <Check className="h-3 w-3 text-white" />
+                        )}
+                      </div>
+                      {tag.icon && <span className="text-sm">{tag.icon}</span>}
+                      <span className="text-xs truncate">{tag.name}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </PopoverContent>
+          </Popover>
+
           {/* Status Filter */}
           <Select value={statusFilter} onValueChange={setStatusFilter}>
             <SelectTrigger className="h-9 w-[140px]">
@@ -446,11 +541,13 @@ function BrowsePage() {
             <p className="text-sm text-muted-foreground">
               {allManhwa.data?.length || 0} manga found
             </p>
-            {(typeFilters.length > 0 || genreFilters.length > 0) && (
+            {(typeFilters.length > 0 || genreFilters.length > 0 || tagFilters.length > 0) && (
               <p className="mt-1 text-xs text-muted-foreground">
                 {typeFilters.length > 0 && `${typeFilters.length} type${typeFilters.length > 1 ? 's' : ''}`}
-                {typeFilters.length > 0 && genreFilters.length > 0 && ' • '}
-                {genreFilters.length > 0 && `${genreFilters.length} genre${genreFilters.length > 1 ? 's' : ''}`} selected
+                {typeFilters.length > 0 && (genreFilters.length > 0 || tagFilters.length > 0) && ' • '}
+                {genreFilters.length > 0 && `${genreFilters.length} genre${genreFilters.length > 1 ? 's' : ''}`}
+                {genreFilters.length > 0 && tagFilters.length > 0 && ' • '}
+                {tagFilters.length > 0 && `${tagFilters.length} tag${tagFilters.length > 1 ? 's' : ''}`} selected
               </p>
             )}
           </div>

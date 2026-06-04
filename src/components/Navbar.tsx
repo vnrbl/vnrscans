@@ -245,19 +245,21 @@ export function Navbar() {
 
   return (
     <header className="sticky top-0 z-40 border-b border-border/50 bg-background/95 backdrop-blur-md supports-[backdrop-filter]:bg-background/60">
-      <div className="container mx-auto flex h-16 items-center justify-between gap-4 px-8 md:px-12 lg:px-16">
+      <div className="container mx-auto flex h-16 items-center px-8 md:px-12 lg:px-16 relative">
         {/* Logo */}
-        <Link to="/home" className="flex shrink-0 items-center gap-2 transition-transform hover:scale-105">
-          <div className="relative grid h-10 w-10 place-items-center rounded-lg bg-primary">
-            <span className="text-lg font-bold text-primary-foreground">VS</span>
-          </div>
-          <span className="hidden text-xl font-bold tracking-tight text-primary sm:inline">
-            vnrscans
-          </span>
-        </Link>
+        <div className="flex-1 flex items-center justify-start">
+          <Link to="/home" className="flex shrink-0 items-center gap-2 transition-transform hover:scale-105">
+            <div className="relative grid h-10 w-10 place-items-center rounded-lg bg-primary">
+              <span className="text-lg font-bold text-primary-foreground">VS</span>
+            </div>
+            <span className="hidden text-xl font-bold tracking-tight text-primary sm:inline">
+              vnrscans
+            </span>
+          </Link>
+        </div>
 
         {/* Desktop Navigation */}
-        <nav className="hidden items-center gap-1 md:flex">
+        <nav className="hidden md:flex items-center justify-center gap-1 absolute left-1/2 -translate-x-1/2">
           {links.map((l) => (
             <Link
               key={l.to}
@@ -273,7 +275,7 @@ export function Navbar() {
         </nav>
 
         {/* Actions */}
-        <div className="flex items-center gap-2">
+        <div className="flex-1 flex items-center justify-end gap-2">
           {/* Search Button (desktop) */}
           <button
             onClick={() => setSearchOpen(true)}
@@ -409,6 +411,21 @@ export function Navbar() {
                 <Search className="h-5 w-5" />
               </button>
 
+              {/* Mobile Dice Roll Icon */}
+              {(() => {
+                const DiceIcon = [Dice1, Dice2, Dice3, Dice4, Dice5, Dice6][navDiceFace - 1];
+                return (
+                  <button
+                    className="flex sm:hidden items-center justify-center h-9 w-9 rounded-lg text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors disabled:opacity-50"
+                    onClick={handleRandom}
+                    disabled={isRolling}
+                    aria-label="Roll Random"
+                  >
+                    <DiceIcon className={`h-5 w-5 transition-all ${isRolling ? "text-primary scale-110" : ""}`} />
+                  </button>
+                );
+              })()}
+
               {/* Notifications Bell */}
               <NotificationBell />
 
@@ -482,23 +499,13 @@ export function Navbar() {
       {/* Mobile Menu */}
       {open && (
         <div className="border-t border-border/50 md:hidden">
-          <nav className="container mx-auto flex flex-col px-4 py-2">
-            {/* Mobile Random */}
-            <button
-              onClick={() => { handleRandom(); setOpen(false); }}
-              disabled={isRolling}
-              className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-secondary hover:text-foreground disabled:opacity-50"
-            >
-              {(() => { const DI = [Dice1, Dice2, Dice3, Dice4, Dice5, Dice6][navDiceFace - 1]; return <DI className={`h-4 w-4 ${isRolling ? "text-primary" : ""}`} />; })()}
-              Roll Random
-            </button>
-
+          <nav className="container mx-auto flex flex-col items-center px-4 py-2">
             {links.map((l) => (
               <Link
                 key={l.to}
                 to={l.to}
                 onClick={() => setOpen(false)}
-                className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-secondary hover:text-foreground"
+                className="flex items-center justify-center gap-2 w-full max-w-[200px] rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-secondary hover:text-foreground"
               >
                 <l.icon className="h-4 w-4" />
                 {l.label}

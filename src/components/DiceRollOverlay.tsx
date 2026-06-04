@@ -417,11 +417,12 @@ export function DiceRollOverlay({
               style={{
                 display: "flex",
                 flexDirection: "row",
-                gap: 10,
+                gap: 12,
+                justifyContent: visibleSeries.length * 128 < 820 ? "center" : "flex-start",
                 overflowX: "auto",
                 maxWidth: "min(90vw, 820px)",
                 width: "100%",
-                paddingBottom: 8,
+                paddingBottom: 12,
                 scrollbarWidth: "thin",
                 scrollbarColor: "rgba(220,38,38,0.4) transparent",
                 animation: "resultReveal 0.45s 0.1s ease both",
@@ -439,7 +440,10 @@ export function DiceRollOverlay({
                     borderRadius: 10,
                     overflow: "hidden",
                     cursor: "pointer",
-                    textAlign: "left",
+                    textAlign: "center",
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
                     transition:
                       "transform 0.2s ease, background 0.2s ease, box-shadow 0.2s ease",
                     animation: `cardReveal 0.4s ${0.06 + idx * 0.045}s ease both`,
@@ -459,7 +463,7 @@ export function DiceRollOverlay({
                 >
                   {/* Cover image */}
                   <div
-                    style={{ aspectRatio: "2/3", overflow: "hidden", position: "relative" }}
+                    style={{ aspectRatio: "2/3", overflow: "hidden", position: "relative", width: "100%" }}
                   >
                     {s.cover_url ? (
                       <img
@@ -504,22 +508,24 @@ export function DiceRollOverlay({
                       style={{
                         position: "absolute",
                         bottom: 6,
-                        left: 6,
+                        left: "50%",
+                        transform: "translateX(-50%)",
                         fontSize: 9,
                         fontWeight: 800,
                         color: TYPE_COLORS[s.type] ?? "white",
                         textTransform: "uppercase",
                         letterSpacing: "0.08em",
-                        background: "rgba(0,0,0,0.55)",
-                        padding: "2px 5px",
+                        background: "rgba(0,0,0,0.65)",
+                        padding: "2px 6px",
                         borderRadius: 4,
+                        whiteSpace: "nowrap",
                       }}
                     >
                       {s.type}
                     </div>
                   </div>
                   {/* Title */}
-                  <div style={{ padding: "7px 8px 8px" }}>
+                  <div style={{ padding: "7px 8px 8px", width: "100%", display: "flex", justifyContent: "center" }}>
                     <div
                       style={{
                         fontSize: 10,
@@ -530,6 +536,7 @@ export function DiceRollOverlay({
                         display: "-webkit-box",
                         WebkitLineClamp: 2,
                         WebkitBoxOrient: "vertical",
+                        textAlign: "center",
                       }}
                     >
                       {s.title}

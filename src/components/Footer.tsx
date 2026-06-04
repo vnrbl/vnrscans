@@ -6,9 +6,9 @@ export function Footer() {
     <footer className="border-t border-border/40 bg-secondary/10 text-muted-foreground transition-all">
       {/* Top half */}
       <div className="container mx-auto px-8 md:px-12 lg:px-16 py-12">
-        <div className="grid gap-8 sm:grid-cols-2 md:grid-cols-4">
+        <div className="grid gap-8 grid-cols-1 sm:grid-cols-2 md:grid-cols-4 text-center sm:text-left">
           {/* Logo & Description */}
-          <div className="space-y-4">
+          <div className="flex flex-col items-center sm:items-start space-y-4">
             <Link to="/home" className="flex items-center gap-2 transition-transform hover:scale-102 w-fit">
               <div className="relative grid h-9 w-9 place-items-center rounded-lg bg-violet-600 font-bold text-white shadow-[0_0_15px_rgba(139,92,246,0.35)]">
                 VS
@@ -27,7 +27,7 @@ export function Footer() {
           </div>
 
           {/* Navigation Links */}
-          <div>
+          <div className="flex flex-col items-center sm:items-start">
             <h4 className="text-xs font-bold text-foreground uppercase tracking-widest mb-4">Navigation</h4>
             <ul className="space-y-2 text-xs">
               <li>
@@ -46,9 +46,9 @@ export function Footer() {
           </div>
 
           {/* Legal & Info */}
-          <div>
+          <div className="flex flex-col items-center sm:items-start">
             <h4 className="text-xs font-bold text-foreground uppercase tracking-widest mb-4">Legal & Support</h4>
-            <ul className="space-y-2 text-xs">
+            <ul className="space-y-2 text-xs flex flex-col items-center sm:items-start">
               <li>
                 <Link to="/about" className="hover:text-primary transition-colors">About Platform</Link>
               </li>
@@ -67,9 +67,9 @@ export function Footer() {
           </div>
 
           {/* Community & Socials */}
-          <div>
+          <div className="flex flex-col items-center sm:items-start">
             <h4 className="text-xs font-bold text-foreground uppercase tracking-widest mb-4">Community</h4>
-            <ul className="space-y-2.5 text-xs">
+            <ul className="space-y-2.5 text-xs flex flex-col items-center sm:items-start">
               <li>
                 <a
                   href="https://discord.gg/"

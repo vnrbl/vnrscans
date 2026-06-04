@@ -359,15 +359,15 @@ function SeriesDetail() {
 
   return (
     <div className="min-h-screen bg-background relative overflow-hidden">
-      {/* Blurred cover backdrop */}
+      {/* Background cover image */}
       {s.cover_url && (
-        <div className="absolute top-0 left-0 w-full h-[380px] pointer-events-none overflow-hidden z-0 select-none">
+        <div className="absolute top-0 left-0 w-full h-[480px] pointer-events-none overflow-hidden z-0 select-none">
           <img
             src={s.cover_url}
             alt=""
-            className="w-full h-full object-cover blur-[75px] opacity-[0.14] saturate-[1.6] scale-110"
+            className="w-full h-full object-cover opacity-[0.22] saturate-[1.1] scale-100"
           />
-          <div className="absolute inset-0 bg-gradient-to-b from-transparent via-background/60 to-background" />
+          <div className="absolute inset-0 bg-gradient-to-b from-transparent via-background/40 to-background" />
         </div>
       )}
 
@@ -473,13 +473,13 @@ function SeriesDetail() {
               </Link>
             </nav>
 
-            <div className="mb-3 flex flex-wrap items-center gap-2">
-              <Badge variant="secondary" className="rounded-md uppercase text-3xs font-semibold tracking-wider p-1 bg-secondary/50">
+            <div className="mb-3 flex flex-wrap items-center gap-1.5">
+              <Badge variant="secondary" className="rounded-md uppercase text-[10px] font-semibold tracking-wider px-2 py-0.5 bg-secondary/50">
                 {s.type}
               </Badge>
               {contentRating && (
                 <Badge
-                  className={`rounded-md uppercase text-3xs font-semibold tracking-wider p-1 ${
+                  className={`rounded-md uppercase text-[10px] font-semibold tracking-wider px-2 py-0.5 ${
                     contentRating === "safe"
                       ? "bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600/30"
                       : contentRating === "suggestive"
@@ -491,13 +491,13 @@ function SeriesDetail() {
                 </Badge>
               )}
               {s.release_year && (
-                <Badge variant="outline" className="rounded-md text-3xs font-semibold p-1 border-border/50">
+                <Badge variant="outline" className="rounded-md text-[10px] font-semibold px-2 py-0.5 border-border/50">
                   {s.release_year}
                 </Badge>
               )}
-              <Badge variant="outline" className="gap-1.5 rounded-md capitalize text-3xs font-semibold p-1 border-border/50">
+              <Badge variant="outline" className="gap-1 rounded-md capitalize text-[10px] font-semibold px-2 py-0.5 border-border/50">
                 {s.status === "ongoing" && (
-                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  <span className="h-1 w-1 rounded-full bg-emerald-500 animate-pulse" />
                 )}
                 {statusLabel(s.status)}
               </Badge>
@@ -556,19 +556,10 @@ function SeriesDetail() {
             {tags.length > 0 && (
               <MetaSection label="Tags">
                 {tags.map((tag) => (
-                  <Badge
-                    key={tag.id}
-                    variant="outline"
-                    className="cursor-default gap-1 text-3xs font-semibold px-2 py-0.5 border-border/50"
-                    style={{
-                      borderColor: tag.color,
-                      backgroundColor: `${tag.color}15`,
-                      color: tag.color,
-                    }}
-                  >
-                    {tag.icon && <span>{tag.icon}</span>}
+                  <MetaPill key={tag.id} href="/browse" search={{ tag: tag.slug }}>
+                    {tag.icon && <span className="mr-1">{tag.icon}</span>}
                     {tag.name}
-                  </Badge>
+                  </MetaPill>
                 ))}
               </MetaSection>
             )}
