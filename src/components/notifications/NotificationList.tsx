@@ -117,13 +117,12 @@ export function NotificationList({ notifications, isLoading, onMarkAllRead, onCl
             </Badge>
           )}
         </div>
-        {unreadCount > 0 ? (
           <Button
             variant="ghost"
             size="sm"
             onClick={onMarkAllRead}
-            disabled={isMarkingRead}
-            className="h-8 gap-2 text-xs text-violet-600 hover:text-violet-700 hover:bg-violet-50 dark:text-violet-400 dark:hover:text-violet-300 dark:hover:bg-violet-950/50"
+            disabled={isMarkingRead || unreadCount === 0}
+            className="h-8 gap-2 text-xs text-violet-600 hover:text-violet-700 hover:bg-violet-50 dark:text-violet-400 dark:hover:text-violet-300 dark:hover:bg-violet-950/50 disabled:opacity-50"
           >
             {isMarkingRead ? (
               <>
@@ -137,16 +136,10 @@ export function NotificationList({ notifications, isLoading, onMarkAllRead, onCl
               </>
             )}
           </Button>
-        ) : (
-          <div className="flex items-center gap-1 text-xs text-muted-foreground">
-            <Check className="h-3 w-3" />
-            All caught up
-          </div>
-        )}
       </div>
 
       {/* List */}
-      <ScrollArea className="max-h-64">
+      <ScrollArea className="h-80 pr-1">
         <div className="divide-y">
           {notifications.map((notification) => {
             const Icon = iconMap[notification.notification_type] || Check;

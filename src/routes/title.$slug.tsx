@@ -45,6 +45,12 @@ function SeriesDetail() {
   const [selectedGroup, setSelectedGroup] = React.useState<string>("all");
   const [sortOrder, setSortOrder] = React.useState<"desc" | "asc">("desc");
   const [searchQuery, setSearchQuery] = React.useState<string>("");
+  const [currentPage, setCurrentPage] = React.useState<number>(1);
+  const ITEMS_PER_PAGE = 15;
+
+  React.useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedGroup, sortOrder, searchQuery]);
 
   const seriesQ = useQuery({
     queryKey: ["series", "detail", slug],
@@ -103,6 +109,12 @@ function SeriesDetail() {
       );
     });
   }, [chaptersQ.data, searchQuery]);
+
+  const totalPages = Math.ceil(filteredChapters.length / ITEMS_PER_PAGE);
+  const paginatedChapters = React.useMemo(() => {
+    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+    return filteredChapters.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+  }, [filteredChapters, currentPage]);
 
   // Calculate unique chapter count (base chapters only, ignoring .1, .2 variants)
   const uniqueChapterCount = React.useMemo(() => {
@@ -677,7 +689,7 @@ function SeriesDetail() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border/40">
-                    {filteredChapters.map((c) => {
+                    {paginatedChapters.map((c) => {
                       const isRead = readChapters.data?.has(c.id) ?? false;
                       const isNew = new Date(c.created_at) > new Date(Date.now() - 2 * 60 * 60 * 1000);
                       const showNewBadge = isNew && !isRead;
@@ -730,6 +742,75 @@ function SeriesDetail() {
                     })}
                   </tbody>
                 </table>
+                {totalPages > 1 && (
+                  <div className="flex flex-col gap-4 items-center justify-between border-t border-border/40 py-4 px-4 sm:flex-row">
+                    <p className="text-sm text-muted-foreground">
+                      Showing <span className="font-semibold text-foreground">{(currentPage - 1) * ITEMS_PER_PAGE + 1}</span> to{" "}
+                      <span className="font-semibold text-foreground">
+                        {Math.min(currentPage * ITEMS_PER_PAGE, filteredChapters.length)}
+                      </span>{" "}
+                      of <span className="font-semibold text-foreground">{filteredChapters.length}</span> chapters
+                    </p>
+                    <div className="flex items-center gap-1.5">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setCurrentPage((prev) => Math.max(prev - 1, 1));
+                          document.getElementById("chapters-section")?.scrollIntoView({ behavior: "smooth" });
+                        }}
+                        disabled={currentPage === 1}
+                        className="h-8 w-8 p-0"
+                      >
+                        <ChevronLeft className="h-4 w-4" />
+                      </Button>
+                      {Array.from({ length: totalPages }).map((_, idx) => {
+                        const pageNum = idx + 1;
+                        if (totalPages > 5) {
+                          if (
+                            pageNum !== 1 &&
+                            pageNum !== totalPages &&
+                            Math.abs(pageNum - currentPage) > 1
+                          ) {
+                            if (pageNum === 2 && currentPage > 3) {
+                              return <span key="ellipsis-start" className="px-1 text-muted-foreground select-none">...</span>;
+                            }
+                            if (pageNum === totalPages - 1 && currentPage < totalPages - 2) {
+                              return <span key="ellipsis-end" className="px-1 text-muted-foreground select-none">...</span>;
+                            }
+                            return null;
+                          }
+                        }
+                        return (
+                          <Button
+                            key={pageNum}
+                            variant={currentPage === pageNum ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => {
+                              setCurrentPage(pageNum);
+                              document.getElementById("chapters-section")?.scrollIntoView({ behavior: "smooth" });
+                            }}
+                            className={`h-8 w-8 text-xs font-semibold ${currentPage === pageNum ? "bg-primary text-primary-foreground hover:bg-primary/95" : "hover:bg-secondary"}`}
+                          >
+                            {pageNum}
+                          </Button>
+                        );
+                      })}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setCurrentPage((prev) => Math.min(prev + 1, totalPages));
+                          document.getElementById("chapters-section")?.scrollIntoView({ behavior: "smooth" });
+                        }}
+                        disabled={currentPage === totalPages}
+                        className="h-8 w-8 p-0"
+                      >
+                        <ChevronRight className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </section>

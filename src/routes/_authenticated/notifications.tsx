@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { formatDistanceToNow, format } from "date-fns";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -24,6 +24,8 @@ import {
   Inbox,
   Sparkles,
   ArrowLeft,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/notifications")({
@@ -157,23 +159,6 @@ function NotificationsPage() {
     onSettled: () => qc.invalidateQueries({ queryKey: ["notifications"] }),
   });
 
-  const clearAllRead = useMutation({
-    mutationFn: async () => {
-      const { data: u } = await supabase.auth.getUser();
-      if (!u.user) return;
-      const { error } = await supabase
-        .from("user_notifications")
-        .delete()
-        .eq("user_id", u.user.id)
-        .eq("is_read", true);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      toast.success("Cleared read notifications");
-      qc.invalidateQueries({ queryKey: ["notifications"] });
-    },
-    onError: () => toast.error("Failed to clear"),
-  });
 
   const allNotifications = notifications.data || [];
   const unreadCount = allNotifications.filter((n) => !n.is_read).length;
@@ -190,8 +175,18 @@ function NotificationsPage() {
         ? allNotifications.filter((n) => !n.is_read)
         : allNotifications.filter((n) => n.notification_type === filter);
 
-  // Group by date
-  const grouped = filtered.reduce<Record<string, Notification[]>>((acc, n) => {
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const ITEMS_PER_PAGE = 10;
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filter]);
+
+  const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE);
+  const paginated = filtered.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+
+  // Group by date (only the paginated ones)
+  const grouped = paginated.reduce<Record<string, Notification[]>>((acc, n) => {
     const date = format(new Date(n.created_at), "MMMM d, yyyy");
     if (!acc[date]) acc[date] = [];
     acc[date].push(n);
@@ -215,30 +210,16 @@ function NotificationsPage() {
         </div>
 
         <div className="flex items-center gap-2">
-          {unreadCount > 0 && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => markAllRead.mutate()}
-              disabled={markAllRead.isPending}
-              className="gap-2"
-            >
-              {markAllRead.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCheck className="h-3.5 w-3.5" />}
-              Mark all read
-            </Button>
-          )}
-          {readCount > 0 && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => clearAllRead.mutate()}
-              disabled={clearAllRead.isPending}
-              className="gap-2 text-destructive hover:text-destructive"
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-              Clear read
-            </Button>
-          )}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => markAllRead.mutate()}
+            disabled={markAllRead.isPending || unreadCount === 0}
+            className="gap-2"
+          >
+            {markAllRead.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCheck className="h-3.5 w-3.5" />}
+            Mark all read
+          </Button>
         </div>
       </div>
 
@@ -376,6 +357,77 @@ function NotificationsPage() {
               </Card>
             </div>
           ))}
+
+          {/* Pagination controls */}
+          {totalPages > 1 && (
+            <div className="mt-6 flex flex-col gap-4 items-center justify-between border-t border-border/40 py-4 sm:flex-row">
+              <p className="text-sm text-muted-foreground">
+                Showing <span className="font-semibold text-foreground">{(currentPage - 1) * ITEMS_PER_PAGE + 1}</span> to{" "}
+                <span className="font-semibold text-foreground">
+                  {Math.min(currentPage * ITEMS_PER_PAGE, filtered.length)}
+                </span>{" "}
+                of <span className="font-semibold text-foreground">{filtered.length}</span> notifications
+              </p>
+              <div className="flex items-center gap-1.5">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setCurrentPage((prev) => Math.max(prev - 1, 1));
+                    window.scrollTo({ top: 0, behavior: "smooth" });
+                  }}
+                  disabled={currentPage === 1}
+                  className="h-8 w-8 p-0"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                {Array.from({ length: totalPages }).map((_, idx) => {
+                  const pageNum = idx + 1;
+                  if (totalPages > 5) {
+                    if (
+                      pageNum !== 1 &&
+                      pageNum !== totalPages &&
+                      Math.abs(pageNum - currentPage) > 1
+                    ) {
+                      if (pageNum === 2 && currentPage > 3) {
+                        return <span key="ellipsis-start" className="px-1 text-muted-foreground select-none">...</span>;
+                      }
+                      if (pageNum === totalPages - 1 && currentPage < totalPages - 2) {
+                        return <span key="ellipsis-end" className="px-1 text-muted-foreground select-none">...</span>;
+                      }
+                      return null;
+                    }
+                  }
+                  return (
+                    <Button
+                      key={pageNum}
+                      variant={currentPage === pageNum ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => {
+                        setCurrentPage(pageNum);
+                        window.scrollTo({ top: 0, behavior: "smooth" });
+                      }}
+                      className={`h-8 w-8 text-xs font-semibold ${currentPage === pageNum ? "bg-violet-500 text-white hover:bg-violet-600" : "hover:bg-secondary"}`}
+                    >
+                      {pageNum}
+                    </Button>
+                  );
+                })}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setCurrentPage((prev) => Math.min(prev + 1, totalPages));
+                    window.scrollTo({ top: 0, behavior: "smooth" });
+                  }}
+                  disabled={currentPage === totalPages}
+                  className="h-8 w-8 p-0"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

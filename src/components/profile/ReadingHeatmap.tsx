@@ -26,16 +26,16 @@ export function ReadingHeatmap() {
 
       const { data, error } = await supabase
         .from("reading_history")
-        .select("read_at")
+        .select("updated_at")
         .eq("user_id", u.user.id)
-        .gte("read_at", oneYearAgo.toISOString());
+        .gte("updated_at", oneYearAgo.toISOString());
 
       if (error) throw error;
 
       // Group by date
       const dateCounts: Record<string, number> = {};
       data?.forEach((item) => {
-        const date = new Date(item.read_at).toISOString().split("T")[0];
+        const date = new Date(item.updated_at).toISOString().split("T")[0];
         dateCounts[date] = (dateCounts[date] || 0) + 1;
       });
 
