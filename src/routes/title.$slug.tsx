@@ -679,7 +679,7 @@ function SeriesDetail() {
                   <tbody className="divide-y divide-border/40">
                     {filteredChapters.map((c) => {
                       const isRead = readChapters.data?.has(c.id) ?? false;
-                      const isNew = new Date(c.created_at) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+                      const isNew = new Date(c.created_at) > new Date(Date.now() - 2 * 60 * 60 * 1000);
                       const showNewBadge = isNew && !isRead;
 
                       return (
