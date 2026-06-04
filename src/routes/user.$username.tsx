@@ -141,6 +141,7 @@ function PublicProfilePage() {
 
   const socialLinks = {
     social_discord: profile.data.social_discord || "",
+    social_instagram: profile.data.social_instagram || "",
     social_twitter: profile.data.social_twitter || "",
     social_mal: profile.data.social_mal || "",
     social_anilist: profile.data.social_anilist || "",

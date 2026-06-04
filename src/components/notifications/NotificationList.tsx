@@ -146,7 +146,7 @@ export function NotificationList({ notifications, isLoading, onMarkAllRead, onCl
       </div>
 
       {/* List */}
-      <ScrollArea className="max-h-96">
+      <ScrollArea className="max-h-64">
         <div className="divide-y">
           {notifications.map((notification) => {
             const Icon = iconMap[notification.notification_type] || Check;

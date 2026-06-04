@@ -193,6 +193,14 @@ function ProfilePage() {
           username, 
           bio, 
           avatar_url: avatarUrl || null,
+          banner_url: bannerUrl || null,
+          accent_color: accentColor,
+          social_discord: socialLinks.social_discord || null,
+          social_instagram: socialLinks.social_instagram || null,
+          social_twitter: socialLinks.social_twitter || null,
+          social_mal: socialLinks.social_mal || null,
+          social_anilist: socialLinks.social_anilist || null,
+          social_website: socialLinks.social_website || null,
         } as any)
         .eq("user_id", u.user.id);
       if (error) throw error;

@@ -103,7 +103,7 @@ export function NotificationBell() {
           )}
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-80 p-0">
+      <DropdownMenuContent align="end" className="w-72 p-0">
         <NotificationList
           notifications={notifications.data || []}
           isLoading={notifications.isLoading}

@@ -6,6 +6,7 @@ ALTER TABLE profiles
   ADD COLUMN IF NOT EXISTS banner_url TEXT,
   ADD COLUMN IF NOT EXISTS accent_color TEXT DEFAULT '#8B5CF6',
   ADD COLUMN IF NOT EXISTS social_discord TEXT,
+  ADD COLUMN IF NOT EXISTS social_instagram TEXT,
   ADD COLUMN IF NOT EXISTS social_twitter TEXT,
   ADD COLUMN IF NOT EXISTS social_mal TEXT,
   ADD COLUMN IF NOT EXISTS social_anilist TEXT,
