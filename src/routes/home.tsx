@@ -16,6 +16,7 @@ import {
 import { useDragScroll, DRAG_SCROLL_CONTAINER_CLASS } from "@/hooks/useDragScroll";
 import { TITLE_CARD_WIDTH, TITLE_COVER_CLASS } from "@/components/titleCardStyles";
 import { HomeHeroCarousel } from "@/components/HomeHeroCarousel";
+import { OptimizedImage } from "@/components/OptimizedImage";
 
 export const Route = createFileRoute("/home")({
   head: () => ({
@@ -557,19 +558,11 @@ function SeriesCarouselSection({
               className={`group ${TITLE_CARD_WIDTH} overflow-hidden rounded-lg border border-border/40 bg-card transition-all hover:border-primary/50 hover:shadow-lg`}
             >
               <div className={TITLE_COVER_CLASS}>
-                {item.cover_url ? (
-                  <img
-                    src={item.cover_url}
-                    alt={item.title}
-                    loading="lazy"
-                    className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-                    draggable={false}
-                  />
-                ) : (
-                  <div className="flex h-full w-full items-center justify-center text-muted-foreground">
-                    <BookOpen className="h-10 w-10" />
-                  </div>
-                )}
+                <OptimizedImage
+                  src={item.cover_url}
+                  alt={item.title}
+                  className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                />
                 <div className="absolute left-2 top-2">
                   <Badge variant="secondary" className="bg-background/80 text-xs uppercase backdrop-blur">
                     {item.type}
@@ -713,19 +706,11 @@ function LatestUpdatesSection({
                   className="shrink-0"
                 >
                   <div className="relative h-[200px] w-[140px] overflow-hidden rounded-lg bg-secondary">
-                    {item.cover_url ? (
-                      <img
-                        src={item.cover_url}
-                        alt={item.title}
-                        loading="lazy"
-                        className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-                        draggable={false}
-                      />
-                    ) : (
-                      <div className="flex h-full w-full items-center justify-center text-muted-foreground">
-                        <BookOpen className="h-10 w-10" />
-                      </div>
-                    )}
+                    <OptimizedImage
+                      src={item.cover_url}
+                      alt={item.title}
+                      className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                    />
                   </div>
                 </Link>
 
@@ -877,19 +862,11 @@ function RecentChapterCard({
 
   const cover = (
     <div className={TITLE_COVER_CLASS}>
-      {chapter.series?.cover_url ? (
-        <img
-          src={chapter.series.cover_url}
-          alt={chapter.series.title}
-          loading="lazy"
-          className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-          draggable={false}
-        />
-      ) : (
-        <div className="flex h-full w-full items-center justify-center text-muted-foreground">
-          <BookOpen className="h-10 w-10" />
-        </div>
-      )}
+      <OptimizedImage
+        src={chapter.series?.cover_url ?? null}
+        alt={chapter.series?.title ?? ""}
+        className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+      />
     </div>
   );
 

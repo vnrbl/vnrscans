@@ -2,6 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { Star, BookOpen } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { TITLE_COVER_CLASS } from "@/components/titleCardStyles";
+import { OptimizedImage } from "@/components/OptimizedImage";
 
 type Series = {
   id: string;
@@ -22,18 +23,11 @@ export function SeriesCard({ s, rank }: { s: Series; rank?: number }) {
       className="group block overflow-hidden rounded-lg border border-border/40 bg-card transition-all hover:border-primary/50 hover:shadow-lg hover:shadow-primary/10"
     >
       <div className={TITLE_COVER_CLASS}>
-        {s.cover_url ? (
-          <img
-            src={s.cover_url}
-            alt={s.title}
-            loading="lazy"
-            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-          />
-        ) : (
-          <div className="flex h-full w-full items-center justify-center text-muted-foreground">
-            <BookOpen className="h-10 w-10" />
-          </div>
-        )}
+        <OptimizedImage
+          src={s.cover_url}
+          alt={s.title}
+          className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+        />
         {rank !== undefined && (
           <div className="absolute left-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-violet-600 text-sm font-bold text-white shadow-lg">
             #{rank}

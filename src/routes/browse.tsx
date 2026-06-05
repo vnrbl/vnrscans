@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Search, LayoutGrid, List, Star, X, BookOpen, Check } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { SeriesGrid } from "@/components/SeriesGrid";
+import { OptimizedImage } from "@/components/OptimizedImage";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -629,13 +630,7 @@ function SeriesList({ items, loading }: { items?: any[]; loading: boolean }) {
 
           {/* Cover Image */}
           <div className="w-32 shrink-0 overflow-hidden rounded-lg bg-secondary shadow-md lg:w-40">
-            {s.cover_url ? (
-              <img src={s.cover_url} alt={s.title} className="h-48 w-full object-cover lg:h-60" />
-            ) : (
-              <div className="flex h-48 lg:h-60 items-center justify-center text-muted-foreground">
-                <BookOpen className="h-10 w-10" />
-              </div>
-            )}
+            <OptimizedImage src={s.cover_url} alt={s.title} className="h-48 w-full object-cover lg:h-60" />
           </div>
 
           {/* Content */}

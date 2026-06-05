@@ -207,6 +207,70 @@ function Reader() {
   const prev = idx > 0 ? siblingsQ.data![idx - 1] : null;
   const next = idx >= 0 && siblingsQ.data && idx < siblingsQ.data.length - 1 ? siblingsQ.data[idx + 1] : null;
 
+  // Prefetch next chapter when scroll progress is >= 50%
+  const prefetchedNextRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!next || !chapterQ.data?.series?.id) return;
+    
+    // Check if we already prefetched this next chapter slug
+    if (prefetchedNextRef.current === next.slug) return;
+
+    const handleScrollPrefetch = () => {
+      const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+      const scrollHeight = document.documentElement.scrollHeight - window.innerHeight;
+      const progress = scrollHeight > 0 ? (scrollTop / scrollHeight) * 100 : 0;
+
+      if (progress >= 50) {
+        prefetchedNextRef.current = next.slug;
+        window.removeEventListener("scroll", handleScrollPrefetch);
+
+        console.log(`Prefetching next chapter in background: ${next.slug}`);
+
+        const nextChapterSlug = next.slug;
+        const seriesData = chapterQ.data.series;
+
+        // Prefetch next chapter metadata
+        qc.prefetchQuery({
+          queryKey: ["chapter", titleSlug, nextChapterSlug],
+          queryFn: async () => {
+            const { data, error } = await supabase
+              .from("chapters")
+              .select("*, series:series(id,slug,title,type)")
+              .eq("slug", nextChapterSlug)
+              .eq("series_id", seriesData!.id)
+              .maybeSingle();
+            
+            if (error) throw error;
+            if (!data) throw new Error("Next chapter not found");
+            
+            // Side effect: also prefetch next chapter's pages if it is an image type!
+            if (data.chapter_type === "image") {
+              qc.prefetchQuery({
+                queryKey: ["pages", data.id],
+                queryFn: async () => {
+                  const { data: pageData, error: pageError } = await supabase
+                    .from("chapter_pages")
+                    .select("id,page_number,image_url")
+                    .eq("chapter_id", data.id)
+                    .order("page_number");
+                  if (pageError) throw pageError;
+                  return pageData ?? [];
+                }
+              });
+            }
+
+            return data;
+          }
+        });
+      }
+    };
+
+    window.addEventListener("scroll", handleScrollPrefetch, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", handleScrollPrefetch);
+    };
+  }, [next, chapterQ.data, titleSlug, qc]);
+
   // Keyboard navigation (Arrow keys for PC)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -905,7 +969,7 @@ function ImageView({ pages, loading, chapterId, zoomLevel, hasPrev, hasNext, onP
     <>
       {/* Pages with Zoom (Desktop) / Normal (Mobile) */}
       <div className="mx-auto max-w-3xl px-2 py-4">
-        {pages.map((p) => (
+        {pages.map((p, idx) => (
           <div key={p.id} className="relative">
             {imageErrors[p.id] ? (
               // Error fallback UI
@@ -946,8 +1010,9 @@ function ImageView({ pages, loading, chapterId, zoomLevel, hasPrev, hasNext, onP
                 <img
                   data-page-id={p.id}
                   src={p.image_url}
-                  alt={`Page {p.page_number}`}
-                  loading="lazy"
+                  alt={`Page ${p.page_number}`}
+                  loading={idx < 2 ? "eager" : "lazy"}
+                  fetchPriority={idx < 2 ? "high" : "auto"}
                   className="mx-auto block w-full transition-transform duration-200"
                   style={{ 
                     transform: isMobile ? 'scale(1)' : `scale(${zoomLevel / 100})`, 

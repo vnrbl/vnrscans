@@ -1,5 +1,23 @@
 import type { LucideIcon } from "lucide-react";
-import * as Icons from "lucide-react";
+import {
+  Flame, Zap, Skull, Swords, Sun, Moon, PawPrint, Scroll, Scale, FlaskConical,
+  Orbit, Crown, Sword, Feather, Compass, ShieldAlert, Shield, User, Ghost,
+  Droplet, Flower, Mountain, Pill, Gem, Sparkles, Sprout, Layers, Circle,
+  Baby, Leaf, PenTool, Grid, CloudLightning, Cloud, Tent, Award, HardHat,
+  Triangle, Dna, Loader, Eye, Wand, Target, Map, Bomb, Magnet, Waves,
+  Snowflake, Wind, Settings, Bird, Dog, Minus, Laugh, AlertTriangle, Stars,
+  CircleDot, Link, Flag
+} from "lucide-react";
+
+const IconMap: Record<string, LucideIcon> = {
+  Flame, Zap, Skull, Swords, Sun, Moon, PawPrint, Scroll, Scale, FlaskConical,
+  Orbit, Crown, Sword, Feather, Compass, ShieldAlert, Shield, User, Ghost,
+  Droplet, Flower, Mountain, Pill, Gem, Sparkles, Sprout, Layers, Circle,
+  Baby, Leaf, PenTool, Grid, CloudLightning, Cloud, Tent, Award, HardHat,
+  Triangle, Dna, Loader, Eye, Wand, Target, Map, Bomb, Magnet, Waves,
+  Snowflake, Wind, Settings, Bird, Dog, Minus, Laugh, AlertTriangle, Stars,
+  CircleDot, Link, Flag
+};
 
 export type BadgeCategory = "Title" | "Badge" | "Tag";
 export type BadgeDifficulty = "Easy" | "Moderate" | "Hard" | "Godly";
@@ -386,7 +404,7 @@ export const emojiToIconName: Record<string, string> = {
   "🌸": "Flower",
   "🏔️": "Mountain",
   "🌑": "Moon",
-  "💊": "Pills",
+  "💊": "Pill",
   "📿": "Gem",
   "🐉": "Sparkles",
   "🔥": "Flame",
@@ -436,7 +454,7 @@ export const emojiToIconName: Record<string, string> = {
 
 export function BadgeIcon({ icon, className }: { icon: string; className?: string }) {
   const iconName = emojiToIconName[icon] || "Award";
-  const IconComponent = ((Icons as Record<string, LucideIcon>)[iconName] || Icons.Award) as LucideIcon;
+  const IconComponent = IconMap[iconName] || Award;
   return <IconComponent className={className} />;
 }
 
