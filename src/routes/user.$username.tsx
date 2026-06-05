@@ -20,6 +20,7 @@ import {
   ArrowLeft,
   Clock,
   Lock,
+  Orbit,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SocialLinksDisplay } from "@/components/profile/SocialLinks";
@@ -165,6 +166,69 @@ const keyframeStyles = `
   80% { opacity: 0.8; transform: scaleY(1.02) scaleX(0.99); }
   90% { opacity: 0.9; transform: scaleY(0.98) scaleX(1.02); }
 }
+@keyframes avatarSmokeOrbit {
+  0% { transform: rotate(0deg) translateX(78px) rotate(0deg) scale(0.7); opacity: 0; filter: blur(3px); }
+  15% { opacity: 0.35; }
+  50% { transform: rotate(180deg) translateX(78px) rotate(-180deg) scale(1.1); opacity: 0.2; filter: blur(5px); }
+  85% { opacity: 0.1; }
+  100% { transform: rotate(360deg) translateX(78px) rotate(-360deg) scale(0.7); opacity: 0; filter: blur(3px); }
+}
+@keyframes smokeRise {
+  0% { transform: translateY(0) translateX(0) scale(0.8); opacity: 0; filter: blur(2px); }
+  15% { opacity: 0.5; }
+  40% { transform: translateY(-12px) translateX(4px) scale(1.1); opacity: 0.35; filter: blur(4px); }
+  70% { transform: translateY(-22px) translateX(-3px) scale(1.3); opacity: 0.15; filter: blur(6px); }
+  100% { transform: translateY(-35px) translateX(2px) scale(1.5); opacity: 0; filter: blur(8px); }
+}
+@keyframes smokeRise2 {
+  0% { transform: translateY(0) translateX(0) scale(0.6); opacity: 0; filter: blur(3px); }
+  20% { opacity: 0.4; }
+  50% { transform: translateY(-15px) translateX(-5px) scale(1.0); opacity: 0.25; filter: blur(5px); }
+  80% { transform: translateY(-28px) translateX(3px) scale(1.2); opacity: 0.1; filter: blur(7px); }
+  100% { transform: translateY(-40px) translateX(-1px) scale(1.4); opacity: 0; filter: blur(9px); }
+}
+@keyframes flameTextPulse {
+  0%, 100% { filter: brightness(1) drop-shadow(0 0 4px var(--flame-color, #ef4444)); text-shadow: 0 0 8px var(--flame-color, #ef4444); }
+  25% { filter: brightness(1.15) drop-shadow(0 0 8px var(--flame-color, #ef4444)); text-shadow: 0 0 12px var(--flame-color, #ef4444), 0 0 20px var(--flame-glow, #f97316); }
+  50% { filter: brightness(1.3) drop-shadow(0 0 12px var(--flame-color, #ef4444)); text-shadow: 0 0 16px var(--flame-color, #ef4444), 0 0 30px var(--flame-glow, #f97316), 0 0 45px var(--flame-outer, #fbbf24); }
+  75% { filter: brightness(1.1) drop-shadow(0 0 6px var(--flame-color, #ef4444)); text-shadow: 0 0 10px var(--flame-color, #ef4444), 0 0 18px var(--flame-glow, #f97316); }
+}
+@keyframes frameCardShimmer {
+  0% { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+@keyframes abyssVoidGlow {
+  0%, 100% { filter: brightness(1) drop-shadow(0 0 8px rgba(217, 70, 239, 0.45)); transform: scale(1); }
+  50% { filter: brightness(1.25) drop-shadow(0 0 22px rgba(139, 92, 246, 0.75)); transform: scale(1.03); }
+}
+@keyframes glitchFlicker {
+  0%, 100% { transform: scale(1) skew(0deg); opacity: 1; filter: hue-rotate(0deg); }
+  10% { transform: scale(1.02) skew(1deg); opacity: 0.95; filter: hue-rotate(30deg); }
+  20% { transform: scale(0.98) skew(-1deg); opacity: 0.9; filter: hue-rotate(-30deg); }
+  30% { transform: scale(1) skew(0deg); opacity: 1; filter: hue-rotate(0deg); }
+}
+@keyframes fireTongue {
+  0%, 100% {
+    transform: scaleY(1) skewX(0deg) scaleX(1);
+    opacity: 0.85;
+    filter: blur(1.5px) brightness(1);
+  }
+  25% {
+    transform: scaleY(1.2) skewX(4deg) scaleX(0.95);
+    opacity: 1;
+    filter: blur(1px) brightness(1.25);
+  }
+  50% {
+    transform: scaleY(0.9) skewX(-3deg) scaleX(1.05);
+    opacity: 0.75;
+    filter: blur(2px) brightness(0.9);
+  }
+  75% {
+    transform: scaleY(1.3) skewX(-5deg) scaleX(0.9);
+    opacity: 0.95;
+    filter: blur(1px) brightness(1.35);
+  }
+}
 `;
 
 const getAvatarFrameStyles = (frame: string, accent: string) => {
@@ -187,11 +251,35 @@ const getAvatarFrameStyles = (frame: string, accent: string) => {
       return { boxShadow: "0 0 25px rgba(239, 68, 68, 0.65), inset 0 0 12px rgba(0, 0, 0, 0.85)" };
     case "system":
       return { boxShadow: "0 0 22px rgba(6, 182, 212, 0.55), inset 0 0 10px rgba(6, 182, 212, 0.35)" };
+    case "abyss":
+      return { boxShadow: "0 0 25px rgba(217, 70, 239, 0.6), inset 0 0 12px rgba(74, 4, 78, 0.5)" };
+    case "glitch":
+      return { boxShadow: "0 0 22px rgba(239, 68, 68, 0.55), inset 0 0 10px rgba(6, 182, 212, 0.35)" };
+    case "divine":
+      return { boxShadow: "0 0 25px rgba(252, 211, 77, 0.6), inset 0 0 10px rgba(255, 255, 255, 0.35)" };
     case "none":
     default:
       return {
         boxShadow: `0 0 15px ${accent}25`,
       };
+  }
+};
+
+const getFrameSmokeColor = (frame: string, accent: string) => {
+  switch (frame) {
+    case "neon": return "#A855F7";
+    case "gold": return "#ffd700";
+    case "cyber": return "#06B6D4";
+    case "fire": return "#EF4444";
+    case "sakura": return "#F472B6";
+    case "shadow": return "#6366F1";
+    case "qi": return "#10B981";
+    case "asura": return "#EF4444";
+    case "system": return "#06B6D4";
+    case "abyss": return "#D946EF";
+    case "glitch": return "#EF4444";
+    case "divine": return "#FCD34D";
+    default: return accent;
   }
 };
 
@@ -495,6 +583,14 @@ function PublicProfilePage() {
                 padding: '4px',
               }}
             >
+              {/* Smoke wisps orbiting the avatar frame */}
+              {(profile.data.avatar_frame || "none") !== "none" && (
+                <div className="absolute inset-0 pointer-events-none z-[25]">
+                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-3 h-3 rounded-full" style={{ background: `radial-gradient(circle, ${getFrameSmokeColor(profile.data.avatar_frame || "none", accentColor)}50, transparent)`, animation: 'avatarSmokeOrbit 6s linear infinite' }} />
+                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-4 h-4 rounded-full" style={{ background: `radial-gradient(circle, ${getFrameSmokeColor(profile.data.avatar_frame || "none", accentColor)}40, transparent)`, animation: 'avatarSmokeOrbit 8s linear infinite 2s' }} />
+                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full" style={{ background: `radial-gradient(circle, ${getFrameSmokeColor(profile.data.avatar_frame || "none", accentColor)}35, transparent)`, animation: 'avatarSmokeOrbit 10s linear infinite 4s' }} />
+                </div>
+              )}
               {/* Layer 1: Spinners, double-rotators & backgrounds for custom frames */}
               {(profile.data.avatar_frame || "none") === "neon" && (
                 <div className="absolute inset-0 rounded-full overflow-hidden animate-[lightningFlicker_6s_ease-in-out_infinite]">
@@ -528,6 +624,7 @@ function PublicProfilePage() {
                   </div>
                 </div>
               )}
+
               {(profile.data.avatar_frame || "none") === "sakura" && (
                 <>
                   <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-[#FDA4AF] via-[#F472B6] to-[#E879F9] animate-[smoothBreath_4s_ease-in-out_infinite]" />
@@ -558,6 +655,26 @@ function PublicProfilePage() {
                 <div className="absolute inset-0 rounded-full border-2 border-cyan-400 bg-cyan-950/20 animate-[asuraRage_4s_ease-in-out_infinite] overflow-hidden">
                   {/* Rotating radar sweep */}
                   <div className="absolute inset-[-50%] rounded-full bg-[conic-gradient(from_0deg,rgba(6,182,212,0.25),transparent_40%,transparent)] animate-[rotationCW_3s_linear_infinite]" />
+                </div>
+              )}
+              {(profile.data.avatar_frame || "none") === "abyss" && (
+                <div className="absolute inset-0 rounded-full bg-slate-950 overflow-hidden animate-[abyssVoidGlow_5s_ease-in-out_infinite]">
+                  {/* Swirling void conic gradient */}
+                  <div className="absolute inset-[-50%] rounded-full bg-[conic-gradient(from_0deg,#D946EF,#4A044E,#3B0764,#D946EF)] animate-[rotationCW_8s_linear_infinite]" />
+                  <div className="absolute inset-[3px] rounded-full border border-purple-500/30 bg-purple-950/20 animate-[rotationCCW_10s_linear_infinite] z-5" />
+                </div>
+              )}
+              {(profile.data.avatar_frame || "none") === "glitch" && (
+                <div className="absolute inset-0 rounded-full border-2 border-red-500/40 bg-slate-950/20 overflow-hidden animate-[glitchFlicker_4s_linear_infinite]">
+                  {/* Swirling tech rings */}
+                  <div className="absolute inset-[-50%] rounded-full bg-[conic-gradient(from_0deg,#ef4444,#06b6d4,#ef4444)] animate-[rotationCW_4s_linear_infinite]" />
+                </div>
+              )}
+              {(profile.data.avatar_frame || "none") === "divine" && (
+                <div className="absolute inset-0 rounded-full bg-amber-50/10 overflow-hidden animate-[divineHalo_4s_ease-in-out_infinite]">
+                  {/* Light halo rotating rings */}
+                  <div className="absolute inset-[-50%] rounded-full bg-[conic-gradient(from_0deg,#FCD34D,#FFFFFF,#FFFBEB,#FCD34D)] animate-[rotationCW_6s_linear_infinite]" />
+                  <div className="absolute inset-[2.5px] rounded-full bg-gradient-to-bl from-[#FFFBEB] via-[#FCD34D] to-[#FFFFFF] animate-[rotationCCW_5s_linear_infinite]" />
                 </div>
               )}
 
@@ -716,6 +833,32 @@ function PublicProfilePage() {
                   </div>
                 </>
               )}
+              {(profile.data.avatar_frame || "none") === "abyss" && (
+                <div className="absolute inset-0 pointer-events-none z-20">
+                  <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 text-fuchsia-400 drop-shadow-[0_0_8px_#D946EF] animate-[asuraRage_3s_ease-in-out_infinite] z-25">
+                    <Orbit className="h-5.5 w-5.5" />
+                  </div>
+                  {/* Swirling Abyssal Orbs */}
+                  <div className="absolute bottom-2 left-4 h-2 w-2 rounded-full bg-fuchsia-500 shadow-[0_0_6px_#D946EF]" style={{ animation: 'fireEmbersWavy 2.8s ease-out infinite' }} />
+                  <div className="absolute bottom-3 right-5 h-1.5 w-1.5 rounded-full bg-purple-400 shadow-[0_0_5px_#8B5CF6]" style={{ animation: 'fireEmbersWavy 3.2s ease-out infinite', animationDelay: '0.8s' }} />
+                </div>
+              )}
+              {(profile.data.avatar_frame || "none") === "glitch" && (
+                <div className="absolute inset-0 pointer-events-none z-20 animate-[cyberGlitch_6s_infinite]">
+                  <div className="absolute -top-1.5 left-[15%] h-1.5 w-[70%] border-t-2 border-red-500 shadow-[0_0_5px_red]" />
+                  <div className="absolute -bottom-1.5 left-[15%] h-1.5 w-[70%] border-b-2 border-cyan-400 shadow-[0_0_5px_cyan]" />
+                </div>
+              )}
+              {(profile.data.avatar_frame || "none") === "divine" && (
+                <div className="absolute inset-0 pointer-events-none z-20">
+                  <div className="absolute -top-4.5 left-1/2 -translate-x-1/2 text-yellow-300 drop-shadow-[0_0_8px_rgba(252,211,77,0.7)] animate-[starTwinkle_2s_ease-in-out_infinite] z-25">
+                    <Sparkles className="h-6 w-6" />
+                  </div>
+                  {/* Orbiting divine spark stars */}
+                  <div className="absolute top-2 left-2 w-1.5 h-1.5 rounded-full bg-yellow-100 animate-[starTwinkle_3s_ease-out_infinite]" />
+                  <div className="absolute top-4 right-2 w-1 h-1 rounded-full bg-white animate-[starTwinkle_2.5s_ease-out_infinite_1.2s]" />
+                </div>
+              )}
 
               {profile.data.is_vip && (
                 <div
@@ -732,17 +875,38 @@ function PublicProfilePage() {
                 <h1 className="text-3xl font-extrabold tracking-tight">{username}</h1>
                 <div className="flex flex-wrap items-center gap-2">
                   {roles.includes("admin") && (
-                    <Badge className="border border-red-500/20 bg-red-500/10 text-red-400 hover:bg-red-500/20">
+                    <Badge
+                      style={{
+                        borderColor: `${accentColor}30`,
+                        backgroundColor: `${accentColor}12`,
+                        color: accentColor,
+                      }}
+                      className="border transition-all duration-200 hover:brightness-110 hover:scale-[1.02] shadow-sm backdrop-blur-sm cursor-default"
+                    >
                       <Shield className="mr-1 h-3 w-3" /> Admin
                     </Badge>
                   )}
                   {roles.includes("moderator") && (
-                    <Badge className="border border-blue-500/20 bg-blue-500/10 text-blue-400 hover:bg-blue-500/20">
+                    <Badge
+                      style={{
+                        borderColor: `${accentColor}30`,
+                        backgroundColor: `${accentColor}12`,
+                        color: accentColor,
+                      }}
+                      className="border transition-all duration-200 hover:brightness-110 hover:scale-[1.02] shadow-sm backdrop-blur-sm cursor-default"
+                    >
                       <Shield className="mr-1 h-3 w-3" /> Mod
                     </Badge>
                   )}
                   {roles.includes("uploader") && (
-                    <Badge className="border border-emerald-500/20 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20">
+                    <Badge
+                      style={{
+                        borderColor: `${accentColor}30`,
+                        backgroundColor: `${accentColor}12`,
+                        color: accentColor,
+                      }}
+                      className="border transition-all duration-200 hover:brightness-110 hover:scale-[1.02] shadow-sm backdrop-blur-sm cursor-default"
+                    >
                       <Shield className="mr-1 h-3 w-3" /> Uploader
                     </Badge>
                   )}

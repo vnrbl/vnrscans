@@ -750,6 +750,28 @@ const navFrameKeyframes = `
 @keyframes navRotCCW { 0% { transform: rotate(360deg); } 100% { transform: rotate(0deg); } }
 @keyframes navPulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.06); } }
 @keyframes navGlitch { 0%,100% { filter: hue-rotate(0deg); } 50% { filter: hue-rotate(30deg); } }
+@keyframes fireTongue {
+  0%, 100% {
+    transform: scaleY(1) skewX(0deg) scaleX(1);
+    opacity: 0.85;
+    filter: blur(1px) brightness(1);
+  }
+  25% {
+    transform: scaleY(1.25) skewX(3deg) scaleX(0.95);
+    opacity: 1;
+    filter: blur(0.5px) brightness(1.25);
+  }
+  50% {
+    transform: scaleY(0.9) skewX(-2deg) scaleX(1.05);
+    opacity: 0.75;
+    filter: blur(1.5px) brightness(0.9);
+  }
+  75% {
+    transform: scaleY(1.3) skewX(-3deg) scaleX(0.9);
+    opacity: 0.95;
+    filter: blur(0.5px) brightness(1.35);
+  }
+}
 `;
 
 let navFrameStylesInjected = false;
@@ -849,6 +871,7 @@ function NavbarAvatarFrame({
           inset: borderWidth,
         }} 
       />
+
       {/* Avatar image or initial */}
       <div 
         className="relative rounded-full overflow-hidden flex items-center justify-center bg-background z-10"

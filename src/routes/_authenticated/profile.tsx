@@ -194,6 +194,28 @@ const keyframeStyles = `
   0%, 100% { transform: scale(1); filter: brightness(1) drop-shadow(0 0 10px rgba(252, 211, 77, 0.5)); }
   50% { transform: scale(1.03); filter: brightness(1.25) drop-shadow(0 0 24px rgba(253, 224, 71, 0.8)); }
 }
+@keyframes fireTongue {
+  0%, 100% {
+    transform: scaleY(1) skewX(0deg) scaleX(1);
+    opacity: 0.85;
+    filter: blur(1.5px) brightness(1);
+  }
+  25% {
+    transform: scaleY(1.2) skewX(4deg) scaleX(0.95);
+    opacity: 1;
+    filter: blur(1px) brightness(1.25);
+  }
+  50% {
+    transform: scaleY(0.9) skewX(-3deg) scaleX(1.05);
+    opacity: 0.75;
+    filter: blur(2px) brightness(0.9);
+  }
+  75% {
+    transform: scaleY(1.3) skewX(-5deg) scaleX(0.9);
+    opacity: 0.95;
+    filter: blur(1px) brightness(1.35);
+  }
+}
 @keyframes titleUnderlineSweep {
   0% { background-position: -200% center; }
   100% { background-position: 200% center; }
@@ -588,6 +610,7 @@ function ProfilePage() {
                   </div>
                 </div>
               )}
+
               {avatarFrame === "sakura" && (
                 <>
                   <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-[#FDA4AF] via-[#F472B6] to-[#E879F9] animate-[smoothBreath_4s_ease-in-out_infinite]" />
@@ -838,21 +861,36 @@ function ProfilePage() {
                 <div className="flex flex-wrap items-center gap-2">
                   {userRoles.data?.includes("admin") && (
                     <Badge
-                      className="border border-red-500/20 bg-red-500/10 text-red-400 hover:bg-red-500/20"
+                      style={{
+                        borderColor: `${accentColor}30`,
+                        backgroundColor: `${accentColor}12`,
+                        color: accentColor,
+                      }}
+                      className="border transition-all duration-200 hover:brightness-110 hover:scale-[1.02] shadow-sm backdrop-blur-sm cursor-default"
                     >
                       <Shield className="mr-1 h-3 w-3" /> Admin
                     </Badge>
                   )}
                   {userRoles.data?.includes("moderator") && (
                     <Badge
-                      className="border border-blue-500/20 bg-blue-500/10 text-blue-400 hover:bg-blue-500/20"
+                      style={{
+                        borderColor: `${accentColor}30`,
+                        backgroundColor: `${accentColor}12`,
+                        color: accentColor,
+                      }}
+                      className="border transition-all duration-200 hover:brightness-110 hover:scale-[1.02] shadow-sm backdrop-blur-sm cursor-default"
                     >
                       <Shield className="mr-1 h-3 w-3" /> Mod
                     </Badge>
                   )}
                   {userRoles.data?.includes("uploader") && (
                     <Badge
-                      className="border border-emerald-500/20 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20"
+                      style={{
+                        borderColor: `${accentColor}30`,
+                        backgroundColor: `${accentColor}12`,
+                        color: accentColor,
+                      }}
+                      className="border transition-all duration-200 hover:brightness-110 hover:scale-[1.02] shadow-sm backdrop-blur-sm cursor-default"
                     >
                       <Shield className="mr-1 h-3 w-3" /> Uploader
                     </Badge>
@@ -1298,7 +1336,7 @@ function ProfilePage() {
                             </div>
 
                             <div className="min-w-0 flex-1 relative">
-                              <p className="font-semibold text-sm flex items-center gap-1.5">
+                              <div className="font-semibold text-sm flex items-center gap-1.5">
                                 <span style={{ color: isSelected ? frame.color : undefined, textShadow: isSelected ? `0 0 8px ${frame.color}40` : 'none' }}>
                                   {frame.name}
                                 </span>
@@ -1307,7 +1345,7 @@ function ProfilePage() {
                                     ✦ Equipped
                                   </Badge>
                                 )}
-                              </p>
+                              </div>
                               <p className="text-xs text-muted-foreground truncate mt-0.5">{frame.description}</p>
                             </div>
                           </button>
