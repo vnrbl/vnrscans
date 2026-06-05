@@ -17,16 +17,19 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 async function runCleanup() {
   console.log('🧹 --- Database Scrape Cleanup Script --- 🧹\n');
 
-  // Step 1: Find the series record for "i-am-the-fated-villain"
-  console.log('Finding series "i-am-the-fated-villain"...');
+  // Get series slug from command line arguments or default to i-am-the-fated-villain
+  const seriesSlug = process.argv[2] || 'i-am-the-fated-villain';
+  
+  // Step 1: Find the series record for the given slug
+  console.log(`Finding series "${seriesSlug}"...`);
   const { data: series, error: seriesError } = await supabase
     .from('series')
     .select('id, title')
-    .eq('slug', 'i-am-the-fated-villain')
+    .eq('slug', seriesSlug)
     .single();
 
   if (seriesError || !series) {
-    console.error('❌ Could not find series with slug "i-am-the-fated-villain".', seriesError?.message);
+    console.error(`❌ Could not find series with slug "${seriesSlug}".`, seriesError?.message);
     process.exit(1);
   }
 
@@ -47,14 +50,15 @@ async function runCleanup() {
   console.log(`✅ Found ${chapters.length} chapters.`);
 
   // Step 3: Clean up chapter titles
-  console.log('\nChecking for relative time titles (e.g. "1 day ago")...');
+  console.log('\nChecking for relative time titles...');
   let updatedTitlesCount = 0;
   
   for (const ch of chapters) {
     if (ch.title) {
-      const isRelativeTime = /^\s*\d+\s+(?:second|sec|minute|min|hour|hr|day|week|wk|month|year)s?\s+ago\s*$/i.test(ch.title) ||
-                             /^\s*\d{1,4}[-/\s.]\d{1,2}[-/\s.]\d{1,4}\s*$/.test(ch.title) ||
-                             /^\s*(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+\d{1,2}(?:st|nd|rd|th)?(?:,?\s+\d{4})?\s*$/i.test(ch.title);
+      const isRelativeTime = 
+        /\b\d+\s*(?:seconds?|sec|s|minutes?|min|m|hours?|hr|h|days?|d|weeks?|wk|w|months?|mo|years?|y)\s+ago(?:\s+\d+)?\b/i.test(ch.title) ||
+        /^\s*\d{1,4}[-/\s.]\d{1,2}[-/\s.]\d{1,4}\s*$/.test(ch.title) ||
+        /^\s*(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+\d{1,2}(?:st|nd|rd|th)?(?:,?\s+\d{4})?\s*$/.test(ch.title);
 
       if (isRelativeTime) {
         console.log(`  └─ Chapter ${ch.chapter_number}: Resetting title "${ch.title}" -> NULL`);
@@ -78,11 +82,25 @@ async function runCleanup() {
   console.log('\nRegenerating and updating chapter slugs...');
   let updatedSlugsCount = 0;
   
+  // Sort chapters to process deterministically
+  chapters.sort((a, b) => a.chapter_number - b.chapter_number);
+  const takenSlugs = new Set<string>();
+  
   for (const ch of chapters) {
-    const correctSlug = buildChapterSlug(ch.chapter_number, {
+    let correctSlug = buildChapterSlug(ch.chapter_number, {
       title: ch.title,
       scanlationGroup: null,
     });
+
+    // If this slug is already taken in this series, append the scanlation group to make it unique
+    if (takenSlugs.has(correctSlug)) {
+      correctSlug = buildChapterSlug(ch.chapter_number, {
+        title: ch.title,
+        scanlationGroup: ch.scanlation_group || null,
+      });
+    }
+
+    takenSlugs.add(correctSlug);
 
     if (ch.slug !== correctSlug) {
       console.log(`  └─ Chapter ${ch.chapter_number}: Updating slug "${ch.slug}" -> "${correctSlug}"`);
@@ -97,43 +115,50 @@ async function runCleanup() {
         ch.slug = correctSlug;
         updatedSlugsCount++;
       }
+    } else {
+      // Even if we didn't update it, record it as taken so other duplicates don't conflict
+      takenSlugs.add(ch.slug);
     }
   }
   console.log(`✅ Updated ${updatedSlugsCount} chapter slugs.`);
 
-  // Step 4: Delete the target cover image from all chapters of this series
-  const targetCoverUrl = 'https://cdn.asurascans.com/asura-images/covers/i-am-the-fated-villain.e8d6b3-400.webp';
-  console.log(`\nDeleting cover image entries (${targetCoverUrl}) from pages...`);
+  // Step 4: Delete the target cover image from all chapters of this series if applicable
+  if (seriesSlug === 'i-am-the-fated-villain') {
+    const targetCoverUrl = 'https://cdn.asurascans.com/asura-images/covers/i-am-the-fated-villain.e8d6b3-400.webp';
+    console.log(`\nDeleting cover image entries (${targetCoverUrl}) from pages...`);
 
-  const chapterIds = chapters.map(ch => ch.id);
+    const chapterIds = chapters.map(ch => ch.id);
 
-  // Find matching pages
-  const { data: pagesToDelete, error: selectPagesError } = await supabase
-    .from('chapter_pages')
-    .select('id, chapter_id')
-    .in('chapter_id', chapterIds)
-    .eq('image_url', targetCoverUrl);
-
-  if (selectPagesError) {
-    console.error('❌ Failed to select pages to delete:', selectPagesError.message);
-    process.exit(1);
-  }
-
-  if (!pagesToDelete || pagesToDelete.length === 0) {
-    console.log('✅ No cover image entries found to delete.');
-  } else {
-    console.log(`Found ${pagesToDelete.length} page entries to delete. Deleting...`);
-    const { error: deleteError } = await supabase
+    // Find matching pages
+    const { data: pagesToDelete, error: selectPagesError } = await supabase
       .from('chapter_pages')
-      .delete()
-      .in('id', pagesToDelete.map(p => p.id));
+      .select('id, chapter_id')
+      .in('chapter_id', chapterIds)
+      .eq('image_url', targetCoverUrl);
 
-    if (deleteError) {
-      console.error('❌ Failed to delete cover image entries:', deleteError.message);
+    if (selectPagesError) {
+      console.error('❌ Failed to select pages to delete:', selectPagesError.message);
       process.exit(1);
     }
 
-    console.log(`✅ Deleted ${pagesToDelete.length} entries.`);
+    if (!pagesToDelete || pagesToDelete.length === 0) {
+      console.log('✅ No cover image entries found to delete.');
+    } else {
+      console.log(`Found ${pagesToDelete.length} page entries to delete. Deleting...`);
+      const { error: deleteError } = await supabase
+        .from('chapter_pages')
+        .delete()
+        .in('id', pagesToDelete.map(p => p.id));
+
+      if (deleteError) {
+        console.error('❌ Failed to delete cover image entries:', deleteError.message);
+        process.exit(1);
+      }
+
+      console.log(`✅ Deleted ${pagesToDelete.length} entries.`);
+    }
+  } else {
+    console.log('\nSkipping cover image deletion step.');
   }
 
   // Step 5: Re-index remaining page numbers

@@ -614,7 +614,7 @@ function Reader() {
         }`}
       >
         <ReaderTopBar
-          title={`Ch. ${c.chapter_number}${c.title ? " — " + c.title : ""}`}
+          title={`Ch. ${c.chapter_number}`}
           seriesTitle={c.series?.title ?? ""}
           seriesSlug={c.series?.slug ?? ""}
           isNovel={isNovel}

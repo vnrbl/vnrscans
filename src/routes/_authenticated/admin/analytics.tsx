@@ -357,7 +357,6 @@ function AdminAnalytics() {
                       <p className="truncate font-semibold">{chapter.series?.title}</p>
                       <p className="text-sm text-muted-foreground">
                         Chapter {chapter.chapter_number}
-                        {chapter.title && ` - ${chapter.title}`}
                       </p>
                     </div>
                     <div className="text-xs text-muted-foreground">

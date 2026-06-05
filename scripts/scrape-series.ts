@@ -114,10 +114,20 @@ async function main() {
   const browser = await puppeteer.launch({
     headless: false, // Visible window so you can solve Turnstile challenges if prompted
     defaultViewport: null,
-    args: ['--start-maximized'],
+    args: [
+      '--start-maximized',
+      '--disable-blink-features=AutomationControlled',
+    ],
   });
 
   const page = await browser.newPage();
+  
+  // Apply anti-detection measures to prevent Cloudflare from blocking Puppeteer
+  await page.evaluateOnNewDocument(() => {
+    Object.defineProperty(navigator, 'webdriver', {
+      get: () => undefined,
+    });
+  });
   
   // Set realistic User-Agent
   await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');

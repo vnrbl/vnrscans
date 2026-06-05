@@ -807,8 +807,10 @@ function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack: () => 
 
   const create = useMutation({
     mutationFn: async () => {
-      const chapterNum = parseFloat(form.chapter_number);
-      if (isNaN(chapterNum)) throw new Error("Invalid chapter number");
+      // Extract number from chapter_number input (which can now contain text/letters)
+      const parsedNum = parseFloat(form.chapter_number.replace(/[^\d.]/g, '')) || parseFloat(form.chapter_number);
+      const chapterNum = isNaN(parsedNum) ? 0 : parsedNum;
+      
       const scanlation_group = getScanlationGroupForUpload();
 
       const { data: chapter, error: chapterError } = await supabase
@@ -816,9 +818,9 @@ function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack: () => 
         .insert({
           series_id: seriesId,
           chapter_number: chapterNum,
-          title: form.title || null,
+          title: null, // Hardcoded to null to completely remove the title option feature
           slug: buildChapterSlug(chapterNum, {
-            title: form.title,
+            title: null,
             scanlationGroup: scanlation_group,
           }),
           chapter_type: "image",
@@ -1011,9 +1013,9 @@ function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack: () => 
             .insert({
               series_id: seriesId,
               chapter_number: chapter.chapterNumber,
-              title: chapter.title || null,
+              title: null, // Hardcoded to null to completely remove the title option feature
               slug: buildChapterSlug(chapter.chapterNumber, {
-                title: chapter.title,
+                title: null,
                 scanlationGroup: scanlation_group,
               }),
               chapter_type: "image",
@@ -1064,16 +1066,18 @@ function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack: () => 
   const updateChapter = useMutation({
     mutationFn: async () => {
       if (!editingChapter) throw new Error("No chapter selected");
-      const chapterNum = parseFloat(form.chapter_number);
-      if (isNaN(chapterNum)) throw new Error("Invalid chapter number");
+      // Extract number from chapter_number input (which can now contain text/letters)
+      const parsedNum = parseFloat(form.chapter_number.replace(/[^\d.]/g, '')) || parseFloat(form.chapter_number);
+      const chapterNum = isNaN(parsedNum) ? 0 : parsedNum;
+      
       const scanlation_group = getScanlationGroupForUpload();
       const { error: chapterError } = await supabase
         .from("chapters")
         .update({
           chapter_number: chapterNum,
-          title: form.title || null,
+          title: null, // Hardcoded to null to completely remove the title option feature
           slug: buildChapterSlug(chapterNum, {
-            title: form.title,
+            title: null,
             scanlationGroup: scanlation_group,
           }),
           status: form.status as any,
@@ -1262,7 +1266,7 @@ function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack: () => 
               <div className="grid grid-cols-3 gap-3">
                 <div>
                   <Label>Chapter Number *</Label>
-                  <Input type="number" step="0.1" placeholder="1 or 1.5" value={form.chapter_number} onChange={(e) => setForm({ ...form, chapter_number: e.target.value })} />
+                  <Input type="text" placeholder="e.g., 1, 1.5, or 1a" value={form.chapter_number} onChange={(e) => setForm({ ...form, chapter_number: e.target.value })} />
                 </div>
                 <div>
                   <Label>Status</Label>
@@ -1275,10 +1279,6 @@ function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack: () => 
                   <Label>Scheduled At</Label>
                   <Input type="datetime-local" value={form.scheduled_at} onChange={(e) => setForm({ ...form, scheduled_at: e.target.value })} disabled={form.status !== "scheduled"} />
                 </div>
-              </div>
-              <div>
-                <Label>Chapter Title (Optional)</Label>
-                <Input placeholder="e.g., The Beginning" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -1357,7 +1357,7 @@ function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack: () => 
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
                 <Link to="/title/$titleSlug/$chapterSlug" params={{ titleSlug: series.data?.slug || "", chapterSlug: ch.slug }} className="truncate font-medium hover:text-violet-600" target="_blank">
-                  Chapter {ch.chapter_number}{ch.title && `: ${ch.title}`}
+                  Chapter {ch.chapter_number}
                 </Link>
                 <ExternalLink className="h-3 w-3" />
               </div>
@@ -1404,7 +1404,7 @@ function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack: () => 
             <div className="grid grid-cols-3 gap-3">
               <div>
                 <Label>Chapter Number *</Label>
-                <Input type="number" step="0.1" value={form.chapter_number} onChange={(e) => setForm({ ...form, chapter_number: e.target.value })} />
+                <Input type="text" placeholder="e.g., 1, 1.5, or 1a" value={form.chapter_number} onChange={(e) => setForm({ ...form, chapter_number: e.target.value })} />
               </div>
               <div>
                 <Label>Status</Label>
@@ -1417,10 +1417,6 @@ function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack: () => 
                 <Label>Scheduled At</Label>
                 <Input type="datetime-local" value={form.scheduled_at} onChange={(e) => setForm({ ...form, scheduled_at: e.target.value })} disabled={form.status !== "scheduled"} />
               </div>
-            </div>
-            <div>
-              <Label>Chapter Title</Label>
-              <Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>

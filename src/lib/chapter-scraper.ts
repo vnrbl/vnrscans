@@ -10,23 +10,39 @@ export interface ChapterInfo {
 
 export async function extractChaptersFromSeriesUrl(seriesUrl: string): Promise<ChapterInfo[]> {
   try {
-    // Fetch the series page HTML
-    const response = await fetch(seriesUrl, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.5',
-      },
-    });
+    let html = '';
+    let usePuppeteerFallback = false;
 
-    if (!response.ok) {
-      throw new Error(`Failed to fetch series page: ${response.status} ${response.statusText}`);
+    try {
+      // Fetch the series page HTML
+      const response = await fetch(seriesUrl, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.5',
+        },
+      });
+
+      if (!response.ok) {
+        if (response.status === 403 || response.status === 503) {
+          usePuppeteerFallback = true;
+        } else {
+          throw new Error(`Failed to fetch series page: ${response.status} ${response.statusText}`);
+        }
+      } else {
+        html = await response.text();
+        if (isProtectedPage(html)) {
+          usePuppeteerFallback = true;
+        }
+      }
+    } catch (fetchError) {
+      console.warn('[Scraper] Direct fetch failed, trying Puppeteer fallback:', fetchError);
+      usePuppeteerFallback = true;
     }
 
-    const html = await response.text();
-    
-    if (isProtectedPage(html)) {
-      throw new Error('The website is protected by Cloudflare/anti-bot protection. Scraping is blocked. Please upload chapters manually.');
+    if (usePuppeteerFallback) {
+      console.log(`[Scraper] URL ${seriesUrl} seems protected or fetch failed. Bypassing with Puppeteer...`);
+      html = await scrapeWithPuppeteer(seriesUrl, false);
     }
 
     // Extract all chapter links from the HTML
@@ -47,16 +63,71 @@ export async function extractChaptersFromSeriesUrl(seriesUrl: string): Promise<C
 
 function isProtectedPage(html: string): boolean {
   const lowercaseHtml = html.toLowerCase();
+  // Cloudflare block pages usually contain 'ray id', 'challenge-platform', 'just a moment', etc.
+  // We check for these specific indicators to avoid false positives on sites that simply use Cloudflare.
   return (
-    lowercaseHtml.includes('cloudflare') ||
     lowercaseHtml.includes('challenge-platform') ||
     lowercaseHtml.includes('ray id') ||
-    lowercaseHtml.includes('captcha') ||
     lowercaseHtml.includes('ddos protection') ||
-    lowercaseHtml.includes('enable javascript') ||
     lowercaseHtml.includes('just a moment...') ||
-    lowercaseHtml.includes('checking your browser')
+    lowercaseHtml.includes('checking your browser') ||
+    (lowercaseHtml.includes('cloudflare') && lowercaseHtml.includes('turnstile')) ||
+    (lowercaseHtml.includes('cloudflare') && lowercaseHtml.includes('captcha'))
   );
+}
+
+async function scrapeWithPuppeteer(url: string, isChapterPage: boolean = false): Promise<string> {
+  console.log(`[Scraper] Launching Puppeteer browser to bypass Cloudflare protection for: ${url}`);
+  const puppeteer = await import('puppeteer');
+  const browser = await puppeteer.default.launch({
+    headless: true, // Run in background to be less intrusive
+    args: [
+      '--disable-blink-features=AutomationControlled',
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+    ],
+  });
+
+  try {
+    const page = await browser.newPage();
+    
+    // Apply anti-detection measures to prevent Cloudflare Turnstile blocks
+    await page.evaluateOnNewDocument(() => {
+      Object.defineProperty(navigator, 'webdriver', {
+        get: () => undefined,
+      });
+    });
+
+    await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+    await page.setViewport({ width: 1280, height: 800 });
+
+    console.log(`[Scraper] Navigating page to ${url}...`);
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
+
+    // Wait for automatic challenge resolution/redirects
+    await new Promise(r => setTimeout(r, 4000));
+
+    // Scroll down if it's a chapter page to trigger lazy loading of images
+    if (isChapterPage) {
+      console.log('[Scraper] Triggering lazy-load image scrolling...');
+      await page.evaluate(() => {
+        window.scrollTo(0, document.body.scrollHeight / 2);
+      });
+      await new Promise(r => setTimeout(r, 1500));
+      await page.evaluate(() => {
+        window.scrollTo(0, document.body.scrollHeight);
+      });
+      await new Promise(r => setTimeout(r, 1500));
+    }
+
+    const html = await page.content();
+    return html;
+  } catch (error) {
+    console.error(`[Scraper] Puppeteer scraping failed for ${url}:`, error);
+    throw error;
+  } finally {
+    await browser.close();
+  }
 }
 
 function isChapterLink(url: string, text: string): boolean {
@@ -268,8 +339,13 @@ function extractChapterTitle(text: string): string | null {
     .replace(/episode\s*\d+\.?\d*\s*[:–-]?\s*/i, '')
     .trim();
   
-  // Reject relative timestamps (e.g., "1 day ago", "12 hours ago", "2 mins ago")
-  if (/^\s*\d+\s+(?:second|sec|minute|min|hour|hr|day|week|wk|month|year)s?\s+ago\s*$/i.test(title)) {
+  // Strip relative timestamps (e.g., "1 day ago", "12 hours ago", "2 mins ago", "1h ago", "36m ago", "11d ago 1")
+  title = title
+    .replace(/\b\d+\s*(?:seconds?|sec|s|minutes?|min|m|hours?|hr|h|days?|d|weeks?|wk|w|months?|mo|years?|y)\s+ago(?:\s+\d+)?\b/gi, '')
+    .trim();
+
+  // Reject purely relative timestamp placeholders if they were the only text
+  if (title.length === 0) {
     return null;
   }
   
@@ -279,7 +355,7 @@ function extractChapterTitle(text: string): string | null {
   }
   
   // Reject wordy dates (e.g. "January 15, 2026", "Jan 15, 2026")
-  if (/^\s*(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+\d{1,2}(?:st|nd|rd|th)?(?:,?\s+\d{4})?\s*$/i.test(title)) {
+  if (/^\s*(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+\d{1,2}(?:st|nd|rd|th)?(?:,?\s+\d{4})?\s*$/.test(title)) {
     return null;
   }
 
@@ -288,23 +364,39 @@ function extractChapterTitle(text: string): string | null {
 
 export async function extractImagesFromChapterUrl(chapterUrl: string): Promise<string[]> {
   try {
-    // Fetch the chapter page HTML
-    const response = await fetch(chapterUrl, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.5',
-      },
-    });
+    let html = '';
+    let usePuppeteerFallback = false;
 
-    if (!response.ok) {
-      throw new Error(`Failed to fetch chapter: ${response.status} ${response.statusText}`);
+    try {
+      // Fetch the chapter page HTML
+      const response = await fetch(chapterUrl, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.5',
+        },
+      });
+
+      if (!response.ok) {
+        if (response.status === 403 || response.status === 503) {
+          usePuppeteerFallback = true;
+        } else {
+          throw new Error(`Failed to fetch chapter: ${response.status} ${response.statusText}`);
+        }
+      } else {
+        html = await response.text();
+        if (isProtectedPage(html)) {
+          usePuppeteerFallback = true;
+        }
+      }
+    } catch (fetchError) {
+      console.warn('[Scraper] Direct fetch failed, trying Puppeteer fallback:', fetchError);
+      usePuppeteerFallback = true;
     }
 
-    const html = await response.text();
-
-    if (isProtectedPage(html)) {
-      throw new Error('The website is protected by Cloudflare/anti-bot protection. Scraping is blocked. Please upload images manually.');
+    if (usePuppeteerFallback) {
+      console.log(`[Scraper] URL ${chapterUrl} seems protected or fetch failed. Bypassing with Puppeteer...`);
+      html = await scrapeWithPuppeteer(chapterUrl, true);
     }
     
     // Extract all image URLs from the HTML
@@ -357,7 +449,7 @@ export function extractImageUrls(html: string, baseUrl: string): string[] {
         !lowercaseUrl.includes('banner') &&
         !lowercaseUrl.includes('placeholder') &&
         !lowercaseUrl.includes('thumb') &&
-        !lowercaseUrl.includes('covers/')
+        !lowercaseUrl.includes('cover')
       ) {
         // Resolve relative URL
         if (!url.startsWith('http')) {
@@ -408,7 +500,7 @@ export function extractImageUrls(html: string, baseUrl: string): string[] {
         !lowercaseUrl.includes('banner') &&
         !lowercaseUrl.includes('placeholder') &&
         !lowercaseUrl.includes('thumb') &&
-        !lowercaseUrl.includes('covers/') &&
+        !lowercaseUrl.includes('cover') &&
         !images.includes(url)
       ) {
         images.push(url);

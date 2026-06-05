@@ -704,7 +704,6 @@ function SeriesDetail() {
                             >
                               <span className="font-medium" style={isRead ? { color: "#7f22fe" } : undefined}>
                                 Chapter {c.chapter_number}
-                                {c.title ? ` — ${c.title}` : ""}
                               </span>
                               {showNewBadge && (
                                 <Badge className="bg-violet-600 text-xs uppercase text-white hover:bg-violet-700">

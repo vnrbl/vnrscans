@@ -146,10 +146,10 @@ function HomePage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("chapters")
-        .select("id,slug,chapter_number,title,created_at,series_id,series:series_id(id,slug,title,cover_url,type)")
+        .select("id,slug,chapter_number,title,created_at,series_id,series:series_id(id,slug,title,cover_url,type,is_hidden)")
         .eq("status", "published")
         .order("created_at", { ascending: false })
-        .limit(100);
+        .limit(1000); // Increased limit to include updates from other series that would otherwise be cut off
 
       if (error) throw error;
 
@@ -157,6 +157,8 @@ function HomePage() {
       const seriesMap = new Map();
       (data || []).forEach((ch: any) => {
         if (!ch.series) return;
+        if (ch.series.is_hidden) return; // Skip hidden series
+        
         const seriesId = ch.series.id;
         if (!seriesMap.has(seriesId)) {
           seriesMap.set(seriesId, {
@@ -853,11 +855,9 @@ function RecentChapterCard({
   const seriesSlug = chapter.series?.slug;
   if (!seriesSlug) return null;
 
-  const chapterLabel = chapter.title
-    ? `Chapter ${chapter.chapter_number}: ${chapter.title}`
-    : timeField === "created"
-      ? `Chapter ${chapter.chapter_number} uploaded`
-      : `Chapter ${chapter.chapter_number}`;
+  const chapterLabel = timeField === "created"
+    ? `Chapter ${chapter.chapter_number} uploaded`
+    : `Chapter ${chapter.chapter_number}`;
   const timeLabel = timeField === "updated" ? "Last read" : "Uploaded";
 
   const cover = (
@@ -912,9 +912,6 @@ function RecentChapterCard({
                 Ch. {chapter.chapter_number}
               </Link>
             </Button>
-            {chapter.title && (
-              <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{chapter.title}</p>
-            )}
             {timeRow}
           </>
         )}
