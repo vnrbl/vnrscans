@@ -105,7 +105,7 @@ export function Navbar() {
       const { data, error } = await supabase
         .from("profiles")
         .select("user_level,reading_streak,is_vip,experience_points,avatar_url,avatar_frame,accent_color,username")
-        .eq("id", user.id)
+        .eq("user_id", user.id)
         .single();
       if (error) throw error;
       return data;
@@ -788,6 +788,9 @@ function NavbarAvatarFrame({
       case "qi": return "conic-gradient(from 0deg, #059669, #10B981, #FBBF24, #059669)";
       case "asura": return "conic-gradient(from 0deg, #ef4444, #7f1d1d, #ef4444)";
       case "system": return "conic-gradient(from 0deg, #06B6D4, transparent 30%, #06B6D4 50%, transparent 70%, #06B6D4)";
+      case "abyss": return "conic-gradient(from 0deg, #D946EF, #4A044E, #3B0764, #D946EF)";
+      case "glitch": return "conic-gradient(from 0deg, #ef4444, #06b6d4, #ef4444)";
+      case "divine": return "conic-gradient(from 0deg, #FCD34D, #FFFFFF, #FFFBEB, #FCD34D)";
       default: return accentColor;
     }
   };
@@ -803,12 +806,15 @@ function NavbarAvatarFrame({
       case "qi": return "0 0 8px rgba(16,185,129,0.5), 0 0 14px rgba(251,191,36,0.25)";
       case "asura": return "0 0 10px rgba(239,68,68,0.7), 0 0 18px rgba(127,29,29,0.4)";
       case "system": return "0 0 8px rgba(6,182,212,0.6), 0 0 14px rgba(6,182,212,0.3)";
+      case "abyss": return "0 0 10px rgba(217,70,239,0.6), 0 0 16px rgba(139,92,246,0.3)";
+      case "glitch": return "0 0 8px rgba(239,68,68,0.5), 0 0 14px rgba(6,182,212,0.3)";
+      case "divine": return "0 0 10px rgba(252,211,77,0.6), 0 0 16px rgba(255,255,255,0.3)";
       default: return `0 0 6px ${accentColor}40`;
     }
   };
 
   const isAnimated = avatarFrame !== "none";
-  const animSpeed = avatarFrame === "fire" ? "1.5s" : avatarFrame === "neon" ? "2s" : "3s";
+  const animSpeed = avatarFrame === "fire" ? "1.5s" : avatarFrame === "neon" ? "2s" : avatarFrame === "abyss" ? "4.5s" : avatarFrame === "glitch" ? "1.2s" : "3s";
 
   return (
     <div
@@ -878,6 +884,21 @@ function NavbarAvatarFrame({
           <div className="absolute top-0 right-0 h-1.5 w-1.5 border-t border-r border-cyan-400 rounded-tr-sm" style={{ boxShadow: '0 0 3px cyan' }} />
           <div className="absolute bottom-0 left-0 h-1.5 w-1.5 border-b border-l border-cyan-400 rounded-bl-sm" style={{ boxShadow: '0 0 3px cyan' }} />
           <div className="absolute bottom-0 right-0 h-1.5 w-1.5 border-b border-r border-cyan-400 rounded-br-sm" style={{ boxShadow: '0 0 3px cyan' }} />
+        </div>
+      )}
+
+      {/* Glitch temporal overlay */}
+      {avatarFrame === "glitch" && (
+        <div className="absolute inset-[-1px] pointer-events-none z-20 animate-[navGlitch_4s_infinite]">
+          <div className="absolute top-0 left-0 w-full h-[1px] bg-red-500 shadow-[0_0_2px_red]" />
+          <div className="absolute bottom-0 left-0 w-full h-[1px] bg-cyan-400 shadow-[0_0_2px_cyan]" />
+        </div>
+      )}
+
+      {/* Divine stars tiny */}
+      {avatarFrame === "divine" && (
+        <div className="absolute -top-1.5 left-1/2 -translate-x-1/2 text-yellow-300 z-20 animate-pulse" style={{ fontSize: '7px' }}>
+          ✨
         </div>
       )}
 

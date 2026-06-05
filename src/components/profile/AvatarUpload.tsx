@@ -11,6 +11,7 @@ import {
 import { Camera, Upload, X, Check } from "lucide-react";
 import Cropper from "react-easy-crop";
 import { Area } from "react-easy-crop";
+import { useQueryClient } from "@tanstack/react-query";
 
 type Props = {
   currentAvatarUrl: string;
@@ -19,6 +20,7 @@ type Props = {
 };
 
 export function AvatarUpload({ currentAvatarUrl, username, onAvatarUpdated }: Props) {
+  const qc = useQueryClient();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [imageSrc, setImageSrc] = useState<string | null>(null);
   const [crop, setCrop] = useState({ x: 0, y: 0 });
@@ -143,6 +145,8 @@ export function AvatarUpload({ currentAvatarUrl, username, onAvatarUpdated }: Pr
       if (updateError) throw updateError;
 
       onAvatarUpdated(publicUrl);
+      qc.invalidateQueries({ queryKey: ["profile"] });
+      qc.invalidateQueries({ queryKey: ["user-stats"] });
       toast.success("Avatar updated successfully!");
       setDialogOpen(false);
       setImageSrc(null);
@@ -169,6 +173,8 @@ export function AvatarUpload({ currentAvatarUrl, username, onAvatarUpdated }: Pr
       if (error) throw error;
 
       onAvatarUpdated("");
+      qc.invalidateQueries({ queryKey: ["profile"] });
+      qc.invalidateQueries({ queryKey: ["user-stats"] });
       toast.success("Avatar removed");
     } catch (error: any) {
       toast.error(error.message || "Failed to remove avatar");

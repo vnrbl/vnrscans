@@ -29,6 +29,7 @@ import {
   Palette,
   Link2,
   Sparkles,
+  Orbit,
 } from "lucide-react";
 import { ReadingGoals } from "@/components/profile/ReadingGoals";
 import { AvatarUpload } from "@/components/profile/AvatarUpload";
@@ -179,6 +180,20 @@ const keyframeStyles = `
   0% { background-position: -200% center; }
   100% { background-position: 200% center; }
 }
+@keyframes abyssVoidGlow {
+  0%, 100% { filter: brightness(1) drop-shadow(0 0 8px rgba(217, 70, 239, 0.45)); transform: scale(1); }
+  50% { filter: brightness(1.25) drop-shadow(0 0 22px rgba(139, 92, 246, 0.75)); transform: scale(1.03); }
+}
+@keyframes glitchFlicker {
+  0%, 100% { transform: scale(1) skew(0deg); opacity: 1; filter: hue-rotate(0deg); }
+  10% { transform: scale(1.02) skew(1deg); opacity: 0.95; filter: hue-rotate(30deg); }
+  20% { transform: scale(0.98) skew(-1deg); opacity: 0.9; filter: hue-rotate(-30deg); }
+  30% { transform: scale(1) skew(0deg); opacity: 1; filter: hue-rotate(0deg); }
+}
+@keyframes divineHalo {
+  0%, 100% { transform: scale(1); filter: brightness(1) drop-shadow(0 0 10px rgba(252, 211, 77, 0.5)); }
+  50% { transform: scale(1.03); filter: brightness(1.25) drop-shadow(0 0 24px rgba(253, 224, 71, 0.8)); }
+}
 @keyframes titleUnderlineSweep {
   0% { background-position: -200% center; }
   100% { background-position: 200% center; }
@@ -209,6 +224,12 @@ const getAvatarFrameStyles = (frame: string, accent: string) => {
       return { boxShadow: "0 0 25px rgba(239, 68, 68, 0.65), inset 0 0 12px rgba(0, 0, 0, 0.85)" };
     case "system":
       return { boxShadow: "0 0 22px rgba(6, 182, 212, 0.55), inset 0 0 10px rgba(6, 182, 212, 0.35)" };
+    case "abyss":
+      return { boxShadow: "0 0 25px rgba(217, 70, 239, 0.6), inset 0 0 12px rgba(74, 4, 78, 0.5)" };
+    case "glitch":
+      return { boxShadow: "0 0 22px rgba(239, 68, 68, 0.55), inset 0 0 10px rgba(6, 182, 212, 0.35)" };
+    case "divine":
+      return { boxShadow: "0 0 25px rgba(252, 211, 77, 0.6), inset 0 0 10px rgba(255, 255, 255, 0.35)" };
     case "none":
     default:
       return {
@@ -228,6 +249,9 @@ const getFrameSmokeColor = (frame: string, accent: string) => {
     case "qi": return "#10B981";
     case "asura": return "#EF4444";
     case "system": return "#06B6D4";
+    case "abyss": return "#D946EF";
+    case "glitch": return "#EF4444";
+    case "divine": return "#FCD34D";
     default: return accent;
   }
 };
@@ -427,6 +451,7 @@ function ProfilePage() {
           .eq("user_id", profile.data.user_id)
           .then(() => {
             qc.invalidateQueries({ queryKey: ["profile"] });
+            qc.invalidateQueries({ queryKey: ["user-stats"] });
           });
       }
     }
@@ -489,6 +514,7 @@ function ProfilePage() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["profile"] });
+      qc.invalidateQueries({ queryKey: ["user-stats"] });
       toast.success("Profile updated");
     },
     onError: (e: Error) => toast.error(e.message),
@@ -592,6 +618,26 @@ function ProfilePage() {
                 <div className="absolute inset-0 rounded-full border-2 border-cyan-400 bg-cyan-950/20 animate-[asuraRage_4s_ease-in-out_infinite] overflow-hidden">
                   {/* Rotating radar sweep */}
                   <div className="absolute inset-[-50%] rounded-full bg-[conic-gradient(from_0deg,rgba(6,182,212,0.25),transparent_40%,transparent)] animate-[rotationCW_3s_linear_infinite]" />
+                </div>
+              )}
+              {avatarFrame === "abyss" && (
+                <div className="absolute inset-0 rounded-full bg-slate-950 overflow-hidden animate-[abyssVoidGlow_5s_ease-in-out_infinite]">
+                  {/* Swirling void conic gradient */}
+                  <div className="absolute inset-[-50%] rounded-full bg-[conic-gradient(from_0deg,#D946EF,#4A044E,#3B0764,#D946EF)] animate-[rotationCW_8s_linear_infinite]" />
+                  <div className="absolute inset-[3px] rounded-full border border-purple-500/30 bg-purple-950/20 animate-[rotationCCW_10s_linear_infinite] z-5" />
+                </div>
+              )}
+              {avatarFrame === "glitch" && (
+                <div className="absolute inset-0 rounded-full border-2 border-red-500/40 bg-slate-950/20 overflow-hidden animate-[glitchFlicker_4s_linear_infinite]">
+                  {/* Swirling tech rings */}
+                  <div className="absolute inset-[-50%] rounded-full bg-[conic-gradient(from_0deg,#ef4444,#06b6d4,#ef4444)] animate-[rotationCW_4s_linear_infinite]" />
+                </div>
+              )}
+              {avatarFrame === "divine" && (
+                <div className="absolute inset-0 rounded-full bg-amber-50/10 overflow-hidden animate-[divineHalo_4s_ease-in-out_infinite]">
+                  {/* Light halo rotating rings */}
+                  <div className="absolute inset-[-50%] rounded-full bg-[conic-gradient(from_0deg,#FCD34D,#FFFFFF,#FFFBEB,#FCD34D)] animate-[rotationCW_6s_linear_infinite]" />
+                  <div className="absolute inset-[2.5px] rounded-full bg-gradient-to-bl from-[#FFFBEB] via-[#FCD34D] to-[#FFFFFF] animate-[rotationCCW_5s_linear_infinite]" />
                 </div>
               )}
 
@@ -747,6 +793,32 @@ function ProfilePage() {
                     <div className="absolute bottom-1 right-1 w-1.5 h-1.5 border-b border-r border-cyan-400 animate-pulse" />
                   </div>
                 </>
+              )}
+              {avatarFrame === "abyss" && (
+                <div className="absolute inset-0 pointer-events-none z-20">
+                  <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 text-fuchsia-400 drop-shadow-[0_0_8px_#D946EF] animate-[asuraRage_3s_ease-in-out_infinite] z-25">
+                    <Orbit className="h-5.5 w-5.5" />
+                  </div>
+                  {/* Swirling Abyssal Orbs */}
+                  <div className="absolute bottom-2 left-4 h-2 w-2 rounded-full bg-fuchsia-500 shadow-[0_0_6px_#D946EF]" style={{ animation: 'fireEmbersWavy 2.8s ease-out infinite' }} />
+                  <div className="absolute bottom-3 right-5 h-1.5 w-1.5 rounded-full bg-purple-400 shadow-[0_0_5px_#8B5CF6]" style={{ animation: 'fireEmbersWavy 3.2s ease-out infinite', animationDelay: '0.8s' }} />
+                </div>
+              )}
+              {avatarFrame === "glitch" && (
+                <div className="absolute inset-0 pointer-events-none z-20 animate-[cyberGlitch_6s_infinite]">
+                  <div className="absolute -top-1.5 left-[15%] h-1.5 w-[70%] border-t-2 border-red-500 shadow-[0_0_5px_red]" />
+                  <div className="absolute -bottom-1.5 left-[15%] h-1.5 w-[70%] border-b-2 border-cyan-400 shadow-[0_0_5px_cyan]" />
+                </div>
+              )}
+              {avatarFrame === "divine" && (
+                <div className="absolute inset-0 pointer-events-none z-20">
+                  <div className="absolute -top-4.5 left-1/2 -translate-x-1/2 text-yellow-300 drop-shadow-[0_0_8px_rgba(252,211,77,0.7)] animate-[starTwinkle_2s_ease-in-out_infinite] z-25">
+                    <Sparkles className="h-6 w-6" />
+                  </div>
+                  {/* Orbiting divine spark stars */}
+                  <div className="absolute top-2 left-2 w-1.5 h-1.5 rounded-full bg-yellow-100 animate-[starTwinkle_3s_ease-out_infinite]" />
+                  <div className="absolute top-4 right-2 w-1 h-1 rounded-full bg-white animate-[starTwinkle_2.5s_ease-out_infinite_1.2s]" />
+                </div>
               )}
 
               {profile.data?.is_vip && (
@@ -1070,6 +1142,9 @@ function ProfilePage() {
                         { id: "qi", name: "Heavenly Qi", description: "Celestial jade runes & sparkles", color: "#10B981", gradient: 'linear-gradient(135deg, #10B98118, #05966915, #FBBF2410)' },
                         { id: "asura", name: "Murim Asura", description: "Demonic crimson mist & rage aura", color: "#EF4444", gradient: 'linear-gradient(135deg, #EF444420, #7f1d1d18, #00000015)' },
                         { id: "system", name: "System Hunter", description: "S-Rank cosmic status interface", color: "#06B6D4", gradient: 'linear-gradient(135deg, #06B6D418, #0ea5e912, #eab30810)' },
+                        { id: "abyss", name: "Abyssal Void", description: "Swirling dimensional rift of pure void energy", color: "#D946EF", gradient: 'linear-gradient(135deg, #D946EF20, #4A044E18, #3B076415)' },
+                        { id: "glitch", name: "Chronos Distortion", description: "Flickering temporal aberration with chromatic splits", color: "#EF4444", gradient: 'linear-gradient(135deg, #EF444415, #06B6D415, #00000020)' },
+                        { id: "divine", name: "Seraphic Light", description: "Angelic golden halos & glowing divine feathers", color: "#FCD34D", gradient: 'linear-gradient(135deg, #FCD34D15, #FFFFFF12, #FFFBEB10)' },
                       ].map((frame) => {
                         const isSelected = avatarFrame === frame.id;
                         return (
@@ -1174,6 +1249,22 @@ function ProfilePage() {
                                   <div className="absolute inset-[-50%] rounded-full bg-[conic-gradient(from_0deg,rgba(6,182,212,0.25),transparent_40%,transparent)] animate-[rotationCW_3s_linear_infinite]" />
                                 </div>
                               )}
+                              {frame.id === "abyss" && (
+                                <div className="absolute inset-0 rounded-full bg-slate-950 overflow-hidden animate-[abyssVoidGlow_5s_ease-in-out_infinite]">
+                                  <div className="absolute inset-[-50%] rounded-full bg-[conic-gradient(from_0deg,#D946EF,#4A044E,#3B0764,#D946EF)] animate-[rotationCW_8s_linear_infinite]" />
+                                  <div className="absolute inset-[1px] rounded-full bg-background z-5" />
+                                </div>
+                              )}
+                              {frame.id === "glitch" && (
+                                <div className="absolute inset-0 rounded-full border border-red-500/40 bg-slate-950/20 overflow-hidden animate-[glitchFlicker_4s_linear_infinite]">
+                                  <div className="absolute inset-[-50%] rounded-full bg-[conic-gradient(from_0deg,#ef4444,#06b6d4,#ef4444)] animate-[rotationCW_4s_linear_infinite]" />
+                                </div>
+                              )}
+                              {frame.id === "divine" && (
+                                <div className="absolute inset-0 rounded-full bg-amber-50/10 overflow-hidden animate-[divineHalo_4s_ease-in-out_infinite]">
+                                  <div className="absolute inset-[-50%] rounded-full bg-[conic-gradient(from_0deg,#FCD34D,#FFFFFF,#FFFBEB,#FCD34D)] animate-[rotationCW_6s_linear_infinite]" />
+                                </div>
+                              )}
 
                               {frame.id !== "none" && (
                                 <div className="absolute inset-[2.5px] rounded-full bg-background z-10" />
@@ -1197,6 +1288,11 @@ function ProfilePage() {
                               {frame.id === "system" && (
                                 <div className="absolute -top-1 -right-1 z-30 bg-slate-950 text-cyan-400 text-[4px] font-black px-0.5 rounded border border-cyan-400 shadow-[0_0_3px_cyan] scale-75 origin-top-right">
                                   S
+                                </div>
+                              )}
+                              {frame.id === "divine" && (
+                                <div className="absolute -top-1 left-1/2 -translate-x-1/2 text-yellow-300 z-20 scale-75 origin-top" style={{ fontSize: '8px' }}>
+                                  ✨
                                 </div>
                               )}
                             </div>

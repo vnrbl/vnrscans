@@ -749,7 +749,7 @@ function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack: () => 
       const { data, error } = await supabase
         .from("profiles")
         .select("username")
-        .eq("id", user.id)
+        .eq("user_id", user.id)
         .single();
       if (error) return null;
       return data;
