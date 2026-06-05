@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SocialLinksDisplay } from "@/components/profile/SocialLinks";
+import { BadgeIcon, enhanceBadge } from "@/lib/profileBadges";
 
 type PublicProfileStats = {
   chapters_read: number;
@@ -137,6 +138,33 @@ const keyframeStyles = `
   50% { transform: scale(1.08) translate(3px, -3px); opacity: 0.5; filter: blur(3px); }
   100% { transform: scale(1) translate(0, 0); opacity: 0.2; }
 }
+@keyframes titleUnderlineSweep {
+  0% { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+@keyframes titleShimmerSweep {
+  0% { background-position: -250% center; }
+  100% { background-position: 250% center; }
+}
+@keyframes titleEmberFloat {
+  0% { transform: translateY(0) translateX(0) scale(0.4); opacity: 0; }
+  20% { opacity: 0.8; }
+  50% { transform: translateY(-10px) translateX(3px) scale(0.6); opacity: 0.6; }
+  80% { opacity: 0.2; }
+  100% { transform: translateY(-20px) translateX(-2px) scale(0.3); opacity: 0; }
+}
+@keyframes flameFlicker {
+  0%, 100% { opacity: 0.7; transform: scaleY(1) scaleX(1); }
+  10% { opacity: 0.9; transform: scaleY(1.05) scaleX(0.97); }
+  20% { opacity: 0.75; transform: scaleY(0.98) scaleX(1.02); }
+  30% { opacity: 0.85; transform: scaleY(1.03) scaleX(0.99); }
+  40% { opacity: 0.8; transform: scaleY(0.97) scaleX(1.01); }
+  50% { opacity: 0.9; transform: scaleY(1.04) scaleX(0.98); }
+  60% { opacity: 0.75; transform: scaleY(1.0) scaleX(1.0); }
+  70% { opacity: 0.85; transform: scaleY(0.99) scaleX(1.01); }
+  80% { opacity: 0.8; transform: scaleY(1.02) scaleX(0.99); }
+  90% { opacity: 0.9; transform: scaleY(0.98) scaleX(1.02); }
+}
 `;
 
 const getAvatarFrameStyles = (frame: string, accent: string) => {
@@ -234,6 +262,33 @@ function PublicProfilePage() {
     },
     enabled: !!profile.data?.user_id,
     staleTime: 5 * 60 * 1000,
+  });
+
+  // Fetch equipped badge/title for this user
+  const equippedBadge = useQuery({
+    queryKey: ["public-profile-equipped-badge", profile.data?.user_id],
+    queryFn: async () => {
+      if (!profile.data?.user_id) return null;
+      const { data, error } = await supabase
+        .from("user_badges")
+        .select(`
+          *,
+          badge:badge_id(*)
+        `)
+        .eq("user_id", profile.data.user_id)
+        .eq("is_equipped", true)
+        .maybeSingle();
+      if (error) {
+        console.error("Error fetching equipped badge:", error);
+        return null;
+      }
+      if (data && data.badge) {
+        data.badge = enhanceBadge(data.badge);
+      }
+      return data as any;
+    },
+    enabled: !!profile.data?.user_id,
+    staleTime: 2 * 60 * 1000,
   });
 
   const isProfilePublic = (profile.data?.profile_visibility ?? "public") === "public";
@@ -698,6 +753,61 @@ function PublicProfilePage() {
                   )}
                 </div>
               </div>
+
+              {/* Equipped title badge */}
+              {equippedBadge.data && (() => {
+                const titleColor = equippedBadge.data.badge?.badge_color || accentColor;
+                return (
+                  <div 
+                    className="group/title relative flex items-center gap-2 mt-2 text-xs font-bold w-fit border rounded-full px-4 py-1.5 overflow-hidden transition-all duration-300 hover:scale-[1.02]"
+                    style={{ 
+                      borderColor: `${titleColor}35`,
+                      background: `linear-gradient(135deg, ${titleColor}0a, transparent)`,
+                    }}
+                  >
+                    {/* Animated gradient underline */}
+                    <span 
+                      className="absolute bottom-0 left-0 right-0 h-[1.5px] pointer-events-none"
+                      style={{ 
+                        background: `linear-gradient(90deg, transparent, ${titleColor}50, ${titleColor}, ${titleColor}50, transparent)`,
+                        backgroundSize: '200% 100%',
+                        animation: 'titleUnderlineSweep 3s linear infinite',
+                      }}
+                    />
+                    
+                    {/* Subtle shimmer on hover */}
+                    <span 
+                      className="absolute inset-0 pointer-events-none opacity-0 group-hover/title:opacity-100 transition-opacity"
+                      style={{ 
+                        background: `linear-gradient(105deg, transparent 40%, ${titleColor}12 50%, transparent 60%)`,
+                        backgroundSize: '250% 100%',
+                        animation: 'titleShimmerSweep 2s ease-in-out infinite',
+                      }}
+                    />
+
+                    {/* Tiny floating ember particles */}
+                    <span className="absolute -top-0.5 left-[25%] w-[3px] h-[3px] rounded-full pointer-events-none" style={{ background: titleColor, opacity: 0.6, animation: 'titleEmberFloat 2.5s ease-out infinite' }} />
+                    <span className="absolute -top-0.5 left-[65%] w-[2px] h-[2px] rounded-full pointer-events-none" style={{ background: titleColor, opacity: 0.5, animation: 'titleEmberFloat 3s ease-out infinite 1.2s' }} />
+
+                    <span className="text-muted-foreground">Title:</span>
+                    <span style={{ color: titleColor }}>
+                      <BadgeIcon icon={equippedBadge.data.badge?.icon} className="h-3.5 w-3.5" />
+                    </span>
+                    <span style={{ color: titleColor }}>
+                      {equippedBadge.data.badge?.name}
+                    </span>
+                    
+                    <Flame 
+                      className="h-3 w-3 ml-0.5" 
+                      style={{ 
+                        color: titleColor,
+                        animation: 'flameFlicker 1.5s ease-in-out infinite',
+                        opacity: 0.8,
+                      }} 
+                    />
+                  </div>
+                );
+              })()}
 
               <div className="mt-3 flex flex-wrap items-center gap-3">
                 <SocialLinksDisplay values={socialLinks} accentColor={accentColor} />

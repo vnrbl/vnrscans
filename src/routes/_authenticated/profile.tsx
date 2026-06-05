@@ -129,6 +129,64 @@ const keyframeStyles = `
   50% { transform: scale(1.08) translate(3px, -3px); opacity: 0.5; filter: blur(3px); }
   100% { transform: scale(1) translate(0, 0); opacity: 0.2; }
 }
+@keyframes smokeRise {
+  0% { transform: translateY(0) translateX(0) scale(0.8); opacity: 0; filter: blur(2px); }
+  15% { opacity: 0.5; }
+  40% { transform: translateY(-12px) translateX(4px) scale(1.1); opacity: 0.35; filter: blur(4px); }
+  70% { transform: translateY(-22px) translateX(-3px) scale(1.3); opacity: 0.15; filter: blur(6px); }
+  100% { transform: translateY(-35px) translateX(2px) scale(1.5); opacity: 0; filter: blur(8px); }
+}
+@keyframes smokeRise2 {
+  0% { transform: translateY(0) translateX(0) scale(0.6); opacity: 0; filter: blur(3px); }
+  20% { opacity: 0.4; }
+  50% { transform: translateY(-15px) translateX(-5px) scale(1.0); opacity: 0.25; filter: blur(5px); }
+  80% { transform: translateY(-28px) translateX(3px) scale(1.2); opacity: 0.1; filter: blur(7px); }
+  100% { transform: translateY(-40px) translateX(-1px) scale(1.4); opacity: 0; filter: blur(9px); }
+}
+@keyframes flameTextPulse {
+  0%, 100% { filter: brightness(1) drop-shadow(0 0 4px var(--flame-color, #ef4444)); text-shadow: 0 0 8px var(--flame-color, #ef4444); }
+  25% { filter: brightness(1.15) drop-shadow(0 0 8px var(--flame-color, #ef4444)); text-shadow: 0 0 12px var(--flame-color, #ef4444), 0 0 20px var(--flame-glow, #f97316); }
+  50% { filter: brightness(1.3) drop-shadow(0 0 12px var(--flame-color, #ef4444)); text-shadow: 0 0 16px var(--flame-color, #ef4444), 0 0 30px var(--flame-glow, #f97316), 0 0 45px var(--flame-outer, #fbbf24); }
+  75% { filter: brightness(1.1) drop-shadow(0 0 6px var(--flame-color, #ef4444)); text-shadow: 0 0 10px var(--flame-color, #ef4444), 0 0 18px var(--flame-glow, #f97316); }
+}
+@keyframes flameFlicker {
+  0%, 100% { opacity: 0.7; transform: scaleY(1) scaleX(1); }
+  10% { opacity: 0.9; transform: scaleY(1.05) scaleX(0.97); }
+  20% { opacity: 0.75; transform: scaleY(0.98) scaleX(1.02); }
+  30% { opacity: 0.85; transform: scaleY(1.03) scaleX(0.99); }
+  40% { opacity: 0.8; transform: scaleY(0.97) scaleX(1.01); }
+  50% { opacity: 0.9; transform: scaleY(1.04) scaleX(0.98); }
+  60% { opacity: 0.75; transform: scaleY(1.0) scaleX(1.0); }
+  70% { opacity: 0.85; transform: scaleY(0.99) scaleX(1.01); }
+  80% { opacity: 0.8; transform: scaleY(1.02) scaleX(0.99); }
+  90% { opacity: 0.9; transform: scaleY(0.98) scaleX(1.02); }
+}
+@keyframes avatarSmokeOrbit {
+  0% { transform: rotate(0deg) translateX(78px) rotate(0deg) scale(0.7); opacity: 0; filter: blur(3px); }
+  15% { opacity: 0.35; }
+  50% { transform: rotate(180deg) translateX(78px) rotate(-180deg) scale(1.1); opacity: 0.2; filter: blur(5px); }
+  85% { opacity: 0.1; }
+  100% { transform: rotate(360deg) translateX(78px) rotate(-360deg) scale(0.7); opacity: 0; filter: blur(3px); }
+}
+@keyframes titleEmberFloat {
+  0% { transform: translateY(0) translateX(0) scale(0.4); opacity: 0; }
+  20% { opacity: 0.8; }
+  50% { transform: translateY(-10px) translateX(3px) scale(0.6); opacity: 0.6; }
+  80% { opacity: 0.2; }
+  100% { transform: translateY(-20px) translateX(-2px) scale(0.3); opacity: 0; }
+}
+@keyframes frameCardShimmer {
+  0% { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+@keyframes titleUnderlineSweep {
+  0% { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+@keyframes titleShimmerSweep {
+  0% { background-position: -250% center; }
+  100% { background-position: 250% center; }
+}
 `;
 
 const getAvatarFrameStyles = (frame: string, accent: string) => {
@@ -156,6 +214,21 @@ const getAvatarFrameStyles = (frame: string, accent: string) => {
       return {
         boxShadow: `0 0 15px ${accent}25`,
       };
+  }
+};
+
+const getFrameSmokeColor = (frame: string, accent: string) => {
+  switch (frame) {
+    case "neon": return "#A855F7";
+    case "gold": return "#ffd700";
+    case "cyber": return "#06B6D4";
+    case "fire": return "#EF4444";
+    case "sakura": return "#F472B6";
+    case "shadow": return "#6366F1";
+    case "qi": return "#10B981";
+    case "asura": return "#EF4444";
+    case "system": return "#06B6D4";
+    default: return accent;
   }
 };
 
@@ -448,6 +521,14 @@ function ProfilePage() {
                 padding: '4px',
               }}
             >
+              {/* Smoke wisps orbiting the avatar frame */}
+              {avatarFrame !== "none" && (
+                <div className="absolute inset-0 pointer-events-none z-[25]">
+                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-3 h-3 rounded-full" style={{ background: `radial-gradient(circle, ${getFrameSmokeColor(avatarFrame, accentColor)}50, transparent)`, animation: 'avatarSmokeOrbit 6s linear infinite' }} />
+                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-4 h-4 rounded-full" style={{ background: `radial-gradient(circle, ${getFrameSmokeColor(avatarFrame, accentColor)}40, transparent)`, animation: 'avatarSmokeOrbit 8s linear infinite 2s' }} />
+                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full" style={{ background: `radial-gradient(circle, ${getFrameSmokeColor(avatarFrame, accentColor)}35, transparent)`, animation: 'avatarSmokeOrbit 10s linear infinite 4s' }} />
+                </div>
+              )}
               {/* Layer 1: Spinners, double-rotators & backgrounds for custom frames */}
               {avatarFrame === "neon" && (
                 <div className="absolute inset-0 rounded-full overflow-hidden animate-[lightningFlicker_6s_ease-in-out_infinite]">
@@ -714,19 +795,63 @@ function ProfilePage() {
                 </div>
               </div>
 
-              {/* Title badge */}
-              {equippedBadge.data && (
-                <div 
-                  className="flex items-center gap-1.5 mt-2 text-xs font-semibold w-fit border rounded-full px-3 py-1 bg-secondary/10"
-                  style={{ borderColor: `${equippedBadge.data.badge?.badge_color || accentColor}30` }}
-                >
-                  <span className="text-muted-foreground">Title:</span>
-                  <span style={{ color: equippedBadge.data.badge?.badge_color || accentColor }}>
-                    <BadgeIcon icon={equippedBadge.data.badge?.icon} className="h-3.5 w-3.5" />
-                  </span>
-                  <span className="text-foreground">{equippedBadge.data.badge?.name}</span>
-                </div>
-              )}
+              {/* Title badge with refined animated effect */}
+              {equippedBadge.data && (() => {
+                const titleColor = equippedBadge.data.badge?.badge_color || accentColor;
+                return (
+                  <div 
+                    className="group/title relative flex items-center gap-2 mt-2 text-xs font-bold w-fit border rounded-full px-4 py-1.5 overflow-hidden transition-all duration-300 hover:scale-[1.02]"
+                    style={{ 
+                      borderColor: `${titleColor}35`,
+                      background: `linear-gradient(135deg, ${titleColor}0a, transparent)`,
+                    }}
+                  >
+                    {/* Animated gradient underline that sweeps left to right */}
+                    <span 
+                      className="absolute bottom-0 left-0 right-0 h-[1.5px] pointer-events-none"
+                      style={{ 
+                        background: `linear-gradient(90deg, transparent, ${titleColor}50, ${titleColor}, ${titleColor}50, transparent)`,
+                        backgroundSize: '200% 100%',
+                        animation: 'titleUnderlineSweep 3s linear infinite',
+                      }}
+                    />
+                    
+                    {/* Subtle shimmer sweep across the badge */}
+                    <span 
+                      className="absolute inset-0 pointer-events-none opacity-0 group-hover/title:opacity-100 transition-opacity"
+                      style={{ 
+                        background: `linear-gradient(105deg, transparent 40%, ${titleColor}12 50%, transparent 60%)`,
+                        backgroundSize: '250% 100%',
+                        animation: 'titleShimmerSweep 2s ease-in-out infinite',
+                      }}
+                    />
+
+                    {/* Tiny floating ember particles */}
+                    <span className="absolute -top-0.5 left-[25%] w-[3px] h-[3px] rounded-full pointer-events-none" style={{ background: titleColor, opacity: 0.6, animation: 'titleEmberFloat 2.5s ease-out infinite' }} />
+                    <span className="absolute -top-0.5 left-[65%] w-[2px] h-[2px] rounded-full pointer-events-none" style={{ background: titleColor, opacity: 0.5, animation: 'titleEmberFloat 3s ease-out infinite 1.2s' }} />
+
+                    <span className="text-muted-foreground">Title:</span>
+                    <span style={{ color: titleColor }}>
+                      <BadgeIcon icon={equippedBadge.data.badge?.icon} className="h-3.5 w-3.5" />
+                    </span>
+                    <span 
+                      style={{ color: titleColor }}
+                    >
+                      {equippedBadge.data.badge?.name}
+                    </span>
+                    
+                    {/* Small flame icon with gentle animation */}
+                    <Flame 
+                      className="h-3 w-3 ml-0.5" 
+                      style={{ 
+                        color: titleColor,
+                        animation: 'flameFlicker 1.5s ease-in-out infinite',
+                        opacity: 0.8,
+                      }} 
+                    />
+                  </div>
+                );
+              })()}
 
               {/* Email */}
               <p className="mt-2 text-sm text-muted-foreground">{profile.data?.email}</p>
@@ -935,16 +1060,16 @@ function ProfilePage() {
 
                     <div className="grid gap-4 sm:grid-cols-2">
                       {[
-                        { id: "none", name: "None", description: "Default accent ring", color: accentColor },
-                        { id: "neon", name: "Neon Phoenix", description: "Rotating neon aura", color: "#EC4899" },
-                        { id: "gold", name: "Golden Royal", description: "Shimmering gold border & stars", color: "#F59E0B" },
-                        { id: "cyber", name: "Cyber Nexus", description: "Futuristic targeting reticle", color: "#06B6D4" },
-                        { id: "fire", name: "Fiery Aura", description: "Pulsing flame glow", color: "#EF4444" },
-                        { id: "sakura", name: "Sakura Dream", description: "Soft rose petals & hover lift", color: "#F472B6" },
-                        { id: "shadow", name: "Shadow Monarch", description: "Dark energy shadow flames", color: "#6366F1" },
-                        { id: "qi", name: "Heavenly Qi", description: "Celestial jade aura & sparkles", color: "#10B981" },
-                        { id: "asura", name: "Murim Asura", description: "Deep crimson mist & rage", color: "#EF4444" },
-                        { id: "system", name: "System Hunter", description: "Cosmic status window S-Rank", color: "#06B6D4" },
+                        { id: "none", name: "None", description: "Default accent ring", color: accentColor, gradient: 'none' },
+                        { id: "neon", name: "Neon Phoenix", description: "Rotating neon aura with lightning", color: "#EC4899", gradient: 'linear-gradient(135deg, #A855F720, #EC489920, #06B6D420)' },
+                        { id: "gold", name: "Golden Royal", description: "Shimmering gold border & crown", color: "#F59E0B", gradient: 'linear-gradient(135deg, #ffd70015, #F59E0B15, #ffeb9915)' },
+                        { id: "cyber", name: "Cyber Nexus", description: "Futuristic holographic targeting reticle", color: "#06B6D4", gradient: 'linear-gradient(135deg, #06B6D418, #0ea5e910, #c084fc12)' },
+                        { id: "fire", name: "Fiery Aura", description: "Volcanic flame ring with embers", color: "#EF4444", gradient: 'linear-gradient(135deg, #EF444418, #f9731615, #b91c1c10)' },
+                        { id: "sakura", name: "Sakura Dream", description: "Enchanted blossom drift & glow", color: "#F472B6", gradient: 'linear-gradient(135deg, #F472B618, #FDA4AF15, #E879F910)' },
+                        { id: "shadow", name: "Shadow Monarch", description: "Void energy tendrils & dark wisps", color: "#6366F1", gradient: 'linear-gradient(135deg, #6366F118, #4f46e515, #1e1b4b12)' },
+                        { id: "qi", name: "Heavenly Qi", description: "Celestial jade runes & sparkles", color: "#10B981", gradient: 'linear-gradient(135deg, #10B98118, #05966915, #FBBF2410)' },
+                        { id: "asura", name: "Murim Asura", description: "Demonic crimson mist & rage aura", color: "#EF4444", gradient: 'linear-gradient(135deg, #EF444420, #7f1d1d18, #00000015)' },
+                        { id: "system", name: "System Hunter", description: "S-Rank cosmic status interface", color: "#06B6D4", gradient: 'linear-gradient(135deg, #06B6D418, #0ea5e912, #eab30810)' },
                       ].map((frame) => {
                         const isSelected = avatarFrame === frame.id;
                         return (
@@ -952,15 +1077,37 @@ function ProfilePage() {
                             key={frame.id}
                             type="button"
                             onClick={() => setAvatarFrame(frame.id)}
-                            className="flex items-center gap-4 rounded-xl border p-3 text-left transition-all hover:scale-[1.01] hover:bg-muted/40 focus:outline-none"
+                            className="group/card relative flex items-center gap-4 rounded-xl border p-3 text-left transition-all duration-300 hover:scale-[1.02] focus:outline-none overflow-hidden"
                             style={{
-                              borderColor: isSelected ? accentColor : "oklch(var(--border) / 0.4)",
-                              backgroundColor: isSelected ? `${accentColor}0d` : "transparent",
+                              borderColor: isSelected ? `${frame.color}80` : `${frame.color}20`,
+                              background: isSelected ? frame.gradient : `${frame.color}06`,
+                              boxShadow: isSelected 
+                                ? `0 0 20px ${frame.color}15, inset 0 0 15px ${frame.color}08` 
+                                : 'none',
                             }}
                           >
+                            {/* Hover shimmer overlay */}
+                            <div 
+                              className="absolute inset-0 opacity-0 group-hover/card:opacity-100 transition-opacity duration-500 pointer-events-none"
+                              style={{ 
+                                background: `linear-gradient(90deg, transparent, ${frame.color}08, transparent)`,
+                                backgroundSize: '200% 100%',
+                                animation: 'frameCardShimmer 2s linear infinite',
+                              }}
+                            />
+                            {/* Active glow dot */}
+                            {isSelected && (
+                              <div 
+                                className="absolute top-2 right-2 w-2 h-2 rounded-full animate-pulse"
+                                style={{ 
+                                  background: frame.color,
+                                  boxShadow: `0 0 6px ${frame.color}, 0 0 12px ${frame.color}60`,
+                                }}
+                              />
+                            )}
                             {/* Frame Mini Preview */}
                             <div
-                              className="relative h-10 w-10 flex-shrink-0 rounded-full flex items-center justify-center"
+                              className="relative h-10 w-10 flex-shrink-0 rounded-full flex items-center justify-center transition-transform duration-300 group-hover/card:scale-110"
                               style={{
                                 ...getAvatarFrameStyles(frame.id, accentColor),
                                 background: frame.id === "none" ? accentColor : undefined,
@@ -1054,16 +1201,18 @@ function ProfilePage() {
                               )}
                             </div>
 
-                            <div className="min-w-0 flex-1">
+                            <div className="min-w-0 flex-1 relative">
                               <p className="font-semibold text-sm flex items-center gap-1.5">
-                                {frame.name}
+                                <span style={{ color: isSelected ? frame.color : undefined, textShadow: isSelected ? `0 0 8px ${frame.color}40` : 'none' }}>
+                                  {frame.name}
+                                </span>
                                 {isSelected && (
-                                  <Badge variant="secondary" className="h-5 px-1.5 text-[10px] uppercase font-bold" style={{ backgroundColor: `${accentColor}15`, color: accentColor }}>
-                                    Equipped
+                                  <Badge variant="secondary" className="h-5 px-1.5 text-[10px] uppercase font-bold border" style={{ backgroundColor: `${frame.color}15`, color: frame.color, borderColor: `${frame.color}30`, boxShadow: `0 0 8px ${frame.color}20` }}>
+                                    ✦ Equipped
                                   </Badge>
                                 )}
                               </p>
-                              <p className="text-xs text-muted-foreground truncate">{frame.description}</p>
+                              <p className="text-xs text-muted-foreground truncate mt-0.5">{frame.description}</p>
                             </div>
                           </button>
                         );

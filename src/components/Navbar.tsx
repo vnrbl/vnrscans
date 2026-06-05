@@ -104,7 +104,7 @@ export function Navbar() {
       if (!user) return null;
       const { data, error } = await supabase
         .from("profiles")
-        .select("user_level,reading_streak,is_vip,experience_points")
+        .select("user_level,reading_streak,is_vip,experience_points,avatar_url,avatar_frame,accent_color,username")
         .eq("id", user.id)
         .single();
       if (error) throw error;
@@ -432,8 +432,13 @@ export function Navbar() {
               {/* User Dropdown with Stats */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="rounded-full transition-all hover:bg-primary/10">
-                    <UserIcon className="h-5 w-5" />
+                  <Button variant="ghost" size="icon" className="rounded-full p-0 transition-all hover:bg-transparent hover:scale-105 focus-visible:ring-0 focus-visible:ring-offset-0">
+                    <NavbarAvatarFrame 
+                      avatarUrl={userStats.data?.avatar_url}
+                      avatarFrame={userStats.data?.avatar_frame || 'none'}
+                      accentColor={userStats.data?.accent_color || '#8B5CF6'}
+                      username={userStats.data?.username}
+                    />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-64">
@@ -735,6 +740,165 @@ function SearchEmpty({ message }: { message: string }) {
   return (
     <div className="rounded-md border border-dashed border-border/70 bg-[#19191d] px-4 py-10 text-center text-sm text-muted-foreground">
       {message}
+    </div>
+  );
+}
+
+/* ─── Navbar Mini Avatar with Frame ─── */
+const navFrameKeyframes = `
+@keyframes navRotCW { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+@keyframes navRotCCW { 0% { transform: rotate(360deg); } 100% { transform: rotate(0deg); } }
+@keyframes navPulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.06); } }
+@keyframes navGlitch { 0%,100% { filter: hue-rotate(0deg); } 50% { filter: hue-rotate(30deg); } }
+`;
+
+let navFrameStylesInjected = false;
+
+function NavbarAvatarFrame({ 
+  avatarUrl, 
+  avatarFrame, 
+  accentColor, 
+  username 
+}: { 
+  avatarUrl?: string | null; 
+  avatarFrame: string; 
+  accentColor: string; 
+  username?: string | null; 
+}) {
+  // Inject keyframes once
+  if (!navFrameStylesInjected && typeof document !== 'undefined') {
+    const style = document.createElement("style");
+    style.textContent = navFrameKeyframes;
+    document.head.appendChild(style);
+    navFrameStylesInjected = true;
+  }
+
+  const size = 36; // px
+  const borderWidth = 2; // px
+  const innerSize = size - borderWidth * 2;
+
+  const getFrameGradient = () => {
+    switch (avatarFrame) {
+      case "neon": return "conic-gradient(from 0deg, #A855F7, #06B6D4, #EC4899, #A855F7)";
+      case "gold": return "conic-gradient(from 0deg, #a67c00, #ffd700, #ffeb99, #ffd700, #a67c00)";
+      case "cyber": return "conic-gradient(from 0deg, #0ea5e9, transparent 30%, #c084fc, transparent 60%, #0ea5e9)";
+      case "fire": return "conic-gradient(from 0deg, #b91c1c, #f97316, #ef4444, #b91c1c)";
+      case "sakura": return "conic-gradient(from 0deg, #FDA4AF, #F472B6, #E879F9, #FDA4AF)";
+      case "shadow": return "conic-gradient(from 0deg, #4f46e5, #06b6d4, #1e1b4b, #4f46e5)";
+      case "qi": return "conic-gradient(from 0deg, #059669, #10B981, #FBBF24, #059669)";
+      case "asura": return "conic-gradient(from 0deg, #ef4444, #7f1d1d, #ef4444)";
+      case "system": return "conic-gradient(from 0deg, #06B6D4, transparent 30%, #06B6D4 50%, transparent 70%, #06B6D4)";
+      default: return accentColor;
+    }
+  };
+
+  const getFrameGlow = () => {
+    switch (avatarFrame) {
+      case "neon": return "0 0 8px rgba(168,85,247,0.5), 0 0 16px rgba(6,182,212,0.3)";
+      case "gold": return "0 0 8px rgba(255,215,0,0.5), 0 0 14px rgba(255,215,0,0.25)";
+      case "cyber": return "0 0 8px rgba(6,182,212,0.5), 0 0 14px rgba(192,132,252,0.25)";
+      case "fire": return "0 0 10px rgba(239,68,68,0.6), 0 0 16px rgba(249,115,22,0.3)";
+      case "sakura": return "0 0 8px rgba(244,114,182,0.5), 0 0 14px rgba(233,121,249,0.25)";
+      case "shadow": return "0 0 10px rgba(99,102,241,0.6), 0 0 16px rgba(6,182,212,0.2)";
+      case "qi": return "0 0 8px rgba(16,185,129,0.5), 0 0 14px rgba(251,191,36,0.25)";
+      case "asura": return "0 0 10px rgba(239,68,68,0.7), 0 0 18px rgba(127,29,29,0.4)";
+      case "system": return "0 0 8px rgba(6,182,212,0.6), 0 0 14px rgba(6,182,212,0.3)";
+      default: return `0 0 6px ${accentColor}40`;
+    }
+  };
+
+  const isAnimated = avatarFrame !== "none";
+  const animSpeed = avatarFrame === "fire" ? "1.5s" : avatarFrame === "neon" ? "2s" : "3s";
+
+  return (
+    <div
+      className="relative rounded-full flex items-center justify-center flex-shrink-0 cursor-pointer"
+      style={{ 
+        width: size, 
+        height: size,
+        boxShadow: getFrameGlow(),
+      }}
+    >
+      {/* Rotating frame border */}
+      {isAnimated && (
+        <div 
+          className="absolute inset-0 rounded-full" 
+          style={{ 
+            background: getFrameGradient(),
+            animation: `navRotCW ${animSpeed} linear infinite`,
+          }} 
+        />
+      )}
+      {/* Static frame border for "none" */}
+      {!isAnimated && (
+        <div 
+          className="absolute inset-0 rounded-full" 
+          style={{ background: accentColor }} 
+        />
+      )}
+      {/* Inner background mask */}
+      <div 
+        className="absolute rounded-full bg-background" 
+        style={{ 
+          inset: borderWidth,
+        }} 
+      />
+      {/* Avatar image or initial */}
+      <div 
+        className="relative rounded-full overflow-hidden flex items-center justify-center bg-background z-10"
+        style={{ 
+          width: innerSize, 
+          height: innerSize,
+          animation: isAnimated ? `navPulse 4s ease-in-out infinite` : undefined,
+        }}
+      >
+        {avatarUrl ? (
+          <img 
+            src={avatarUrl} 
+            alt={username || "Profile"} 
+            className="h-full w-full object-cover rounded-full"
+          />
+        ) : (
+          <div 
+            className="h-full w-full flex items-center justify-center rounded-full text-[11px] font-bold"
+            style={{ 
+              background: `linear-gradient(135deg, ${accentColor}30, ${accentColor}10)`,
+              color: accentColor,
+            }}
+          >
+            {username?.charAt(0)?.toUpperCase() || <UserIcon className="h-4 w-4" />}
+          </div>
+        )}
+      </div>
+
+      {/* Cyber brackets overlay */}
+      {avatarFrame === "cyber" && (
+        <div className="absolute inset-[-1px] pointer-events-none z-20" style={{ animation: 'navGlitch 6s infinite' }}>
+          <div className="absolute top-0 left-0 h-1.5 w-1.5 border-t border-l border-cyan-400 rounded-tl-sm" style={{ boxShadow: '0 0 3px cyan' }} />
+          <div className="absolute top-0 right-0 h-1.5 w-1.5 border-t border-r border-cyan-400 rounded-tr-sm" style={{ boxShadow: '0 0 3px cyan' }} />
+          <div className="absolute bottom-0 left-0 h-1.5 w-1.5 border-b border-l border-cyan-400 rounded-bl-sm" style={{ boxShadow: '0 0 3px cyan' }} />
+          <div className="absolute bottom-0 right-0 h-1.5 w-1.5 border-b border-r border-cyan-400 rounded-br-sm" style={{ boxShadow: '0 0 3px cyan' }} />
+        </div>
+      )}
+
+      {/* System S-RANK mini badge */}
+      {avatarFrame === "system" && (
+        <div className="absolute -top-1 -right-1 z-30 bg-slate-950 border border-cyan-400 text-cyan-400 text-[5px] font-black px-0.5 rounded leading-tight" style={{ boxShadow: '0 0 4px rgba(6,182,212,0.7)' }}>
+          S
+        </div>
+      )}
+
+      {/* Fire ember dot */}
+      {avatarFrame === "fire" && (
+        <div className="absolute -top-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-orange-500 z-20 animate-pulse" style={{ boxShadow: '0 0 4px #ef4444' }} />
+      )}
+
+      {/* Gold crown tiny */}
+      {avatarFrame === "gold" && (
+        <div className="absolute -top-1 left-1/2 -translate-x-1/2 text-amber-400 z-20" style={{ fontSize: '8px', filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.5))' }}>
+          👑
+        </div>
+      )}
     </div>
   );
 }
