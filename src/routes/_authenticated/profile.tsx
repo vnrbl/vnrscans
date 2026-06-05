@@ -30,6 +30,7 @@ import {
   Link2,
   Sparkles,
   Orbit,
+  Sword,
 } from "lucide-react";
 import { ReadingGoals } from "@/components/profile/ReadingGoals";
 import { AvatarUpload } from "@/components/profile/AvatarUpload";
@@ -223,6 +224,27 @@ const keyframeStyles = `
 @keyframes titleShimmerSweep {
   0% { background-position: -250% center; }
   100% { background-position: 250% center; }
+}
+@keyframes shadowExtraction {
+  0% { transform: translateY(0) scaleY(0.7) scaleX(1); opacity: 0; filter: blur(2px); }
+  50% { transform: translateY(-12px) scaleY(1.2) scaleX(0.8); opacity: 0.55; filter: blur(1.5px); }
+  100% { transform: translateY(-25px) scaleY(1.5) scaleX(0.5); opacity: 0; filter: blur(3px); }
+}
+@keyframes bloodDrip {
+  0% { transform: translateY(-15px) scaleY(0.8) scaleX(1.2); opacity: 0; }
+  10% { opacity: 1; }
+  50% { transform: translateY(12px) scaleY(1.3) scaleX(0.7); opacity: 0.95; }
+  80% { transform: translateY(28px) scaleY(1) scaleX(1); opacity: 0.35; }
+  100% { transform: translateY(38px) scaleY(0.8) scaleX(1.2); opacity: 0; }
+}
+@keyframes abyssBreath {
+  0%, 100% { opacity: 0.5; transform: scale(1); filter: blur(1px); }
+  50% { opacity: 0.95; transform: scale(1.03); filter: blur(2.5px); }
+}
+@keyframes abyssWarp {
+  0% { transform: translate(0, 0) scale(1) rotate(0deg); opacity: 0.3; }
+  50% { transform: translate(-6px, 6px) scale(0.6) rotate(180deg); opacity: 0.8; filter: blur(1.5px); }
+  100% { transform: translate(0, 0) scale(1) rotate(360deg); opacity: 0.3; }
 }
 `;
 
@@ -772,10 +794,18 @@ function ProfilePage() {
 
               {avatarFrame === "shadow" && (
                 <div className="absolute inset-0 pointer-events-none z-20">
+                  {/* Solo Leveling Glowing Monarch Eyes */}
+                  <div className="absolute -top-1.5 left-[38%] w-3 h-1 bg-cyan-400 rounded-full shadow-[0_0_8px_#22d3ee] rotate-[-12deg] animate-pulse z-30" />
+                  <div className="absolute -top-1.5 right-[38%] w-3 h-1 bg-cyan-400 rounded-full shadow-[0_0_8px_#22d3ee] rotate-[12deg] animate-pulse z-30" />
+                  
+                  {/* Shadow Extraction wisps */}
+                  <div className="absolute -bottom-2 left-[15%] w-3 h-7 bg-cyan-400/25 blur-[1px] rounded-t-full animate-[shadowExtraction_1.5s_ease-out_infinite]" style={{ transform: 'rotate(-15deg)' }} />
+                  <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 w-4 h-8 bg-indigo-500/20 blur-[1.5px] rounded-t-full animate-[shadowExtraction_2s_ease-out_infinite_0.4s]" />
+                  <div className="absolute -bottom-2 right-[15%] w-3 h-7 bg-purple-500/25 blur-[1px] rounded-t-full animate-[shadowExtraction_1.7s_ease-out_infinite_0.2s]" style={{ transform: 'rotate(15deg)' }} />
+
                   {/* Void Sparks */}
                   <div className="absolute bottom-2 left-6 h-2 w-2 rounded-full bg-purple-500 shadow-[0_0_6px_#6366F1]" style={{ animation: 'fireEmbersWavy 3s ease-out infinite' }} />
                   <div className="absolute bottom-4 right-6 h-1.5 w-1.5 rounded-full bg-cyan-400 shadow-[0_0_5px_#06b6d4]" style={{ animation: 'fireEmbersWavy 2.5s ease-out infinite', animationDelay: '1s' }} />
-                  <div className="absolute bottom-1 left-10 h-1.2 w-1.2 rounded-full bg-indigo-500 shadow-[0_0_4px_#4f46e5]" style={{ animation: 'fireEmbersWavy 3.5s ease-out infinite', animationDelay: '0.5s' }} />
                 </div>
               )}
 
@@ -791,6 +821,17 @@ function ProfilePage() {
                 <div className="absolute inset-0 pointer-events-none z-20">
                   {/* Demonic Eye Flash */}
                   <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 w-2 h-2 rounded-full bg-red-500 shadow-[0_0_8px_#ef4444] animate-pulse z-30" />
+                  
+                  {/* Crossed bloody swords */}
+                  <div className="absolute -bottom-3.5 left-1/2 -translate-x-1/2 flex items-center gap-1 z-35 animate-[smoothBreath_3s_ease-in-out_infinite]">
+                    <Sword className="h-6.5 w-6.5 text-red-700 drop-shadow-[0_0_5px_red] rotate-[-45deg] translate-x-1.5" />
+                    <Sword className="h-6.5 w-6.5 text-red-700 drop-shadow-[0_0_5px_red] rotate-[45deg] -translate-x-1.5" />
+                  </div>
+
+                  {/* Dripping blood drops */}
+                  <div className="absolute bottom-[-15px] left-[35%] w-1 h-2 bg-red-600 rounded-full animate-[bloodDrip_2.5s_infinite] shadow-[0_0_3px_red]" />
+                  <div className="absolute bottom-[-15px] right-[35%] w-1.2 h-2 bg-red-600 rounded-full animate-[bloodDrip_3s_infinite_1.2s] shadow-[0_0_3px_red]" />
+
                   {/* Sword guards brackets */}
                   <div className="absolute inset-0 animate-[smoothBreath_3s_ease-in-out_infinite]">
                     <div className="absolute -top-1.5 left-1/2 -translate-x-1/2 h-4 w-2 bg-red-700 rounded-b-md shadow-[0_0_6px_red] border border-red-500" />
@@ -825,6 +866,14 @@ function ProfilePage() {
                   {/* Swirling Abyssal Orbs */}
                   <div className="absolute bottom-2 left-4 h-2 w-2 rounded-full bg-fuchsia-500 shadow-[0_0_6px_#D946EF]" style={{ animation: 'fireEmbersWavy 2.8s ease-out infinite' }} />
                   <div className="absolute bottom-3 right-5 h-1.5 w-1.5 rounded-full bg-purple-400 shadow-[0_0_5px_#8B5CF6]" style={{ animation: 'fireEmbersWavy 3.2s ease-out infinite', animationDelay: '0.8s' }} />
+
+                  {/* Darkness vignette consuming the avatar */}
+                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_45%,#000000_100%)] rounded-full mix-blend-multiply opacity-90" />
+                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_55%,rgba(168,85,247,0.25)_95%)] rounded-full animate-[abyssBreath_4s_ease-in-out_infinite]" />
+
+                  {/* Void dust / darkness particles */}
+                  <div className="absolute top-[20%] left-[20%] w-2 h-2 rounded-full bg-purple-950/80 blur-[0.5px] animate-[abyssWarp_6s_infinite]" />
+                  <div className="absolute bottom-[25%] right-[25%] w-3 h-3 rounded-full bg-black blur-[1px] animate-[abyssWarp_8s_infinite_2s]" />
                 </div>
               )}
               {avatarFrame === "glitch" && (
