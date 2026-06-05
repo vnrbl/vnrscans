@@ -512,6 +512,25 @@ export function extractImageUrls(html: string, baseUrl: string): string[] {
   return [...new Set(images)].filter(url => {
     try {
       new URL(url);
+      const lowercaseBaseUrl = baseUrl.toLowerCase();
+      const lowercaseUrl = url.toLowerCase();
+      
+      // If scraping from asurascans.com, only allow URLs of the pattern: asura-images/chapters/
+      const isAsura = lowercaseBaseUrl.includes('asurascans.com') || lowercaseUrl.includes('asurascans.com');
+      if (isAsura && !lowercaseUrl.includes('asura-images/chapters/')) {
+        return false;
+      }
+
+      // If scraping from elftoon.com / elftoon.xyz, only allow URLs of the pattern: /wp-content/uploads/
+      const isElftoon = 
+        lowercaseBaseUrl.includes('elftoon.com') || 
+        lowercaseBaseUrl.includes('elftoon.xyz') || 
+        lowercaseUrl.includes('elftoon.xyz') || 
+        lowercaseUrl.includes('elftoon.com');
+      if (isElftoon && !lowercaseUrl.includes('/wp-content/uploads/')) {
+        return false;
+      }
+      
       return true;
     } catch {
       return false;

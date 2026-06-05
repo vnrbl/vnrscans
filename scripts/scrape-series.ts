@@ -163,6 +163,7 @@ async function main() {
   // Get existing chapters
   console.log('Checking existing chapters in database...');
   let missing: any[] = [];
+  let existingNumbers = new Set<number>();
   try {
     const { data: existing, error } = await supabase
       .from('chapters')
@@ -171,25 +172,25 @@ async function main() {
 
     if (error) throw error;
 
-    const existingNumbers = new Set(existing?.map(c => c.chapter_number) || []);
+    existingNumbers = new Set(existing?.map(c => c.chapter_number) || []);
     missing = discovered.filter(ch => !existingNumbers.has(ch.chapterNumber));
 
     console.log(`📊 Stats:`);
     console.log(`  - Discovered: ${discovered.length}`);
     console.log(`  - Already in DB: ${existingNumbers.size}`);
-    console.log(`  - To Scrape & Import: ${missing.length}`);
-
-    if (missing.length === 0) {
-      console.log('🎉 All discovered chapters already exist in the database! Nothing to do.');
-      await browser.close();
-      rlConfirm.close();
-      process.exit(0);
-    }
+    console.log(`  - New (to import): ${missing.length}`);
   } catch (error) {
     console.error('❌ Failed to check existing chapters:', error);
     await browser.close();
     rlConfirm.close();
     process.exit(1);
+  }
+
+  if (missing.length === 0) {
+    console.log('🎉 All discovered chapters already exist in the database! Nothing to do.');
+    await browser.close();
+    rlConfirm.close();
+    process.exit(0);
   }
 
   const confirm = (await new Promise<string>((resolve) => {
@@ -242,41 +243,56 @@ async function main() {
         throw new Error('No images found on chapter page.');
       }
 
-      // Step 3: Insert Chapter
-      console.log('  └─ Saving chapter to database...');
-      const { data: chapterRecord, error: chapterError } = await supabase
+      // Step 3: Insert or Update Chapter
+      const targetSlug = buildChapterSlug(ch.chapterNumber, {
+        title: ch.title,
+        scanlationGroup: scanlationGroup || null,
+      });
+
+      const { data: existingChapter } = await supabase
         .from('chapters')
-        .insert({
-          series_id: seriesId,
-          chapter_number: ch.chapterNumber,
-          title: ch.title || null,
-          slug: buildChapterSlug(ch.chapterNumber, {
-            title: ch.title,
-            scanlationGroup: scanlationGroup || null,
-          }),
-          chapter_type: 'image',
-          status: 'published',
-          uploaded_by: uploadedBy || null,
-          scanlation_group: scanlationGroup || null,
-        })
-        .select()
-        .single();
+        .select('id')
+        .eq('series_id', seriesId)
+        .eq('slug', targetSlug)
+        .maybeSingle();
 
-      if (chapterError) throw chapterError;
+      if (existingChapter) {
+        console.log(`  ✅ Chapter ${ch.chapterNumber} already exists in DB. Skipping.\n`);
+        successCount++;
+      } else {
+        // Insert new chapter
+        console.log('  └─ Saving new chapter to database...');
+        const { data: chapterRecord, error: chapterError } = await supabase
+          .from('chapters')
+          .insert({
+            series_id: seriesId,
+            chapter_number: ch.chapterNumber,
+            title: ch.title || null,
+            slug: targetSlug,
+            chapter_type: 'image',
+            status: 'published',
+            uploaded_by: uploadedBy || null,
+            scanlation_group: scanlationGroup || null,
+          })
+          .select()
+          .single();
 
-      // Step 4: Insert Pages
-      console.log('  └─ Saving pages to database...');
-      const pagesData = images.map((url, imgIdx) => ({
-        chapter_id: chapterRecord.id,
-        page_number: imgIdx + 1,
-        image_url: url,
-      }));
+        if (chapterError) throw chapterError;
 
-      const { error: pagesError } = await supabase.from('chapter_pages').insert(pagesData);
-      if (pagesError) throw pagesError;
+        // Step 4: Insert Pages
+        console.log('  └─ Saving pages to database...');
+        const pagesData = images.map((url, imgIdx) => ({
+          chapter_id: chapterRecord.id,
+          page_number: imgIdx + 1,
+          image_url: url,
+        }));
 
-      console.log(`  ✅ Chapter ${ch.chapterNumber} imported successfully!\n`);
-      successCount++;
+        const { error: pagesError } = await supabase.from('chapter_pages').insert(pagesData);
+        if (pagesError) throw pagesError;
+
+        console.log(`  ✅ Chapter ${ch.chapterNumber} imported successfully!\n`);
+        successCount++;
+      }
     } catch (error) {
       console.error(`  ❌ Failed to import Chapter ${ch.chapterNumber}:`, error instanceof Error ? error.message : error);
       console.log();

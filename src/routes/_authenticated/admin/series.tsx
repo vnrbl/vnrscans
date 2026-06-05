@@ -1,8 +1,22 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { toast } from "sonner";
-import { Plus, Trash2, Eye, EyeOff, Upload, ExternalLink, X, Pencil, Download, Layers, Tag, Sparkles } from "lucide-react";
+import {
+  Plus,
+  Trash2,
+  Eye,
+  EyeOff,
+  Upload,
+  ExternalLink,
+  X,
+  Pencil,
+  Download,
+  Layers,
+  Tag,
+  Sparkles,
+  Search,
+} from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { $extractChaptersFromUrl, $extractImagesFromUrl } from "@/lib/api/scraper.functions";
@@ -11,9 +25,33 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { ScanlationGroupPicker } from "@/components/admin/ScanlationGroupPicker";
 import {
@@ -30,7 +68,11 @@ export const Route = createFileRoute("/_authenticated/admin/series")({
 });
 
 function slugify(s: string) {
-  return s.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  return s
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
 }
 
 const seriesTypes = ["manga", "manhwa", "manhua", "novel"] as const;
@@ -120,7 +162,13 @@ function seriesPayloadFromForm(form: SeriesForm) {
 }
 
 type GenreOption = { id: string; name: string; slug: string };
-type TagOption = { id: string; name: string; slug: string; color: string | null; icon: string | null };
+type TagOption = {
+  id: string;
+  name: string;
+  slug: string;
+  color: string | null;
+  icon: string | null;
+};
 
 function namesFromInput(value: string) {
   return value
@@ -171,7 +219,10 @@ async function syncSeriesTaxonomy(seriesId: string, form: SeriesForm) {
   const genreIds = uniqueIds([...form.genre_ids, ...newGenreIds]);
   const tagIds = uniqueIds([...form.tag_ids, ...newTagIds]);
 
-  const { error: deleteGenresError } = await supabase.from("series_genres").delete().eq("series_id", seriesId);
+  const { error: deleteGenresError } = await supabase
+    .from("series_genres")
+    .delete()
+    .eq("series_id", seriesId);
   if (deleteGenresError) throw deleteGenresError;
   if (genreIds.length > 0) {
     const { error } = await supabase
@@ -180,7 +231,10 @@ async function syncSeriesTaxonomy(seriesId: string, form: SeriesForm) {
     if (error) throw error;
   }
 
-  const { error: deleteTagsError } = await (supabase as any).from("series_tags").delete().eq("series_id", seriesId);
+  const { error: deleteTagsError } = await (supabase as any)
+    .from("series_tags")
+    .delete()
+    .eq("series_id", seriesId);
   if (deleteTagsError) throw deleteTagsError;
   if (tagIds.length > 0) {
     const { error } = await (supabase as any)
@@ -201,18 +255,31 @@ function AdminSeries() {
   const [visibilityFilter, setVisibilityFilter] = useState<string>("all");
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 20;
-  
+
   const list = useQuery({
-    queryKey: ["admin", "series", currentPage, searchQuery, typeFilter, statusFilter, visibilityFilter],
+    queryKey: [
+      "admin",
+      "series",
+      currentPage,
+      searchQuery,
+      typeFilter,
+      statusFilter,
+      visibilityFilter,
+    ],
     queryFn: async () => {
       let query = supabase
         .from("series")
-        .select("*,series_genres(genre_id,genre:genres(id,name,slug)),series_tags(tag_id,tag:tags(id,name,slug,color,icon))", { count: "exact" })
+        .select(
+          "*,series_genres(genre_id,genre:genres(id,name,slug)),series_tags(tag_id,tag:tags(id,name,slug,color,icon))",
+          { count: "exact" },
+        )
         .order("updated_at", { ascending: false });
-      
+
       // Apply filters
       if (searchQuery) {
-        query = query.or(`title.ilike.%${searchQuery}%,alternative_titles.ilike.%${searchQuery}%,author.ilike.%${searchQuery}%,artist.ilike.%${searchQuery}%`);
+        query = query.or(
+          `title.ilike.%${searchQuery}%,alternative_titles.ilike.%${searchQuery}%,author.ilike.%${searchQuery}%,artist.ilike.%${searchQuery}%`,
+        );
       }
       if (typeFilter !== "all") {
         query = query.eq("type", typeFilter);
@@ -225,15 +292,15 @@ function AdminSeries() {
       } else if (visibilityFilter === "hidden") {
         query = query.eq("is_hidden", true);
       }
-      
+
       // Pagination
       const from = (currentPage - 1) * itemsPerPage;
       const to = from + itemsPerPage - 1;
       query = query.range(from, to);
-      
+
       const { data: seriesData, error, count } = await query;
       if (error) throw error;
-      
+
       return {
         series: seriesData ?? [],
         totalCount: count ?? 0,
@@ -312,7 +379,10 @@ function AdminSeries() {
 
   const toggleHidden = useMutation({
     mutationFn: async (s: any) => {
-      const { error } = await supabase.from("series").update({ is_hidden: !s.is_hidden }).eq("id", s.id);
+      const { error } = await supabase
+        .from("series")
+        .update({ is_hidden: !s.is_hidden })
+        .eq("id", s.id);
       if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "series"] }),
@@ -323,7 +393,10 @@ function AdminSeries() {
       const { error } = await supabase.from("series").delete().eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => { toast.success("Series deleted"); qc.invalidateQueries({ queryKey: ["admin", "series"] }); },
+    onSuccess: () => {
+      toast.success("Series deleted");
+      qc.invalidateQueries({ queryKey: ["admin", "series"] });
+    },
     onError: (e: Error) => toast.error(e.message),
   });
 
@@ -336,12 +409,26 @@ function AdminSeries() {
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold tracking-tight">Titles</h1>
         <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger asChild><Button><Plus className="mr-1 h-4 w-4" />New title</Button></DialogTrigger>
+          <DialogTrigger asChild>
+            <Button>
+              <Plus className="mr-1 h-4 w-4" />
+              New title
+            </Button>
+          </DialogTrigger>
           <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
-            <DialogHeader><DialogTitle>Create title</DialogTitle></DialogHeader>
-            <SeriesFormFields form={form} setForm={setForm} genres={genres.data ?? []} tags={tags.data ?? []} />
+            <DialogHeader>
+              <DialogTitle>Create title</DialogTitle>
+            </DialogHeader>
+            <SeriesFormFields
+              form={form}
+              setForm={setForm}
+              genres={genres.data ?? []}
+              tags={tags.data ?? []}
+            />
             <DialogFooter>
-              <Button onClick={() => create.mutate()} disabled={!form.title || create.isPending}>Create</Button>
+              <Button onClick={() => create.mutate()} disabled={!form.title || create.isPending}>
+                Create
+              </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -408,7 +495,10 @@ function AdminSeries() {
             </SelectContent>
           </Select>
 
-          {(searchQuery || typeFilter !== "all" || statusFilter !== "all" || visibilityFilter !== "all") && (
+          {(searchQuery ||
+            typeFilter !== "all" ||
+            statusFilter !== "all" ||
+            visibilityFilter !== "all") && (
             <Button
               variant="ghost"
               size="sm"
@@ -427,38 +517,60 @@ function AdminSeries() {
 
           <div className="ml-auto text-sm text-muted-foreground">
             Showing {list.data?.series.length || 0} of {list.data?.totalCount || 0} titles
-            {list.data && list.data.totalPages > 1 && ` (Page ${currentPage} of ${list.data.totalPages})`}
+            {list.data &&
+              list.data.totalPages > 1 &&
+              ` (Page ${currentPage} of ${list.data.totalPages})`}
           </div>
         </div>
       </div>
 
       <div className="mt-6 divide-y divide-border/40 rounded-lg border border-border/40 bg-card">
         {list.isLoading && <div className="p-6 text-sm text-muted-foreground">Loading…</div>}
-        {(list.data?.series.length === 0) && !list.isLoading && (
+        {list.data?.series.length === 0 && !list.isLoading && (
           <div className="p-8 text-center text-muted-foreground">
-            {searchQuery || typeFilter !== "all" || statusFilter !== "all" || visibilityFilter !== "all" 
-              ? "No titles match your filters" 
+            {searchQuery ||
+            typeFilter !== "all" ||
+            statusFilter !== "all" ||
+            visibilityFilter !== "all"
+              ? "No titles match your filters"
               : "No titles found"}
           </div>
         )}
         {(list.data?.series || []).map((s: any) => (
           <div key={s.id} className="flex items-center gap-3 p-3">
-            {s.cover_url ? <img src={s.cover_url} alt="" className="h-14 w-10 rounded object-cover" /> : <div className="h-14 w-10 rounded bg-secondary" />}
+            {s.cover_url ? (
+              <img src={s.cover_url} alt="" className="h-14 w-10 rounded object-cover" />
+            ) : (
+              <div className="h-14 w-10 rounded bg-secondary" />
+            )}
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
-                <button type="button" onClick={() => setSelectedSeries(s.id)} className="truncate text-left font-medium hover:text-primary">{s.title}</button>
-                <Badge variant="outline" className="uppercase">{s.type}</Badge>
+                <button
+                  type="button"
+                  onClick={() => setSelectedSeries(s.id)}
+                  className="truncate text-left font-medium hover:text-primary"
+                >
+                  {s.title}
+                </button>
+                <Badge variant="outline" className="uppercase">
+                  {s.type}
+                </Badge>
                 {s.is_hidden && <Badge variant="secondary">Hidden</Badge>}
               </div>
               <div className="text-xs text-muted-foreground">
-                {s.status} · {Number(s.rating_average || 0).toFixed(1)}★ · {s.view_count} views · {s.chapter_count || 0} chapters
+                {s.status} · {Number(s.rating_average || 0).toFixed(1)}★ · {s.view_count} views ·{" "}
+                {s.chapter_count || 0} chapters
               </div>
               <div className="mt-1 flex flex-wrap gap-1">
-                {((s.series_genres as any[]) ?? []).map((sg) => sg.genre).filter(Boolean).slice(0, 4).map((genre) => (
-                  <Badge key={genre.id} variant="secondary" className="px-1.5 py-0 text-[10px]">
-                    {genre.name}
-                  </Badge>
-                ))}
+                {((s.series_genres as any[]) ?? [])
+                  .map((sg) => sg.genre)
+                  .filter(Boolean)
+                  .slice(0, 4)
+                  .map((genre) => (
+                    <Badge key={genre.id} variant="secondary" className="px-1.5 py-0 text-[10px]">
+                      {genre.name}
+                    </Badge>
+                  ))}
                 {((s.series_tags as any[]) ?? [])
                   .map((st) => st.tag)
                   .filter(Boolean)
@@ -476,21 +588,45 @@ function AdminSeries() {
                   ))}
               </div>
             </div>
-            <Button variant="ghost" size="icon" onClick={() => setSelectedSeries(s.id)} title="Manage Chapters">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setSelectedSeries(s.id)}
+              title="Manage Chapters"
+            >
               <Upload className="h-4 w-4 text-violet-600" />
             </Button>
-            <Button variant="ghost" size="icon" onClick={() => { setEditingSeries(s); setForm(seriesToForm(s)); }} title="Edit Title">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => {
+                setEditingSeries(s);
+                setForm(seriesToForm(s));
+              }}
+              title="Edit Title"
+            >
               <Pencil className="h-4 w-4" />
             </Button>
-            <Button variant="ghost" size="icon" onClick={() => toggleHidden.mutate(s)} title={s.is_hidden ? "Show" : "Hide"}>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => toggleHidden.mutate(s)}
+              title={s.is_hidden ? "Show" : "Hide"}
+            >
               {s.is_hidden ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
             </Button>
             <AlertDialog>
-              <AlertDialogTrigger asChild><Button variant="ghost" size="icon"><Trash2 className="h-4 w-4 text-destructive" /></Button></AlertDialogTrigger>
+              <AlertDialogTrigger asChild>
+                <Button variant="ghost" size="icon">
+                  <Trash2 className="h-4 w-4 text-destructive" />
+                </Button>
+              </AlertDialogTrigger>
               <AlertDialogContent>
                 <AlertDialogHeader>
                   <AlertDialogTitle>Delete "{s.title}"?</AlertDialogTitle>
-                  <AlertDialogDescription>This also removes all chapters and pages. This cannot be undone.</AlertDialogDescription>
+                  <AlertDialogDescription>
+                    This also removes all chapters and pages. This cannot be undone.
+                  </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                   <AlertDialogCancel>Cancel</AlertDialogCancel>
@@ -508,7 +644,7 @@ function AdminSeries() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
             disabled={currentPage === 1 || list.isLoading}
           >
             Previous
@@ -525,7 +661,7 @@ function AdminSeries() {
               } else {
                 pageNum = currentPage - 2 + i;
               }
-              
+
               return (
                 <Button
                   key={pageNum}
@@ -543,7 +679,7 @@ function AdminSeries() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => setCurrentPage(p => Math.min(list.data.totalPages, p + 1))}
+            onClick={() => setCurrentPage((p) => Math.min(list.data.totalPages, p + 1))}
             disabled={currentPage === list.data.totalPages || list.isLoading}
           >
             Next
@@ -551,12 +687,30 @@ function AdminSeries() {
         </div>
       )}
 
-      <Dialog open={!!editingSeries} onOpenChange={(v) => { if (!v) { setEditingSeries(null); setForm(emptySeriesForm); } }}>
+      <Dialog
+        open={!!editingSeries}
+        onOpenChange={(v) => {
+          if (!v) {
+            setEditingSeries(null);
+            setForm(emptySeriesForm);
+          }
+        }}
+      >
         <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
-          <DialogHeader><DialogTitle>Edit title</DialogTitle></DialogHeader>
-          <SeriesFormFields form={form} setForm={setForm} genres={genres.data ?? []} tags={tags.data ?? []} />
+          <DialogHeader>
+            <DialogTitle>Edit title</DialogTitle>
+          </DialogHeader>
+          <SeriesFormFields
+            form={form}
+            setForm={setForm}
+            genres={genres.data ?? []}
+            tags={tags.data ?? []}
+          />
           <DialogFooter>
-            <Button onClick={() => updateSeries.mutate()} disabled={!form.title || updateSeries.isPending}>
+            <Button
+              onClick={() => updateSeries.mutate()}
+              disabled={!form.title || updateSeries.isPending}
+            >
               {updateSeries.isPending ? "Saving..." : "Save changes"}
             </Button>
           </DialogFooter>
@@ -583,37 +737,112 @@ function SeriesFormFields({
 }) {
   return (
     <div className="space-y-3">
-      <div><Label>Title *</Label><Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="Enter series title" /></div>
+      <div>
+        <Label>Title *</Label>
+        <Input
+          value={form.title}
+          onChange={(e) => setForm({ ...form, title: e.target.value })}
+          placeholder="Enter series title"
+        />
+      </div>
 
       <div className="grid grid-cols-2 gap-3">
         <div>
           <Label>Type</Label>
           <Select value={form.type} onValueChange={(v) => setForm({ ...form, type: v })}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>{seriesTypes.map((t) => <SelectItem key={t} value={t}>{t.toUpperCase()}</SelectItem>)}</SelectContent>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {seriesTypes.map((t) => (
+                <SelectItem key={t} value={t}>
+                  {t.toUpperCase()}
+                </SelectItem>
+              ))}
+            </SelectContent>
           </Select>
         </div>
         <div>
           <Label>Status</Label>
           <Select value={form.status} onValueChange={(v) => setForm({ ...form, status: v })}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>{seriesStatuses.map((t) => <SelectItem key={t} value={t}>{t.charAt(0).toUpperCase() + t.slice(1)}</SelectItem>)}</SelectContent>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {seriesStatuses.map((t) => (
+                <SelectItem key={t} value={t}>
+                  {t.charAt(0).toUpperCase() + t.slice(1)}
+                </SelectItem>
+              ))}
+            </SelectContent>
           </Select>
         </div>
       </div>
 
       <div className="grid grid-cols-2 gap-3">
-        <div><Label>Author</Label><Input value={form.author} onChange={(e) => setForm({ ...form, author: e.target.value })} placeholder="Author name" /></div>
-        <div><Label>Artist</Label><Input value={form.artist} onChange={(e) => setForm({ ...form, artist: e.target.value })} placeholder="Artist name" /></div>
+        <div>
+          <Label>Author</Label>
+          <Input
+            value={form.author}
+            onChange={(e) => setForm({ ...form, author: e.target.value })}
+            placeholder="Author name"
+          />
+        </div>
+        <div>
+          <Label>Artist</Label>
+          <Input
+            value={form.artist}
+            onChange={(e) => setForm({ ...form, artist: e.target.value })}
+            placeholder="Artist name"
+          />
+        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-3">
-        <div><Label>Release Year</Label><Input type="number" value={form.release_year} onChange={(e) => setForm({ ...form, release_year: e.target.value })} placeholder="2024" /></div>
-        <div><Label>Chapter Count</Label><Input type="number" value={form.chapter_count} onChange={(e) => setForm({ ...form, chapter_count: e.target.value })} placeholder="0" /></div>
+        <div>
+          <Label>Release Year</Label>
+          <Input
+            type="number"
+            value={form.release_year}
+            onChange={(e) => setForm({ ...form, release_year: e.target.value })}
+            placeholder="2024"
+          />
+        </div>
+        <div>
+          <Label>Chapter Count</Label>
+          <Input
+            type="number"
+            value={form.chapter_count}
+            onChange={(e) => setForm({ ...form, chapter_count: e.target.value })}
+            placeholder="0"
+          />
+        </div>
       </div>
-      <div><Label>Cover URL</Label><Input value={form.cover_url} onChange={(e) => setForm({ ...form, cover_url: e.target.value })} placeholder="https://example.com/cover.jpg" /></div>
-      <div><Label>Alternative Titles</Label><Input value={form.alternative_titles} onChange={(e) => setForm({ ...form, alternative_titles: e.target.value })} placeholder="Alt title 1, Alt title 2" /></div>
-      <div><Label>Description</Label><Textarea rows={4} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Enter title description..." /></div>
+      <div>
+        <Label>Cover URL</Label>
+        <Input
+          value={form.cover_url}
+          onChange={(e) => setForm({ ...form, cover_url: e.target.value })}
+          placeholder="https://example.com/cover.jpg"
+        />
+      </div>
+      <div>
+        <Label>Alternative Titles</Label>
+        <Input
+          value={form.alternative_titles}
+          onChange={(e) => setForm({ ...form, alternative_titles: e.target.value })}
+          placeholder="Alt title 1, Alt title 2"
+        />
+      </div>
+      <div>
+        <Label>Description</Label>
+        <Textarea
+          rows={4}
+          value={form.description}
+          onChange={(e) => setForm({ ...form, description: e.target.value })}
+          placeholder="Enter title description..."
+        />
+      </div>
 
       <div className="grid gap-3 rounded-md border border-border/40 p-3">
         <div className="flex items-center gap-2 text-sm font-semibold">
@@ -621,16 +850,22 @@ function SeriesFormFields({
           Genres
         </div>
         <div className="flex max-h-36 flex-wrap gap-2 overflow-y-auto">
-          {genres.length === 0 && <p className="text-xs text-muted-foreground">No genres yet. Add one below.</p>}
+          {genres.length === 0 && (
+            <p className="text-xs text-muted-foreground">No genres yet. Add one below.</p>
+          )}
           {genres.map((genre) => {
             const selected = form.genre_ids.includes(genre.id);
             return (
               <button
                 key={genre.id}
                 type="button"
-                onClick={() => setForm({ ...form, genre_ids: toggleSelection(form.genre_ids, genre.id) })}
+                onClick={() =>
+                  setForm({ ...form, genre_ids: toggleSelection(form.genre_ids, genre.id) })
+                }
                 className={`rounded-full border px-3 py-1 text-xs font-medium transition ${
-                  selected ? "border-violet-600 bg-violet-600 text-white" : "border-border/60 bg-secondary/40 hover:border-violet-500"
+                  selected
+                    ? "border-violet-600 bg-violet-600 text-white"
+                    : "border-border/60 bg-secondary/40 hover:border-violet-500"
                 }`}
               >
                 {genre.name}
@@ -651,7 +886,9 @@ function SeriesFormFields({
           Tags
         </div>
         <div className="flex max-h-36 flex-wrap gap-2 overflow-y-auto">
-          {tags.length === 0 && <p className="text-xs text-muted-foreground">No tags yet. Add one below.</p>}
+          {tags.length === 0 && (
+            <p className="text-xs text-muted-foreground">No tags yet. Add one below.</p>
+          )}
           {tags.map((tag) => {
             const selected = form.tag_ids.includes(tag.id);
             return (
@@ -660,9 +897,13 @@ function SeriesFormFields({
                 type="button"
                 onClick={() => setForm({ ...form, tag_ids: toggleSelection(form.tag_ids, tag.id) })}
                 className={`rounded-full border px-3 py-1 text-xs font-medium transition ${
-                  selected ? "border-violet-600 bg-violet-600 text-white" : "border-border/60 bg-secondary/40 hover:border-violet-500"
+                  selected
+                    ? "border-violet-600 bg-violet-600 text-white"
+                    : "border-border/60 bg-secondary/40 hover:border-violet-500"
                 }`}
-                style={!selected && tag.color ? { borderColor: tag.color, color: tag.color } : undefined}
+                style={
+                  !selected && tag.color ? { borderColor: tag.color, color: tag.color } : undefined
+                }
               >
                 {tag.icon && <span className="mr-1">{tag.icon}</span>}
                 {tag.name}
@@ -678,9 +919,30 @@ function SeriesFormFields({
       </div>
 
       <div className="grid gap-2 rounded-md border border-border/40 p-3 text-sm">
-        <label className="flex items-center gap-2"><input type="checkbox" checked={form.is_featured} onChange={(e) => setForm({ ...form, is_featured: e.target.checked })} />Featured</label>
-        <label className="flex items-center gap-2"><input type="checkbox" checked={form.is_trending} onChange={(e) => setForm({ ...form, is_trending: e.target.checked })} />Trending</label>
-        <label className="flex items-center gap-2"><input type="checkbox" checked={form.is_hidden} onChange={(e) => setForm({ ...form, is_hidden: e.target.checked })} />Hidden</label>
+        <label className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            checked={form.is_featured}
+            onChange={(e) => setForm({ ...form, is_featured: e.target.checked })}
+          />
+          Featured
+        </label>
+        <label className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            checked={form.is_trending}
+            onChange={(e) => setForm({ ...form, is_trending: e.target.checked })}
+          />
+          Trending
+        </label>
+        <label className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            checked={form.is_hidden}
+            onChange={(e) => setForm({ ...form, is_hidden: e.target.checked })}
+          />
+          Hidden
+        </label>
       </div>
     </div>
   );
@@ -706,7 +968,7 @@ function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack: () => 
         .from("chapters")
         .select("*")
         .eq("series_id", seriesId)
-        .order("chapter_number", { ascending: false});
+        .order("chapter_number", { ascending: false });
       if (error) throw error;
       return data ?? [];
     },
@@ -721,20 +983,58 @@ function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack: () => 
         .select("scanlation_group")
         .eq("series_id", seriesId)
         .not("scanlation_group", "is", null);
-      
+
       if (error) throw error;
-      
+
       // Get unique groups
-      const uniqueGroups = [...new Set(data?.map(c => c.scanlation_group).filter(Boolean) ?? [])];
+      const uniqueGroups = [...new Set(data?.map((c) => c.scanlation_group).filter(Boolean) ?? [])];
       return uniqueGroups.sort();
     },
   });
 
   const [open, setOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [filterGroup, setFilterGroup] = useState("all");
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 20;
+
+  // Filter and search chapters
+  const filteredChapters = useMemo(() => {
+    if (!chapters.data) return [];
+    return chapters.data.filter((ch) => {
+      // 1. Group filter
+      if (filterGroup !== "all") {
+        if (ch.scanlation_group !== filterGroup) return false;
+      }
+
+      // 2. Search term filter
+      if (searchTerm.trim() !== "") {
+        const query = searchTerm.toLowerCase().trim();
+        const chNum = String(ch.chapter_number).toLowerCase();
+        const chGroup = (ch.scanlation_group || "").toLowerCase();
+
+        if (!chNum.includes(query) && !chGroup.includes(query)) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+  }, [chapters.data, filterGroup, searchTerm]);
+
+  // Pagination logic
+  const totalItems = filteredChapters.length;
+  const totalPages = Math.ceil(totalItems / itemsPerPage) || 1;
+
+  // Slice current page items
+  const paginatedChapters = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    return filteredChapters.slice(startIndex, startIndex + itemsPerPage);
+  }, [filteredChapters, currentPage]);
   const [editingChapter, setEditingChapter] = useState<any | null>(null);
-  const [form, setForm] = useState({ 
-    chapter_number: "", 
-    title: "", 
+  const [form, setForm] = useState({
+    chapter_number: "",
+    title: "",
     image_urls: "",
     chapter_url: "",
     status: "published",
@@ -745,8 +1045,11 @@ function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack: () => 
   const [extracting, setExtracting] = useState(false);
   const [bulkUploadOpen, setBulkUploadOpen] = useState(false);
   const [seriesUrl, setSeriesUrl] = useState("");
+  const [imageUrlTypeExample, setImageUrlTypeExample] = useState("");
   const [discoveredChapters, setDiscoveredChapters] = useState<ChapterInfo[]>([]);
   const [selectedChapters, setSelectedChapters] = useState<Set<number>>(new Set());
+  const [selectedChapterIds, setSelectedChapterIds] = useState<Set<string>>(new Set());
+  const [deleteSelectedOpen, setDeleteSelectedOpen] = useState(false);
   const [bulkUploading, setBulkUploading] = useState(false);
   const [bulkProgress, setBulkProgress] = useState({ done: 0, total: 0, phase: "" });
   const [groupSelect, setGroupSelect] = useState(SCANLATION_GROUP_NONE);
@@ -772,7 +1075,7 @@ function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack: () => 
       scanlationGroups.data && scanlationGroups.data.length > 0
         ? groupSelect
         : SCANLATION_GROUP_NEW,
-      groupNewName
+      groupNewName,
     );
 
   // Get user profile for username
@@ -794,23 +1097,24 @@ function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack: () => 
   // Auto-fill uploaded_by with username when opening upload dialog
   useEffect(() => {
     if (open && userProfile.data?.username && !form.uploaded_by) {
-      setForm(prev => ({ ...prev, uploaded_by: userProfile.data.username || "" }));
+      setForm((prev) => ({ ...prev, uploaded_by: userProfile.data.username || "" }));
     }
   }, [open, userProfile.data?.username]);
 
   // Also auto-fill when bulk upload dialog opens
   useEffect(() => {
     if (bulkUploadOpen && userProfile.data?.username && !form.uploaded_by) {
-      setForm(prev => ({ ...prev, uploaded_by: userProfile.data.username || "" }));
+      setForm((prev) => ({ ...prev, uploaded_by: userProfile.data.username || "" }));
     }
   }, [bulkUploadOpen, userProfile.data?.username]);
 
   const create = useMutation({
     mutationFn: async () => {
       // Extract number from chapter_number input (which can now contain text/letters)
-      const parsedNum = parseFloat(form.chapter_number.replace(/[^\d.]/g, '')) || parseFloat(form.chapter_number);
+      const parsedNum =
+        parseFloat(form.chapter_number.replace(/[^\d.]/g, "")) || parseFloat(form.chapter_number);
       const chapterNum = isNaN(parsedNum) ? 0 : parsedNum;
-      
+
       const scanlation_group = getScanlationGroupForUpload();
 
       const { data: chapter, error: chapterError } = await supabase
@@ -825,7 +1129,10 @@ function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack: () => 
           }),
           chapter_type: "image",
           status: form.status as any,
-          scheduled_at: form.status === "scheduled" && form.scheduled_at ? new Date(form.scheduled_at).toISOString() : null,
+          scheduled_at:
+            form.status === "scheduled" && form.scheduled_at
+              ? new Date(form.scheduled_at).toISOString()
+              : null,
           uploaded_by: form.uploaded_by || null,
           scanlation_group,
         })
@@ -869,7 +1176,7 @@ function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack: () => 
     setEditingChapter(chapter);
     const { selectValue, newGroupName } = scanlationGroupToSelectValue(
       chapter.scanlation_group,
-      scanlationGroups.data ?? []
+      scanlationGroups.data ?? [],
     );
     setGroupSelect(selectValue);
     setGroupNewName(newGroupName);
@@ -879,7 +1186,9 @@ function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack: () => 
       image_urls: (data ?? []).map((p) => p.image_url).join("\n"),
       chapter_url: "",
       status: chapter.status ?? "published",
-      scheduled_at: chapter.scheduled_at ? new Date(chapter.scheduled_at).toISOString().slice(0, 16) : "",
+      scheduled_at: chapter.scheduled_at
+        ? new Date(chapter.scheduled_at).toISOString().slice(0, 16)
+        : "",
       uploaded_by: chapter.uploaded_by ?? "",
       scanlation_group: chapter.scanlation_group ?? "",
     });
@@ -894,7 +1203,7 @@ function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack: () => 
     try {
       setExtracting(true);
       const result = await $extractImagesFromUrl({ data: { url: form.chapter_url } });
-      
+
       if (result.success && result.images) {
         setForm({ ...form, image_urls: result.images.join("\n") });
         toast.success(`Extracted ${result.images.length} images from chapter URL`);
@@ -917,7 +1226,7 @@ function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack: () => 
     try {
       setExtracting(true);
       const result = await $extractChaptersFromUrl({ data: { url: seriesUrl } });
-      
+
       if (result.success && result.chapters) {
         setDiscoveredChapters(result.chapters);
         // Auto-select all chapters
@@ -943,9 +1252,71 @@ function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack: () => 
     setSelectedChapters(newSelected);
   };
 
+  const getImageUrlTypePrefix = (exampleUrl: string): string | null => {
+    try {
+      const parsed = new URL(exampleUrl.trim());
+      const segments = parsed.pathname.split("/").filter(Boolean);
+      if (segments.length >= 3) {
+        return `${parsed.origin}/${segments.slice(0, 3).join("/")}/`;
+      }
+      return `${parsed.origin}${parsed.pathname.replace(/\/[^/]*$/, "/")}`;
+    } catch {
+      return null;
+    }
+  };
+
+  const toggleChapterSelect = (chapterId: string) => {
+    const next = new Set(selectedChapterIds);
+    if (next.has(chapterId)) {
+      next.delete(chapterId);
+    } else {
+      next.add(chapterId);
+    }
+    setSelectedChapterIds(next);
+  };
+
+  const allVisibleChaptersSelected =
+    paginatedChapters.length > 0 && paginatedChapters.every((ch) => selectedChapterIds.has(ch.id));
+
+  const toggleSelectAllVisibleChapters = () => {
+    const next = new Set(selectedChapterIds);
+    if (allVisibleChaptersSelected) {
+      paginatedChapters.forEach((ch) => next.delete(ch.id));
+    } else {
+      paginatedChapters.forEach((ch) => next.add(ch.id));
+    }
+    setSelectedChapterIds(next);
+  };
+
+  const deleteSelectedChaptersMutation = useMutation({
+    mutationFn: async (chapterIds: string[]) => {
+      const { error: deletePagesError } = await supabase
+        .from("chapter_pages")
+        .delete()
+        .in("chapter_id", chapterIds);
+      if (deletePagesError) throw deletePagesError;
+
+      const { error } = await supabase.from("chapters").delete().in("id", chapterIds);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      setSelectedChapterIds(new Set());
+      toast.success("Selected chapters deleted");
+      qc.invalidateQueries({ queryKey: ["admin", "chapters", seriesId] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   const bulkUploadChapters = async () => {
     if (selectedChapters.size === 0) {
       toast.error("Please select at least one chapter");
+      return;
+    }
+
+    const imageTypeExample = imageUrlTypeExample.trim();
+    const imageUrlPrefix = imageTypeExample ? getImageUrlTypePrefix(imageTypeExample) : null;
+    if (imageTypeExample && !imageUrlPrefix) {
+      toast.error("Please enter a valid example image URL to filter by.");
       return;
     }
 
@@ -961,7 +1332,9 @@ function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack: () => 
       setBulkProgress({ done: 0, total: selectedList.length, phase: "Extracting images" });
 
       const BATCH_SIZE = 5;
-      type ExtractionResult = { chapter: ChapterInfo; images: string[] } | { chapter: ChapterInfo; error: string };
+      type ExtractionResult =
+        | { chapter: ChapterInfo; images: string[] }
+        | { chapter: ChapterInfo; error: string };
       const extractionResults: ExtractionResult[] = [];
 
       for (let i = 0; i < selectedList.length; i += BATCH_SIZE) {
@@ -972,8 +1345,17 @@ function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack: () => 
             if (!result.success || !result.images?.length) {
               throw new Error(result.error || "No images found");
             }
-            return { chapter, images: result.images };
-          })
+
+            const images = imageUrlPrefix
+              ? result.images.filter((url) => url.startsWith(imageUrlPrefix))
+              : result.images;
+
+            if (imageUrlPrefix && images.length === 0) {
+              throw new Error("No images matching the example URL type were found.");
+            }
+
+            return { chapter, images };
+          }),
         );
 
         for (let j = 0; j < batch.length; j++) {
@@ -987,8 +1369,12 @@ function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack: () => 
         }
       }
 
-      const succeeded = extractionResults.filter((r): r is { chapter: ChapterInfo; images: string[] } => "images" in r);
-      const failed = extractionResults.filter((r): r is { chapter: ChapterInfo; error: string } => "error" in r);
+      const succeeded = extractionResults.filter(
+        (r): r is { chapter: ChapterInfo; images: string[] } => "images" in r,
+      );
+      const failed = extractionResults.filter(
+        (r): r is { chapter: ChapterInfo; error: string } => "error" in r,
+      );
 
       failed.forEach((r) => {
         console.error(`Failed to extract Chapter ${r.chapter.chapterNumber}:`, r.error);
@@ -1008,36 +1394,52 @@ function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack: () => 
 
       for (const { chapter, images } of succeeded) {
         try {
-          const { data: newChapter, error: chapterError } = await supabase
+          // Check if chapter already exists
+          const targetSlug = buildChapterSlug(chapter.chapterNumber, {
+            title: null,
+            scanlationGroup: scanlation_group,
+          });
+
+          const { data: existingChapter } = await supabase
             .from("chapters")
-            .insert({
-              series_id: seriesId,
-              chapter_number: chapter.chapterNumber,
-              title: null, // Hardcoded to null to completely remove the title option feature
-              slug: buildChapterSlug(chapter.chapterNumber, {
+            .select("id")
+            .eq("series_id", seriesId)
+            .eq("slug", targetSlug)
+            .maybeSingle();
+
+          if (existingChapter) {
+            // Chapter already exists, skip it
+            savedCount++;
+          } else {
+            // Chapter doesn't exist, create it new
+            const { data: newChapter, error: chapterError } = await supabase
+              .from("chapters")
+              .insert({
+                series_id: seriesId,
+                chapter_number: chapter.chapterNumber,
                 title: null,
-                scanlationGroup: scanlation_group,
-              }),
-              chapter_type: "image",
-              status: "published",
-              uploaded_by: form.uploaded_by || null,
-              scanlation_group,
-            })
-            .select()
-            .single();
+                slug: targetSlug,
+                chapter_type: "image",
+                status: "published",
+                uploaded_by: form.uploaded_by || null,
+                scanlation_group,
+              })
+              .select()
+              .single();
 
-          if (chapterError) throw chapterError;
+            if (chapterError) throw chapterError;
 
-          const pages = images.map((url, idx) => ({
-            chapter_id: newChapter.id,
-            page_number: idx + 1,
-            image_url: url,
-          }));
+            const pages = images.map((url, idx) => ({
+              chapter_id: newChapter.id,
+              page_number: idx + 1,
+              image_url: url,
+            }));
 
-          const { error: pagesError } = await supabase.from("chapter_pages").insert(pages);
-          if (pagesError) throw pagesError;
+            const { error: pagesError } = await supabase.from("chapter_pages").insert(pages);
+            if (pagesError) throw pagesError;
 
-          savedCount++;
+            savedCount++;
+          }
         } catch (error) {
           saveFailCount++;
           console.error(`Failed to save Chapter ${chapter.chapterNumber}:`, error);
@@ -1047,7 +1449,7 @@ function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack: () => 
       }
 
       toast.success(
-        `Bulk upload complete: ${savedCount} saved${saveFailCount > 0 ? `, ${saveFailCount} failed` : ""}${failed.length > 0 ? `, ${failed.length} skipped` : ""}`
+        `Bulk upload complete: ${savedCount} saved${saveFailCount > 0 ? `, ${saveFailCount} failed` : ""}${failed.length > 0 ? `, ${failed.length} skipped` : ""}`,
       );
       setBulkUploadOpen(false);
       setSeriesUrl("");
@@ -1067,9 +1469,10 @@ function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack: () => 
     mutationFn: async () => {
       if (!editingChapter) throw new Error("No chapter selected");
       // Extract number from chapter_number input (which can now contain text/letters)
-      const parsedNum = parseFloat(form.chapter_number.replace(/[^\d.]/g, '')) || parseFloat(form.chapter_number);
+      const parsedNum =
+        parseFloat(form.chapter_number.replace(/[^\d.]/g, "")) || parseFloat(form.chapter_number);
       const chapterNum = isNaN(parsedNum) ? 0 : parsedNum;
-      
+
       const scanlation_group = getScanlationGroupForUpload();
       const { error: chapterError } = await supabase
         .from("chapters")
@@ -1081,7 +1484,10 @@ function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack: () => 
             scanlationGroup: scanlation_group,
           }),
           status: form.status as any,
-          scheduled_at: form.status === "scheduled" && form.scheduled_at ? new Date(form.scheduled_at).toISOString() : null,
+          scheduled_at:
+            form.status === "scheduled" && form.scheduled_at
+              ? new Date(form.scheduled_at).toISOString()
+              : null,
           uploaded_by: form.uploaded_by || null,
           scanlation_group,
           updated_at: new Date().toISOString(),
@@ -1089,10 +1495,16 @@ function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack: () => 
         .eq("id", editingChapter.id);
       if (chapterError) throw chapterError;
 
-      const urls = form.image_urls.split("\n").map((u) => u.trim()).filter(Boolean);
+      const urls = form.image_urls
+        .split("\n")
+        .map((u) => u.trim())
+        .filter(Boolean);
       if (urls.length === 0) throw new Error("At least one image URL is required");
 
-      const { error: deleteError } = await supabase.from("chapter_pages").delete().eq("chapter_id", editingChapter.id);
+      const { error: deleteError } = await supabase
+        .from("chapter_pages")
+        .delete()
+        .eq("chapter_id", editingChapter.id);
       if (deleteError) throw deleteError;
 
       const { error: pagesError } = await supabase.from("chapter_pages").insert(
@@ -1100,7 +1512,7 @@ function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack: () => 
           chapter_id: editingChapter.id,
           page_number: idx + 1,
           image_url: url,
-        }))
+        })),
       );
       if (pagesError) throw pagesError;
     },
@@ -1144,18 +1556,30 @@ function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack: () => 
         <div className="flex gap-2">
           <Dialog open={bulkUploadOpen} onOpenChange={setBulkUploadOpen}>
             <DialogTrigger asChild>
-              <Button variant="outline" className="border-violet-600 text-violet-600 hover:bg-violet-600 hover:text-white">
-                <Layers className="mr-1 h-4 w-4" />Bulk Upload from Series URL
+              <Button
+                variant="outline"
+                className="border-violet-600 text-violet-600 hover:bg-violet-600 hover:text-white"
+              >
+                <Layers className="mr-1 h-4 w-4" />
+                Bulk Upload from Series URL
               </Button>
             </DialogTrigger>
             <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-              <DialogHeader><DialogTitle>Bulk Upload Chapters from Series URL</DialogTitle></DialogHeader>
+              <DialogHeader>
+                <DialogTitle>Bulk Upload Chapters from Series URL</DialogTitle>
+              </DialogHeader>
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <Label>Uploaded By</Label>
-                    <Input placeholder="Uploader name" value={form.uploaded_by} onChange={(e) => setForm({ ...form, uploaded_by: e.target.value })} />
-                    <p className="text-xs text-muted-foreground mt-1">Auto-filled with your username</p>
+                    <Input
+                      placeholder="Uploader name"
+                      value={form.uploaded_by}
+                      onChange={(e) => setForm({ ...form, uploaded_by: e.target.value })}
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Auto-filled with your username
+                    </p>
                   </div>
                   <ScanlationGroupPicker
                     groups={scanlationGroups.data ?? []}
@@ -1169,15 +1593,15 @@ function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack: () => 
                 <div className="rounded-lg border border-violet-500/30 bg-violet-500/5 p-4 space-y-3">
                   <Label className="text-violet-600 font-semibold">Series URL</Label>
                   <div className="flex gap-2">
-                    <Input 
-                      placeholder="https://example.com/manga/title-name" 
-                      value={seriesUrl} 
+                    <Input
+                      placeholder="https://example.com/manga/title-name"
+                      value={seriesUrl}
                       onChange={(e) => setSeriesUrl(e.target.value)}
                       className="flex-1"
                     />
-                    <Button 
+                    <Button
                       type="button"
-                      onClick={discoverChapters} 
+                      onClick={discoverChapters}
                       disabled={!seriesUrl.trim() || extracting}
                       className="bg-violet-600 hover:bg-violet-700"
                     >
@@ -1185,26 +1609,44 @@ function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack: () => 
                     </Button>
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    Paste the series main page URL. We'll automatically discover all available chapters.
+                    Paste the series main page URL. We'll automatically discover all available
+                    chapters.
                   </p>
+                  <div>
+                    <Label>Image URL Example (optional)</Label>
+                    <Input
+                      placeholder="https://cdn.asurascans.com/asura-images/chapters/..."
+                      value={imageUrlTypeExample}
+                      onChange={(e) => setImageUrlTypeExample(e.target.value)}
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Optional: enter one sample image URL from the source you want. Bulk upload
+                      will keep only images matching that same URL pattern.
+                    </p>
+                  </div>
                 </div>
 
                 {discoveredChapters.length > 0 && (
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
-                      <Label className="font-semibold">Select Chapters to Upload ({selectedChapters.size}/{discoveredChapters.length})</Label>
+                      <Label className="font-semibold">
+                        Select Chapters to Upload ({selectedChapters.size}/
+                        {discoveredChapters.length})
+                      </Label>
                       <div className="flex gap-2">
-                        <Button 
+                        <Button
                           type="button"
-                          variant="outline" 
+                          variant="outline"
                           size="sm"
-                          onClick={() => setSelectedChapters(new Set(discoveredChapters.map((_, i) => i)))}
+                          onClick={() =>
+                            setSelectedChapters(new Set(discoveredChapters.map((_, i) => i)))
+                          }
                         >
                           Select All
                         </Button>
-                        <Button 
+                        <Button
                           type="button"
-                          variant="outline" 
+                          variant="outline"
                           size="sm"
                           onClick={() => setSelectedChapters(new Set())}
                         >
@@ -1214,11 +1656,11 @@ function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack: () => 
                     </div>
                     <div className="max-h-96 overflow-y-auto border border-border/40 rounded-lg divide-y divide-border/40">
                       {discoveredChapters.map((chapter, index) => (
-                        <label 
+                        <label
                           key={index}
                           className="flex items-center gap-3 p-3 hover:bg-secondary/40 cursor-pointer"
                         >
-                          <input 
+                          <input
                             type="checkbox"
                             checked={selectedChapters.has(index)}
                             onChange={() => toggleChapterSelection(index)}
@@ -1226,8 +1668,14 @@ function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack: () => 
                           />
                           <div className="flex-1 min-w-0">
                             <div className="font-medium">Chapter {chapter.chapterNumber}</div>
-                            {chapter.title && <div className="text-sm text-muted-foreground truncate">{chapter.title}</div>}
-                            <div className="text-xs text-muted-foreground truncate">{chapter.url}</div>
+                            {chapter.title && (
+                              <div className="text-sm text-muted-foreground truncate">
+                                {chapter.title}
+                              </div>
+                            )}
+                            <div className="text-xs text-muted-foreground truncate">
+                              {chapter.url}
+                            </div>
                           </div>
                         </label>
                       ))}
@@ -1236,8 +1684,8 @@ function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack: () => 
                 )}
               </div>
               <DialogFooter>
-                <Button 
-                  onClick={bulkUploadChapters} 
+                <Button
+                  onClick={bulkUploadChapters}
                   disabled={selectedChapters.size === 0 || bulkUploading}
                   className="bg-violet-600 hover:bg-violet-700"
                 >
@@ -1248,6 +1696,40 @@ function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack: () => 
               </DialogFooter>
             </DialogContent>
           </Dialog>
+          <AlertDialog open={deleteSelectedOpen} onOpenChange={setDeleteSelectedOpen}>
+            <AlertDialogTrigger asChild>
+              <Button
+                variant="destructive"
+                disabled={selectedChapterIds.size === 0}
+                className="ml-2"
+              >
+                Delete Selected ({selectedChapterIds.size})
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>
+                  Delete {selectedChapterIds.size} Selected Chapter
+                  {selectedChapterIds.size !== 1 ? "s" : ""}?
+                </AlertDialogTitle>
+                <AlertDialogDescription>
+                  This will permanently delete the selected chapters and all their pages.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={() => {
+                    deleteSelectedChaptersMutation.mutate(Array.from(selectedChapterIds));
+                    setDeleteSelectedOpen(false);
+                  }}
+                  disabled={deleteSelectedChaptersMutation.isPending}
+                >
+                  {deleteSelectedChaptersMutation.isPending ? "Deleting..." : "Delete"}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
           <Dialog
             open={open}
             onOpenChange={(v) => {
@@ -1257,106 +1739,225 @@ function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack: () => 
           >
             <DialogTrigger asChild>
               <Button className="bg-violet-600 hover:bg-violet-700">
-                <Plus className="mr-1 h-4 w-4" />Upload Chapter
+                <Plus className="mr-1 h-4 w-4" />
+                Upload Chapter
               </Button>
             </DialogTrigger>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader><DialogTitle>Upload Chapter from URLs</DialogTitle></DialogHeader>
-            <div className="space-y-4">
-              <div className="grid grid-cols-3 gap-3">
-                <div>
-                  <Label>Chapter Number *</Label>
-                  <Input type="text" placeholder="e.g., 1, 1.5, or 1a" value={form.chapter_number} onChange={(e) => setForm({ ...form, chapter_number: e.target.value })} />
+            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Upload Chapter from URLs</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <Label>Chapter Number *</Label>
+                    <Input
+                      type="text"
+                      placeholder="e.g., 1, 1.5, or 1a"
+                      value={form.chapter_number}
+                      onChange={(e) => setForm({ ...form, chapter_number: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <Label>Status</Label>
+                    <Select
+                      value={form.status}
+                      onValueChange={(v) => setForm({ ...form, status: v })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {chapterStatuses.map((s) => (
+                          <SelectItem key={s} value={s}>
+                            {s.charAt(0).toUpperCase() + s.slice(1)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label>Scheduled At</Label>
+                    <Input
+                      type="datetime-local"
+                      value={form.scheduled_at}
+                      onChange={(e) => setForm({ ...form, scheduled_at: e.target.value })}
+                      disabled={form.status !== "scheduled"}
+                    />
+                  </div>
                 </div>
-                <div>
-                  <Label>Status</Label>
-                  <Select value={form.status} onValueChange={(v) => setForm({ ...form, status: v })}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>{chapterStatuses.map((s) => <SelectItem key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</SelectItem>)}</SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label>Scheduled At</Label>
-                  <Input type="datetime-local" value={form.scheduled_at} onChange={(e) => setForm({ ...form, scheduled_at: e.target.value })} disabled={form.status !== "scheduled"} />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <Label>Uploaded By</Label>
-                  <Input placeholder="Uploader name" value={form.uploaded_by} onChange={(e) => setForm({ ...form, uploaded_by: e.target.value })} />
-                  <p className="text-xs text-muted-foreground mt-1">Auto-filled with your username</p>
-                </div>
-                <ScanlationGroupPicker
-                  groups={scanlationGroups.data ?? []}
-                  selectValue={groupSelect}
-                  newGroupName={groupNewName}
-                  onSelectValueChange={setGroupSelect}
-                  onNewGroupNameChange={setGroupNewName}
-                />
-              </div>
-
-              {/* Chapter URL Extraction */}
-              <div className="rounded-lg border border-violet-500/30 bg-violet-500/5 p-4 space-y-3">
-                <div className="flex items-center justify-between">
-                  <Label className="text-violet-600 font-semibold">Option 1: Extract from Chapter URL</Label>
-                  <Download className="h-4 w-4 text-violet-600" />
-                </div>
-                <div className="flex gap-2">
-                  <Input 
-                    placeholder="https://example.com/manga/title/chapter-1" 
-                    value={form.chapter_url} 
-                    onChange={(e) => setForm({ ...form, chapter_url: e.target.value })}
-                    className="flex-1"
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label>Uploaded By</Label>
+                    <Input
+                      placeholder="Uploader name"
+                      value={form.uploaded_by}
+                      onChange={(e) => setForm({ ...form, uploaded_by: e.target.value })}
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Auto-filled with your username
+                    </p>
+                  </div>
+                  <ScanlationGroupPicker
+                    groups={scanlationGroups.data ?? []}
+                    selectValue={groupSelect}
+                    newGroupName={groupNewName}
+                    onSelectValueChange={setGroupSelect}
+                    onNewGroupNameChange={setGroupNewName}
                   />
-                  <Button 
-                    type="button"
-                    onClick={extractFromUrl} 
-                    disabled={!form.chapter_url.trim() || extracting}
-                    variant="outline"
-                    className="border-violet-600 text-violet-600 hover:bg-violet-600 hover:text-white"
-                  >
-                    {extracting ? "Extracting..." : "Extract"}
-                  </Button>
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  Paste a chapter URL from any manga/manhwa site and we'll automatically extract all images.
-                </p>
-              </div>
 
-              {/* Manual URL Input */}
-              <div>
-                <Label>Option 2: Manual Image URLs (one per line) *</Label>
-                <Textarea
-                  rows={10}
-                  placeholder="https://example.com/page1.jpg&#10;https://example.com/page2.jpg&#10;https://example.com/page3.jpg"
-                  value={form.image_urls}
-                  onChange={(e) => setForm({ ...form, image_urls: e.target.value })}
-                  className="font-mono text-sm"
-                />
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Or paste image URLs directly, one URL per line. Supports direct image links from any website.
-                </p>
+                {/* Chapter URL Extraction */}
+                <div className="rounded-lg border border-violet-500/30 bg-violet-500/5 p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-violet-600 font-semibold">
+                      Option 1: Extract from Chapter URL
+                    </Label>
+                    <Download className="h-4 w-4 text-violet-600" />
+                  </div>
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="https://example.com/manga/title/chapter-1"
+                      value={form.chapter_url}
+                      onChange={(e) => setForm({ ...form, chapter_url: e.target.value })}
+                      className="flex-1"
+                    />
+                    <Button
+                      type="button"
+                      onClick={extractFromUrl}
+                      disabled={!form.chapter_url.trim() || extracting}
+                      variant="outline"
+                      className="border-violet-600 text-violet-600 hover:bg-violet-600 hover:text-white"
+                    >
+                      {extracting ? "Extracting..." : "Extract"}
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Paste a chapter URL from any manga/manhwa site and we'll automatically extract
+                    all images.
+                  </p>
+                </div>
+
+                {/* Manual URL Input */}
+                <div>
+                  <Label>Option 2: Manual Image URLs (one per line) *</Label>
+                  <Textarea
+                    rows={10}
+                    placeholder="https://example.com/page1.jpg&#10;https://example.com/page2.jpg&#10;https://example.com/page3.jpg"
+                    value={form.image_urls}
+                    onChange={(e) => setForm({ ...form, image_urls: e.target.value })}
+                    className="font-mono text-sm"
+                  />
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Or paste image URLs directly, one URL per line. Supports direct image links from
+                    any website.
+                  </p>
+                </div>
               </div>
-            </div>
-            <DialogFooter>
-              <Button onClick={() => create.mutate()} disabled={!form.chapter_number || !form.image_urls.trim() || create.isPending} className="bg-violet-600 hover:bg-violet-700">
-                {create.isPending ? "Uploading..." : "Upload Chapter"}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+              <DialogFooter>
+                <Button
+                  onClick={() => create.mutate()}
+                  disabled={!form.chapter_number || !form.image_urls.trim() || create.isPending}
+                  className="bg-violet-600 hover:bg-violet-700"
+                >
+                  {create.isPending ? "Uploading..." : "Upload Chapter"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </div>
+      </div>
+
+      {/* Search and Group Filter Controls */}
+      <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+        <div className="relative flex-1">
+          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search chapters (e.g. 335)..."
+            value={searchTerm}
+            onChange={(e) => {
+              setSearchTerm(e.target.value);
+              setCurrentPage(1);
+            }}
+            className="pl-8"
+          />
+        </div>
+        <div className="w-full sm:w-[200px]">
+          <Select
+            value={filterGroup}
+            onValueChange={(v) => {
+              setFilterGroup(v);
+              setCurrentPage(1);
+            }}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="All Groups" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Groups</SelectItem>
+              {(scanlationGroups.data || []).map((group) => (
+                <SelectItem key={group} value={group}>
+                  {group}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
       </div>
 
       <div className="mt-6 divide-y divide-border/40 rounded-lg border border-border/40 bg-card">
+        <div className="flex items-center justify-between gap-3 border-b border-border/40 px-3 py-3">
+          <div className="flex items-center gap-3">
+            <Checkbox
+              checked={allVisibleChaptersSelected}
+              onCheckedChange={toggleSelectAllVisibleChapters}
+              aria-label="Select all visible chapters"
+            />
+            <div>
+              <div className="text-sm font-medium">Select visible chapters</div>
+              <div className="text-xs text-muted-foreground">
+                {selectedChapterIds.size} selected
+              </div>
+            </div>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={selectedChapterIds.size === 0}
+            onClick={() => setDeleteSelectedOpen(true)}
+          >
+            Delete Selected
+          </Button>
+        </div>
         {chapters.isLoading && <div className="p-6 text-sm text-muted-foreground">Loading...</div>}
-        {chapters.data?.length === 0 && <div className="p-6 text-center text-sm text-muted-foreground">No chapters yet.</div>}
-        {(chapters.data ?? []).map((ch) => (
+        {!chapters.isLoading && chapters.data?.length === 0 && (
+          <div className="p-6 text-center text-sm text-muted-foreground">No chapters yet.</div>
+        )}
+        {!chapters.isLoading &&
+          chapters.data &&
+          chapters.data.length > 0 &&
+          paginatedChapters.length === 0 && (
+            <div className="p-6 text-center text-sm text-muted-foreground">
+              No chapters match your search or filter criteria.
+            </div>
+          )}
+        {paginatedChapters.map((ch) => (
           <div key={ch.id} className="flex items-center gap-3 p-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded bg-violet-600/10 text-sm font-bold text-violet-600">{ch.chapter_number}</div>
+            <Checkbox
+              checked={selectedChapterIds.has(ch.id)}
+              onCheckedChange={() => toggleChapterSelect(ch.id)}
+            />
+            <div className="flex h-10 w-10 items-center justify-center rounded bg-violet-600/10 text-sm font-bold text-violet-600">
+              {ch.chapter_number}
+            </div>
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
-                <Link to="/title/$titleSlug/$chapterSlug" params={{ titleSlug: series.data?.slug || "", chapterSlug: ch.slug }} className="truncate font-medium hover:text-violet-600" target="_blank">
+                <Link
+                  to="/title/$titleSlug/$chapterSlug"
+                  params={{ titleSlug: series.data?.slug || "", chapterSlug: ch.slug }}
+                  className="truncate font-medium hover:text-violet-600"
+                  target="_blank"
+                >
                   Chapter {ch.chapter_number}
                 </Link>
                 <ExternalLink className="h-3 w-3" />
@@ -1377,19 +1978,32 @@ function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack: () => 
                 )}
               </div>
             </div>
-            <Button variant="ghost" size="icon" onClick={() => openChapterEdit(ch)} title="Edit Chapter">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => openChapterEdit(ch)}
+              title="Edit Chapter"
+            >
               <Pencil className="h-4 w-4" />
             </Button>
             <AlertDialog>
-              <AlertDialogTrigger asChild><Button variant="ghost" size="icon"><Trash2 className="h-4 w-4 text-destructive" /></Button></AlertDialogTrigger>
+              <AlertDialogTrigger asChild>
+                <Button variant="ghost" size="icon">
+                  <Trash2 className="h-4 w-4 text-destructive" />
+                </Button>
+              </AlertDialogTrigger>
               <AlertDialogContent>
                 <AlertDialogHeader>
                   <AlertDialogTitle>Delete Chapter {ch.chapter_number}?</AlertDialogTitle>
-                  <AlertDialogDescription>This will permanently delete the chapter and all its pages.</AlertDialogDescription>
+                  <AlertDialogDescription>
+                    This will permanently delete the chapter and all its pages.
+                  </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                   <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction onClick={() => deleteChapter.mutate(ch.id)}>Delete</AlertDialogAction>
+                  <AlertDialogAction onClick={() => deleteChapter.mutate(ch.id)}>
+                    Delete
+                  </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
@@ -1397,31 +2011,122 @@ function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack: () => 
         ))}
       </div>
 
-      <Dialog open={!!editingChapter} onOpenChange={(v) => { if (!v) { setEditingChapter(null); resetChapterForm(); } }}>
+      {/* Pagination Controls */}
+      {totalPages > 1 && (
+        <div className="mt-4 flex items-center justify-between border-t border-border/40 pt-4 bg-transparent">
+          <p className="text-sm text-muted-foreground">
+            Showing{" "}
+            <span className="font-semibold">
+              {Math.min((currentPage - 1) * itemsPerPage + 1, totalItems)}
+            </span>{" "}
+            to{" "}
+            <span className="font-semibold">
+              {Math.min(currentPage * itemsPerPage, totalItems)}
+            </span>{" "}
+            of <span className="font-semibold">{totalItems}</span> chapters
+          </p>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+            >
+              Previous
+            </Button>
+
+            <div className="flex gap-1">
+              {Array.from({ length: totalPages }, (_, i) => i + 1)
+                .filter((p) => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1)
+                .map((p, idx, arr) => {
+                  const showEllipsis = idx > 0 && p - arr[idx - 1] > 1;
+                  return (
+                    <div key={p} className="flex items-center gap-1">
+                      {showEllipsis && (
+                        <span className="px-2 text-sm text-muted-foreground">...</span>
+                      )}
+                      <Button
+                        variant={currentPage === p ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setCurrentPage(p)}
+                        className={`h-8 w-8 p-0 ${currentPage === p ? "bg-violet-600 hover:bg-violet-700 text-white font-medium" : ""}`}
+                      >
+                        {p}
+                      </Button>
+                    </div>
+                  );
+                })}
+            </div>
+
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+            >
+              Next
+            </Button>
+          </div>
+        </div>
+      )}
+
+      <Dialog
+        open={!!editingChapter}
+        onOpenChange={(v) => {
+          if (!v) {
+            setEditingChapter(null);
+            resetChapterForm();
+          }
+        }}
+      >
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader><DialogTitle>Edit Chapter</DialogTitle></DialogHeader>
+          <DialogHeader>
+            <DialogTitle>Edit Chapter</DialogTitle>
+          </DialogHeader>
           <div className="space-y-4">
             <div className="grid grid-cols-3 gap-3">
               <div>
                 <Label>Chapter Number *</Label>
-                <Input type="text" placeholder="e.g., 1, 1.5, or 1a" value={form.chapter_number} onChange={(e) => setForm({ ...form, chapter_number: e.target.value })} />
+                <Input
+                  type="text"
+                  placeholder="e.g., 1, 1.5, or 1a"
+                  value={form.chapter_number}
+                  onChange={(e) => setForm({ ...form, chapter_number: e.target.value })}
+                />
               </div>
               <div>
                 <Label>Status</Label>
                 <Select value={form.status} onValueChange={(v) => setForm({ ...form, status: v })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>{chapterStatuses.map((s) => <SelectItem key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</SelectItem>)}</SelectContent>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {chapterStatuses.map((s) => (
+                      <SelectItem key={s} value={s}>
+                        {s.charAt(0).toUpperCase() + s.slice(1)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
                 </Select>
               </div>
               <div>
                 <Label>Scheduled At</Label>
-                <Input type="datetime-local" value={form.scheduled_at} onChange={(e) => setForm({ ...form, scheduled_at: e.target.value })} disabled={form.status !== "scheduled"} />
+                <Input
+                  type="datetime-local"
+                  value={form.scheduled_at}
+                  onChange={(e) => setForm({ ...form, scheduled_at: e.target.value })}
+                  disabled={form.status !== "scheduled"}
+                />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label>Uploaded By</Label>
-                <Input value={form.uploaded_by} onChange={(e) => setForm({ ...form, uploaded_by: e.target.value })} placeholder="Uploader name" />
+                <Input
+                  value={form.uploaded_by}
+                  onChange={(e) => setForm({ ...form, uploaded_by: e.target.value })}
+                  placeholder="Uploader name"
+                />
               </div>
               <ScanlationGroupPicker
                 groups={scanlationGroups.data ?? []}
@@ -1433,11 +2138,19 @@ function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack: () => 
             </div>
             <div>
               <Label>Image URLs (one per line) *</Label>
-              <Textarea rows={12} value={form.image_urls} onChange={(e) => setForm({ ...form, image_urls: e.target.value })} className="font-mono text-sm" />
+              <Textarea
+                rows={12}
+                value={form.image_urls}
+                onChange={(e) => setForm({ ...form, image_urls: e.target.value })}
+                className="font-mono text-sm"
+              />
             </div>
           </div>
           <DialogFooter>
-            <Button onClick={() => updateChapter.mutate()} disabled={!form.chapter_number || !form.image_urls.trim() || updateChapter.isPending}>
+            <Button
+              onClick={() => updateChapter.mutate()}
+              disabled={!form.chapter_number || !form.image_urls.trim() || updateChapter.isPending}
+            >
               {updateChapter.isPending ? "Saving..." : "Save changes"}
             </Button>
           </DialogFooter>

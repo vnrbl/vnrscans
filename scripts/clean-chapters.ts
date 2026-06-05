@@ -55,10 +55,7 @@ async function runCleanup() {
   
   for (const ch of chapters) {
     if (ch.title) {
-      const isRelativeTime = 
-        /\b\d+\s*(?:seconds?|sec|s|minutes?|min|m|hours?|hr|h|days?|d|weeks?|wk|w|months?|mo|years?|y)\s+ago(?:\s+\d+)?\b/i.test(ch.title) ||
-        /^\s*\d{1,4}[-/\s.]\d{1,2}[-/\s.]\d{1,4}\s*$/.test(ch.title) ||
-        /^\s*(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+\d{1,2}(?:st|nd|rd|th)?(?:,?\s+\d{4})?\s*$/.test(ch.title);
+      const isRelativeTime = true; // Always reset titles to NULL to ensure clean chapter numbers and slugs
 
       if (isRelativeTime) {
         console.log(`  └─ Chapter ${ch.chapter_number}: Resetting title "${ch.title}" -> NULL`);
