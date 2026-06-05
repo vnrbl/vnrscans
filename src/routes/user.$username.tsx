@@ -251,6 +251,10 @@ const keyframeStyles = `
   50% { transform: translate(-6px, 6px) scale(0.6) rotate(180deg); opacity: 0.8; filter: blur(1.5px); }
   100% { transform: translate(0, 0) scale(1) rotate(360deg); opacity: 0.3; }
 }
+@keyframes creatorReflection {
+  0% { transform: translate(-150%, -150%) rotate(45deg); }
+  35%, 100% { transform: translate(150%, 150%) rotate(45deg); }
+}
 `;
 
 const getAvatarFrameStyles = (frame: string, accent: string) => {
@@ -279,6 +283,8 @@ const getAvatarFrameStyles = (frame: string, accent: string) => {
       return { boxShadow: "0 0 22px rgba(239, 68, 68, 0.55), inset 0 0 10px rgba(6, 182, 212, 0.35)" };
     case "divine":
       return { boxShadow: "0 0 25px rgba(252, 211, 77, 0.6), inset 0 0 10px rgba(255, 255, 255, 0.35)" };
+    case "creator":
+      return { boxShadow: `0 0 25px ${accent}, inset 0 0 12px ${accent}` };
     case "none":
     default:
       return {
@@ -301,6 +307,7 @@ const getFrameSmokeColor = (frame: string, accent: string) => {
     case "abyss": return "#D946EF";
     case "glitch": return "#EF4444";
     case "divine": return "#FCD34D";
+    case "creator": return accent;
     default: return accent;
   }
 };
@@ -699,10 +706,29 @@ function PublicProfilePage() {
                   <div className="absolute inset-[2.5px] rounded-full bg-gradient-to-bl from-[#FFFBEB] via-[#FCD34D] to-[#FFFFFF] animate-[rotationCCW_5s_linear_infinite]" />
                 </div>
               )}
+              {(profile.data.avatar_frame || "none") === "creator" && (
+                <div className="absolute inset-0 rounded-full bg-slate-950 overflow-hidden" style={{
+                  boxShadow: `0 0 30px ${accentColor}, inset 0 0 15px ${accentColor}`,
+                }}>
+                  <div className="absolute inset-[-55%] rounded-full" style={{
+                    background: `conic-gradient(from 0deg, ${accentColor}, transparent, ${accentColor}80, transparent, ${accentColor})`,
+                    animation: 'rotationCW 4s linear infinite',
+                  }} />
+                  <div className="absolute inset-[-55%] rounded-full" style={{
+                    background: `conic-gradient(from 180deg, ${accentColor}dd, transparent, #ffffffaa, transparent, ${accentColor}dd)`,
+                    animation: 'rotationCCW 6s linear infinite',
+                  }} />
+                </div>
+              )}
 
-              {/* Layer 2: Inner mask background to shape the 4px border */}
+              {/* Layer 2: Inner mask background to shape the border */}
               {(profile.data.avatar_frame || "none") !== "none" && (
-                <div className="absolute inset-[4px] rounded-full bg-background z-10" />
+                <div 
+                  className="absolute rounded-full bg-background z-10" 
+                  style={{
+                    inset: (profile.data.avatar_frame || "none") === "creator" ? '6px' : '4px',
+                  }}
+                />
               )}
 
               {/* Layer 3: Avatar image and internal animations (z-10 relative) */}
@@ -908,6 +934,40 @@ function PublicProfilePage() {
                   <div className="absolute top-4 right-2 w-1 h-1 rounded-full bg-white animate-[starTwinkle_2.5s_ease-out_infinite_1.2s]" />
                 </div>
               )}
+              {(profile.data.avatar_frame || "none") === "creator" && (
+                <div className="absolute inset-0 pointer-events-none z-20">
+                  {/* Crown with dynamic glowing accent aura */}
+                  <div className="absolute -top-4.5 left-1/2 -translate-x-1/2 w-9 h-9 rounded-full blur-md animate-pulse" style={{ backgroundColor: `${accentColor}40` }} />
+                  <div className="absolute -top-4 left-1/2 -translate-x-1/2 drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)] animate-[smoothBreath_2.5s_ease-in-out_infinite] z-25" style={{ color: accentColor }}>
+                    <Crown className="h-7 w-7" style={{ fill: accentColor, filter: `drop-shadow(0 0 5px ${accentColor})` }} />
+                  </div>
+                  
+                  {/* Extra border design: Orbiting outer segmented rings */}
+                  <div className="absolute inset-[-5px] rounded-full border-2 animate-[rotationCCW_8s_linear_infinite]" style={{
+                    borderColor: `${accentColor}80 transparent ${accentColor}80 transparent`,
+                  }} />
+                  <div className="absolute inset-[-9px] rounded-full border border-dashed animate-[rotationCW_12s_linear_infinite]" style={{
+                    borderColor: `${accentColor}50`,
+                  }} />
+
+                  {/* Orbiting light spots */}
+                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-3.5 h-3.5 rounded-full" style={{ background: `radial-gradient(circle, ${accentColor}, transparent)`, animation: 'avatarSmokeOrbit 5s linear infinite' }} />
+                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full" style={{ background: `radial-gradient(circle, #ffffff, transparent)`, animation: 'avatarSmokeOrbit 7s linear infinite 2s' }} />
+
+                  {/* Floating Sparks matching accent color */}
+                  <div className="absolute bottom-1 left-2 h-1.5 w-1.5 rounded-full shadow-lg" style={{ backgroundColor: accentColor, animation: 'fireEmbersWavy 3s ease-out infinite', boxShadow: `0 0 6px ${accentColor}` }} />
+                  <div className="absolute bottom-3 right-3 h-2 w-2 rounded-full shadow-lg" style={{ backgroundColor: accentColor, animation: 'fireEmbersWavy 3.5s ease-out infinite 1.5s', boxShadow: `0 0 8px ${accentColor}` }} />
+                  <div className="absolute bottom-5 left-5 h-1 w-1 rounded-full" style={{ backgroundColor: '#ffffff', animation: 'fireEmbersWavy 2.5s ease-out infinite 0.8s', boxShadow: '0 0 4px #ffffff' }} />
+
+                  {/* Glowing S-RANK S-tier labels */}
+                  <div className="absolute -top-1.5 -right-2.5 z-30 bg-slate-950 border-2 font-black px-1.5 py-0.5 rounded text-[8px] tracking-wider" style={{ borderColor: accentColor, color: accentColor, boxShadow: `0 0 8px ${accentColor}` }}>
+                    CREATOR
+                  </div>
+                  <div className="absolute -bottom-2 -left-2.5 z-30 bg-slate-950 border font-black px-1.5 py-0.5 rounded text-[7px] text-white" style={{ borderColor: `${accentColor}80`, boxShadow: `0 0 5px ${accentColor}50` }}>
+                    ⭐ ADMIN
+                  </div>
+                </div>
+              )}
 
               {profile.data.is_vip && (
                 <div
@@ -969,7 +1029,10 @@ function PublicProfilePage() {
 
               {/* Equipped title badge */}
               {equippedBadge.data && (() => {
-                const titleColor = equippedBadge.data.badge?.badge_color || accentColor;
+                let titleColor = equippedBadge.data.badge?.badge_color || accentColor;
+                if (equippedBadge.data.badge?.name === "The Creator") {
+                  titleColor = accentColor;
+                }
                 return (
                   <div 
                     className="group/title relative flex items-center gap-2 mt-2 text-xs font-bold w-fit border rounded-full px-4 py-1.5 overflow-hidden transition-all duration-300 hover:scale-[1.02]"

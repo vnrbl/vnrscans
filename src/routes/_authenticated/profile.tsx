@@ -31,6 +31,7 @@ import {
   Sparkles,
   Orbit,
   Sword,
+  Lock,
 } from "lucide-react";
 import { ReadingGoals } from "@/components/profile/ReadingGoals";
 import { AvatarUpload } from "@/components/profile/AvatarUpload";
@@ -246,10 +247,32 @@ const keyframeStyles = `
   50% { transform: translate(-6px, 6px) scale(0.6) rotate(180deg); opacity: 0.8; filter: blur(1.5px); }
   100% { transform: translate(0, 0) scale(1) rotate(360deg); opacity: 0.3; }
 }
+@keyframes creatorReflection {
+  0% { transform: translate(-150%, -150%) rotate(45deg); }
+  35%, 100% { transform: translate(150%, 150%) rotate(45deg); }
+}
 `;
 
 const getAvatarFrameStyles = (frame: string, accent: string) => {
   switch (frame) {
+    case "bronze":
+      return { boxShadow: "0 0 12px rgba(205, 127, 50, 0.45), inset 0 0 6px rgba(255, 255, 255, 0.15)" };
+    case "iron":
+      return { boxShadow: "0 0 12px rgba(112, 128, 144, 0.45), inset 0 0 6px rgba(255, 255, 255, 0.1)" };
+    case "silver":
+      return { boxShadow: "0 0 16px rgba(192, 192, 192, 0.5), inset 0 0 8px rgba(255, 255, 255, 0.2)" };
+    case "platinum":
+      return { boxShadow: "0 0 20px rgba(229, 228, 226, 0.55), inset 0 0 10px rgba(6, 182, 212, 0.25)" };
+    case "apprentice":
+      return { boxShadow: "0 0 12px rgba(210, 180, 140, 0.45), inset 0 0 6px rgba(255, 255, 255, 0.15)" };
+    case "scholar":
+      return { boxShadow: "0 0 15px rgba(143, 188, 143, 0.5), inset 0 0 8px rgba(255, 255, 255, 0.2)" };
+    case "sage":
+      return { boxShadow: "0 0 20px rgba(0, 250, 154, 0.55), inset 0 0 10px rgba(0, 250, 154, 0.25)" };
+    case "elder":
+      return { boxShadow: "0 0 22px rgba(218, 112, 214, 0.6), inset 0 0 12px rgba(218, 112, 214, 0.3)" };
+    case "immortal":
+      return { boxShadow: "0 0 25px rgba(255, 215, 0, 0.7), inset 0 0 12px rgba(255, 215, 0, 0.4)" };
     case "neon":
       return { boxShadow: "0 0 20px rgba(168, 85, 247, 0.45), inset 0 0 10px rgba(6, 182, 212, 0.35)" };
     case "gold":
@@ -274,6 +297,8 @@ const getAvatarFrameStyles = (frame: string, accent: string) => {
       return { boxShadow: "0 0 22px rgba(239, 68, 68, 0.55), inset 0 0 10px rgba(6, 182, 212, 0.35)" };
     case "divine":
       return { boxShadow: "0 0 25px rgba(252, 211, 77, 0.6), inset 0 0 10px rgba(255, 255, 255, 0.35)" };
+    case "creator":
+      return { boxShadow: `0 0 25px ${accent}, inset 0 0 12px ${accent}` };
     case "none":
     default:
       return {
@@ -284,6 +309,15 @@ const getAvatarFrameStyles = (frame: string, accent: string) => {
 
 const getFrameSmokeColor = (frame: string, accent: string) => {
   switch (frame) {
+    case "bronze": return "#CD7F32";
+    case "iron": return "#708090";
+    case "silver": return "#C0C0C0";
+    case "platinum": return "#E5E4E2";
+    case "apprentice": return "#D2B48C";
+    case "scholar": return "#8FBC8F";
+    case "sage": return "#00FA9A";
+    case "elder": return "#DA70D6";
+    case "immortal": return "#FFD700";
     case "neon": return "#A855F7";
     case "gold": return "#ffd700";
     case "cyber": return "#06B6D4";
@@ -296,8 +330,41 @@ const getFrameSmokeColor = (frame: string, accent: string) => {
     case "abyss": return "#D946EF";
     case "glitch": return "#EF4444";
     case "divine": return "#FCD34D";
+    case "creator": return accent;
     default: return accent;
   }
+};
+
+const FRAME_REQUIREMENTS: Record<string, {
+  level?: number;
+  chapters?: number;
+  streak?: number;
+  series?: number;
+  text: string;
+}> = {
+  none: { text: "Always unlocked" },
+  creator: { text: "Exclusive to Administrators" },
+  bronze: { level: 5, text: "Reach Level 5" },
+  iron: { level: 10, text: "Reach Level 10" },
+  silver: { level: 20, text: "Reach Level 20" },
+  sakura: { level: 30, text: "Reach Level 30" },
+  platinum: { level: 40, text: "Reach Level 40" },
+  neon: { level: 50, text: "Reach Level 50" },
+  qi: { level: 80, text: "Reach Level 80" },
+  cyber: { level: 100, text: "Reach Level 100" },
+  gold: { level: 150, text: "Reach Level 150" },
+  glitch: { level: 250, text: "Reach Level 250" },
+  apprentice: { chapters: 100, text: "Read 100+ chapters" },
+  scholar: { chapters: 200, text: "Read 200+ chapters" },
+  sage: { chapters: 400, text: "Read 400+ chapters" },
+  elder: { chapters: 500, text: "Read 500+ chapters" },
+  immortal: { chapters: 800, text: "Read 800+ chapters" },
+  asura: { streak: 100, text: "Maintain a 100-day reading streak" },
+  divine: { streak: 300, text: "Maintain a 300-day reading streak" },
+  system: { series: 200, text: "Follow 200+ series" },
+  fire: { chapters: 1000, text: "Read 1000+ chapters" },
+  shadow: { chapters: 3000, text: "Read 3000+ chapters" },
+  abyss: { chapters: 5000, text: "Read 5000+ chapters" },
 };
 
 function ProfilePage() {
@@ -534,8 +601,35 @@ function ProfilePage() {
     }
   }, [profile.data]);
 
+  const xp = profile.data?.experience_points || 0;
+  const level = profile.data?.user_level || 1;
+  const xpForNextLevel = Math.pow((level + 1) * 2, 2);
+  const xpProgress = ((xp % xpForNextLevel) / xpForNextLevel) * 100;
+  const isAdmin = userRoles.data?.includes("admin");
+
+  const isFrameUnlocked = (frameId: string) => {
+    if (frameId === "creator") return isAdmin;
+    if (isAdmin || frameId === "none") return true;
+    const req = FRAME_REQUIREMENTS[frameId];
+    if (!req) return true;
+
+    if (req.level && level < req.level) return false;
+    
+    const stats = readingStats.data || { chapters: 0, series: 0, comments: 0, ratings: 0 };
+    if (req.chapters && stats.chapters < req.chapters) return false;
+    if (req.series && stats.series < req.series) return false;
+    
+    const streakVal = streaks.current || 0;
+    if (req.streak && streakVal < req.streak) return false;
+
+    return true;
+  };
+
   const save = useMutation({
     mutationFn: async () => {
+      const unlocked = isFrameUnlocked(avatarFrame);
+      if (!unlocked) throw new Error("This avatar frame is locked: " + (FRAME_REQUIREMENTS[avatarFrame]?.text || ""));
+
       const { data: u } = await supabase.auth.getUser();
       if (!u.user) throw new Error("No user");
       const { error } = await supabase
@@ -563,12 +657,6 @@ function ProfilePage() {
     },
     onError: (e: Error) => toast.error(e.message),
   });
-
-  const xp = profile.data?.experience_points || 0;
-  const level = profile.data?.user_level || 1;
-  const xpForNextLevel = Math.pow((level + 1) * 2, 2);
-  const xpProgress = ((xp % xpForNextLevel) / xpForNextLevel) * 100;
-  const isAdmin = userRoles.data?.includes("admin");
 
   return (
     <div className="min-h-screen">
@@ -600,6 +688,41 @@ function ProfilePage() {
                 </div>
               )}
               {/* Layer 1: Spinners, double-rotators & backgrounds for custom frames */}
+              {avatarFrame === "bronze" && (
+                <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-[#8c521a] via-[#cd7f32] to-[#ffb677] animate-[smoothBreath_5s_ease-in-out_infinite]" />
+              )}
+              {avatarFrame === "iron" && (
+                <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-[#3a4454] via-[#708090] to-[#b0c4de] animate-[smoothBreath_5s_ease-in-out_infinite]" />
+              )}
+              {avatarFrame === "silver" && (
+                <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-[#7f7f7f] via-[#C0C0C0] to-[#ffffff] animate-[smoothBreath_4s_ease-in-out_infinite]" />
+              )}
+              {avatarFrame === "platinum" && (
+                <div className="absolute inset-0 rounded-full overflow-hidden bg-slate-950">
+                  <div className="absolute inset-[-50%] rounded-full bg-[conic-gradient(from_0deg,#d3d3d3,#E5E4E2,#06B6D4,#d3d3d3)] animate-[rotationCW_6s_linear_infinite]" />
+                </div>
+              )}
+              {avatarFrame === "apprentice" && (
+                <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-[#a0522d] via-[#D2B48C] to-[#ffebcd]" />
+              )}
+              {avatarFrame === "scholar" && (
+                <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-[#2e8b57] via-[#8FBC8F] to-[#f0fff0]" />
+              )}
+              {avatarFrame === "sage" && (
+                <div className="absolute inset-0 rounded-full overflow-hidden bg-slate-950">
+                  <div className="absolute inset-[-50%] rounded-full bg-[conic-gradient(from_0deg,#00FA9A,transparent,#20B2AA,transparent,#00FA9A)] animate-[rotationCW_5s_linear_infinite]" />
+                </div>
+              )}
+              {avatarFrame === "elder" && (
+                <div className="absolute inset-0 rounded-full overflow-hidden bg-slate-950">
+                  <div className="absolute inset-[-50%] rounded-full bg-[conic-gradient(from_0deg,#DA70D6,#8A2BE2,#DA70D6)] animate-[rotationCW_4s_linear_infinite]" />
+                </div>
+              )}
+              {avatarFrame === "immortal" && (
+                <div className="absolute inset-0 rounded-full overflow-hidden bg-slate-950 animate-[divineHalo_4s_ease-in-out_infinite]">
+                  <div className="absolute inset-[-50%] rounded-full bg-[conic-gradient(from_0deg,#FFD700,#FFA500,#FF8C00,#FFD700)] animate-[rotationCW_3s_linear_infinite]" />
+                </div>
+              )}
               {avatarFrame === "neon" && (
                 <div className="absolute inset-0 rounded-full overflow-hidden animate-[lightningFlicker_6s_ease-in-out_infinite]">
                   {/* Double rotating rings */}
@@ -685,10 +808,29 @@ function ProfilePage() {
                   <div className="absolute inset-[2.5px] rounded-full bg-gradient-to-bl from-[#FFFBEB] via-[#FCD34D] to-[#FFFFFF] animate-[rotationCCW_5s_linear_infinite]" />
                 </div>
               )}
+              {avatarFrame === "creator" && (
+                <div className="absolute inset-0 rounded-full bg-slate-950 overflow-hidden" style={{
+                  boxShadow: `0 0 30px ${accentColor}, inset 0 0 15px ${accentColor}`,
+                }}>
+                  <div className="absolute inset-[-55%] rounded-full" style={{
+                    background: `conic-gradient(from 0deg, ${accentColor}, transparent, ${accentColor}80, transparent, ${accentColor})`,
+                    animation: 'rotationCW 4s linear infinite',
+                  }} />
+                  <div className="absolute inset-[-55%] rounded-full" style={{
+                    background: `conic-gradient(from 180deg, ${accentColor}dd, transparent, #ffffffaa, transparent, ${accentColor}dd)`,
+                    animation: 'rotationCCW 6s linear infinite',
+                  }} />
+                </div>
+              )}
 
-              {/* Layer 2: Inner mask background to shape the 4px border */}
+              {/* Layer 2: Inner mask background to shape the border */}
               {avatarFrame !== "none" && (
-                <div className="absolute inset-[4px] rounded-full bg-background z-10" />
+                <div 
+                  className="absolute rounded-full bg-background z-10" 
+                  style={{
+                    inset: avatarFrame === "creator" ? '6px' : '4px',
+                  }}
+                />
               )}
 
               {/* Layer 3: Avatar image and internal animations (z-10 relative) */}
@@ -744,6 +886,106 @@ function ProfilePage() {
               </div>
 
               {/* Layer 4: Frame brackets and decorative widgets (z-20) */}
+              {avatarFrame === "bronze" && (
+                <div className="absolute inset-0 pointer-events-none z-20">
+                  {/* Floating Bronze Sparks */}
+                  <div className="absolute bottom-1 left-3 w-1.5 h-1.5 rounded-full bg-orange-600 animate-[fireEmbersWavy_3s_ease-out_infinite]" />
+                  <div className="absolute top-4 right-3 w-1 h-1 rounded-full bg-yellow-600 animate-[fireEmbersWavy_4s_ease-out_infinite_1.5s]" />
+                </div>
+              )}
+
+              {avatarFrame === "iron" && (
+                <div className="absolute inset-0 pointer-events-none z-20">
+                  {/* Heavy Iron cardinal bolts */}
+                  <div className="absolute -top-1.5 left-1/2 -translate-x-1/2 h-3.5 w-1.5 bg-[#4f5660] rounded-b border border-slate-500 shadow-[0_0_3px_rgba(0,0,0,0.5)] z-25" />
+                  <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 h-3.5 w-1.5 bg-[#4f5660] rounded-t border border-slate-500 shadow-[0_0_3px_rgba(0,0,0,0.5)] z-25" />
+                  <div className="absolute -left-1.5 top-1/2 -translate-y-1/2 w-3.5 h-1.5 bg-[#4f5660] rounded-r border border-slate-500 shadow-[0_0_3px_rgba(0,0,0,0.5)] z-25" />
+                  <div className="absolute -right-1.5 top-1/2 -translate-y-1/2 w-3.5 h-1.5 bg-[#4f5660] rounded-l border border-slate-500 shadow-[0_0_3px_rgba(0,0,0,0.5)] z-25" />
+                  {/* Sparks */}
+                  <div className="absolute bottom-2 left-4 w-1 h-1 rounded-full bg-red-600 animate-[fireEmbersWavy_2s_ease-out_infinite]" />
+                  <div className="absolute bottom-3 right-4 w-0.8 h-0.8 rounded-full bg-orange-500 animate-[fireEmbersWavy_2.5s_ease-out_infinite_0.8s]" />
+                </div>
+              )}
+
+              {avatarFrame === "silver" && (
+                <div className="absolute inset-0 pointer-events-none z-20">
+                  {/* Shield at the bottom */}
+                  <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 z-30 flex items-center justify-center bg-slate-800 border border-slate-300 text-slate-300 rounded-md p-1 scale-90 shadow-md">
+                    <Shield className="h-4 w-4 text-slate-300 drop-shadow-[0_0_3px_rgba(255,255,255,0.4)]" />
+                  </div>
+                  {/* Orbiting silver stars */}
+                  <Sparkles className="absolute top-2 left-2 h-4 w-4 text-slate-200 animate-[starTwinkle_2s_ease-in-out_infinite]" />
+                  <Sparkles className="absolute top-3 right-3 h-3 w-3 text-white animate-[starTwinkle_2.5s_ease-in-out_infinite_0.8s]" />
+                </div>
+              )}
+
+              {avatarFrame === "platinum" && (
+                <div className="absolute inset-0 pointer-events-none z-20">
+                  {/* Tech corners */}
+                  <div className="absolute -top-1 -left-1 h-4 w-4 border-t-2 border-l-2 border-cyan-400 rounded-tl-sm shadow-[0_0_4px_cyan]" />
+                  <div className="absolute -top-1 -right-1 h-4 w-4 border-t-2 border-r-2 border-cyan-400 rounded-tr-sm shadow-[0_0_4px_cyan]" />
+                  <div className="absolute -bottom-1 -left-1 h-4 w-4 border-b-2 border-l-2 border-cyan-400 rounded-bl-sm shadow-[0_0_4px_cyan]" />
+                  <div className="absolute -bottom-1 -right-1 h-4 w-4 border-b-2 border-r-2 border-cyan-400 rounded-br-sm shadow-[0_0_4px_cyan]" />
+                  {/* Blue light sweep */}
+                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-3 h-3 rounded-full" style={{ background: 'radial-gradient(circle, #22d3ee, transparent)', animation: 'avatarSmokeOrbit 6s linear infinite' }} />
+                </div>
+              )}
+
+              {avatarFrame === "apprentice" && (
+                <div className="absolute inset-0 pointer-events-none z-20">
+                  {/* Left & Right scroll rollers */}
+                  <div className="absolute top-[15%] left-[-3px] bottom-[15%] w-2 bg-[#8b5a2b] border border-[#5c3a21] rounded-full z-25 shadow-[0_0_4px_rgba(0,0,0,0.5)]" />
+                  <div className="absolute top-[15%] right-[-3px] bottom-[15%] w-2 bg-[#8b5a2b] border border-[#5c3a21] rounded-full z-25 shadow-[0_0_4px_rgba(0,0,0,0.5)]" />
+                  {/* Ink droplets */}
+                  <div className="absolute bottom-2 left-6 w-1.5 h-1.5 rounded-full bg-slate-900 animate-[fireEmbersWavy_3s_ease-out_infinite]" />
+                  <div className="absolute bottom-3 right-6 w-1 h-1 rounded-full bg-slate-800 animate-[fireEmbersWavy_4s_ease-out_infinite_1.2s]" />
+                </div>
+              )}
+
+              {avatarFrame === "scholar" && (
+                <div className="absolute inset-0 pointer-events-none z-20">
+                  {/* Jade Rollers with Gold ends */}
+                  <div className="absolute top-[12%] left-[-3px] bottom-[12%] w-2.5 bg-emerald-700 border-y-2 border-x border-[#ffd700] rounded-sm z-25 shadow-md" />
+                  <div className="absolute top-[12%] right-[-3px] bottom-[12%] w-2.5 bg-emerald-700 border-y-2 border-x border-[#ffd700] rounded-sm z-25 shadow-md" />
+                  {/* Sparkles */}
+                  <Sparkles className="absolute -top-1.5 left-4 h-3.5 w-3.5 text-yellow-300 animate-[starTwinkle_2s_ease-in-out_infinite]" />
+                  <Sparkles className="absolute -bottom-1.5 right-4 h-3.5 w-3.5 text-emerald-300 animate-[starTwinkle_2.5s_ease-in-out_infinite_1.2s]" />
+                </div>
+              )}
+
+              {avatarFrame === "sage" && (
+                <div className="absolute inset-0 pointer-events-none z-20">
+                  {/* Book at the bottom */}
+                  <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 z-30 flex items-center justify-center bg-slate-900 border border-emerald-400 text-emerald-400 rounded-md p-1 scale-90 shadow-[0_0_6px_#10B981]">
+                    <BookOpen className="h-4 w-4 text-emerald-400" />
+                  </div>
+                  {/* Pulsing rune borders */}
+                  <div className="absolute inset-[2px] rounded-full border border-dashed border-emerald-400/40 animate-[rotationCCW_12s_linear_infinite]" />
+                </div>
+              )}
+
+              {avatarFrame === "elder" && (
+                <div className="absolute inset-0 pointer-events-none z-20">
+                  {/* Amethyst runes rotating */}
+                  <div className="absolute inset-[3px] rounded-full border border-dotted border-purple-400/60 animate-[rotationCCW_8s_linear_infinite]" />
+                  {/* Void dust */}
+                  <div className="absolute top-[20%] left-[20%] w-2 h-2 rounded-full bg-purple-600/65 blur-[0.5px] animate-[abyssWarp_5s_infinite]" />
+                  <div className="absolute bottom-[20%] right-[20%] w-2.5 h-2.5 rounded-full bg-indigo-900/60 blur-[1px] animate-[abyssWarp_7s_infinite_1.5s]" />
+                </div>
+              )}
+
+              {avatarFrame === "immortal" && (
+                <div className="absolute inset-0 pointer-events-none z-20">
+                  {/* Solar Flame Crown at top */}
+                  <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 text-yellow-400 drop-shadow-[0_0_8px_#ffd700] animate-[asuraRage_2s_ease-in-out_infinite] z-25">
+                    <Flame className="h-5.5 w-5.5" />
+                  </div>
+                  {/* Orbiting sparks */}
+                  <Sparkles className="absolute top-2 left-3 h-4 w-4 text-yellow-100 animate-[starTwinkle_2s_ease-in-out_infinite]" />
+                  <Sparkles className="absolute bottom-2 right-3 h-3.5 w-3.5 text-white animate-[starTwinkle_2.5s_ease-in-out_infinite_1s]" />
+                </div>
+              )}
+
               {avatarFrame === "gold" && (
                 <div className="absolute inset-0 pointer-events-none z-20">
                   {/* Glow halo ring behind crown */}
@@ -892,6 +1134,40 @@ function ProfilePage() {
                   <div className="absolute top-4 right-2 w-1 h-1 rounded-full bg-white animate-[starTwinkle_2.5s_ease-out_infinite_1.2s]" />
                 </div>
               )}
+              {avatarFrame === "creator" && (
+                <div className="absolute inset-0 pointer-events-none z-20">
+                  {/* Crown with dynamic glowing accent aura */}
+                  <div className="absolute -top-4.5 left-1/2 -translate-x-1/2 w-9 h-9 rounded-full blur-md animate-pulse" style={{ backgroundColor: `${accentColor}40` }} />
+                  <div className="absolute -top-4 left-1/2 -translate-x-1/2 drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)] animate-[smoothBreath_2.5s_ease-in-out_infinite] z-25" style={{ color: accentColor }}>
+                    <Crown className="h-7 w-7" style={{ fill: accentColor, filter: `drop-shadow(0 0 5px ${accentColor})` }} />
+                  </div>
+                  
+                  {/* Extra border design: Orbiting outer segmented rings */}
+                  <div className="absolute inset-[-5px] rounded-full border-2 animate-[rotationCCW_8s_linear_infinite]" style={{
+                    borderColor: `${accentColor}80 transparent ${accentColor}80 transparent`,
+                  }} />
+                  <div className="absolute inset-[-9px] rounded-full border border-dashed animate-[rotationCW_12s_linear_infinite]" style={{
+                    borderColor: `${accentColor}50`,
+                  }} />
+
+                  {/* Orbiting light spots */}
+                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-3.5 h-3.5 rounded-full" style={{ background: `radial-gradient(circle, ${accentColor}, transparent)`, animation: 'avatarSmokeOrbit 5s linear infinite' }} />
+                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full" style={{ background: `radial-gradient(circle, #ffffff, transparent)`, animation: 'avatarSmokeOrbit 7s linear infinite 2s' }} />
+
+                  {/* Floating Sparks matching accent color */}
+                  <div className="absolute bottom-1 left-2 h-1.5 w-1.5 rounded-full shadow-lg" style={{ backgroundColor: accentColor, animation: 'fireEmbersWavy 3s ease-out infinite', boxShadow: `0 0 6px ${accentColor}` }} />
+                  <div className="absolute bottom-3 right-3 h-2 w-2 rounded-full shadow-lg" style={{ backgroundColor: accentColor, animation: 'fireEmbersWavy 3.5s ease-out infinite 1.5s', boxShadow: `0 0 8px ${accentColor}` }} />
+                  <div className="absolute bottom-5 left-5 h-1 w-1 rounded-full" style={{ backgroundColor: '#ffffff', animation: 'fireEmbersWavy 2.5s ease-out infinite 0.8s', boxShadow: '0 0 4px #ffffff' }} />
+
+                  {/* Glowing S-RANK S-tier labels */}
+                  <div className="absolute -top-1.5 -right-2.5 z-30 bg-slate-950 border-2 font-black px-1.5 py-0.5 rounded text-[8px] tracking-wider" style={{ borderColor: accentColor, color: accentColor, boxShadow: `0 0 8px ${accentColor}` }}>
+                    CREATOR
+                  </div>
+                  <div className="absolute -bottom-2 -left-2.5 z-30 bg-slate-950 border font-black px-1.5 py-0.5 rounded text-[7px] text-white" style={{ borderColor: `${accentColor}80`, boxShadow: `0 0 5px ${accentColor}50` }}>
+                    ⭐ ADMIN
+                  </div>
+                </div>
+              )}
 
               {profile.data?.is_vip && (
                 <div
@@ -956,7 +1232,10 @@ function ProfilePage() {
 
               {/* Title badge with refined animated effect */}
               {equippedBadge.data && (() => {
-                const titleColor = equippedBadge.data.badge?.badge_color || accentColor;
+                let titleColor = equippedBadge.data.badge?.badge_color || accentColor;
+                if (equippedBadge.data.badge?.name === "The Creator") {
+                  titleColor = accentColor;
+                }
                 return (
                   <div 
                     className="group/title relative flex items-center gap-2 mt-2 text-xs font-bold w-fit border rounded-full px-4 py-1.5 overflow-hidden transition-all duration-300 hover:scale-[1.02]"
@@ -1220,29 +1499,58 @@ function ProfilePage() {
                     <div className="grid gap-4 sm:grid-cols-2">
                       {[
                         { id: "none", name: "None", description: "Default accent ring", color: accentColor, gradient: 'none' },
-                        { id: "neon", name: "Neon Phoenix", description: "Rotating neon aura with lightning", color: "#EC4899", gradient: 'linear-gradient(135deg, #A855F720, #EC489920, #06B6D420)' },
-                        { id: "gold", name: "Golden Royal", description: "Shimmering gold border & crown", color: "#F59E0B", gradient: 'linear-gradient(135deg, #ffd70015, #F59E0B15, #ffeb9915)' },
-                        { id: "cyber", name: "Cyber Nexus", description: "Futuristic holographic targeting reticle", color: "#06B6D4", gradient: 'linear-gradient(135deg, #06B6D418, #0ea5e910, #c084fc12)' },
-                        { id: "fire", name: "Fiery Aura", description: "Volcanic flame ring with embers", color: "#EF4444", gradient: 'linear-gradient(135deg, #EF444418, #f9731615, #b91c1c10)' },
+                        { id: "creator", name: "The Creator", description: "Universal administrator status. Responsive to custom colors.", color: accentColor, gradient: `linear-gradient(135deg, ${accentColor}18, rgba(255,255,255,0.1), transparent)` },
+                        // Level-based (Initiate to Vanguard)
+                        { id: "bronze", name: "Bronze Initiate", description: "Polished bronze alloy ring of the novice reader", color: "#CD7F32", gradient: 'linear-gradient(135deg, #CD7F3220, #8c521a15, #ffb67710)' },
+                        { id: "iron", name: "Iron Warrior", description: "Heavy dark iron ring forged through persistence", color: "#708090", gradient: 'linear-gradient(135deg, #70809020, #3a445415, #b0c4de10)' },
+                        { id: "silver", name: "Silver Knight", description: "Shining silver standard of the dedicated reader", color: "#C0C0C0", gradient: 'linear-gradient(135deg, #C0C0C020, #7f7f7f15, #ffffff10)' },
                         { id: "sakura", name: "Sakura Dream", description: "Enchanted blossom drift & glow", color: "#F472B6", gradient: 'linear-gradient(135deg, #F472B618, #FDA4AF15, #E879F910)' },
-                        { id: "shadow", name: "Shadow Monarch", description: "Void energy tendrils & dark wisps", color: "#6366F1", gradient: 'linear-gradient(135deg, #6366F118, #4f46e515, #1e1b4b12)' },
+                        { id: "platinum", name: "Platinum Vanguard", description: "Refined platinum band with soft cyan starlight sweeps", color: "#E5E4E2", gradient: 'linear-gradient(135deg, #E5E4E220, #d3d3d315, #06B6D415)' },
+                        { id: "neon", name: "Neon Phoenix", description: "Rotating neon aura with lightning", color: "#EC4899", gradient: 'linear-gradient(135deg, #A855F720, #EC489920, #06B6D420)' },
                         { id: "qi", name: "Heavenly Qi", description: "Celestial jade runes & sparkles", color: "#10B981", gradient: 'linear-gradient(135deg, #10B98118, #05966915, #FBBF2410)' },
-                        { id: "asura", name: "Murim Asura", description: "Demonic crimson mist & rage aura", color: "#EF4444", gradient: 'linear-gradient(135deg, #EF444420, #7f1d1d18, #00000015)' },
-                        { id: "system", name: "System Hunter", description: "S-Rank cosmic status interface", color: "#06B6D4", gradient: 'linear-gradient(135deg, #06B6D418, #0ea5e912, #eab30810)' },
-                        { id: "abyss", name: "Abyssal Void", description: "Swirling dimensional rift of pure void energy", color: "#D946EF", gradient: 'linear-gradient(135deg, #D946EF20, #4A044E18, #3B076415)' },
+                        { id: "cyber", name: "Cyber Nexus", description: "Futuristic holographic targeting reticle", color: "#06B6D4", gradient: 'linear-gradient(135deg, #06B6D418, #0ea5e910, #c084fc12)' },
+                        { id: "gold", name: "Golden Royal", description: "Shimmering gold border & crown", color: "#F59E0B", gradient: 'linear-gradient(135deg, #ffd70015, #F59E0B15, #ffeb9915)' },
                         { id: "glitch", name: "Chronos Distortion", description: "Flickering temporal aberration with chromatic splits", color: "#EF4444", gradient: 'linear-gradient(135deg, #EF444415, #06B6D415, #00000020)' },
+                        // Chapter-based (Scholar to Immortal)
+                        { id: "apprentice", name: "Manga Scholar", description: "Weathered parchment scroll representing initial studies", color: "#D2B48C", gradient: 'linear-gradient(135deg, #D2B48C20, #a0522d15, #ffebcd10)' },
+                        { id: "scholar", name: "Scroll Keeper", description: "Jade-inlaid border of an avid reader of ancient scripts", color: "#8FBC8F", gradient: 'linear-gradient(135deg, #8FBC8F20, #2e8b5715, #f0fff010)' },
+                        { id: "sage", name: "Sage Reader", description: "Pulsing mystical jade mist reflecting ancient wisdom", color: "#00FA9A", gradient: 'linear-gradient(135deg, #00FA9A20, #20B2AA15, #00FA9A10)' },
+                        { id: "elder", name: "Lore Master", description: "Deep amethyst runic ring denoting high library status", color: "#DA70D6", gradient: 'linear-gradient(135deg, #DA70D620, #8A2BE215, #DA70D610)' },
+                        { id: "immortal", name: "Immortal Reader", description: "Radiant spiritual flames of one who has transcended regular lore", color: "#FFD700", gradient: 'linear-gradient(135deg, #FFD70020, #FFA50015, #FF8C0010)' },
+                        { id: "fire", name: "Fiery Aura", description: "Volcanic flame ring with embers", color: "#EF4444", gradient: 'linear-gradient(135deg, #EF444418, #f9731615, #b91c1c10)' },
+                        { id: "shadow", name: "Shadow Monarch", description: "Void energy tendrils & dark wisps", color: "#6366F1", gradient: 'linear-gradient(135deg, #6366F118, #4f46e515, #1e1b4b12)' },
+                        { id: "abyss", name: "Abyssal Void", description: "Swirling dimensional rift of pure void energy", color: "#D946EF", gradient: 'linear-gradient(135deg, #D946EF20, #4A044E18, #3B076415)' },
+                        // Streak & Series based
+                        { id: "asura", name: "Murim Asura", description: "Demonic crimson mist & rage aura", color: "#EF4444", gradient: 'linear-gradient(135deg, #EF444420, #7f1d1d18, #00000015)' },
                         { id: "divine", name: "Seraphic Light", description: "Angelic golden halos & glowing divine feathers", color: "#FCD34D", gradient: 'linear-gradient(135deg, #FCD34D15, #FFFFFF12, #FFFBEB10)' },
+                        { id: "system", name: "System Hunter", description: "S-Rank cosmic status interface", color: "#06B6D4", gradient: 'linear-gradient(135deg, #06B6D418, #0ea5e912, #eab30810)' },
                       ].map((frame) => {
                         const isSelected = avatarFrame === frame.id;
+                        const unlocked = isFrameUnlocked(frame.id);
+                        const req = FRAME_REQUIREMENTS[frame.id];
                         return (
                           <button
                             key={frame.id}
                             type="button"
-                            onClick={() => setAvatarFrame(frame.id)}
-                            className="group/card relative flex items-center gap-4 rounded-xl border p-3 text-left transition-all duration-300 hover:scale-[1.02] focus:outline-none overflow-hidden"
+                            onClick={() => {
+                              if (!unlocked) {
+                                toast.error(`Unlock requirement: ${req?.text || ""}`);
+                                return;
+                              }
+                              setAvatarFrame(frame.id);
+                            }}
+                            className={`group/card relative flex items-center gap-4 rounded-xl border p-3 text-left transition-all duration-300 focus:outline-none overflow-hidden ${unlocked ? 'hover:scale-[1.02]' : 'opacity-75 bg-secondary/10 border-dashed cursor-not-allowed'}`}
                             style={{
-                              borderColor: isSelected ? `${frame.color}80` : `${frame.color}20`,
-                              background: isSelected ? frame.gradient : `${frame.color}06`,
+                              borderColor: isSelected 
+                                ? `${frame.color}80` 
+                                : !unlocked 
+                                  ? 'var(--border)' 
+                                  : `${frame.color}20`,
+                              background: isSelected 
+                                ? frame.gradient 
+                                : !unlocked 
+                                  ? 'rgba(0, 0, 0, 0.15)' 
+                                  : `${frame.color}06`,
                               boxShadow: isSelected 
                                 ? `0 0 20px ${frame.color}15, inset 0 0 15px ${frame.color}08` 
                                 : 'none',
@@ -1267,7 +1575,6 @@ function ProfilePage() {
                                 }}
                               />
                             )}
-                            {/* Frame Mini Preview */}
                             <div
                               className="relative h-10 w-10 flex-shrink-0 rounded-full flex items-center justify-center transition-transform duration-300 group-hover/card:scale-110"
                               style={{
@@ -1277,6 +1584,63 @@ function ProfilePage() {
                               }}
                             >
                               {/* Spinners scaled down */}
+                              {frame.id === "bronze" && (
+                                <>
+                                  <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-[#8c521a] via-[#cd7f32] to-[#ffb677] animate-[smoothBreath_5s_ease-in-out_infinite]" />
+                                  <div className="absolute bottom-0.5 left-1 w-1 h-1 rounded-full bg-yellow-400 animate-pulse" />
+                                </>
+                              )}
+                              {frame.id === "iron" && (
+                                <>
+                                  <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-[#3a4454] via-[#708090] to-[#b0c4de] animate-[smoothBreath_5s_ease-in-out_infinite]" />
+                                  <div className="absolute top-0.5 right-1 w-1 h-1 rounded-full bg-orange-500 animate-pulse" />
+                                </>
+                              )}
+                              {frame.id === "silver" && (
+                                <>
+                                  <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-[#7f7f7f] via-[#C0C0C0] to-[#ffffff] animate-[smoothBreath_4s_ease-in-out_infinite]" />
+                                  <div className="absolute top-0.5 left-1.5 w-1 h-1 rounded-full bg-white animate-ping" />
+                                </>
+                              )}
+                              {frame.id === "platinum" && (
+                                <div className="absolute inset-0 rounded-full overflow-hidden bg-slate-950">
+                                  <div className="absolute inset-[-55%] rounded-full bg-[conic-gradient(from_0deg,#d3d3d3,#E5E4E2,#06B6D4,#d3d3d3)] animate-[rotationCW_6s_linear_infinite]" />
+                                  <div className="absolute inset-[1px] rounded-full bg-background z-5" />
+                                  <div className="absolute top-0 left-0 h-1 w-1 border-t border-l border-cyan-400 z-10" />
+                                  <div className="absolute bottom-0 right-0 h-1 w-1 border-b border-r border-cyan-400 z-10" />
+                                </div>
+                              )}
+                              {frame.id === "apprentice" && (
+                                <>
+                                  <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-[#a0522d] via-[#D2B48C] to-[#ffebcd]" />
+                                  <div className="absolute top-[20%] left-[-1px] bottom-[20%] w-0.8 bg-[#8b5a2b] z-20" />
+                                  <div className="absolute top-[20%] right-[-1px] bottom-[20%] w-0.8 bg-[#8b5a2b] z-20" />
+                                </>
+                              )}
+                              {frame.id === "scholar" && (
+                                <>
+                                  <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-[#2e8b57] via-[#8FBC8F] to-[#f0fff0]" />
+                                  <div className="absolute top-[20%] left-[-1px] bottom-[20%] w-1 bg-emerald-700 z-20 border border-yellow-400" />
+                                  <div className="absolute top-[20%] right-[-1px] bottom-[20%] w-1 bg-emerald-700 z-20 border border-yellow-400" />
+                                </>
+                              )}
+                              {frame.id === "sage" && (
+                                <div className="absolute inset-0 rounded-full overflow-hidden bg-slate-950">
+                                  <div className="absolute inset-[-55%] rounded-full bg-[conic-gradient(from_0deg,#00FA9A,transparent,#20B2AA,transparent,#00FA9A)] animate-[rotationCW_5s_linear_infinite]" />
+                                  <div className="absolute inset-[1.5px] rounded-full border border-dashed border-emerald-400/40 animate-[rotationCCW_10s_linear_infinite] z-5" />
+                                </div>
+                              )}
+                              {frame.id === "elder" && (
+                                <div className="absolute inset-0 rounded-full overflow-hidden bg-slate-950">
+                                  <div className="absolute inset-[-55%] rounded-full bg-[conic-gradient(from_0deg,#DA70D6,#8A2BE2,#DA70D6)] animate-[rotationCW_4s_linear_infinite]" />
+                                  <div className="absolute inset-[1.5px] rounded-full border border-dotted border-purple-400/40 animate-[rotationCCW_8s_linear_infinite] z-5" />
+                                </div>
+                              )}
+                              {frame.id === "immortal" && (
+                                <div className="absolute inset-0 rounded-full overflow-hidden bg-slate-950 animate-[divineHalo_4s_ease-in-out_infinite]">
+                                  <div className="absolute inset-[-55%] rounded-full bg-[conic-gradient(from_0deg,#FFD700,#FFA500,#FF8C00,#FFD700)] animate-[rotationCW_3s_linear_infinite]" />
+                                </div>
+                              )}
                               {frame.id === "neon" && (
                                 <div className="absolute inset-0 rounded-full overflow-hidden animate-[lightningFlicker_6s_ease-in-out_infinite]">
                                   <div className="absolute inset-[-50%] rounded-full bg-[conic-gradient(from_0deg,#A855F7,#06B6D4,#EC4899,#A855F7)] animate-[rotationCW_4s_linear_infinite]" />
@@ -1352,6 +1716,16 @@ function ProfilePage() {
                                   <div className="absolute inset-[-50%] rounded-full bg-[conic-gradient(from_0deg,#FCD34D,#FFFFFF,#FFFBEB,#FCD34D)] animate-[rotationCW_6s_linear_infinite]" />
                                 </div>
                               )}
+                              {frame.id === "creator" && (
+                                <div className="absolute inset-0 rounded-full bg-slate-950 overflow-hidden" style={{
+                                  boxShadow: `0 0 15px ${accentColor}, inset 0 0 8px ${accentColor}`,
+                                }}>
+                                  <div className="absolute inset-[-55%] rounded-full" style={{
+                                    background: `conic-gradient(from 0deg, ${accentColor}, transparent, ${accentColor}80, transparent, ${accentColor})`,
+                                    animation: 'rotationCW 4s linear infinite',
+                                  }} />
+                                </div>
+                              )}
 
                               {frame.id !== "none" && (
                                 <div className="absolute inset-[2.5px] rounded-full bg-background z-10" />
@@ -1382,20 +1756,36 @@ function ProfilePage() {
                                   ✨
                                 </div>
                               )}
+                              {frame.id === "creator" && (
+                                <div className="absolute -top-1.2 left-1/2 -translate-x-1/2 text-amber-400 z-20 scale-75 origin-top" style={{ fontSize: '8px', color: accentColor }}>
+                                  👑
+                                </div>
+                              )}
                             </div>
 
                             <div className="min-w-0 flex-1 relative">
-                              <div className="font-semibold text-sm flex items-center gap-1.5">
+                              <div className="font-semibold text-sm flex items-center gap-1.5 flex-wrap">
                                 <span style={{ color: isSelected ? frame.color : undefined, textShadow: isSelected ? `0 0 8px ${frame.color}40` : 'none' }}>
                                   {frame.name}
                                 </span>
+                                {!unlocked && (
+                                  <Lock className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                                )}
                                 {isSelected && (
                                   <Badge variant="secondary" className="h-5 px-1.5 text-[10px] uppercase font-bold border" style={{ backgroundColor: `${frame.color}15`, color: frame.color, borderColor: `${frame.color}30`, boxShadow: `0 0 8px ${frame.color}20` }}>
                                     ✦ Equipped
                                   </Badge>
                                 )}
                               </div>
-                              <p className="text-xs text-muted-foreground truncate mt-0.5">{frame.description}</p>
+                              <p className="text-xs text-muted-foreground mt-0.5">
+                                {!unlocked && req ? (
+                                  <span className="text-destructive font-medium flex items-center gap-1">
+                                    🔒 {req.text}
+                                  </span>
+                                ) : (
+                                  <span className="truncate block">{frame.description}</span>
+                                )}
+                              </p>
                             </div>
                           </button>
                         );
@@ -1440,7 +1830,7 @@ function ProfilePage() {
           {/* ─── Profile Badges Tab ─── */}
           <TabsContent value="badges">
             <Card className="p-4 sm:p-6">
-              <ProfileBadges />
+              <ProfileBadges accentColor={accentColor} />
             </Card>
           </TabsContent>
 

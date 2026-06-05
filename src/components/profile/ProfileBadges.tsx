@@ -38,9 +38,16 @@ type UserBadge = {
   badge: NormalizedBadge;
 };
 
-export function ProfileBadges() {
+export function ProfileBadges({ accentColor }: { accentColor?: string }) {
   const qc = useQueryClient();
   const [selectedBadge, setSelectedBadge] = useState<UserBadge | null>(null);
+
+  const accent = accentColor || "#8B5CF6";
+
+  const getBadgeColor = (badgeName: string, defaultColor: string) => {
+    if (badgeName === "The Creator") return accent;
+    return defaultColor;
+  };
 
   // Fetch user roles
   const userRoles = useQuery({
@@ -119,13 +126,19 @@ export function ProfileBadges() {
       const { data: u } = await supabase.auth.getUser();
       if (!u.user) throw new Error("Not authenticated");
 
+      const badgeName = availableBadges.data?.find((b) => b.id === badgeId)?.name || 
+                        userBadges.data?.find((b) => b.badge_id === badgeId)?.badge?.name;
+      if (badgeName === "The Creator" && !isAdmin) {
+        throw new Error("This badge is locked: Exclusive to Administrators");
+      }
+
       const userBadge = userBadges.data?.find((b) => b.badge_id === badgeId);
 
       // If equipping, unequip all others first
       await supabase
-        .from("user_badges")
-        .update({ is_equipped: false })
-        .eq("user_id", u.user.id);
+          .from("user_badges")
+          .update({ is_equipped: false })
+          .eq("user_id", u.user.id);
 
       if (!userBadge) {
         // If they are admin and badge is not in database yet, insert it as equipped!
@@ -214,8 +227,8 @@ export function ProfileBadges() {
                   <div
                     className="flex h-16 w-16 items-center justify-center rounded-lg p-3 animate-pulse"
                     style={{
-                      backgroundColor: `${equippedBadge.badge.badge_color}20`,
-                      color: equippedBadge.badge.badge_color,
+                      backgroundColor: `${getBadgeColor(equippedBadge.badge.name, equippedBadge.badge.badge_color)}20`,
+                      color: getBadgeColor(equippedBadge.badge.name, equippedBadge.badge.badge_color),
                     }}
                   >
                     <BadgeIcon icon={equippedBadge.badge.icon} className="h-10 w-10" />
@@ -284,8 +297,8 @@ export function ProfileBadges() {
                         <div
                           className="flex h-12 w-12 items-center justify-center rounded-lg p-2.5"
                           style={{
-                            backgroundColor: `${userBadge.badge.badge_color}20`,
-                            color: userBadge.badge.badge_color,
+                            backgroundColor: `${getBadgeColor(userBadge.badge.name, userBadge.badge.badge_color)}20`,
+                            color: getBadgeColor(userBadge.badge.name, userBadge.badge.badge_color),
                           }}
                         >
                           <BadgeIcon icon={userBadge.badge.icon} className="h-6 w-6" />
@@ -394,8 +407,8 @@ export function ProfileBadges() {
                 <div
                   className="flex h-24 w-24 items-center justify-center rounded-lg p-5"
                   style={{
-                    backgroundColor: `${selectedBadge.badge.badge_color}20`,
-                    color: selectedBadge.badge.badge_color,
+                    backgroundColor: `${getBadgeColor(selectedBadge.badge.name, selectedBadge.badge.badge_color)}20`,
+                    color: getBadgeColor(selectedBadge.badge.name, selectedBadge.badge.badge_color),
                   }}
                 >
                   <BadgeIcon icon={selectedBadge.badge.icon} className="h-14 w-14" />

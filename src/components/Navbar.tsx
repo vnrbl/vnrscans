@@ -796,7 +796,7 @@ function NavbarAvatarFrame({
   }
 
   const size = 36; // px
-  const borderWidth = 2; // px
+  const borderWidth = avatarFrame === "creator" ? 3 : 2; // px
   const innerSize = size - borderWidth * 2;
 
   const getFrameGradient = () => {
@@ -813,6 +813,7 @@ function NavbarAvatarFrame({
       case "abyss": return "conic-gradient(from 0deg, #D946EF, #4A044E, #3B0764, #D946EF)";
       case "glitch": return "conic-gradient(from 0deg, #ef4444, #06b6d4, #ef4444)";
       case "divine": return "conic-gradient(from 0deg, #FCD34D, #FFFFFF, #FFFBEB, #FCD34D)";
+      case "creator": return `conic-gradient(from 0deg, ${accentColor}, transparent, ${accentColor}80, transparent, ${accentColor})`;
       default: return accentColor;
     }
   };
@@ -831,6 +832,7 @@ function NavbarAvatarFrame({
       case "abyss": return "0 0 10px rgba(217,70,239,0.6), 0 0 16px rgba(139,92,246,0.3)";
       case "glitch": return "0 0 8px rgba(239,68,68,0.5), 0 0 14px rgba(6,182,212,0.3)";
       case "divine": return "0 0 10px rgba(252,211,77,0.6), 0 0 16px rgba(255,255,255,0.3)";
+      case "creator": return `0 0 10px ${accentColor}, 0 0 16px ${accentColor}50`;
       default: return `0 0 6px ${accentColor}40`;
     }
   };
@@ -940,6 +942,13 @@ function NavbarAvatarFrame({
       {/* Gold crown tiny */}
       {avatarFrame === "gold" && (
         <div className="absolute -top-1 left-1/2 -translate-x-1/2 text-amber-400 z-20" style={{ fontSize: '8px', filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.5))' }}>
+          👑
+        </div>
+      )}
+
+      {/* Creator crown tiny */}
+      {avatarFrame === "creator" && (
+        <div className="absolute -top-1.2 left-1/2 -translate-x-1/2 text-amber-400 z-20" style={{ fontSize: '8px', filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.5))', color: accentColor }}>
           👑
         </div>
       )}
