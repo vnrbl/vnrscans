@@ -117,16 +117,25 @@ function Reader() {
     enabled: !!chapterQ.data && chapterQ.data.chapter_type === "image",
   });
 
+  const activeScanlationGroup = chapterQ.data?.scanlation_group ?? null;
+
   const siblingsQ = useQuery({
-    queryKey: ["chapter-siblings", chapterQ.data?.series?.id],
+    queryKey: ["chapter-siblings", chapterQ.data?.series?.id, activeScanlationGroup],
     queryFn: async () => {
       console.log(`Loading siblings for series ID: ${chapterQ.data!.series!.id}`);
-      const { data, error } = await supabase
+      let query = supabase
         .from("chapters")
-        .select("id,slug,chapter_number")
+        .select("id,slug,chapter_number,scanlation_group")
         .eq("series_id", chapterQ.data!.series!.id)
-        .eq("status", "published")
-        .order("chapter_number");
+        .eq("status", "published");
+
+      if (activeScanlationGroup) {
+        query = query.eq("scanlation_group", activeScanlationGroup);
+      } else {
+        query = query.is("scanlation_group", null);
+      }
+
+      const { data, error } = await query.order("chapter_number");
       if (error) {
         console.error("Siblings query error:", error);
         throw error;
@@ -135,6 +144,26 @@ function Reader() {
       return data ?? [];
     },
     enabled: !!chapterQ.data?.series?.id,
+  });
+
+  const alternateGroupsQ = useQuery({
+    queryKey: [
+      "chapter-alternate-groups",
+      chapterQ.data?.series_id,
+      chapterQ.data?.chapter_number,
+    ],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("chapters")
+        .select("id,slug,scanlation_group,chapter_number")
+        .eq("series_id", chapterQ.data!.series_id)
+        .eq("chapter_number", chapterQ.data!.chapter_number)
+        .eq("status", "published")
+        .order("scanlation_group", { ascending: true, nullsFirst: true });
+      if (error) throw error;
+      return data ?? [];
+    },
+    enabled: !!chapterQ.data?.series_id && chapterQ.data?.chapter_number != null,
   });
 
   // Save reading history with scroll progress
@@ -591,6 +620,8 @@ function Reader() {
           isNovel={isNovel}
           allChapters={siblingsQ.data ?? []}
           currentChapterSlug={chapterSlug}
+          alternateGroups={alternateGroupsQ.data ?? []}
+          currentGroup={activeScanlationGroup}
         />
       </div>
 
@@ -772,22 +803,32 @@ function Reader() {
   );
 }
 
-function ReaderTopBar({ 
-  title, 
-  seriesTitle, 
-  seriesSlug, 
-  isNovel, 
-  allChapters, 
-  currentChapterSlug 
-}: { 
-  title: string; 
-  seriesTitle: string; 
-  seriesSlug: string; 
+function ReaderTopBar({
+  title,
+  seriesTitle,
+  seriesSlug,
+  isNovel,
+  allChapters,
+  currentChapterSlug,
+  alternateGroups,
+  currentGroup,
+}: {
+  title: string;
+  seriesTitle: string;
+  seriesSlug: string;
   isNovel: boolean;
   allChapters: Array<{ id: string; slug: string; chapter_number: number }>;
   currentChapterSlug: string;
+  alternateGroups: Array<{
+    id: string;
+    slug: string;
+    scanlation_group: string | null;
+    chapter_number: number;
+  }>;
+  currentGroup: string | null;
 }) {
   const navigate = useNavigate();
+  const showGroupSwitcher = alternateGroups.length > 1;
 
   return (
     <header className="sticky top-0 z-30 border-b border-border/50 bg-background/90 backdrop-blur">
@@ -800,9 +841,34 @@ function ReaderTopBar({
           </div>
         </Link>
         <div className="flex items-center gap-2">
+          {showGroupSwitcher && (
+            <Select
+              value={currentChapterSlug}
+              onValueChange={(slug) =>
+                navigate({
+                  to: "/title/$titleSlug/$chapterSlug",
+                  params: { titleSlug: seriesSlug, chapterSlug: slug },
+                })
+              }
+            >
+              <SelectTrigger className="w-[160px]">
+                <SelectValue placeholder="Scan group" />
+              </SelectTrigger>
+              <SelectContent>
+                {alternateGroups.map((ch) => (
+                  <SelectItem key={ch.id} value={ch.slug}>
+                    {ch.scanlation_group || "Default"}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+          {!showGroupSwitcher && currentGroup && (
+            <span className="hidden text-xs text-muted-foreground sm:inline">{currentGroup}</span>
+          )}
           {allChapters.length > 0 && (
-            <Select 
-              value={currentChapterSlug} 
+            <Select
+              value={currentChapterSlug}
               onValueChange={(slug) => navigate({ to: "/title/$titleSlug/$chapterSlug", params: { titleSlug: seriesSlug, chapterSlug: slug } })}
             >
               <SelectTrigger className="w-[180px]">

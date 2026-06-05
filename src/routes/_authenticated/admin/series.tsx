@@ -15,6 +15,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
+import { ScanlationGroupPicker } from "@/components/admin/ScanlationGroupPicker";
+import {
+  buildChapterSlug,
+  resolveScanlationGroup,
+  scanlationGroupToSelectValue,
+  SCANLATION_GROUP_NEW,
+  SCANLATION_GROUP_NONE,
+} from "@/lib/chapter-utils";
 
 export const Route = createFileRoute("/_authenticated/admin/series")({
   head: () => ({ meta: [{ title: "Admin · Titles" }] }),
@@ -740,6 +748,31 @@ function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack: () => 
   const [discoveredChapters, setDiscoveredChapters] = useState<ChapterInfo[]>([]);
   const [selectedChapters, setSelectedChapters] = useState<Set<number>>(new Set());
   const [bulkUploading, setBulkUploading] = useState(false);
+  const [groupSelect, setGroupSelect] = useState(SCANLATION_GROUP_NONE);
+  const [groupNewName, setGroupNewName] = useState("");
+
+  const resetChapterForm = () => {
+    setForm({
+      chapter_number: "",
+      title: "",
+      image_urls: "",
+      chapter_url: "",
+      status: "published",
+      scheduled_at: "",
+      uploaded_by: "",
+      scanlation_group: "",
+    });
+    setGroupSelect(SCANLATION_GROUP_NONE);
+    setGroupNewName("");
+  };
+
+  const getScanlationGroupForUpload = () =>
+    resolveScanlationGroup(
+      scanlationGroups.data && scanlationGroups.data.length > 0
+        ? groupSelect
+        : SCANLATION_GROUP_NEW,
+      groupNewName
+    );
 
   // Get user profile for username
   const userProfile = useQuery({
@@ -775,6 +808,7 @@ function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack: () => 
     mutationFn: async () => {
       const chapterNum = parseFloat(form.chapter_number);
       if (isNaN(chapterNum)) throw new Error("Invalid chapter number");
+      const scanlation_group = getScanlationGroupForUpload();
 
       const { data: chapter, error: chapterError } = await supabase
         .from("chapters")
@@ -782,12 +816,15 @@ function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack: () => 
           series_id: seriesId,
           chapter_number: chapterNum,
           title: form.title || null,
-          slug: `chapter-${chapterNum}${form.title ? `-${slugify(form.title)}` : ""}`,
+          slug: buildChapterSlug(chapterNum, {
+            title: form.title,
+            scanlationGroup: scanlation_group,
+          }),
           chapter_type: "image",
           status: form.status as any,
           scheduled_at: form.status === "scheduled" && form.scheduled_at ? new Date(form.scheduled_at).toISOString() : null,
           uploaded_by: form.uploaded_by || null,
-          scanlation_group: form.scanlation_group || null,
+          scanlation_group,
         })
         .select()
         .single();
@@ -809,8 +846,9 @@ function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack: () => 
     onSuccess: () => {
       toast.success("Chapter uploaded");
       setOpen(false);
-      setForm({ chapter_number: "", title: "", image_urls: "", chapter_url: "", status: "published", scheduled_at: "", uploaded_by: "", scanlation_group: "" });
+      resetChapterForm();
       qc.invalidateQueries({ queryKey: ["admin", "chapters", seriesId] });
+      qc.invalidateQueries({ queryKey: ["admin", "scanlation-groups", seriesId] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -826,6 +864,12 @@ function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack: () => 
       return;
     }
     setEditingChapter(chapter);
+    const { selectValue, newGroupName } = scanlationGroupToSelectValue(
+      chapter.scanlation_group,
+      scanlationGroups.data ?? []
+    );
+    setGroupSelect(selectValue);
+    setGroupNewName(newGroupName);
     setForm({
       chapter_number: String(chapter.chapter_number ?? ""),
       title: chapter.title ?? "",
@@ -906,6 +950,7 @@ function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack: () => 
       setBulkUploading(true);
       let successCount = 0;
       let failCount = 0;
+      const scanlation_group = getScanlationGroupForUpload();
 
       for (const index of Array.from(selectedChapters).sort((a, b) => a - b)) {
         const chapter = discoveredChapters[index];
@@ -925,11 +970,14 @@ function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack: () => 
               series_id: seriesId,
               chapter_number: chapter.chapterNumber,
               title: chapter.title || null,
-              slug: `chapter-${chapter.chapterNumber}${chapter.title ? `-${slugify(chapter.title)}` : ""}`,
+              slug: buildChapterSlug(chapter.chapterNumber, {
+                title: chapter.title,
+                scanlationGroup: scanlation_group,
+              }),
               chapter_type: "image",
               status: "published",
               uploaded_by: form.uploaded_by || null,
-              scanlation_group: form.scanlation_group || null,
+              scanlation_group,
             })
             .select()
             .single();
@@ -961,6 +1009,7 @@ function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack: () => 
       setDiscoveredChapters([]);
       setSelectedChapters(new Set());
       qc.invalidateQueries({ queryKey: ["admin", "chapters", seriesId] });
+      qc.invalidateQueries({ queryKey: ["admin", "scanlation-groups", seriesId] });
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Bulk upload failed");
     } finally {
@@ -973,16 +1022,20 @@ function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack: () => 
       if (!editingChapter) throw new Error("No chapter selected");
       const chapterNum = parseFloat(form.chapter_number);
       if (isNaN(chapterNum)) throw new Error("Invalid chapter number");
+      const scanlation_group = getScanlationGroupForUpload();
       const { error: chapterError } = await supabase
         .from("chapters")
         .update({
           chapter_number: chapterNum,
           title: form.title || null,
-          slug: `chapter-${chapterNum}${form.title ? `-${slugify(form.title)}` : ""}`,
+          slug: buildChapterSlug(chapterNum, {
+            title: form.title,
+            scanlationGroup: scanlation_group,
+          }),
           status: form.status as any,
           scheduled_at: form.status === "scheduled" && form.scheduled_at ? new Date(form.scheduled_at).toISOString() : null,
           uploaded_by: form.uploaded_by || null,
-          scanlation_group: form.scanlation_group || null,
+          scanlation_group,
           updated_at: new Date().toISOString(),
         })
         .eq("id", editingChapter.id);
@@ -1006,8 +1059,9 @@ function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack: () => 
     onSuccess: () => {
       toast.success("Chapter updated");
       setEditingChapter(null);
-      setForm({ chapter_number: "", title: "", image_urls: "", chapter_url: "", status: "published", scheduled_at: "", uploaded_by: "", scanlation_group: "" });
+      resetChapterForm();
       qc.invalidateQueries({ queryKey: ["admin", "chapters", seriesId] });
+      qc.invalidateQueries({ queryKey: ["admin", "scanlation-groups", seriesId] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -1055,34 +1109,13 @@ function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack: () => 
                     <Input placeholder="Uploader name" value={form.uploaded_by} onChange={(e) => setForm({ ...form, uploaded_by: e.target.value })} />
                     <p className="text-xs text-muted-foreground mt-1">Auto-filled with your username</p>
                   </div>
-                  <div>
-                    <Label>Scanlation Group (Optional)</Label>
-                    {scanlationGroups.data && scanlationGroups.data.length > 0 ? (
-                      <Select value={form.scanlation_group} onValueChange={(v) => setForm({ ...form, scanlation_group: v === "custom" ? "" : v })}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select or add new" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {scanlationGroups.data.map((group) => (
-                            <SelectItem key={group} value={group}>
-                              {group}
-                            </SelectItem>
-                          ))}
-                          <SelectItem value="custom">+ Add New Group</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    ) : (
-                      <Input placeholder="Group/Team name" value={form.scanlation_group} onChange={(e) => setForm({ ...form, scanlation_group: e.target.value })} />
-                    )}
-                    {scanlationGroups.data && scanlationGroups.data.length > 0 && form.scanlation_group === "" && (
-                      <Input 
-                        placeholder="Enter new group name" 
-                        value={form.scanlation_group} 
-                        onChange={(e) => setForm({ ...form, scanlation_group: e.target.value })}
-                        className="mt-2"
-                      />
-                    )}
-                  </div>
+                  <ScanlationGroupPicker
+                    groups={scanlationGroups.data ?? []}
+                    selectValue={groupSelect}
+                    newGroupName={groupNewName}
+                    onSelectValueChange={setGroupSelect}
+                    onNewGroupNameChange={setGroupNewName}
+                  />
                 </div>
 
                 <div className="rounded-lg border border-violet-500/30 bg-violet-500/5 p-4 space-y-3">
@@ -1165,7 +1198,13 @@ function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack: () => 
               </DialogFooter>
             </DialogContent>
           </Dialog>
-          <Dialog open={open} onOpenChange={setOpen}>
+          <Dialog
+            open={open}
+            onOpenChange={(v) => {
+              setOpen(v);
+              if (!v) resetChapterForm();
+            }}
+          >
             <DialogTrigger asChild>
               <Button className="bg-violet-600 hover:bg-violet-700">
                 <Plus className="mr-1 h-4 w-4" />Upload Chapter
@@ -1201,34 +1240,13 @@ function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack: () => 
                   <Input placeholder="Uploader name" value={form.uploaded_by} onChange={(e) => setForm({ ...form, uploaded_by: e.target.value })} />
                   <p className="text-xs text-muted-foreground mt-1">Auto-filled with your username</p>
                 </div>
-                <div>
-                  <Label>Scanlation Group (Optional)</Label>
-                  {scanlationGroups.data && scanlationGroups.data.length > 0 ? (
-                    <Select value={form.scanlation_group} onValueChange={(v) => setForm({ ...form, scanlation_group: v === "custom" ? "" : v })}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select or add new" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {scanlationGroups.data.map((group) => (
-                          <SelectItem key={group} value={group}>
-                            {group}
-                          </SelectItem>
-                        ))}
-                        <SelectItem value="custom">+ Add New Group</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  ) : (
-                    <Input placeholder="Group/Team name" value={form.scanlation_group} onChange={(e) => setForm({ ...form, scanlation_group: e.target.value })} />
-                  )}
-                  {scanlationGroups.data && scanlationGroups.data.length > 0 && form.scanlation_group === "" && (
-                    <Input 
-                      placeholder="Enter new group name" 
-                      value={form.scanlation_group} 
-                      onChange={(e) => setForm({ ...form, scanlation_group: e.target.value })}
-                      className="mt-2"
-                    />
-                  )}
-                </div>
+                <ScanlationGroupPicker
+                  groups={scanlationGroups.data ?? []}
+                  selectValue={groupSelect}
+                  newGroupName={groupNewName}
+                  onSelectValueChange={setGroupSelect}
+                  onNewGroupNameChange={setGroupNewName}
+                />
               </div>
 
               {/* Chapter URL Extraction */}
@@ -1333,7 +1351,7 @@ function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack: () => 
         ))}
       </div>
 
-      <Dialog open={!!editingChapter} onOpenChange={(v) => { if (!v) { setEditingChapter(null); setForm({ chapter_number: "", title: "", image_urls: "", chapter_url: "", status: "published", scheduled_at: "", uploaded_by: "", scanlation_group: "" }); } }}>
+      <Dialog open={!!editingChapter} onOpenChange={(v) => { if (!v) { setEditingChapter(null); resetChapterForm(); } }}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>Edit Chapter</DialogTitle></DialogHeader>
           <div className="space-y-4">
@@ -1363,34 +1381,13 @@ function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack: () => 
                 <Label>Uploaded By</Label>
                 <Input value={form.uploaded_by} onChange={(e) => setForm({ ...form, uploaded_by: e.target.value })} placeholder="Uploader name" />
               </div>
-              <div>
-                <Label>Scanlation Group</Label>
-                {scanlationGroups.data && scanlationGroups.data.length > 0 ? (
-                  <Select value={form.scanlation_group} onValueChange={(v) => setForm({ ...form, scanlation_group: v === "custom" ? "" : v })}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select or add new" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {scanlationGroups.data.map((group) => (
-                        <SelectItem key={group} value={group}>
-                          {group}
-                        </SelectItem>
-                      ))}
-                      <SelectItem value="custom">+ Add New Group</SelectItem>
-                    </SelectContent>
-                  </Select>
-                ) : (
-                  <Input value={form.scanlation_group} onChange={(e) => setForm({ ...form, scanlation_group: e.target.value })} placeholder="Group/Team name" />
-                )}
-                {scanlationGroups.data && scanlationGroups.data.length > 0 && form.scanlation_group === "" && (
-                  <Input 
-                    placeholder="Enter new group name" 
-                    value={form.scanlation_group} 
-                    onChange={(e) => setForm({ ...form, scanlation_group: e.target.value })}
-                    className="mt-2"
-                  />
-                )}
-              </div>
+              <ScanlationGroupPicker
+                groups={scanlationGroups.data ?? []}
+                selectValue={groupSelect}
+                newGroupName={groupNewName}
+                onSelectValueChange={setGroupSelect}
+                onNewGroupNameChange={setGroupNewName}
+              />
             </div>
             <div>
               <Label>Image URLs (one per line) *</Label>

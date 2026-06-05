@@ -85,14 +85,14 @@
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://www.vnrscans.com/title/i-am-the-fated-villain</loc>
+    <loc>https://www.vnrscans.com/title/reincarnation-of-the-fist-king</loc>
     <lastmod>2026-06-04</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://www.vnrscans.com/title/reincarnation-of-the-fist-king</loc>
-    <lastmod>2026-06-04</lastmod>
+    <loc>https://www.vnrscans.com/title/got-dropped-into-a-ghost-story-still-gotta-work</loc>
+    <lastmod>2026-06-05</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
@@ -105,6 +105,12 @@
   <url>
     <loc>https://www.vnrscans.com/title/invincible-after-100-years-of-seclusion</loc>
     <lastmod>2026-06-03</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://www.vnrscans.com/title/i-am-the-fated-villain</loc>
+    <lastmod>2026-06-05</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
@@ -201,6 +207,12 @@
   <url>
     <loc>https://www.vnrscans.com/title/i-am-the-fated-villain/chapter-7</loc>
     <lastmod>2026-06-03</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://www.vnrscans.com/title/i-am-the-fated-villain/chapter-12</loc>
+    <lastmod>2026-06-04</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url>
@@ -349,12 +361,6 @@
     <priority>0.5</priority>
   </url>
   <url>
-    <loc>https://www.vnrscans.com/title/i-am-the-fated-villain/chapter-12</loc>
-    <lastmod>2026-06-04</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.5</priority>
-  </url>
-  <url>
     <loc>https://www.vnrscans.com/title/i-am-the-fated-villain/chapter-9</loc>
     <lastmod>2026-06-03</lastmod>
     <changefreq>monthly</changefreq>
@@ -405,6 +411,18 @@
   <url>
     <loc>https://www.vnrscans.com/title/i-am-the-fated-villain/chapter-6</loc>
     <lastmod>2026-06-03</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://www.vnrscans.com/title/got-dropped-into-a-ghost-story-still-gotta-work/chapter-0.1</loc>
+    <lastmod>2026-06-05</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://www.vnrscans.com/title/got-dropped-into-a-ghost-story-still-gotta-work/chapter-0-preview</loc>
+    <lastmod>2026-06-05</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url>
