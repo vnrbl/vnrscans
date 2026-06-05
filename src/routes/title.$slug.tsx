@@ -714,15 +714,27 @@ function SeriesDetail() {
                             </Link>
                           </td>
                           <td className="hidden px-4 py-3 md:table-cell">
-                            <span className="text-sm text-muted-foreground">
-                              {(c as { uploaded_by?: string }).uploaded_by || "—"}
-                            </span>
+                            {(c as { uploaded_by?: string }).uploaded_by ? (
+                              <Link
+                                to="/user/$username"
+                                params={{ username: (c as { uploaded_by?: string }).uploaded_by! }}
+                                className="text-sm text-muted-foreground transition-colors hover:text-violet-600"
+                              >
+                                {(c as { uploaded_by?: string }).uploaded_by}
+                              </Link>
+                            ) : (
+                              <span className="text-sm text-muted-foreground">—</span>
+                            )}
                           </td>
                           <td className="hidden px-4 py-3 md:table-cell">
                             {(c as { scanlation_group?: string }).scanlation_group ? (
-                              <span className="text-sm font-medium text-violet-600">
+                              <Link
+                                to="/browse"
+                                search={{ group: (c as { scanlation_group?: string }).scanlation_group }}
+                                className="text-sm font-medium text-violet-600 transition-colors hover:text-violet-400"
+                              >
                                 {(c as { scanlation_group?: string }).scanlation_group}
-                              </span>
+                              </Link>
                             ) : (
                               <span className="text-sm text-muted-foreground">—</span>
                             )}
