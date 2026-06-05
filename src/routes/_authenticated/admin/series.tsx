@@ -748,6 +748,7 @@ function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack: () => 
   const [discoveredChapters, setDiscoveredChapters] = useState<ChapterInfo[]>([]);
   const [selectedChapters, setSelectedChapters] = useState<Set<number>>(new Set());
   const [bulkUploading, setBulkUploading] = useState(false);
+  const [bulkProgress, setBulkProgress] = useState({ done: 0, total: 0, phase: "" });
   const [groupSelect, setGroupSelect] = useState(SCANLATION_GROUP_NONE);
   const [groupNewName, setGroupNewName] = useState("");
 
@@ -946,24 +947,65 @@ function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack: () => 
       return;
     }
 
+    const selectedList = Array.from(selectedChapters)
+      .sort((a, b) => a - b)
+      .map((index) => discoveredChapters[index]);
+
     try {
       setBulkUploading(true);
-      let successCount = 0;
-      let failCount = 0;
       const scanlation_group = getScanlationGroupForUpload();
 
-      for (const index of Array.from(selectedChapters).sort((a, b) => a - b)) {
-        const chapter = discoveredChapters[index];
-        
-        try {
-          // Extract images from chapter using server function
-          const result = await $extractImagesFromUrl({ data: { url: chapter.url } });
-          
-          if (!result.success || !result.images) {
-            throw new Error(result.error || "Failed to extract images");
+      // ── Phase 1: Parallel image extraction (batches of 5) ──────────────
+      setBulkProgress({ done: 0, total: selectedList.length, phase: "Extracting images" });
+
+      const BATCH_SIZE = 5;
+      type ExtractionResult = { chapter: ChapterInfo; images: string[] } | { chapter: ChapterInfo; error: string };
+      const extractionResults: ExtractionResult[] = [];
+
+      for (let i = 0; i < selectedList.length; i += BATCH_SIZE) {
+        const batch = selectedList.slice(i, i + BATCH_SIZE);
+        const batchResults = await Promise.allSettled(
+          batch.map(async (chapter) => {
+            const result = await $extractImagesFromUrl({ data: { url: chapter.url } });
+            if (!result.success || !result.images?.length) {
+              throw new Error(result.error || "No images found");
+            }
+            return { chapter, images: result.images };
+          })
+        );
+
+        for (let j = 0; j < batch.length; j++) {
+          const r = batchResults[j];
+          if (r.status === "fulfilled") {
+            extractionResults.push(r.value);
+          } else {
+            extractionResults.push({ chapter: batch[j], error: r.reason?.message ?? "Failed" });
           }
-          
-          // Create chapter
+          setBulkProgress((p) => ({ ...p, done: p.done + 1 }));
+        }
+      }
+
+      const succeeded = extractionResults.filter((r): r is { chapter: ChapterInfo; images: string[] } => "images" in r);
+      const failed = extractionResults.filter((r): r is { chapter: ChapterInfo; error: string } => "error" in r);
+
+      failed.forEach((r) => {
+        console.error(`Failed to extract Chapter ${r.chapter.chapterNumber}:`, r.error);
+        toast.error(`Skipped Chapter ${r.chapter.chapterNumber}: ${r.error}`);
+      });
+
+      if (succeeded.length === 0) {
+        toast.error("No chapters could be extracted");
+        return;
+      }
+
+      // ── Phase 2: Insert chapters & pages ──────────────────────────────
+      setBulkProgress({ done: 0, total: succeeded.length, phase: "Saving to database" });
+
+      let savedCount = 0;
+      let saveFailCount = 0;
+
+      for (const { chapter, images } of succeeded) {
+        try {
           const { data: newChapter, error: chapterError } = await supabase
             .from("chapters")
             .insert({
@@ -984,8 +1026,7 @@ function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack: () => 
 
           if (chapterError) throw chapterError;
 
-          // Insert pages
-          const pages = result.images.map((url, idx) => ({
+          const pages = images.map((url, idx) => ({
             chapter_id: newChapter.id,
             page_number: idx + 1,
             image_url: url,
@@ -994,16 +1035,18 @@ function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack: () => 
           const { error: pagesError } = await supabase.from("chapter_pages").insert(pages);
           if (pagesError) throw pagesError;
 
-          successCount++;
-          toast.success(`Uploaded Chapter ${chapter.chapterNumber}`);
+          savedCount++;
         } catch (error) {
-          failCount++;
-          console.error(`Failed to upload Chapter ${chapter.chapterNumber}:`, error);
-          toast.error(`Failed: Chapter ${chapter.chapterNumber}`);
+          saveFailCount++;
+          console.error(`Failed to save Chapter ${chapter.chapterNumber}:`, error);
+          toast.error(`Failed to save Chapter ${chapter.chapterNumber}`);
         }
+        setBulkProgress((p) => ({ ...p, done: p.done + 1 }));
       }
 
-      toast.success(`Bulk upload complete: ${successCount} succeeded, ${failCount} failed`);
+      toast.success(
+        `Bulk upload complete: ${savedCount} saved${saveFailCount > 0 ? `, ${saveFailCount} failed` : ""}${failed.length > 0 ? `, ${failed.length} skipped` : ""}`
+      );
       setBulkUploadOpen(false);
       setSeriesUrl("");
       setDiscoveredChapters([]);
@@ -1014,6 +1057,7 @@ function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack: () => 
       toast.error(error instanceof Error ? error.message : "Bulk upload failed");
     } finally {
       setBulkUploading(false);
+      setBulkProgress({ done: 0, total: 0, phase: "" });
     }
   };
 
@@ -1193,7 +1237,9 @@ function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack: () => 
                   disabled={selectedChapters.size === 0 || bulkUploading}
                   className="bg-violet-600 hover:bg-violet-700"
                 >
-                  {bulkUploading ? "Uploading..." : `Upload ${selectedChapters.size} Chapter${selectedChapters.size !== 1 ? 's' : ''}`}
+                  {bulkUploading
+                    ? `${bulkProgress.phase} (${bulkProgress.done}/${bulkProgress.total})…`
+                    : `Upload ${selectedChapters.size} Chapter${selectedChapters.size !== 1 ? "s" : ""}`}
                 </Button>
               </DialogFooter>
             </DialogContent>
