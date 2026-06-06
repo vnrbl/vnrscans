@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
-import { useEffect, useState, useRef, useCallback } from "react";
-import { ChevronLeft, ChevronRight, ArrowLeft, BookOpen, Home, List, Maximize, Minimize, Flag, ZoomIn, ZoomOut, Heart, Smile, ThumbsUp, Laugh, Star, MessageSquare, Play, Pause, ArrowUp } from "lucide-react";
+import { useEffect, useState, useRef } from "react";
+import { ChevronLeft, ChevronRight, ArrowLeft, BookOpen, Home, List, Maximize, Minimize, Flag, Heart, Smile, ThumbsUp, Laugh, Star, MessageSquare, Play, Pause, ArrowUp } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -43,18 +43,12 @@ function Reader() {
   // All state hooks must be at the top, before any conditional returns
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [controlsVisible, setControlsVisible] = useState(true);
-  const [zoomLevel, setZoomLevel] = useState(100);
-  const [lastScrollY, setLastScrollY] = useState(0);
-  const [scrollingDown, setScrollingDown] = useState(false);
   const [showChapters, setShowChapters] = useState(false);
   const [showSpeedControl, setShowSpeedControl] = useState(false);
   const [showScrollTop, setShowScrollTop] = useState(false);
   const [isAutoScrolling, setIsAutoScrolling] = useState(false);
   const [autoScrollSpeed, setAutoScrollSpeed] = useState(2);
-  const hideTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const controlsVisibleRef = useRef(true);
-  const lastTapRef = useRef(0);
-  const isDoubleTapToggleRef = useRef(false);
+  const lastScrollYRef = useRef(0);
   const autoScrollIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const chapterQ = useQuery({
@@ -319,70 +313,72 @@ function Reader() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [prev, next, navigate, seriesSlug]);
 
-  // Scroll direction detection - hide controls on scroll down, show ONLY when scrolling up (MOBILE)
+  // Keep reader controls visible only at the top or while scrolling upward.
   useEffect(() => {
     let ticking = false;
     let hideTimeout: NodeJS.Timeout | null = null;
 
+    const clearHideTimeout = () => {
+      if (hideTimeout) {
+        clearTimeout(hideTimeout);
+        hideTimeout = null;
+      }
+    };
+
+    const hideAfterScrollStops = () => {
+      clearHideTimeout();
+      hideTimeout = setTimeout(() => {
+        if (window.scrollY > 8 && !showChapters && !showSpeedControl) {
+          setControlsVisible(false);
+        }
+      }, 1000);
+    };
+
     const handleScroll = () => {
-      // Only apply auto-hide on mobile (screen width < 768px)
-      const isMobile = window.innerWidth < 768;
-      
       if (!ticking) {
         window.requestAnimationFrame(() => {
           const currentScrollY = window.scrollY;
-          
-          // Only update if scrolled more than 10px to avoid jitter
-          if (Math.abs(currentScrollY - lastScrollY) > 10) {
-            const isScrollingDown = currentScrollY > lastScrollY;
-            setScrollingDown(isScrollingDown);
-            setLastScrollY(currentScrollY);
-            
-            if (isMobile && !showChapters && !showSpeedControl) {
-              // MOBILE: Only show when actively scrolling UP, hide otherwise
-              if (!isScrollingDown) {
-                // Scrolling UP - show controls
-                setControlsVisible(true);
-                
-                // Clear any pending hide timeout
-                if (hideTimeout) clearTimeout(hideTimeout);
-                
-                // Hide controls 1 second after user stops scrolling up
-                hideTimeout = setTimeout(() => {
-                  setControlsVisible(false);
-                }, 1000);
-              } else {
-                // Scrolling DOWN - hide immediately
-                setControlsVisible(false);
-                if (hideTimeout) clearTimeout(hideTimeout);
-              }
-              
-              // Hide scroll-to-top on scroll down, show on scroll up (mobile only)
-              if (currentScrollY > 300) {
-                setShowScrollTop(!isScrollingDown);
-              } else {
-                setShowScrollTop(false);
-              }
-            } else if (!isMobile) {
-              // Always visible on desktop
+          const delta = currentScrollY - lastScrollYRef.current;
+
+          if (currentScrollY <= 8) {
+            clearHideTimeout();
+            setControlsVisible(true);
+            setShowScrollTop(false);
+          } else if (showChapters || showSpeedControl) {
+            clearHideTimeout();
+            setControlsVisible(true);
+            setShowScrollTop(currentScrollY > 300);
+          } else if (Math.abs(delta) > 8) {
+            const isScrollingUp = delta < 0;
+
+            if (isScrollingUp) {
               setControlsVisible(true);
-              // Always show scroll-to-top when scrolled >300px (desktop)
-              setShowScrollTop(currentScrollY > 300);
+              hideAfterScrollStops();
+            } else {
+              clearHideTimeout();
+              setControlsVisible(false);
             }
+
+            setShowScrollTop(currentScrollY > 300 && isScrollingUp);
           }
-          
+
+          lastScrollYRef.current = currentScrollY;
           ticking = false;
         });
         ticking = true;
       }
     };
 
+    lastScrollYRef.current = window.scrollY;
+    setControlsVisible(window.scrollY <= 8 || showChapters || showSpeedControl);
+    setShowScrollTop(false);
+
     window.addEventListener("scroll", handleScroll, { passive: true });
     return () => {
       window.removeEventListener("scroll", handleScroll);
-      if (hideTimeout) clearTimeout(hideTimeout);
+      clearHideTimeout();
     };
-  }, [lastScrollY, showChapters, showSpeedControl]);
+  }, [showChapters, showSpeedControl]);
 
   // Fullscreen management
   useEffect(() => {
@@ -446,128 +442,6 @@ function Reader() {
     };
   }, [isAutoScrolling, autoScrollSpeed]);
 
-  // Auto-hide controls after 3 seconds of inactivity (Desktop only)
-  const showControls = useCallback(() => {
-    const isMobile = window.innerWidth < 768;
-    
-    // Skip auto-show if this was triggered right after a double-tap toggle-off
-    if (isDoubleTapToggleRef.current) {
-      isDoubleTapToggleRef.current = false;
-      return;
-    }
-    
-    // On mobile, don't auto-show controls - only scroll up shows them
-    if (isMobile) {
-      return;
-    }
-    
-    // Desktop: show controls
-    setControlsVisible(true);
-    controlsVisibleRef.current = true;
-    if (hideTimeoutRef.current) clearTimeout(hideTimeoutRef.current);
-  }, [showChapters, showSpeedControl]);
-
-  useEffect(() => {
-    // Set initial visibility based on device type
-    const isMobile = window.innerWidth < 768;
-    if (isMobile) {
-      setControlsVisible(false); // Start hidden on mobile
-    } else {
-      showControls(); // Start visible on desktop
-    }
-    return () => {
-      if (hideTimeoutRef.current) clearTimeout(hideTimeoutRef.current);
-    };
-  }, [showControls]);
-
-  // Handle window resize - ensure controls are visible on desktop, hidden on mobile
-  useEffect(() => {
-    const handleResize = () => {
-      const isDesktop = window.innerWidth >= 768;
-      if (isDesktop) {
-        setControlsVisible(true);
-        controlsVisibleRef.current = true;
-        // Clear any pending auto-hide timeout
-        if (hideTimeoutRef.current) clearTimeout(hideTimeoutRef.current);
-      } else {
-        // Mobile: start hidden
-        setControlsVisible(false);
-        controlsVisibleRef.current = false;
-      }
-    };
-
-    window.addEventListener('resize', handleResize);
-    // Run once on mount to set initial state
-    handleResize();
-    
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
-
-  // Show controls on mouse movement (Desktop only) and handle double-tap toggle (Mobile)
-  useEffect(() => {
-    // Desktop: show controls on mouse move
-    const handleMouseActivity = () => {
-      const isDesktop = window.innerWidth >= 768;
-      if (isDesktop) {
-        showControls();
-      }
-    };
-    
-    // Double tap detection for mobile - toggle controls
-    const handleDoubleTap = (e: TouchEvent) => {
-      const isMobile = window.innerWidth < 768;
-      if (!isMobile) return;
-      
-      const currentTime = new Date().getTime();
-      const tapLength = currentTime - lastTapRef.current;
-      
-      if (tapLength < 300 && tapLength > 0) {
-        // Check if tap is in middle area (not on edges)
-        const touch = e.touches[0] || e.changedTouches[0];
-        if (!touch) { lastTapRef.current = currentTime; return; }
-        const screenWidth = window.innerWidth;
-        const tapX = touch.clientX;
-        
-        // Middle 60% of screen
-        if (tapX > screenWidth * 0.2 && tapX < screenWidth * 0.8) {
-          e.preventDefault();
-          e.stopPropagation();
-          
-          const newVisible = !controlsVisibleRef.current;
-          controlsVisibleRef.current = newVisible;
-          setControlsVisible(newVisible);
-          
-          // Clear any existing auto-hide timeout
-          if (hideTimeoutRef.current) clearTimeout(hideTimeoutRef.current);
-          
-          if (newVisible) {
-            // If showing, set auto-hide timer (1 second on mobile)
-            hideTimeoutRef.current = setTimeout(() => {
-              setControlsVisible(false);
-              controlsVisibleRef.current = false;
-            }, 1000);
-          } else {
-            // If hiding via double-tap, prevent other events from showing again
-            isDoubleTapToggleRef.current = true;
-          }
-          
-          // Reset lastTap to prevent triple-tap from re-triggering
-          lastTapRef.current = 0;
-          return;
-        }
-      }
-      lastTapRef.current = currentTime;
-    };
-    
-    document.addEventListener("mousemove", handleMouseActivity);
-    document.addEventListener("touchstart", handleDoubleTap, { passive: false });
-    
-    return () => {
-      document.removeEventListener("mousemove", handleMouseActivity);
-      document.removeEventListener("touchstart", handleDoubleTap);
-    };
-  }, [showControls]);
-
   if (chapterQ.isLoading) {
     return <div className="grid min-h-screen place-items-center bg-background text-muted-foreground">Loading chapter…</div>;
   }
@@ -609,7 +483,7 @@ function Reader() {
     <div className="min-h-screen bg-background">
       {/* Top Bar - Auto-hide */}
       <div 
-        className={`transition-transform duration-300 ${
+        className={`sticky top-0 z-30 transition-transform duration-300 ${
           controlsVisible ? "translate-y-0" : "-translate-y-full"
         }`}
       >
@@ -643,7 +517,6 @@ function Reader() {
               pages={pagesQ.data} 
               loading={pagesQ.isLoading} 
               chapterId={c.id}
-              zoomLevel={zoomLevel}
               hasPrev={!!prev}
               hasNext={!!next}
               onPrev={() => prev && navigate({ to: "/title/$titleSlug/$chapterSlug", params: { titleSlug: seriesSlug, chapterSlug: prev.slug } })}
@@ -673,11 +546,6 @@ function Reader() {
           chapterId={c.id}
           seriesId={c.series_id}
           seriesTitle={c.series?.title ?? ""}
-          isNovel={isNovel}
-          zoomLevel={zoomLevel}
-          onZoomIn={() => setZoomLevel(prev => Math.min(prev + 25, 200))}
-          onZoomOut={() => setZoomLevel(prev => Math.max(prev - 25, 50))}
-          onZoomReset={() => setZoomLevel(100)}
           showChapters={showChapters}
           setShowChapters={setShowChapters}
           showSpeedControl={showSpeedControl}
@@ -890,11 +758,10 @@ function ReaderTopBar({
   );
 }
 
-function ImageView({ pages, loading, chapterId, zoomLevel, hasPrev, hasNext, onPrev, onNext, seriesSlug }: { 
+function ImageView({ pages, loading, chapterId, hasPrev, hasNext, onPrev, onNext, seriesSlug }: { 
   pages?: any[]; 
   loading: boolean; 
   chapterId: string; 
-  zoomLevel: number;
   hasPrev: boolean;
   hasNext: boolean;
   onPrev: () => void;
@@ -902,25 +769,12 @@ function ImageView({ pages, loading, chapterId, zoomLevel, hasPrev, hasNext, onP
   seriesSlug: string;
 }) {
   // ALL HOOKS MUST BE AT THE TOP - BEFORE ANY CONDITIONAL RETURNS
-  const [isMobile, setIsMobile] = useState(false);
   const { user } = useAuth();
-  const containerRef = useRef<HTMLDivElement>(null);
   
   // Image error handling state - moved to top
   const [imageErrors, setImageErrors] = useState<Record<string, boolean>>({});
   const [imageRetries, setImageRetries] = useState<Record<string, number>>({});
   const [imageLoading, setImageLoading] = useState<Record<string, boolean>>({});
-
-  // Detect mobile screen size
-  useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth < 768);
-    };
-    
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
 
   // Scroll position restoration
   useEffect(() => {
@@ -994,18 +848,6 @@ function ImageView({ pages, loading, chapterId, zoomLevel, hasPrev, hasNext, onP
     return <div className="grid min-h-[50vh] place-items-center text-muted-foreground">No pages uploaded for this chapter yet.</div>;
   }
 
-  const handleZoomIn = () => {
-    setZoomLevel(prev => Math.min(prev + 25, 200));
-  };
-
-  const handleZoomOut = () => {
-    setZoomLevel(prev => Math.max(prev - 25, 50));
-  };
-
-  const handleZoomReset = () => {
-    setZoomLevel(100);
-  };
-
   const handleImageError = (pageId: string, imageUrl: string) => {
     setImageLoading(prev => ({ ...prev, [pageId]: false }));
     const retryCount = imageRetries[pageId] || 0;
@@ -1033,7 +875,7 @@ function ImageView({ pages, loading, chapterId, zoomLevel, hasPrev, hasNext, onP
 
   return (
     <>
-      {/* Pages with Zoom (Desktop) / Normal (Mobile) */}
+      {/* Pages */}
       <div className="mx-auto max-w-3xl px-2 py-4">
         {pages.map((p, idx) => (
           <div key={p.id} className="relative">
@@ -1081,8 +923,6 @@ function ImageView({ pages, loading, chapterId, zoomLevel, hasPrev, hasNext, onP
                   fetchPriority={idx < 2 ? "high" : "auto"}
                   className="mx-auto block w-full transition-transform duration-200"
                   style={{ 
-                    transform: isMobile ? 'scale(1)' : `scale(${zoomLevel / 100})`, 
-                    transformOrigin: 'top center',
                     opacity: imageLoading[p.id] ? 0.3 : 1
                   }}
                   onLoad={() => handleImageLoad(p.id)}
@@ -1275,11 +1115,6 @@ function FloatingControls({
   chapterId,
   seriesId,
   seriesTitle,
-  isNovel,
-  zoomLevel,
-  onZoomIn,
-  onZoomOut,
-  onZoomReset,
   showChapters,
   setShowChapters,
   showSpeedControl,
@@ -1297,11 +1132,6 @@ function FloatingControls({
   chapterId: string;
   seriesId: string;
   seriesTitle: string;
-  isNovel?: boolean;
-  zoomLevel?: number;
-  onZoomIn?: () => void;
-  onZoomOut?: () => void;
-  onZoomReset?: () => void;
   showChapters: boolean;
   setShowChapters: (show: boolean) => void;
   showSpeedControl: boolean;
@@ -1418,44 +1248,6 @@ function FloatingControls({
           >
             {scrollSpeed}x
           </button>
-        )}
-
-        {/* Zoom Controls (Image chapters only) */}
-        {!isNovel && zoomLevel !== undefined && onZoomIn && onZoomOut && onZoomReset && (
-          <>
-            <div className="h-px bg-border/50 my-1" />
-            
-            {/* Zoom In */}
-            <button
-              onClick={onZoomIn}
-              disabled={zoomLevel >= 200}
-              className="p-3 rounded-full hover:bg-primary/20 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
-              title="Zoom In"
-            >
-              <ZoomIn className="h-5 w-5" />
-            </button>
-
-            {/* Zoom Level Display & Reset */}
-            <button
-              onClick={onZoomReset}
-              className="p-3 rounded-full hover:bg-primary/20 transition-colors flex items-center justify-center text-xs font-semibold"
-              title="Reset Zoom (100%)"
-            >
-              {zoomLevel}%
-            </button>
-
-            {/* Zoom Out */}
-            <button
-              onClick={onZoomOut}
-              disabled={zoomLevel <= 50}
-              className="p-3 rounded-full hover:bg-primary/20 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
-              title="Zoom Out"
-            >
-              <ZoomOut className="h-5 w-5" />
-            </button>
-            
-            <div className="h-px bg-border/50 my-1" />
-          </>
         )}
 
         {/* Chapter List */}

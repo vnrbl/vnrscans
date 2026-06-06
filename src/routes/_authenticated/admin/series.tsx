@@ -1044,8 +1044,18 @@ function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack: () => 
   });
   const [extracting, setExtracting] = useState(false);
   const [bulkUploadOpen, setBulkUploadOpen] = useState(false);
+  const [deleteUrlOpen, setDeleteUrlOpen] = useState(false);
   const [seriesUrl, setSeriesUrl] = useState("");
   const [imageUrlTypeExample, setImageUrlTypeExample] = useState("");
+  const [deleteUrl, setDeleteUrl] = useState("");
+  const [deleteUrlResults, setDeleteUrlResults] = useState<{
+    id: string;
+    chapter_id: string;
+    page_number: number;
+    image_url: string;
+  }[]>([]);
+  const [deleteUrlLoading, setDeleteUrlLoading] = useState(false);
+  const [deleteUrlStatus, setDeleteUrlStatus] = useState("");
   const [discoveredChapters, setDiscoveredChapters] = useState<ChapterInfo[]>([]);
   const [selectedChapters, setSelectedChapters] = useState<Set<number>>(new Set());
   const [selectedChapterIds, setSelectedChapterIds] = useState<Set<string>>(new Set());
@@ -1263,6 +1273,93 @@ function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack: () => 
     } catch {
       return null;
     }
+  };
+
+  const chapterNumberMap = useMemo(
+    () => new Map((chapters.data ?? []).map((ch) => [ch.id, ch.chapter_number])),
+    [chapters.data]
+  );
+
+  const reindexChapterPages = async (chapterId: string) => {
+    const { data: remainingPages, error: fetchPagesError } = await supabase
+      .from("chapter_pages")
+      .select("id, page_number")
+      .eq("chapter_id", chapterId)
+      .order("page_number", { ascending: true });
+
+    if (fetchPagesError || !remainingPages) return;
+
+    for (let idx = 0; idx < remainingPages.length; idx += 1) {
+      const page = remainingPages[idx];
+      const correctPageNum = idx + 1;
+      if (page.page_number !== correctPageNum) {
+        await supabase
+          .from("chapter_pages")
+          .update({ page_number: correctPageNum })
+          .eq("id", page.id);
+      }
+    }
+  };
+
+  const findAndDeleteUrl = async () => {
+    const trimmedUrl = deleteUrl.trim();
+    if (!trimmedUrl) {
+      toast.error("Please enter a URL to delete.");
+      return;
+    }
+
+    if (!chapters.data || chapters.data.length === 0) {
+      toast.error("No chapters available to search.");
+      return;
+    }
+
+    setDeleteUrlLoading(true);
+    setDeleteUrlResults([]);
+    setDeleteUrlStatus("");
+
+    const chapterIds = chapters.data.map((ch) => ch.id);
+    const { data, error } = await supabase
+      .from("chapter_pages")
+      .select("id, chapter_id, page_number, image_url")
+      .in("chapter_id", chapterIds)
+      .eq("image_url", trimmedUrl);
+
+    if (error) {
+      toast.error(error.message);
+      setDeleteUrlLoading(false);
+      return;
+    }
+
+    if (!data || data.length === 0) {
+      setDeleteUrlStatus("No matches found for that URL.");
+      toast.success("No page entries found with that URL.");
+      setDeleteUrlLoading(false);
+      return;
+    }
+
+    setDeleteUrlResults(data);
+    setDeleteUrlStatus(`Found ${data.length} matching page(s). Deleting...`);
+
+    const { error: deleteError } = await supabase
+      .from("chapter_pages")
+      .delete()
+      .in("id", data.map((page) => page.id));
+
+    if (deleteError) {
+      toast.error(deleteError.message);
+      setDeleteUrlLoading(false);
+      return;
+    }
+
+    const affectedChapterIds = Array.from(new Set(data.map((page) => page.chapter_id)));
+    for (const chapterId of affectedChapterIds) {
+      await reindexChapterPages(chapterId);
+    }
+
+    setDeleteUrlStatus(`Deleted ${data.length} page entries from ${affectedChapterIds.length} chapter(s).`);
+    toast.success(`Deleted ${data.length} matching page entries.`);
+    setDeleteUrlLoading(false);
+    qc.invalidateQueries({ queryKey: ["admin", "chapters", seriesId] });
   };
 
   const toggleChapterSelect = (chapterId: string) => {
@@ -1692,6 +1789,56 @@ function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack: () => 
                   {bulkUploading
                     ? `${bulkProgress.phase} (${bulkProgress.done}/${bulkProgress.total})…`
                     : `Upload ${selectedChapters.size} Chapter${selectedChapters.size !== 1 ? "s" : ""}`}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+          <Dialog open={deleteUrlOpen} onOpenChange={setDeleteUrlOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline" className="border-amber-600 text-amber-600 hover:bg-amber-600 hover:text-white">
+                <Search className="mr-1 h-4 w-4" />
+                Delete by URL
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Delete Chapter Pages by Exact URL</DialogTitle>
+                <DialogDescription>
+                  Paste the exact image URL you want removed. This will search all chapter pages and delete matching entries.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div>
+                  <Label>Image URL to delete</Label>
+                  <Input
+                    placeholder="https://cdn.example.com/path/to/image.jpg"
+                    value={deleteUrl}
+                    onChange={(e) => setDeleteUrl(e.target.value)}
+                  />
+                </div>
+                {deleteUrlStatus && (
+                  <div className="rounded-lg border border-border/50 bg-muted p-3 text-sm text-muted-foreground">
+                    {deleteUrlStatus}
+                  </div>
+                )}
+                {deleteUrlResults.length > 0 && (
+                  <div className="space-y-2">
+                    <Label>Matched Pages</Label>
+                    <div className="max-h-72 overflow-y-auto rounded-lg border border-border/40 bg-background p-3">
+                      {deleteUrlResults.map((result) => (
+                        <div key={result.id} className="rounded-md border border-border/30 p-2 mb-2 last:mb-0">
+                          <div className="text-sm font-medium">Chapter {chapterNumberMap.get(result.chapter_id) ?? "?"}</div>
+                          <div className="text-xs text-muted-foreground">Page {result.page_number}</div>
+                          <div className="text-xs truncate text-foreground/80">{result.image_url}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+              <DialogFooter>
+                <Button type="button" onClick={findAndDeleteUrl} disabled={deleteUrlLoading} className="bg-amber-600 hover:bg-amber-700">
+                  {deleteUrlLoading ? "Searching and deleting..." : "Search and Delete"}
                 </Button>
               </DialogFooter>
             </DialogContent>
