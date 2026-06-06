@@ -37,7 +37,8 @@ function HomeContent() {
   
   // Hidden sections state (stored in localStorage)
   const [hiddenSections, setHiddenSections] = React.useState<Set<string>>(() => {
-    const saved = localStorage.getItem('hiddenHomeSections');
+    if (typeof window === "undefined") return new Set();
+    const saved = window.localStorage.getItem('hiddenHomeSections');
     return saved ? new Set(JSON.parse(saved)) : new Set();
   });
 
@@ -50,7 +51,7 @@ function HomeContent() {
       } else {
         newSet.add(sectionId);
       }
-      localStorage.setItem('hiddenHomeSections', JSON.stringify(Array.from(newSet)));
+      window.localStorage.setItem('hiddenHomeSections', JSON.stringify(Array.from(newSet)));
       return newSet;
     });
   };
@@ -162,7 +163,7 @@ function HomeContent() {
         .select("id,slug,chapter_number,title,created_at,series_id,series:series_id(id,slug,title,cover_url,type,is_hidden)")
         .eq("status", "published")
         .order("created_at", { ascending: false })
-        .limit(1000); // Increased limit to include updates from other series that would otherwise be cut off
+        .limit(500);
 
       if (error) throw error;
 
@@ -198,11 +199,21 @@ function HomeContent() {
         }
       });
 
-      // Convert to array and take first 12 unique series
-      return Array.from(seriesMap.values()).slice(0, 12);
+      // Keep newest-updated series order, but list each series' chapters by highest chapter number first.
+      return Array.from(seriesMap.values())
+        .map((seriesData: any) => ({
+          ...seriesData,
+          recent_chapters: [...seriesData.recent_chapters].sort((a: any, b: any) => {
+            if (b.chapter_number !== a.chapter_number) {
+              return b.chapter_number - a.chapter_number;
+            }
+            return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+          }),
+        }))
+        .slice(0, 12);
     },
-    staleTime: 1000 * 60 * 2, // 2 minutes
-    gcTime: 1000 * 60 * 5, // 5 minutes
+    staleTime: 1000 * 60 * 5,
+    gcTime: 1000 * 60 * 20,
   });
   // High score manhwa
   const highScore = useQuery({
@@ -297,7 +308,7 @@ function HomeContent() {
 
       {/* Show Hidden Sections Button */}
       {hiddenSections.size > 0 && (
-        <section className="container mx-auto px-8 md:px-12 lg:px-16 py-4">
+        <section className="container mx-auto px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16 py-4">
           <div className="rounded-lg border border-border/40 bg-card p-6 text-center">
             <p className="mb-4 text-sm text-muted-foreground">
               {hiddenSections.size} section{hiddenSections.size > 1 ? 's' : ''} hidden
@@ -398,7 +409,7 @@ function ChapterCarouselSection({
   const { scrollRef, scrollBy, dragHandlers } = useDragScroll<HTMLDivElement>();
 
   return (
-    <section className="container mx-auto px-8 md:px-12 lg:px-16 py-4">
+    <section className="container mx-auto px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16 py-4">
       <div className="mb-4 flex items-center justify-between">
         <div>
           <div className="flex items-center gap-2">
@@ -519,7 +530,7 @@ function FollowedUpdatesCarouselSection({
   const { scrollRef, scrollBy, dragHandlers } = useDragScroll<HTMLDivElement>();
 
   return (
-    <section className="container mx-auto px-8 md:px-12 lg:px-16 py-4">
+    <section className="container mx-auto px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16 py-4">
       <div className="mb-4 flex items-center justify-between">
         <div>
           <div className="flex items-center gap-2">
@@ -636,7 +647,7 @@ function SeriesCarouselSection({
   const { scrollRef, scrollBy, dragHandlers } = useDragScroll<HTMLDivElement>();
 
   return (
-    <section className="container mx-auto px-8 md:px-12 lg:px-16 py-4">
+    <section className="container mx-auto px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16 py-4">
       <div className="mb-4 flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold">{title}</h2>
@@ -803,7 +814,7 @@ function LatestUpdatesSection({
   };
 
   return (
-    <section className="container mx-auto px-8 md:px-12 lg:px-16 py-4">
+    <section className="container mx-auto px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16 py-4">
       <div className="mb-4 flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold">{title}</h2>
@@ -971,7 +982,7 @@ function ChapterFeedSection({
   linkVariant: "split" | "seriesOnly";
 }) {
   return (
-    <section className="container mx-auto px-8 py-4">
+    <section className="container mx-auto px-4 py-4">
       <div className="mb-4">
         <div className="flex items-center gap-2">
           {icon}
@@ -982,7 +993,7 @@ function ChapterFeedSection({
         )}
       </div>
       {loading ? (
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+        <div className="grid grid-cols-1 gap-3 min-[380px]:grid-cols-2 sm:grid-cols-3 md:gap-4 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
           {[...Array(6)].map((_, i) => (
             <div key={i} className="overflow-hidden rounded-lg border border-border/40 bg-card">
               <div className="aspect-[2/3] animate-pulse bg-secondary" />
@@ -994,7 +1005,7 @@ function ChapterFeedSection({
           ))}
         </div>
       ) : chapters.length > 0 ? (
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+        <div className="grid grid-cols-1 gap-3 min-[380px]:grid-cols-2 sm:grid-cols-3 md:gap-4 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
           {chapters.map((chapter) => (
             <RecentChapterCard
               key={chapter.id}

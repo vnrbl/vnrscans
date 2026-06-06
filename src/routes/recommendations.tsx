@@ -142,7 +142,7 @@ function RecommendationsPage() {
       <div className="absolute top-[-10%] right-[-10%] h-[400px] w-[400px] rounded-full bg-primary/5 blur-[80px] pointer-events-none" />
       <div className="absolute bottom-[-10%] left-[-10%] h-[450px] w-[450px] rounded-full bg-accent/5 blur-[100px] pointer-events-none" />
 
-      <div className="container mx-auto px-8 md:px-12 lg:px-16 py-8 relative">
+      <div className="container mx-auto px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16 py-8 relative">
         <div className="mb-8">
           <div className="flex items-center gap-3">
             <div className="grid h-12 w-12 place-items-center rounded-xl border border-primary/20 bg-primary/10 text-primary shadow-lg shadow-primary/5">
@@ -163,7 +163,7 @@ function RecommendationsPage() {
             <span className="h-2 w-2 rounded-full bg-primary" /> For You
           </h2>
           {recommendations.isLoading ? (
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+            <div className="grid grid-cols-1 gap-3 min-[380px]:grid-cols-2 sm:grid-cols-3 md:gap-4 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
               {[...Array(12)].map((_, i) => (
                 <div key={i} className="overflow-hidden rounded-xl border border-border/40 bg-card/40 p-1">
                   <div className="aspect-[2/3] animate-pulse rounded-lg bg-secondary" />
@@ -175,7 +175,7 @@ function RecommendationsPage() {
               ))}
             </div>
           ) : recommendations.data && recommendations.data.length > 0 ? (
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+            <div className="grid grid-cols-1 gap-3 min-[380px]:grid-cols-2 sm:grid-cols-3 md:gap-4 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
               {recommendations.data.map((rec: any) => {
                 const series = rec.series;
                 if (!series) return null;
@@ -204,7 +204,7 @@ function RecommendationsPage() {
             <span className="h-2 w-2 rounded-full bg-accent" /> Based on Your Favorite Genres
           </h2>
           {basedOnGenres.isLoading ? (
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+            <div className="grid grid-cols-1 gap-3 min-[380px]:grid-cols-2 sm:grid-cols-3 md:gap-4 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
               {[...Array(12)].map((_, i) => (
                 <div key={i} className="overflow-hidden rounded-xl border border-border/40 bg-card/40 p-1">
                   <div className="aspect-[2/3] animate-pulse rounded-lg bg-secondary" />
@@ -216,7 +216,7 @@ function RecommendationsPage() {
               ))}
             </div>
           ) : basedOnGenres.data && basedOnGenres.data.length > 0 ? (
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+            <div className="grid grid-cols-1 gap-3 min-[380px]:grid-cols-2 sm:grid-cols-3 md:gap-4 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
               {basedOnGenres.data.map((series: any) => (
                 <SeriesCard key={series.id} series={series} />
               ))}

@@ -90,6 +90,8 @@ function Home() {
         readers: userRes.count || 0,
       };
     },
+    staleTime: 1000 * 60 * 10,
+    gcTime: 1000 * 60 * 30,
   });
 
   // Fetch popular series for showcase
@@ -103,6 +105,8 @@ function Home() {
       if (error) throw error;
       return data || [];
     },
+    staleTime: 1000 * 60 * 10,
+    gcTime: 1000 * 60 * 30,
   });
 
   // Mock series data as fallback if no series exist in DB yet
@@ -150,8 +154,8 @@ function Home() {
       <div className="absolute top-[20%] right-[-10%] h-[600px] w-[600px] rounded-full bg-cyan-500/5 blur-[120px] animate-pulse-glow pointer-events-none" style={{ animationDelay: "2s" }} />
 
       {/* ─── Hero Section ─── */}
-      <section className="relative pt-24 pb-16 md:pt-36 md:pb-24 border-b border-border/20">
-        <div className="container mx-auto px-6 md:px-12 lg:px-16 text-center">
+      <section className="relative border-b border-border/20 pb-14 pt-20 sm:pb-16 sm:pt-24 md:pb-24 md:pt-36">
+        <div className="container mx-auto px-4 text-center sm:px-6 md:px-8 lg:px-12 xl:px-16">
           <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-4.5 py-1.5 backdrop-blur-md">
             <Sparkles className="h-4.5 w-4.5 text-primary" />
             <span className="text-xs font-semibold uppercase tracking-wider text-primary">
@@ -159,7 +163,7 @@ function Home() {
             </span>
           </div>
 
-          <h1 className="text-4xl font-extrabold tracking-tight sm:text-6xl lg:text-8xl bg-clip-text text-transparent bg-gradient-to-b from-foreground via-foreground to-muted-foreground/60 leading-[1.1] md:leading-[1.1] max-w-4xl mx-auto">
+          <h1 className="mx-auto max-w-4xl bg-gradient-to-b from-foreground via-foreground to-muted-foreground/60 bg-clip-text text-4xl font-extrabold leading-[1.08] tracking-tight text-transparent sm:text-5xl md:text-6xl lg:text-8xl">
             DISCOVER STORIES
             <br />
             <span className="bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
@@ -167,24 +171,24 @@ function Home() {
             </span>
           </h1>
 
-          <p className="mx-auto mt-8 max-w-2xl text-base text-muted-foreground sm:text-lg md:text-xl leading-relaxed">
+          <p className="mx-auto mt-6 max-w-2xl text-sm leading-relaxed text-muted-foreground sm:mt-8 sm:text-lg md:text-xl">
             Follow your favorite manhwa, track new releases, level up your reader rank, and explore creator-first web novels in a premium reading environment.
           </p>
 
-          <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
-            <Link to="/home">
+          <div className="mt-8 flex flex-col items-stretch justify-center gap-3 sm:mt-10 sm:flex-row sm:items-center sm:gap-4">
+            <Link to="/home" className="w-full sm:w-auto">
               <Button
                 size="lg"
-                className="h-13 px-8 text-sm font-bold rounded-xl bg-primary text-primary-foreground hover:bg-primary/95 transition-all shadow-[0_4px_25px_rgba(174,103,250,0.3)] hover:translate-y-[-2px]"
+                className="h-12 w-full rounded-xl bg-primary px-5 text-sm font-bold text-primary-foreground shadow-[0_4px_25px_rgba(174,103,250,0.3)] transition-all hover:translate-y-[-2px] hover:bg-primary/95 sm:w-auto sm:px-8"
               >
                 Start Reading <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
             </Link>
-            <Link to="/browse">
+            <Link to="/browse" className="w-full sm:w-auto">
               <Button
                 variant="outline"
                 size="lg"
-                className="h-13 px-8 text-sm font-bold rounded-xl border-border bg-card/40 backdrop-blur hover:bg-card/85 hover:text-white transition-all hover:translate-y-[-2px]"
+                className="h-12 w-full rounded-xl border-border bg-card/40 px-5 text-sm font-bold backdrop-blur transition-all hover:translate-y-[-2px] hover:bg-card/85 hover:text-white sm:w-auto sm:px-8"
               >
                 Explore Library
               </Button>
@@ -244,7 +248,7 @@ function Home() {
 
       {/* ─── Featured Showcase Section ─── */}
       <section className="py-20 md:py-28 border-b border-border/20">
-        <div className="container mx-auto px-6 md:px-12 lg:px-16">
+        <div className="container mx-auto px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16">
           <div className="flex flex-col md:flex-row md:items-end justify-between mb-12">
             <div>
               <div className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-accent mb-3">
@@ -327,7 +331,7 @@ function Home() {
 
       {/* ─── Value Propositions (Showroom) ─── */}
       <section className="py-20 md:py-28 bg-secondary/5 border-b border-border/20">
-        <div className="container mx-auto px-6 md:px-12 lg:px-16">
+        <div className="container mx-auto px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16">
           <div className="text-center max-w-2xl mx-auto mb-16">
             <div className="inline-flex items-center gap-1 text-xs font-bold uppercase tracking-wider text-primary mb-3">
               <Sparkles className="h-4 w-4" /> Ultimate Reader
@@ -389,7 +393,7 @@ function Home() {
 
       {/* ─── Trust, Legal & Compliance Section ─── */}
       <section className="py-20 md:py-28 border-b border-border/20">
-        <div className="container mx-auto px-6 md:px-12 lg:px-16">
+        <div className="container mx-auto px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16">
           <div className="grid gap-12 lg:grid-cols-2 items-center">
             <div>
               <div className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-accent mb-3">

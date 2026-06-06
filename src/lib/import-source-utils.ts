@@ -14,13 +14,13 @@ const SOURCE_PRESETS: Array<{
     hostIncludes: "qimanhwa.com",
     sourceSite: "Qi Scans",
     scanlationGroup: "Qi Scans",
-    imageUrlExample: "https://media.qimanhwa.com/file/qiscans/upload/rezo/series/example/chapter/001.jpg",
+    imageUrlExample: "https://media.qimanhwa.com/file/qiscans/upload/upload/series/example/chapter/page_001.webp",
   },
   {
     hostIncludes: "qiscans.org",
     sourceSite: "Qi Scans",
     scanlationGroup: "Qi Scans",
-    imageUrlExample: "https://media.qimanhwa.com/file/qiscans/upload/rezo/series/example/chapter/001.jpg",
+    imageUrlExample: "https://media.qimanhwa.com/file/qiscans/upload/upload/series/example/chapter/page_001.webp",
   },
   {
     hostIncludes: "asurascans.com",

@@ -99,19 +99,19 @@ function AdminLayout() {
   );
 
   return (
-    <div className="container mx-auto grid gap-6 px-8 md:px-12 lg:px-16 py-6 md:grid-cols-[220px_1fr]">
-      <aside className="md:sticky md:top-20 md:max-h-[calc(100vh-6rem)] md:self-start md:overflow-y-auto">
+    <div className="container mx-auto grid gap-4 px-4 py-4 sm:px-6 md:grid-cols-[220px_1fr] md:gap-6 md:px-8 md:py-6 lg:px-12 xl:px-16">
+      <aside className="min-w-0 md:sticky md:top-20 md:max-h-[calc(100vh-6rem)] md:self-start md:overflow-y-auto">
         <div className="mb-3 px-3 py-1 text-2xs font-extrabold text-primary uppercase tracking-widest bg-primary/10 rounded-md border border-primary/20 w-fit">
           {panelTitle}
         </div>
-        <nav className="rounded-lg border border-border/40 bg-card p-2">
+        <nav className="flex gap-2 overflow-x-auto rounded-lg border border-border/40 bg-card p-2 md:block md:space-y-1 md:overflow-visible">
           {visibleItems.map((it) => (
             <Link
               key={it.to}
               to={it.to}
               activeProps={{ className: "bg-primary/15 text-primary" }}
               activeOptions={{ exact: it.exact }}
-              className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-secondary hover:text-foreground"
+              className="flex shrink-0 items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-secondary hover:text-foreground md:shrink"
             >
               <it.icon className="h-4 w-4" />{it.label}
             </Link>

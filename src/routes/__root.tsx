@@ -8,7 +8,7 @@ import {
   Scripts,
   useRouterState,
 } from "@tanstack/react-router";
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { Analytics } from "@vercel/analytics/react";
 
 import appCss from "../styles.css?url";
@@ -25,7 +25,7 @@ import { ReaderSettingsProvider } from "@/contexts/ReaderSettingsContext";
 
 function NotFoundComponent() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-8">
+    <div className="flex min-h-screen items-center justify-center bg-background px-4 sm:px-6 md:px-8">
       <div className="max-w-md text-center">
         <h1 className="text-7xl font-bold text-foreground">404</h1>
         <h2 className="mt-4 text-xl font-semibold text-foreground">Page not found</h2>
@@ -53,7 +53,7 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   }, [error]);
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-8">
+    <div className="flex min-h-screen items-center justify-center bg-background px-4 sm:px-6 md:px-8">
       <div className="max-w-md text-center">
         <h1 className="text-xl font-semibold tracking-tight text-foreground">
           This page didn't load
@@ -147,11 +147,33 @@ function AppShell() {
   const queryClient = useQueryClient();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const bare = isReaderLayoutPath(pathname) || pathname === "/auth";
+  const lastAuthUserId = useRef<string | null | undefined>(undefined);
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      const nextUserId = session?.user?.id ?? null;
+      if (event === "INITIAL_SESSION" || event === "TOKEN_REFRESHED") {
+        lastAuthUserId.current = nextUserId;
+        return;
+      }
+
+      if (lastAuthUserId.current === nextUserId && event !== "USER_UPDATED") {
+        return;
+      }
+
+      lastAuthUserId.current = nextUserId;
       router.invalidate();
-      queryClient.invalidateQueries();
+      queryClient.invalidateQueries({
+        predicate: (query) => {
+          const key = query.queryKey[0];
+          return typeof key === "string" && (
+            key.includes("user") ||
+            key.includes("profile") ||
+            key.includes("library") ||
+            key.includes("notification")
+          );
+        },
+      });
     });
     return () => subscription.unsubscribe();
   }, [router, queryClient]);

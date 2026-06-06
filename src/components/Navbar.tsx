@@ -253,7 +253,7 @@ export function Navbar() {
 
   return (
     <header className="sticky top-0 z-40 border-b border-border/50 bg-background/95 backdrop-blur-md supports-[backdrop-filter]:bg-background/60">
-      <div className="container mx-auto flex h-16 items-center px-8 md:px-12 lg:px-16 relative">
+      <div className="container mx-auto flex h-16 items-center px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16 relative">
         {/* Logo */}
         <div className="flex-1 flex items-center justify-start">
           <Link to="/home" className="flex shrink-0 items-center gap-2 transition-transform hover:scale-105">

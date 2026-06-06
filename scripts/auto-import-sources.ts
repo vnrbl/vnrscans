@@ -1,6 +1,10 @@
 import { createClient } from '@supabase/supabase-js';
 import { config } from 'dotenv';
-import { extractChaptersFromSeriesUrl, extractImagesFromChapterUrl } from '../src/lib/chapter-scraper';
+import {
+  extractChaptersFromSeriesUrl,
+  extractImagesFromChapterUrl,
+  extractImagesFromChapterUrls,
+} from '../src/lib/chapter-scraper';
 import { buildChapterSlug } from '../src/lib/chapter-utils';
 import { detectImportSource } from '../src/lib/import-source-utils';
 
@@ -76,10 +80,14 @@ async function syncSource(source: any) {
       .slice(0, maxChaptersPerSource);
 
     skipped = discovered.length - missing.length;
+    const batchExtractedImages = await extractImagesFromChapterUrls(
+      missing.map((chapter) => chapter.url),
+      { concurrency: 2 },
+    );
 
     for (const chapter of missing) {
       try {
-        const images = await extractImagesFromChapterUrl(chapter.url);
+        const images = batchExtractedImages.get(chapter.url) ?? await extractImagesFromChapterUrl(chapter.url);
         if (images.length === 0) throw new Error('No images found');
 
         const slug = buildChapterSlug(chapter.chapterNumber, {

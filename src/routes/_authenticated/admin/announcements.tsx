@@ -300,7 +300,7 @@ function AnnouncementFormFields({
         <Label>Content *</Label>
         <Textarea rows={4} value={form.content} onChange={(e) => setForm({ ...form, content: e.target.value })} />
       </div>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid gap-3 sm:grid-cols-2">
         <div>
           <Label>Type</Label>
           <Select value={form.type} onValueChange={(v) => setForm({ ...form, type: v })}>
@@ -319,7 +319,7 @@ function AnnouncementFormFields({
           <Input type="number" value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value })} />
         </div>
       </div>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid gap-3 sm:grid-cols-2">
         <div>
           <Label>Target audience</Label>
           <Select value={form.target_audience} onValueChange={(v) => setForm({ ...form, target_audience: v })}>
@@ -341,7 +341,7 @@ function AnnouncementFormFields({
         <Label>Banner color</Label>
         <Input type="color" value={form.banner_color} onChange={(e) => setForm({ ...form, banner_color: e.target.value })} />
       </div>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid gap-3 sm:grid-cols-2">
         <div>
           <Label>Starts at</Label>
           <Input type="datetime-local" value={form.starts_at} onChange={(e) => setForm({ ...form, starts_at: e.target.value })} />

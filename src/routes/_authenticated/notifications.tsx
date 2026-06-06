@@ -194,7 +194,7 @@ function NotificationsPage() {
   }, {});
 
   return (
-    <div className="container mx-auto max-w-4xl px-4 py-6 sm:px-8">
+    <div className="container mx-auto max-w-4xl px-4 py-6 sm:px-6 md:px-8">
       {/* Header */}
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">

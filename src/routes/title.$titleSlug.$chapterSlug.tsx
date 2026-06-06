@@ -54,8 +54,6 @@ function Reader() {
   const chapterQ = useQuery({
     queryKey: ["chapter", titleSlug, chapterSlug],
     queryFn: async () => {
-      console.log(`Loading chapter: titleSlug=${titleSlug}, chapterSlug=${chapterSlug}`);
-      
       // First get the series to ensure it exists
       const { data: seriesData, error: seriesError } = await supabase
         .from("series")
@@ -64,15 +62,11 @@ function Reader() {
         .single();
       
       if (seriesError) {
-        console.error(`Series error for slug ${titleSlug}:`, seriesError);
         throw seriesError;
       }
       if (!seriesData) {
-        console.error(`No series found for slug: ${titleSlug}`);
         throw new Error(`Series "${titleSlug}" not found`);
       }
-
-      console.log(`Found series: ${seriesData.title} (ID: ${seriesData.id})`);
 
       // Then get the chapter that belongs to this series
       const { data, error } = await supabase
@@ -83,18 +77,17 @@ function Reader() {
         .maybeSingle();
       
       if (error) {
-        console.error(`Chapter error for slug ${chapterSlug} in series ${seriesData.id}:`, error);
         throw error;
       }
       
       if (!data) {
-        console.error(`No chapter found: chapterSlug=${chapterSlug}, seriesId=${seriesData.id}`);
         throw new Error(`Chapter "${chapterSlug}" not found in series "${seriesData.title}"`);
       }
 
-      console.log(`Found chapter: Ch.${data.chapter_number} in ${data.series?.title} (Chapter ID: ${data.id})`);
       return data;
     },
+    staleTime: 1000 * 60 * 5,
+    gcTime: 1000 * 60 * 20,
   });
 
   const pagesQ = useQuery({
@@ -109,6 +102,8 @@ function Reader() {
       return data ?? [];
     },
     enabled: !!chapterQ.data && chapterQ.data.chapter_type === "image",
+    staleTime: 1000 * 60 * 30,
+    gcTime: 1000 * 60 * 60,
   });
 
   const activeScanlationGroup = chapterQ.data?.scanlation_group ?? null;
@@ -116,7 +111,6 @@ function Reader() {
   const siblingsQ = useQuery({
     queryKey: ["chapter-siblings", chapterQ.data?.series?.id, activeScanlationGroup],
     queryFn: async () => {
-      console.log(`Loading siblings for series ID: ${chapterQ.data!.series!.id}`);
       let query = supabase
         .from("chapters")
         .select("id,slug,chapter_number,scanlation_group")
@@ -131,13 +125,13 @@ function Reader() {
 
       const { data, error } = await query.order("chapter_number");
       if (error) {
-        console.error("Siblings query error:", error);
         throw error;
       }
-      console.log(`Found ${data?.length || 0} sibling chapters`);
       return data ?? [];
     },
     enabled: !!chapterQ.data?.series?.id,
+    staleTime: 1000 * 60 * 5,
+    gcTime: 1000 * 60 * 20,
   });
 
   const alternateGroupsQ = useQuery({
@@ -158,6 +152,8 @@ function Reader() {
       return data ?? [];
     },
     enabled: !!chapterQ.data?.series_id && chapterQ.data?.chapter_number != null,
+    staleTime: 1000 * 60 * 5,
+    gcTime: 1000 * 60 * 20,
   });
 
   // Save reading history with scroll progress
@@ -679,7 +675,7 @@ function ReaderTopBar({
 
   return (
     <header className="sticky top-0 z-30 border-b border-border/50 bg-background/90 backdrop-blur">
-      <div className="container mx-auto flex items-center justify-between gap-2 px-8 py-3">
+      <div className="container mx-auto flex items-center justify-between gap-2 px-4 py-3">
         <Link to="/title/$slug" params={{ slug: seriesSlug }} className="flex min-w-0 items-center gap-2 text-sm">
           <ArrowLeft className="h-4 w-4" />
           <div className="min-w-0">
@@ -718,7 +714,7 @@ function ReaderTopBar({
               value={currentChapterSlug}
               onValueChange={(slug) => navigate({ to: "/title/$titleSlug/$chapterSlug", params: { titleSlug: seriesSlug, chapterSlug: slug } })}
             >
-              <SelectTrigger className="w-[180px]">
+              <SelectTrigger className="w-full min-[420px]:w-[180px]">
                 <List className="mr-2 h-4 w-4" />
                 <SelectValue placeholder="Select Chapter" />
               </SelectTrigger>
@@ -1573,6 +1569,7 @@ function ChapterReactions({ chapterId }: { chapterId: string }) {
       });
       return counts;
     },
+    staleTime: 1000 * 60 * 2,
   });
 
   // Fetch user's reactions
@@ -1590,6 +1587,7 @@ function ChapterReactions({ chapterId }: { chapterId: string }) {
       return data?.map((r) => r.reaction_type) || [];
     },
     enabled: !!user,
+    staleTime: 1000 * 60 * 2,
   });
 
   // Toggle reaction

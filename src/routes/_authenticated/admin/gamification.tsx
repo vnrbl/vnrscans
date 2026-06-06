@@ -476,7 +476,7 @@ function AdminGamification() {
 function AchievementFormFields({ form, setForm }: { form: AchievementForm; setForm: (form: AchievementForm) => void }) {
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid gap-3 sm:grid-cols-2">
         <div>
           <Label>Name *</Label>
           <Input
@@ -507,7 +507,7 @@ function AchievementFormFields({ form, setForm }: { form: AchievementForm; setFo
         />
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid gap-3 sm:grid-cols-2">
         <div>
           <Label>Category</Label>
           <Select value={form.category} onValueChange={(v) => setForm({ ...form, category: v })}>
@@ -540,7 +540,7 @@ function AchievementFormFields({ form, setForm }: { form: AchievementForm; setFo
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid gap-3 sm:grid-cols-2">
         <div>
           <Label>Requirement Type</Label>
           <Select value={form.requirement_type} onValueChange={(v) => setForm({ ...form, requirement_type: v })}>
@@ -568,7 +568,7 @@ function AchievementFormFields({ form, setForm }: { form: AchievementForm; setFo
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid gap-3 sm:grid-cols-2">
         <div>
           <Label>XP Reward</Label>
           <Input
@@ -625,7 +625,7 @@ function XPEventFormFields({ form, setForm }: { form: XPEventForm; setForm: (for
         />
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid gap-3 sm:grid-cols-2">
         <div>
           <Label>XP Multiplier</Label>
           <Input
@@ -652,7 +652,7 @@ function XPEventFormFields({ form, setForm }: { form: XPEventForm; setForm: (for
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid gap-3 sm:grid-cols-2">
         <div>
           <Label>Starts At *</Label>
           <Input

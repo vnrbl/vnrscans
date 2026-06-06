@@ -22,7 +22,7 @@ function AboutPage() {
       {/* Background glow */}
       <div className="absolute top-[-10%] right-[-10%] h-[400px] w-[400px] rounded-full bg-violet-600/5 blur-[80px] pointer-events-none" />
 
-      <div className="container mx-auto max-w-4xl px-8">
+      <div className="container mx-auto max-w-4xl px-4 sm:px-6 md:px-8">
         {/* Back Link */}
         <Link to="/" className="inline-flex items-center gap-1 text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors mb-8">
           <ArrowLeft className="h-4.5 w-4.5" /> Back to landing

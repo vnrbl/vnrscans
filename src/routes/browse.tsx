@@ -95,6 +95,8 @@ function BrowsePage() {
       if (error) throw error;
       return data ?? [];
     },
+    staleTime: 1000 * 60 * 10,
+    gcTime: 1000 * 60 * 30,
   });
 
   // Fetch tags
@@ -108,6 +110,8 @@ function BrowsePage() {
       if (error) throw error;
       return (data ?? []) as any[];
     },
+    staleTime: 1000 * 60 * 10,
+    gcTime: 1000 * 60 * 30,
   });
 
   // Toggle type filter
@@ -309,14 +313,16 @@ function BrowsePage() {
       
       return searchQuery ? rankSeriesResults(filtered, preparedSearch) : filtered;
     },
+    staleTime: 1000 * 60 * 5,
+    gcTime: 1000 * 60 * 20,
   });
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="container mx-auto px-8 md:px-12 lg:px-16 py-8">
+      <div className="container mx-auto px-4 py-6 sm:px-6 md:px-8 lg:px-12 xl:px-16">
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold tracking-tight">Browse Manga</h1>
+        <div className="mb-6 sm:mb-8">
+          <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">Browse Manga</h1>
           <p className="mt-2 text-muted-foreground">Discover your next favorite series</p>
         </div>
 
@@ -335,11 +341,11 @@ function BrowsePage() {
         </div>
 
         {/* All Filters in One Row */}
-        <div className="mb-6 flex flex-wrap items-center gap-3">
+        <div className="mb-6 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center sm:gap-3">
           {/* Type Multi-Select Dropdown */}
           <Popover>
             <PopoverTrigger asChild>
-              <Button variant="outline" className="h-9 min-w-[140px] justify-start">
+              <Button variant="outline" className="h-9 w-full justify-start sm:min-w-[140px] sm:w-auto">
                 {typeFilters.length > 0 ? (
                   <span className="truncate">
                     Type ({typeFilters.length})
@@ -349,7 +355,7 @@ function BrowsePage() {
                 )}
               </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-[200px] p-0" align="start">
+            <PopoverContent className="w-[min(200px,calc(100vw-1rem))] p-0" align="start">
               <Command>
                 <CommandGroup>
                   {typeOptions.map((type) => (
@@ -380,7 +386,7 @@ function BrowsePage() {
           {/* Genre Multi-Select Dropdown */}
           <Popover>
             <PopoverTrigger asChild>
-              <Button variant="outline" className="h-9 min-w-[140px] justify-start">
+              <Button variant="outline" className="h-9 w-full justify-start sm:min-w-[140px] sm:w-auto">
                 {genreFilters.length > 0 ? (
                   <span className="truncate">
                     Genre ({genreFilters.length})
@@ -390,12 +396,12 @@ function BrowsePage() {
                 )}
               </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-[700px] p-3" align="start">
+            <PopoverContent className="w-[calc(100vw-1rem)] p-3 sm:w-[min(700px,calc(100vw-2rem))]" align="start">
               <div className="mb-2 text-sm font-medium">Select Genres</div>
               {genres.isLoading ? (
                 <div className="p-2 text-sm text-muted-foreground">Loading...</div>
               ) : (
-                <div className="grid grid-cols-5 gap-1">
+                <div className="grid max-h-[55vh] grid-cols-1 gap-1 overflow-y-auto min-[420px]:grid-cols-2 sm:grid-cols-3 lg:grid-cols-5">
                   {genres.data?.map((genre) => (
                     <div
                       key={genre.id}
@@ -425,7 +431,7 @@ function BrowsePage() {
           {/* Tag Multi-Select Dropdown */}
           <Popover>
             <PopoverTrigger asChild>
-              <Button variant="outline" className="h-9 min-w-[140px] justify-start">
+              <Button variant="outline" className="h-9 w-full justify-start sm:min-w-[140px] sm:w-auto">
                 {tagFilters.length > 0 ? (
                   <span className="truncate">
                     Tag ({tagFilters.length})
@@ -435,12 +441,12 @@ function BrowsePage() {
                 )}
               </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-[700px] p-3" align="start">
+            <PopoverContent className="w-[calc(100vw-1rem)] p-3 sm:w-[min(700px,calc(100vw-2rem))]" align="start">
               <div className="mb-2 text-sm font-medium">Select Tags</div>
               {tags.isLoading ? (
                 <div className="p-2 text-sm text-muted-foreground">Loading...</div>
               ) : (
-                <div className="grid grid-cols-5 gap-1">
+                <div className="grid max-h-[55vh] grid-cols-1 gap-1 overflow-y-auto min-[420px]:grid-cols-2 sm:grid-cols-3 lg:grid-cols-5">
                   {tags.data?.map((tag) => (
                     <div
                       key={tag.id}
@@ -469,7 +475,7 @@ function BrowsePage() {
 
           {/* Status Filter */}
           <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="h-9 w-[140px]">
+            <SelectTrigger className="h-9 w-full sm:w-[140px]">
               <SelectValue placeholder="Status" />
             </SelectTrigger>
             <SelectContent>
@@ -482,7 +488,7 @@ function BrowsePage() {
 
           {/* Content Rating Filter */}
           <Select value={contentRating} onValueChange={setContentRating}>
-            <SelectTrigger className="h-9 w-[140px]">
+            <SelectTrigger className="h-9 w-full sm:w-[140px]">
               <SelectValue placeholder="Rating" />
             </SelectTrigger>
             <SelectContent>
@@ -495,7 +501,7 @@ function BrowsePage() {
           </Select>
 
           {/* Duration Filter */}          <Select value={duration} onValueChange={setDuration}>
-            <SelectTrigger className="h-9 w-[140px]">
+            <SelectTrigger className="h-9 w-full sm:w-[140px]">
               <SelectValue placeholder="Duration" />
             </SelectTrigger>
             <SelectContent>
@@ -507,7 +513,7 @@ function BrowsePage() {
           </Select>
 
           <Select value={sortBy} onValueChange={setSortBy}>
-            <SelectTrigger className="h-9 w-[140px]">
+            <SelectTrigger className="h-9 w-full sm:w-[140px]">
               <SelectValue placeholder="Sort By" />
             </SelectTrigger>
             <SelectContent>

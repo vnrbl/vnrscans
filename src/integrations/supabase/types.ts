@@ -366,6 +366,7 @@ export type Database = {
           artist: string | null
           author: string | null
           cover_url: string | null
+          content_rating: Database["public"]["Enums"]["content_rating"]
           created_at: string
           description: string | null
           id: string
@@ -386,6 +387,7 @@ export type Database = {
           artist?: string | null
           author?: string | null
           cover_url?: string | null
+          content_rating?: Database["public"]["Enums"]["content_rating"]
           created_at?: string
           description?: string | null
           id?: string
@@ -406,6 +408,7 @@ export type Database = {
           artist?: string | null
           author?: string | null
           cover_url?: string | null
+          content_rating?: Database["public"]["Enums"]["content_rating"]
           created_at?: string
           description?: string | null
           id?: string
@@ -506,6 +509,7 @@ export type Database = {
       app_role: "user" | "moderator" | "admin" | "uploader"
       chapter_status: "draft" | "published" | "scheduled"
       chapter_type: "image" | "novel"
+      content_rating: "safe" | "suggestive" | "nsfw" | "pornographic"
       report_status: "open" | "reviewing" | "resolved" | "dismissed"
       series_status: "ongoing" | "completed" | "hiatus"
       series_type: "manga" | "manhwa" | "manhua" | "novel"
@@ -639,6 +643,7 @@ export const Constants = {
       app_role: ["user", "moderator", "admin", "uploader"],
       chapter_status: ["draft", "published", "scheduled"],
       chapter_type: ["image", "novel"],
+      content_rating: ["safe", "suggestive", "nsfw", "pornographic"],
       report_status: ["open", "reviewing", "resolved", "dismissed"],
       series_status: ["ongoing", "completed", "hiatus"],
       series_type: ["manga", "manhwa", "manhua", "novel"],

@@ -82,6 +82,29 @@ function slugify(s: string) {
 const seriesTypes = ["manga", "manhwa", "manhua", "novel"] as const;
 const seriesStatuses = ["ongoing", "completed", "hiatus"] as const;
 const chapterStatuses = ["draft", "published", "scheduled"] as const;
+const contentRatings = ["safe", "suggestive", "nsfw", "pornographic"] as const;
+type ContentRating = (typeof contentRatings)[number];
+
+const contentRatingLabels: Record<ContentRating, string> = {
+  safe: "Safe",
+  suggestive: "Suggestive",
+  nsfw: "NSFW",
+  pornographic: "Pornographic",
+};
+
+const contentRatingHints: Record<ContentRating, string> = {
+  safe: "General or non-sexual content.",
+  suggestive: "Mild fanservice, teasing, ecchi, or mature themes.",
+  nsfw: "Explicit mature nudity, smut, adult, hentai, or 18+ tags.",
+  pornographic: "Porn, sex, hardcore, yaoi/yuri adult, or pornographic tags.",
+};
+
+const contentRatingRank: Record<ContentRating, number> = {
+  safe: 0,
+  suggestive: 1,
+  nsfw: 2,
+  pornographic: 3,
+};
 
 type SeriesForm = {
   title: string;
@@ -93,6 +116,8 @@ type SeriesForm = {
   cover_url: string;
   release_year: string;
   alternative_titles: string;
+  content_rating: ContentRating;
+  content_rating_auto: boolean;
   is_featured: boolean;
   is_trending: boolean;
   is_hidden: boolean;
@@ -141,6 +166,8 @@ const emptySeriesForm: SeriesForm = {
   cover_url: "",
   release_year: "",
   alternative_titles: "",
+  content_rating: "safe",
+  content_rating_auto: true,
   is_featured: false,
   is_trending: false,
   is_hidden: false,
@@ -162,6 +189,8 @@ function seriesToForm(series: any): SeriesForm {
     cover_url: series.cover_url ?? "",
     release_year: series.release_year ? String(series.release_year) : "",
     alternative_titles: series.alternative_titles ?? "",
+    content_rating: (series.content_rating ?? "safe") as ContentRating,
+    content_rating_auto: false,
     is_featured: Boolean(series.is_featured),
     is_trending: Boolean(series.is_trending),
     is_hidden: Boolean(series.is_hidden),
@@ -185,6 +214,7 @@ function seriesPayloadFromForm(form: SeriesForm) {
     cover_url: form.cover_url || null,
     release_year: form.release_year ? parseInt(form.release_year, 10) : null,
     alternative_titles: form.alternative_titles || null,
+    content_rating: form.content_rating,
     is_featured: form.is_featured,
     is_trending: form.is_trending,
     is_hidden: form.is_hidden,
@@ -207,6 +237,96 @@ function namesFromInput(value: string) {
     .split(",")
     .map((name) => name.trim())
     .filter(Boolean);
+}
+
+function normalizeRatingTag(value: string) {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9+]+/g, " ")
+    .trim();
+}
+
+function ratingForTagName(name: string): ContentRating {
+  const tag = normalizeRatingTag(name);
+  if (!tag) return "safe";
+
+  const pornographicTerms = [
+    "porn",
+    "pornographic",
+    "hardcore",
+    "sex",
+    "sexual content",
+    "explicit sex",
+    "intercourse",
+    "incest",
+    "rape",
+    "non consent",
+    "netorare",
+    "ntr",
+    "adult yaoi",
+    "adult yuri",
+  ];
+  if (pornographicTerms.some((term) => tag.includes(term))) return "pornographic";
+
+  const nsfwTerms = [
+    "nsfw",
+    "18",
+    "18+",
+    "adult",
+    "smut",
+    "hentai",
+    "mature",
+    "explicit",
+    "nudity",
+    "nude",
+    "lewd",
+    "uncensored",
+  ];
+  if (nsfwTerms.some((term) => tag.includes(term))) return "nsfw";
+
+  const suggestiveTerms = [
+    "suggestive",
+    "ecchi",
+    "fanservice",
+    "sexy",
+    "sensual",
+    "romance mature",
+    "mild nudity",
+    "revealing",
+  ];
+  if (suggestiveTerms.some((term) => tag.includes(term))) return "suggestive";
+
+  return "safe";
+}
+
+function inferContentRating(tagNames: string[]) {
+  return tagNames.reduce<ContentRating>((highest, tagName) => {
+    const rating = ratingForTagName(tagName);
+    return contentRatingRank[rating] > contentRatingRank[highest] ? rating : highest;
+  }, "safe");
+}
+
+function ratingScanTermsFromForm(
+  form: SeriesForm,
+  genres: GenreOption[],
+  tags: TagOption[],
+) {
+  const selectedTagNames = tags
+    .filter((tag) => form.tag_ids.includes(tag.id))
+    .map((tag) => tag.name);
+  const selectedGenreNames = genres
+    .filter((genre) => form.genre_ids.includes(genre.id))
+    .map((genre) => genre.name);
+
+  return [
+    ...selectedTagNames,
+    ...selectedGenreNames,
+    ...namesFromInput(form.new_tags),
+    ...namesFromInput(form.new_genres),
+    form.title,
+    form.alternative_titles,
+    form.description,
+  ].filter(Boolean);
 }
 
 function uniqueIds(ids: string[]) {
@@ -302,7 +422,7 @@ function AdminSeries() {
       let query = supabase
         .from("series")
         .select(
-          "*,series_genres(genre_id,genre:genres(id,name,slug)),series_tags(tag_id,tag:tags(id,name,slug,color,icon))",
+          "id,slug,title,cover_url,type,status,content_rating,rating_average,view_count,release_year,author,artist,is_featured,is_trending,is_hidden,chapter_count,updated_at,series_genres(genre_id,genre:genres(id,name,slug)),series_tags(tag_id,tag:tags(id,name,slug,color,icon))",
           { count: "exact" },
         )
         .order("updated_at", { ascending: false });
@@ -352,6 +472,8 @@ function AdminSeries() {
       if (error) throw error;
       return (data ?? []) as GenreOption[];
     },
+    staleTime: 10 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
   });
 
   const tags = useQuery({
@@ -364,6 +486,8 @@ function AdminSeries() {
       if (error) throw error;
       return (data ?? []) as TagOption[];
     },
+    staleTime: 10 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
   });
 
   const create = useMutation({
@@ -488,9 +612,9 @@ function AdminSeries() {
         </div>
 
         {/* Filter Row */}
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="grid grid-cols-1 gap-3 min-[420px]:grid-cols-2 sm:flex sm:flex-wrap sm:items-center">
           <Select value={typeFilter} onValueChange={setTypeFilter}>
-            <SelectTrigger className="w-[140px]">
+            <SelectTrigger className="w-full sm:w-[140px]">
               <SelectValue placeholder="Type" />
             </SelectTrigger>
             <SelectContent>
@@ -503,7 +627,7 @@ function AdminSeries() {
           </Select>
 
           <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-[140px]">
+            <SelectTrigger className="w-full sm:w-[140px]">
               <SelectValue placeholder="Status" />
             </SelectTrigger>
             <SelectContent>
@@ -515,7 +639,7 @@ function AdminSeries() {
           </Select>
 
           <Select value={visibilityFilter} onValueChange={setVisibilityFilter}>
-            <SelectTrigger className="w-[140px]">
+            <SelectTrigger className="w-full sm:w-[140px]">
               <SelectValue placeholder="Visibility" />
             </SelectTrigger>
             <SelectContent>
@@ -588,7 +712,8 @@ function AdminSeries() {
                 {s.is_hidden && <Badge variant="secondary">Hidden</Badge>}
               </div>
               <div className="text-xs text-muted-foreground">
-                {s.status} · {Number(s.rating_average || 0).toFixed(1)}★ · {s.view_count} views ·{" "}
+                {s.status} · {contentRatingLabels[((s.content_rating ?? "safe") as ContentRating)]} ·{" "}
+                {Number(s.rating_average || 0).toFixed(1)}★ · {s.view_count} views ·{" "}
                 {s.chapter_count || 0} chapters
               </div>
               <div className="mt-1 flex flex-wrap gap-1">
@@ -765,6 +890,62 @@ function SeriesFormFields({
   genres: GenreOption[];
   tags: TagOption[];
 }) {
+  const selectedTagNames = useMemo(() => {
+    const selectedExistingTags = tags
+      .filter((tag) => form.tag_ids.includes(tag.id))
+      .map((tag) => tag.name);
+    return [...selectedExistingTags, ...namesFromInput(form.new_tags)];
+  }, [form.new_tags, form.tag_ids, tags]);
+  const [tagSearch, setTagSearch] = useState("");
+  const [showAllTags, setShowAllTags] = useState(false);
+  const filteredTags = useMemo(() => {
+    const query = tagSearch.trim().toLowerCase();
+    if (!query) return tags;
+
+    return tags.filter((tag) => {
+      const selected = form.tag_ids.includes(tag.id);
+      return (
+        selected ||
+        tag.name.toLowerCase().includes(query) ||
+        tag.slug.toLowerCase().includes(query)
+      );
+    });
+  }, [form.tag_ids, tagSearch, tags]);
+  const visibleTags = showAllTags
+    ? filteredTags
+    : filteredTags.filter((tag, index) => form.tag_ids.includes(tag.id) || index < 25);
+  const visibleMobileTags = showAllTags
+    ? filteredTags
+    : filteredTags.filter((tag, index) => form.tag_ids.includes(tag.id) || index < 10);
+  const hiddenTagCount = Math.max(filteredTags.length - visibleTags.length, 0);
+  const hiddenMobileTagCount = Math.max(filteredTags.length - visibleMobileTags.length, 0);
+  const inferredRating = useMemo(
+    () => inferContentRating(selectedTagNames),
+    [selectedTagNames],
+  );
+
+  const updateWithAutoRating = (nextForm: SeriesForm) => {
+    if (!nextForm.content_rating_auto) {
+      setForm(nextForm);
+      return;
+    }
+
+    const existingTagNames = tags
+      .filter((tag) => nextForm.tag_ids.includes(tag.id))
+      .map((tag) => tag.name);
+    setForm({
+      ...nextForm,
+      content_rating: inferContentRating([...existingTagNames, ...namesFromInput(nextForm.new_tags)]),
+    });
+  };
+  const scanRatingFromDetails = () => {
+    setForm({
+      ...form,
+      content_rating: inferContentRating(ratingScanTermsFromForm(form, genres, tags)),
+      content_rating_auto: false,
+    });
+  };
+
   return (
     <div className="space-y-3">
       <div>
@@ -776,7 +957,7 @@ function SeriesFormFields({
         />
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid gap-3 sm:grid-cols-2">
         <div>
           <Label>Type</Label>
           <Select value={form.type} onValueChange={(v) => setForm({ ...form, type: v })}>
@@ -809,7 +990,73 @@ function SeriesFormFields({
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid gap-3 rounded-md border border-border/40 p-3">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <Label>All Ratings</Label>
+            <p className="text-xs text-muted-foreground">
+              Auto rating reads selected and newly typed tags.
+            </p>
+          </div>
+          <label className="flex items-center gap-2 text-xs text-muted-foreground">
+            <input
+              type="checkbox"
+              checked={form.content_rating_auto}
+              onChange={(e) => {
+                const nextForm = { ...form, content_rating_auto: e.target.checked };
+                updateWithAutoRating(nextForm);
+              }}
+            />
+            Auto
+          </label>
+        </div>
+        <Select
+          value={form.content_rating}
+          onValueChange={(v) =>
+            setForm({
+              ...form,
+              content_rating: v as ContentRating,
+              content_rating_auto: false,
+            })
+          }
+        >
+          <SelectTrigger>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {contentRatings.map((rating) => (
+              <SelectItem key={rating} value={rating}>
+                {contentRatingLabels[rating]}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Button type="button" variant="outline" size="sm" onClick={scanRatingFromDetails}>
+          <Search className="mr-2 h-4 w-4" />
+          Scan Details
+        </Button>
+        <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+          <Badge
+            variant={
+              form.content_rating === "safe"
+                ? "default"
+                : form.content_rating === "suggestive"
+                  ? "secondary"
+                  : "destructive"
+            }
+          >
+            {contentRatingLabels[form.content_rating]}
+          </Badge>
+          <span>{contentRatingHints[form.content_rating]}</span>
+          {form.content_rating_auto && inferredRating !== form.content_rating && (
+            <span className="text-amber-500">
+              Detected: {contentRatingLabels[inferredRating]}
+            </span>
+          )}
+        </div>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2">
         <div>
           <Label>Author</Label>
           <Input
@@ -828,7 +1075,7 @@ function SeriesFormFields({
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid gap-3 sm:grid-cols-2">
         <div>
           <Label>Release Year</Label>
           <Input
@@ -915,17 +1162,34 @@ function SeriesFormFields({
           <Tag className="h-4 w-4 text-violet-500" />
           Tags
         </div>
-        <div className="flex max-h-36 flex-wrap gap-2 overflow-y-auto">
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={tagSearch}
+            onChange={(e) => setTagSearch(e.target.value)}
+            placeholder="Search existing tags..."
+            className="pl-9"
+          />
+        </div>
+        <div className="hidden max-h-36 flex-wrap gap-2 overflow-y-auto sm:flex">
           {tags.length === 0 && (
             <p className="text-xs text-muted-foreground">No tags yet. Add one below.</p>
           )}
-          {tags.map((tag) => {
+          {tags.length > 0 && filteredTags.length === 0 && (
+            <p className="text-xs text-muted-foreground">No tags match your search.</p>
+          )}
+          {visibleTags.map((tag) => {
             const selected = form.tag_ids.includes(tag.id);
             return (
               <button
                 key={tag.id}
                 type="button"
-                onClick={() => setForm({ ...form, tag_ids: toggleSelection(form.tag_ids, tag.id) })}
+                onClick={() =>
+                  updateWithAutoRating({
+                    ...form,
+                    tag_ids: toggleSelection(form.tag_ids, tag.id),
+                  })
+                }
                 className={`rounded-full border px-3 py-1 text-xs font-medium transition ${
                   selected
                     ? "border-violet-600 bg-violet-600 text-white"
@@ -941,10 +1205,64 @@ function SeriesFormFields({
             );
           })}
         </div>
-        <Input
+        <div className="flex max-h-36 flex-wrap gap-2 overflow-y-auto sm:hidden">
+          {tags.length === 0 && (
+            <p className="text-xs text-muted-foreground">No tags yet. Add one below.</p>
+          )}
+          {tags.length > 0 && filteredTags.length === 0 && (
+            <p className="text-xs text-muted-foreground">No tags match your search.</p>
+          )}
+          {visibleMobileTags.map((tag) => {
+            const selected = form.tag_ids.includes(tag.id);
+            return (
+              <button
+                key={tag.id}
+                type="button"
+                onClick={() =>
+                  updateWithAutoRating({
+                    ...form,
+                    tag_ids: toggleSelection(form.tag_ids, tag.id),
+                  })
+                }
+                className={`rounded-full border px-3 py-1 text-xs font-medium transition ${
+                  selected
+                    ? "border-violet-600 bg-violet-600 text-white"
+                    : "border-border/60 bg-secondary/40 hover:border-violet-500"
+                }`}
+                style={
+                  !selected && tag.color ? { borderColor: tag.color, color: tag.color } : undefined
+                }
+              >
+                {tag.icon && <span className="mr-1">{tag.icon}</span>}
+                {tag.name}
+              </button>
+            );
+          })}
+        </div>
+        {(hiddenTagCount > 0 || hiddenMobileTagCount > 0 || showAllTags) && (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setShowAllTags((value) => !value)}
+            className="justify-self-start"
+          >
+            {showAllTags ? (
+              "Show less"
+            ) : (
+              <>
+                <span className="hidden sm:inline">Show all {filteredTags.length} tags</span>
+                <span className="sm:hidden">Show all {filteredTags.length} tags</span>
+              </>
+            )}
+          </Button>
+        )}
+        <Textarea
+          rows={3}
           value={form.new_tags}
-          onChange={(e) => setForm({ ...form, new_tags: e.target.value })}
+          onChange={(e) => updateWithAutoRating({ ...form, new_tags: e.target.value })}
           placeholder="Add new tags, comma separated"
+          className="min-h-20 resize-y"
         />
       </div>
 
@@ -986,7 +1304,11 @@ export function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack:
     queryKey: ["admin", "series", seriesId],
     queryFn: async () => {
       try {
-        const { data, error } = await supabase.from("series").select("*").eq("id", seriesId).single();
+        const { data, error } = await supabase
+          .from("series")
+          .select("id,title,slug,cover_url,type,status")
+          .eq("id", seriesId)
+          .single();
         if (error) {
           console.error("Supabase series query error:", error);
           throw error;
@@ -998,6 +1320,7 @@ export function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack:
       }
     },
     retry: 1,
+    staleTime: 5 * 60 * 1000,
   });
 
   const chapters = useQuery({
@@ -1006,7 +1329,7 @@ export function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack:
       try {
         const { data, error } = await supabase
           .from("chapters")
-          .select("*")
+          .select("id,slug,chapter_number,title,chapter_type,created_at,status,scheduled_at,uploaded_by,scanlation_group")
           .eq("series_id", seriesId)
           .order("chapter_number", { ascending: false });
         if (error) {
@@ -1020,6 +1343,7 @@ export function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack:
       }
     },
     retry: 1,
+    staleTime: 2 * 60 * 1000,
   });
 
   // Get existing scanlation groups for this series only
@@ -1047,6 +1371,7 @@ export function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack:
       }
     },
     retry: 1,
+    staleTime: 5 * 60 * 1000,
   });
 
   const importSources = useQuery({
@@ -1061,6 +1386,7 @@ export function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack:
       return (data ?? []) as ImportSourceRow[];
     },
     retry: 1,
+    staleTime: 2 * 60 * 1000,
   });
 
   const importLogs = useQuery({
@@ -1079,6 +1405,7 @@ export function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack:
     },
     enabled: !!importSources.data,
     retry: 1,
+    staleTime: 2 * 60 * 1000,
   });
 
   const [open, setOpen] = useState(false);
@@ -1520,7 +1847,7 @@ export function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack:
   const isNumberedImageUrl = (url: string) => {
     try {
       const filename = new URL(url).pathname.split("/").pop() ?? "";
-      return /^\d{1,4}\.(?:jpe?g|png|webp)$/i.test(filename);
+      return /^(?:page[_-]?)?\d{1,4}\.(?:jpe?g|png|webp)$/i.test(filename);
     } catch {
       return false;
     }
@@ -2247,7 +2574,7 @@ export function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack:
                 <DialogTitle>Bulk Upload Chapters from Series URL</DialogTitle>
               </DialogHeader>
               <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid gap-3 sm:grid-cols-2">
                   <div>
                     <Label>Uploaded By</Label>
                     <Input
@@ -2516,7 +2843,7 @@ export function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack:
                 <DialogTitle>Upload Chapter from URLs</DialogTitle>
               </DialogHeader>
               <div className="space-y-4">
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid gap-3 sm:grid-cols-3">
                   <div>
                     <Label>Chapter Number *</Label>
                     <Input
@@ -2554,7 +2881,7 @@ export function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack:
                     />
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid gap-3 sm:grid-cols-2">
                   <div>
                     <Label>Uploaded By</Label>
                     <Input
@@ -2852,7 +3179,7 @@ export function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack:
             <DialogTitle>Edit Chapter</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid gap-3 sm:grid-cols-3">
               <div>
                 <Label>Chapter Number *</Label>
                 <Input
@@ -2887,7 +3214,7 @@ export function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack:
                 />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid gap-3 sm:grid-cols-2">
               <div>
                 <Label>Uploaded By</Label>
                 <Input

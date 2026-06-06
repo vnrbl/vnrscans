@@ -24,13 +24,13 @@ export const Route = createFileRoute("/title/$slug")({
   }),
   component: SeriesDetail,
   notFoundComponent: () => (
-    <div className="container mx-auto px-8 py-16 text-center">
+    <div className="container mx-auto px-4 py-16 text-center">
       <h1 className="text-2xl font-bold">Series not found</h1>
       <Link to="/browse" className="text-primary">Back to browse</Link>
     </div>
   ),
   errorComponent: ({ error }) => (
-    <div className="container mx-auto px-8 py-16 text-center text-muted-foreground">
+    <div className="container mx-auto px-4 py-16 text-center text-muted-foreground">
       Couldn't load this series: {error.message}
     </div>
   ),
@@ -64,6 +64,8 @@ function SeriesDetail() {
       if (!data) throw notFound();
       return data;
     },
+    staleTime: 1000 * 60 * 5,
+    gcTime: 1000 * 60 * 20,
   });
 
   const chaptersQ = useQuery({
@@ -88,6 +90,8 @@ function SeriesDetail() {
       return (data ?? []).filter((c) => !c.scheduled_at || new Date(c.scheduled_at) <= new Date());
     },
     enabled: !!seriesQ.data,
+    staleTime: 1000 * 60 * 2,
+    gcTime: 1000 * 60 * 10,
   });
 
   const filteredChapters = React.useMemo(() => {
@@ -142,6 +146,8 @@ function SeriesDetail() {
       return uniqueGroups.sort();
     },
     enabled: !!seriesQ.data,
+    staleTime: 1000 * 60 * 5,
+    gcTime: 1000 * 60 * 20,
   });
 
   // Count followers
@@ -157,6 +163,7 @@ function SeriesDetail() {
       return count ?? 0;
     },
     enabled: !!seriesQ.data,
+    staleTime: 1000 * 60 * 2,
   });
 
   // Check if user is following (has entry in user_library)
@@ -173,6 +180,7 @@ function SeriesDetail() {
       return !!data;
     },
     enabled: !!user && !!seriesQ.data,
+    staleTime: 1000 * 60 * 2,
   });
 
   const myRating = useQuery({
@@ -188,6 +196,7 @@ function SeriesDetail() {
       return data?.rating ?? null;
     },
     enabled: !!user && !!seriesQ.data,
+    staleTime: 1000 * 60 * 2,
   });
 
   const libraryStatus = useQuery({
@@ -203,6 +212,7 @@ function SeriesDetail() {
       return data?.reading_status ?? null;
     },
     enabled: !!user && !!seriesQ.data,
+    staleTime: 1000 * 60 * 2,
   });
 
   const toggleFollow = useMutation({
@@ -256,7 +266,8 @@ function SeriesDetail() {
       const { data, error } = await supabase
         .from("series")
         .select("id")
-        .order("view_count", { ascending: false });
+        .order("view_count", { ascending: false })
+        .limit(500);
       
       if (error) throw error;
       
@@ -265,6 +276,8 @@ function SeriesDetail() {
       return rank !== undefined && rank >= 0 ? rank + 1 : null;
     },
     enabled: !!seriesQ.data,
+    staleTime: 1000 * 60 * 10,
+    gcTime: 1000 * 60 * 30,
   });
 
   // Get reading history to find last read chapter and all read chapters
@@ -283,6 +296,7 @@ function SeriesDetail() {
       return data;
     },
     enabled: !!user && !!seriesQ.data,
+    staleTime: 1000 * 60 * 2,
   });
 
   // Get all read chapters for the user
@@ -298,6 +312,7 @@ function SeriesDetail() {
       return new Set(data?.map((r) => r.chapter_id) ?? []);
     },
     enabled: !!user && !!seriesQ.data,
+    staleTime: 1000 * 60 * 2,
   });
 
   const ratingsCount = useQuery({
@@ -312,6 +327,7 @@ function SeriesDetail() {
       return count ?? 0;
     },
     enabled: !!seriesQ.data,
+    staleTime: 1000 * 60 * 2,
   });
 
   const setStatus = useMutation({
@@ -336,7 +352,7 @@ function SeriesDetail() {
   });
 
   if (seriesQ.isLoading) {
-    return <div className="container mx-auto px-8 py-12"><div className="h-96 animate-pulse rounded-lg bg-secondary" /></div>;
+    return <div className="container mx-auto px-4 py-12"><div className="h-96 animate-pulse rounded-lg bg-secondary" /></div>;
   }
   if (!seriesQ.data) return null;
   const s = seriesQ.data;
@@ -386,10 +402,10 @@ function SeriesDetail() {
       {/* Background glow in other areas */}
       <div className="absolute bottom-[-10%] right-[-10%] h-[400px] w-[400px] rounded-full bg-primary/5 blur-[80px] pointer-events-none" />
 
-      <div className="container mx-auto px-8 md:px-12 lg:px-16 py-6 lg:py-8 relative z-10">
-        <div className="flex flex-col gap-8 lg:flex-row lg:gap-10">
+      <div className="container mx-auto px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16 py-6 lg:py-8 relative z-10">
+        <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:gap-8 lg:gap-10">
           {/* Left sidebar — cover & actions */}
-          <aside className="mx-auto w-full max-w-[220px] shrink-0 lg:mx-0">
+          <aside className="mx-auto w-full max-w-[180px] shrink-0 sm:mx-0 sm:max-w-[220px]">
             <div className="overflow-hidden rounded-xl border border-border/40 bg-secondary shadow-2xl transition-all duration-300 hover:border-primary/30">
               {s.cover_url ? (
                 <img src={s.cover_url} alt={s.title} className="aspect-[2/3] w-full object-cover" />
@@ -474,8 +490,8 @@ function SeriesDetail() {
           </aside>
 
           {/* Right — metadata */}
-          <main className="min-w-0 flex-1">
-            <nav className="mb-3 flex items-center gap-1.5 text-xs uppercase tracking-wider text-muted-foreground font-semibold">
+          <main className="min-w-0 flex-1 text-center sm:text-left">
+            <nav className="mb-3 flex flex-wrap items-center justify-center gap-1.5 text-xs uppercase tracking-wider text-muted-foreground font-semibold sm:justify-start">
               <Link to="/home" className="hover:text-primary transition-colors">
                 Home
               </Link>
@@ -485,7 +501,7 @@ function SeriesDetail() {
               </Link>
             </nav>
 
-            <div className="mb-3 flex flex-wrap items-center gap-1.5">
+            <div className="mb-3 flex flex-wrap items-center justify-center gap-1.5 sm:justify-start">
               <Badge variant="secondary" className="rounded-md uppercase text-[10px] font-semibold tracking-wider px-2 py-0.5 bg-secondary/50">
                 {s.type}
               </Badge>
@@ -515,7 +531,7 @@ function SeriesDetail() {
               </Badge>
             </div>
 
-            <h1 className="text-3xl font-black tracking-tight md:text-4xl lg:text-[2.75rem] lg:leading-tight text-foreground">
+            <h1 className="text-2xl font-black tracking-tight text-foreground sm:text-3xl md:text-4xl lg:text-[2.75rem] lg:leading-tight">
               {s.title}
             </h1>
 
@@ -523,7 +539,7 @@ function SeriesDetail() {
               <p className="mt-2 text-sm leading-relaxed text-muted-foreground font-medium">{s.alternative_titles}</p>
             )}
 
-            <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
+            <div className="mt-4 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-sm sm:justify-start">
               {seriesRank.data && (
                 <span className="inline-flex items-center gap-1.5 rounded-md bg-primary/15 px-2.5 py-1 font-semibold text-primary shadow-sm shadow-primary/5">
                   <Trophy className="h-4 w-4" />
@@ -567,12 +583,7 @@ function SeriesDetail() {
 
             {tags.length > 0 && (
               <MetaSection label="Tags">
-                {tags.map((tag) => (
-                  <MetaPill key={tag.id} href="/browse" search={{ tag: tag.slug }}>
-                    {tag.icon && <span className="mr-1">{tag.icon}</span>}
-                    {tag.name}
-                  </MetaPill>
-                ))}
+                <LimitedTagPills tags={tags} />
               </MetaSection>
             )}
 
@@ -619,10 +630,10 @@ function SeriesDetail() {
                   Chapters {uniqueChapterCount > 0 && <span className="text-muted-foreground">({uniqueChapterCount})</span>}
                 </h2>
 
-                <div className="flex flex-wrap gap-2">
+                <div className="grid grid-cols-1 gap-2 min-[420px]:grid-cols-2 sm:flex sm:flex-wrap">
                   {scanlationGroups.data && scanlationGroups.data.length > 0 && (
                     <Select value={selectedGroup} onValueChange={setSelectedGroup}>
-                      <SelectTrigger className="w-[180px]">
+                      <SelectTrigger className="w-full sm:w-[180px]">
                         <SelectValue placeholder="All Groups" />
                       </SelectTrigger>
                       <SelectContent>
@@ -640,7 +651,7 @@ function SeriesDetail() {
                     variant="outline"
                     size="sm"
                     onClick={() => setSortOrder((prev) => (prev === "desc" ? "asc" : "desc"))}
-                    className="gap-2"
+                    className="w-full gap-2 sm:w-auto"
                   >
                     <ArrowUpDown className="h-4 w-4" />
                     {sortOrder === "desc" ? "Newest First" : "Oldest First"}
@@ -677,15 +688,64 @@ function SeriesDetail() {
                 )}
               </div>
             ) : (
-              <div className="overflow-x-auto rounded-lg border border-border/40 bg-card">
-                <table className="w-full">
+              <>
+                <div className="space-y-2 md:hidden">
+                  {paginatedChapters.map((c) => {
+                    const isRead = readChapters.data?.has(c.id) ?? false;
+                    const isNew = new Date(c.created_at) > new Date(Date.now() - 2 * 60 * 60 * 1000);
+                    const showNewBadge = isNew && !isRead;
+                    const uploadedBy = (c as { uploaded_by?: string }).uploaded_by;
+                    const scanlationGroup = (c as { scanlation_group?: string }).scanlation_group;
+
+                    return (
+                      <Link
+                        key={c.id}
+                        to="/title/$titleSlug/$chapterSlug"
+                        params={{ titleSlug: slug, chapterSlug: c.slug }}
+                        className="block rounded-lg border border-border/40 bg-card p-3 transition hover:border-primary/40 hover:bg-secondary/30"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span
+                                className="font-semibold"
+                                style={isRead ? { color: "#7f22fe" } : undefined}
+                              >
+                                Chapter {c.chapter_number}
+                              </span>
+                              {showNewBadge && (
+                                <Badge className="bg-violet-600 text-xs uppercase text-white hover:bg-violet-700">
+                                  NEW
+                                </Badge>
+                              )}
+                            </div>
+                            {c.title && (
+                              <p className="mt-1 line-clamp-1 text-sm text-muted-foreground">{c.title}</p>
+                            )}
+                          </div>
+                          <Badge variant="outline" className="shrink-0 text-xs uppercase">
+                            {c.chapter_type === "novel" ? "Novel" : "Pages"}
+                          </Badge>
+                        </div>
+                        <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                          {scanlationGroup && <span className="font-medium text-violet-400">{scanlationGroup}</span>}
+                          {uploadedBy && <span>by {uploadedBy}</span>}
+                          <span>{new Date(c.created_at).toLocaleDateString()}</span>
+                        </div>
+                      </Link>
+                    );
+                  })}
+                </div>
+
+                <div className="hidden overflow-x-auto rounded-lg border border-border/40 bg-card md:block">
+                  <table className="w-full min-w-[720px]">
                   <thead className="border-b border-border/40 bg-secondary/30">
                     <tr>
                       <th className="px-4 py-3 text-left text-sm font-semibold">Chapter</th>
-                      <th className="hidden px-4 py-3 text-left text-sm font-semibold md:table-cell">Uploaded By</th>
-                      <th className="hidden px-4 py-3 text-left text-sm font-semibold md:table-cell">Group</th>
+                      <th className="px-4 py-3 text-left text-sm font-semibold">Uploaded By</th>
+                      <th className="px-4 py-3 text-left text-sm font-semibold">Group</th>
                       <th className="px-4 py-3 text-left text-sm font-semibold">Upload Date</th>
-                      <th className="hidden px-4 py-3 text-right text-sm font-semibold sm:table-cell">Type</th>
+                      <th className="px-4 py-3 text-right text-sm font-semibold">Type</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border/40">
@@ -712,7 +772,7 @@ function SeriesDetail() {
                               )}
                             </Link>
                           </td>
-                          <td className="hidden px-4 py-3 md:table-cell">
+                          <td className="px-4 py-3">
                             {(c as { uploaded_by?: string }).uploaded_by ? (
                               <Link
                                 to="/user/$username"
@@ -725,7 +785,7 @@ function SeriesDetail() {
                               <span className="text-sm text-muted-foreground">—</span>
                             )}
                           </td>
-                          <td className="hidden px-4 py-3 md:table-cell">
+                          <td className="px-4 py-3">
                             {(c as { scanlation_group?: string }).scanlation_group ? (
                               <Link
                                 to="/browse"
@@ -743,7 +803,7 @@ function SeriesDetail() {
                               {new Date(c.created_at).toLocaleDateString()}
                             </span>
                           </td>
-                          <td className="hidden px-4 py-3 text-right sm:table-cell">
+                          <td className="px-4 py-3 text-right">
                             <Badge variant="outline" className="text-xs uppercase">
                               {c.chapter_type === "novel" ? "Novel" : "Pages"}
                             </Badge>
@@ -752,9 +812,10 @@ function SeriesDetail() {
                       );
                     })}
                   </tbody>
-                </table>
+                  </table>
+                </div>
                 {totalPages > 1 && (
-                  <div className="flex flex-col gap-4 items-center justify-between border-t border-border/40 py-4 px-4 sm:flex-row">
+                  <div className="mt-3 flex flex-col items-center justify-between gap-4 rounded-lg border border-border/40 bg-card px-4 py-4 sm:flex-row md:mt-0 md:rounded-t-none md:border-t-0">
                     <p className="text-sm text-muted-foreground">
                       Showing <span className="font-semibold text-foreground">{(currentPage - 1) * ITEMS_PER_PAGE + 1}</span> to{" "}
                       <span className="font-semibold text-foreground">
@@ -762,7 +823,7 @@ function SeriesDetail() {
                       </span>{" "}
                       of <span className="font-semibold text-foreground">{filteredChapters.length}</span> chapters
                     </p>
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex max-w-full items-center gap-1.5 overflow-x-auto pb-1">
                       <Button
                         variant="outline"
                         size="sm"
@@ -822,7 +883,7 @@ function SeriesDetail() {
                     </div>
                   </div>
                 )}
-              </div>
+              </>
             )}
           </section>
 
@@ -861,6 +922,8 @@ function RecommendationsSidebar({ currentSeriesId, genres }: { currentSeriesId: 
         .sort((a, b) => b.score - a.score || (b.rating_average || 0) - (a.rating_average || 0))
         .slice(0, 12);
     },
+    staleTime: 1000 * 60 * 10,
+    gcTime: 1000 * 60 * 30,
   });
 
   return (
@@ -941,7 +1004,7 @@ function MetaSection({ label, children }: { label: string; children: React.React
   return (
     <div className="mt-5">
       <h3 className="mb-2.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">{label}</h3>
-      <div className="flex flex-wrap gap-2">{children}</div>
+      <div className="flex flex-wrap justify-center gap-2 sm:justify-start">{children}</div>
     </div>
   );
 }
@@ -968,6 +1031,65 @@ function MetaPill({
   }
 
   return <span className={pillClass}>{children}</span>;
+}
+
+function LimitedTagPills({
+  tags,
+}: {
+  tags: Array<{ id: string; name: string; slug: string; color: string; icon: string }>;
+}) {
+  const [showAll, setShowAll] = React.useState(false);
+
+  return (
+    <>
+      {tags.map((tag, index) => {
+        const hiddenClass = showAll
+          ? ""
+          : index >= 20
+            ? "hidden"
+            : index >= 10
+              ? "hidden md:inline-flex"
+              : "";
+
+        return (
+          <MetaPill key={tag.id} href="/browse" search={{ tag: tag.slug }} className={hiddenClass}>
+            {tag.icon && <span className="mr-1">{tag.icon}</span>}
+            {tag.name}
+          </MetaPill>
+        );
+      })}
+
+      {!showAll && tags.length > 10 && (
+        <button
+          type="button"
+          onClick={() => setShowAll(true)}
+          className="inline-flex rounded-md border border-primary/30 bg-primary/10 px-3 py-1.5 text-sm font-medium text-primary transition hover:bg-primary hover:text-primary-foreground md:hidden"
+        >
+          Show all +{tags.length - 10}
+        </button>
+      )}
+
+      {!showAll && tags.length > 20 && (
+        <button
+          type="button"
+          onClick={() => setShowAll(true)}
+          className="hidden rounded-md border border-primary/30 bg-primary/10 px-3 py-1.5 text-sm font-medium text-primary transition hover:bg-primary hover:text-primary-foreground md:inline-flex"
+        >
+          Show all +{tags.length - 20}
+        </button>
+      )}
+
+      {showAll && tags.length > 10 && (
+        <button
+          type="button"
+          onClick={() => setShowAll(false)}
+          className="inline-flex rounded-md border border-border/60 bg-secondary/50 px-3 py-1.5 text-sm font-medium text-muted-foreground transition hover:bg-secondary hover:text-foreground"
+        >
+          Show less
+        </button>
+      )}
+    </>
+  );
 }
 
 function ExpandableSynopsis({ text }: { text: string }) {

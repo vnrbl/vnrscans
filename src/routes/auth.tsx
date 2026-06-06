@@ -245,7 +245,7 @@ function AuthPage() {
 
         {/* Hero content */}
         <div
-          className="relative z-10 flex max-w-md flex-col items-center px-12 text-center"
+          className="relative z-10 flex max-w-md flex-col items-center px-6 text-center xl:px-12"
           style={{ animation: "slideInLeft 0.8s ease-out both" }}
         >
           {/* Logo mark */}

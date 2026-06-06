@@ -51,7 +51,8 @@ function AdminAnalytics() {
       
       return data;
     },
-    refetchInterval: 60000, // Refresh every minute
+    staleTime: 2 * 60 * 1000,
+    refetchInterval: 5 * 60 * 1000,
   });
 
   // Trending series (last 7 days)
@@ -71,6 +72,7 @@ function AdminAnalytics() {
       if (error) throw error;
       return data || [];
     },
+    staleTime: 5 * 60 * 1000,
   });
 
   // Most active users (by reading sessions)
@@ -84,7 +86,8 @@ function AdminAnalytics() {
         .from("reading_sessions")
         .select("user_id, profiles!inner(username, avatar_url, reading_streak)")
         .gte("started_at", sevenDaysAgo.toISOString())
-        .not("user_id", "is", null);
+        .not("user_id", "is", null)
+        .limit(1000);
       
       if (error) throw error;
       
@@ -108,6 +111,7 @@ function AdminAnalytics() {
         .sort((a: any, b: any) => b.session_count - a.session_count)
         .slice(0, 10);
     },
+    staleTime: 5 * 60 * 1000,
   });
 
   // Recent chapters uploaded
@@ -123,6 +127,7 @@ function AdminAnalytics() {
       if (error) throw error;
       return data || [];
     },
+    staleTime: 5 * 60 * 1000,
   });
 
   // Genre (tag) popularity
@@ -138,6 +143,7 @@ function AdminAnalytics() {
       if (error) throw error;
       return data || [];
     },
+    staleTime: 5 * 60 * 1000,
   });
 
   const quickStats = [

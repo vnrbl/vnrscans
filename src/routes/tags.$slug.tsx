@@ -92,7 +92,7 @@ function TagDetailPage() {
       <div className="absolute top-[-10%] right-[-10%] h-[400px] w-[400px] rounded-full bg-primary/5 blur-[80px] pointer-events-none" />
       <div className="absolute bottom-[-10%] left-[-10%] h-[450px] w-[450px] rounded-full bg-accent/5 blur-[100px] pointer-events-none" />
 
-      <div className="container mx-auto px-8 md:px-12 lg:px-16 py-8 relative">
+      <div className="container mx-auto px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16 py-8 relative">
         {/* Back button */}
         <Link to="/tags" className="mb-6 inline-flex items-center gap-2 text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors">
           <ArrowLeft className="h-4.5 w-4.5" />

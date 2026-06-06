@@ -1,7 +1,11 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { createClient } from "@supabase/supabase-js";
-import { extractChaptersFromSeriesUrl, extractImagesFromChapterUrl } from "../chapter-scraper";
+import {
+  extractChaptersFromSeriesUrl,
+  extractImagesFromChapterUrl,
+  extractImagesFromChapterUrls,
+} from "../chapter-scraper";
 import { buildChapterSlug } from "../chapter-utils";
 import { detectImportSource } from "../import-source-utils";
 
@@ -124,10 +128,15 @@ export const $syncImportSource = createServerFn({ method: "POST" })
         .slice(0, maxChapters);
 
       skipped = discovered.length - missing.length;
+      const batchExtractedImages = await extractImagesFromChapterUrls(
+        missing.map((chapter) => chapter.url),
+        { concurrency: 2 },
+      );
 
       for (const chapter of missing) {
         try {
-          const rawImages = await extractImagesFromChapterUrl(chapter.url);
+          const rawImages =
+            batchExtractedImages.get(chapter.url) ?? (await extractImagesFromChapterUrl(chapter.url));
           const images = filterImagesByExampleUrl(rawImages, source.image_url_example || "");
           if (images.length === 0) {
             throw new Error("No images matching the source image pattern were found");
@@ -240,7 +249,9 @@ function filterImagesByExampleUrl(images: string[], exampleUrl: string) {
   if (!exampleUrl) return images;
 
   if (isQimanhwaUrl(exampleUrl)) {
-    const numberedImages = images.filter((url) => isQimanhwaUrl(url) && isNumberedImageUrl(url));
+    const numberedImages = images.filter(
+      (url) => isQimanhwaUrl(url) && isNumberedImageUrl(url) && isQimanhwaReaderPath(url),
+    );
     if (numberedImages.length > 0) return numberedImages;
   }
 
@@ -292,8 +303,18 @@ function isQimanhwaUrl(url: string) {
 function isNumberedImageUrl(url: string) {
   try {
     const filename = new URL(url).pathname.split("/").pop() ?? "";
-    return /^\d{1,4}\.(?:jpe?g|png|webp)$/i.test(filename);
+    return /^(?:page[_-]?)?\d{1,4}\.(?:jpe?g|png|webp)$/i.test(filename);
   } catch {
     return false;
   }
+}
+
+function isQimanhwaReaderPath(url: string) {
+  const lowercaseUrl = url.toLowerCase();
+  return (
+    lowercaseUrl.includes("/file/qiscans/upload/rezo/series/") ||
+    lowercaseUrl.includes("/rezo/series/") ||
+    lowercaseUrl.includes("/file/qiscans/upload/upload/series/") ||
+    lowercaseUrl.includes("/upload/upload/series/")
+  );
 }

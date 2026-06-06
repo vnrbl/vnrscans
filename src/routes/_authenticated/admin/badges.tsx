@@ -325,7 +325,7 @@ function BadgeFormFields({
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid gap-3 sm:grid-cols-2">
         <div>
           <Label>Name *</Label>
           <Input
@@ -355,7 +355,7 @@ function BadgeFormFields({
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid gap-3 sm:grid-cols-2">
         <div>
           <Label>Category *</Label>
           <Select
@@ -402,7 +402,7 @@ function BadgeFormFields({
         />
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid gap-3 sm:grid-cols-2">
         <div>
           <Label>Requirement Type *</Label>
           <Select

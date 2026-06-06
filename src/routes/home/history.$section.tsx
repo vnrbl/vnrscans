@@ -89,7 +89,7 @@ function HomeHistoryPage() {
 
   if (!sectionKey || !meta) {
     return (
-      <main className="container mx-auto min-h-screen px-8 py-24">
+      <main className="container mx-auto min-h-screen px-4 py-24">
         <Button asChild variant="ghost" className="mb-6 gap-2">
           <Link to="/home">
             <ArrowLeft className="h-4 w-4" />
@@ -104,7 +104,7 @@ function HomeHistoryPage() {
   const needsLogin = meta.requiresAuth && !authLoading && !user;
 
   return (
-    <main className="container mx-auto min-h-screen px-6 py-20 md:px-12 lg:px-16">
+    <main className="container mx-auto min-h-screen px-4 py-20 sm:px-6 md:px-8 lg:px-12 xl:px-16">
       <Button asChild variant="ghost" className="mb-6 gap-2">
         <Link to="/home">
           <ArrowLeft className="h-4 w-4" />
@@ -145,7 +145,7 @@ function HomeHistoryPage() {
       ) : chapters.isLoading || authLoading ? (
         <HistoryGridSkeleton />
       ) : (chapters.data ?? []).length > 0 ? (
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+        <div className="grid grid-cols-1 gap-3 min-[380px]:grid-cols-2 sm:grid-cols-3 md:grid-cols-4 md:gap-4 lg:grid-cols-5 xl:grid-cols-6">
           {(chapters.data ?? []).map((chapter) => (
             <HistoryChapterCard key={chapter.id} chapter={chapter} timeLabel={meta.timeLabel} />
           ))}
@@ -263,7 +263,7 @@ function HistoryChapterCard({ chapter, timeLabel }: { chapter: ChapterItem; time
 
 function HistoryGridSkeleton() {
   return (
-    <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+    <div className="grid grid-cols-1 gap-3 min-[380px]:grid-cols-2 sm:grid-cols-3 md:gap-4 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
       {[...Array(12)].map((_, i) => (
         <div key={i} className="overflow-hidden rounded-lg border border-border/40 bg-card">
           <div className="aspect-[3/4] animate-pulse bg-secondary" />

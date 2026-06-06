@@ -63,8 +63,8 @@ function AdminLogs() {
         <p className="text-sm text-muted-foreground">Track admin actions for accountability and auditing</p>
       </div>
 
-      <div className="mt-6 flex flex-wrap gap-3">
-        <div className="relative min-w-[200px] flex-1">
+      <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_180px]">
+        <div className="relative min-w-0">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             className="pl-9"
@@ -74,7 +74,7 @@ function AdminLogs() {
           />
         </div>
         <Select value={resourceFilter} onValueChange={setResourceFilter}>
-          <SelectTrigger className="w-[180px]">
+          <SelectTrigger className="w-full">
             <SelectValue placeholder="Resource type" />
           </SelectTrigger>
           <SelectContent>

@@ -761,7 +761,7 @@ function BannerForm({ form, setForm, series }: { form: BannerForm; setForm: (for
         />
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid gap-3 sm:grid-cols-2">
         <div>
           <Label>Link URL</Label>
           <Input
@@ -781,7 +781,7 @@ function BannerForm({ form, setForm, series }: { form: BannerForm; setForm: (for
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid gap-3 sm:grid-cols-2">
         <div>
           <Label>Position</Label>
           <Select value={form.position} onValueChange={(v) => setForm({ ...form, position: v })}>
@@ -807,7 +807,7 @@ function BannerForm({ form, setForm, series }: { form: BannerForm; setForm: (for
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid gap-3 sm:grid-cols-2">
         <div>
           <Label>Background Color</Label>
           <Input
@@ -842,7 +842,7 @@ function BannerForm({ form, setForm, series }: { form: BannerForm; setForm: (for
         </Select>
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid gap-3 sm:grid-cols-2">
         <div>
           <Label>Starts At</Label>
           <Input

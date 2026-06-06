@@ -725,6 +725,103 @@ export async function extractImagesFromChapterUrl(chapterUrl: string): Promise<s
   }
 }
 
+export async function extractImagesFromChapterUrls(
+  chapterUrls: string[],
+  options: { concurrency?: number } = {},
+): Promise<Map<string, string[]>> {
+  const uniqueUrls = Array.from(new Set(chapterUrls));
+  const qiUrls = uniqueUrls.filter(isQimanhwaLikeUrl);
+  const otherUrls = uniqueUrls.filter((url) => !isQimanhwaLikeUrl(url));
+  const results = new Map<string, string[]>();
+
+  await Promise.all(
+    otherUrls.map(async (url) => {
+      results.set(url, await extractImagesFromChapterUrl(url));
+    }),
+  );
+
+  if (qiUrls.length === 0) return results;
+
+  const qiResults = await extractQimanhwaImagesWithSharedBrowser(qiUrls, {
+    concurrency: options.concurrency ?? 2,
+  });
+  qiResults.forEach((images, url) => results.set(url, images));
+
+  return results;
+}
+
+async function extractQimanhwaImagesWithSharedBrowser(
+  urls: string[],
+  options: { concurrency: number },
+): Promise<Map<string, string[]>> {
+  console.log(`[Scraper] Launching one shared browser for ${urls.length} Qi chapter(s)...`);
+  const puppeteer = await import('puppeteer');
+  const chrome = await resolveChromeExecutable(puppeteer.default);
+  const launchOptions: any = {
+    headless: chrome.headless,
+    args: [
+      ...chrome.args,
+      '--disable-blink-features=AutomationControlled',
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+    ],
+  };
+
+  if (chrome.executablePath) {
+    launchOptions.executablePath = chrome.executablePath;
+  }
+
+  const browser = await puppeteer.default.launch(launchOptions);
+  const results = new Map<string, string[]>();
+  let nextIndex = 0;
+
+  const worker = async () => {
+    while (nextIndex < urls.length) {
+      const url = urls[nextIndex++];
+      const page = await browser.newPage();
+      try {
+        await prepareScraperPage(page);
+        console.log(`[Scraper] Shared Qi browser extracting: ${url}`);
+        await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
+        await new Promise((resolve) => setTimeout(resolve, 2500));
+        await scrollChapterPageForLazyImages(page);
+
+        const images = (await collectLiveReaderImageUrls(page)).filter(isQimanhwaReaderPageImage);
+        if (images.length === 0) {
+          const html = await page.content();
+          const htmlImages = extractImageUrls(html, url).filter(isQimanhwaReaderPageImage);
+          if (htmlImages.length === 0) {
+            throw new Error('No images found on the chapter page.');
+          }
+          results.set(url, htmlImages);
+        } else {
+          results.set(url, images);
+        }
+      } finally {
+        await page.close().catch(() => {});
+      }
+    }
+  };
+
+  try {
+    const workerCount = Math.max(1, Math.min(options.concurrency, urls.length));
+    await Promise.all(Array.from({ length: workerCount }, () => worker()));
+    return results;
+  } finally {
+    await browser.close();
+  }
+}
+
+async function prepareScraperPage(page: any): Promise<void> {
+  await page.evaluateOnNewDocument(() => {
+    Object.defineProperty(navigator, 'webdriver', {
+      get: () => undefined,
+    });
+  });
+  await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+  await page.setViewport({ width: 1280, height: 800 });
+}
+
 export function extractImageUrls(html: string, baseUrl: string): string[] {
   const images: string[] = [];
   const imageRegexPatterns = [
@@ -863,10 +960,12 @@ function isQimanhwaReaderPageImage(url: string): boolean {
     const parsed = new URL(url);
     const lowercaseUrl = url.toLowerCase();
     const filename = parsed.pathname.split('/').pop() ?? '';
-    const isNumberedPage = /^\d{1,4}\.(?:jpe?g|png|webp)$/i.test(filename);
+    const isNumberedPage = /^(?:page[_-]?)?\d{1,4}\.(?:jpe?g|png|webp)$/i.test(filename);
     const isReaderPath =
       lowercaseUrl.includes('/file/qiscans/upload/rezo/series/') ||
-      lowercaseUrl.includes('/rezo/series/');
+      lowercaseUrl.includes('/rezo/series/') ||
+      lowercaseUrl.includes('/file/qiscans/upload/upload/series/') ||
+      lowercaseUrl.includes('/upload/upload/series/');
 
     return isNumberedPage && isReaderPath;
   } catch {

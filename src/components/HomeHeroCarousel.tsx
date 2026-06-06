@@ -178,10 +178,10 @@ export function HomeHeroCarousel() {
 
   return (
     <section className="relative w-full overflow-hidden bg-gradient-to-b from-background via-background/95 to-background/90 py-6 mt-8">
-      <div className="container mx-auto px-8 md:px-12 lg:px-16">
+      <div className="container mx-auto px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16">
         {/* Vignette fade effect on left and right edges */}
-        <div className="absolute left-0 top-0 bottom-0 w-32 md:w-40 lg:w-48 bg-gradient-to-r from-background via-background/80 to-transparent z-10 pointer-events-none" />
-        <div className="absolute right-0 top-0 bottom-0 w-32 md:w-40 lg:w-48 bg-gradient-to-l from-background via-background/80 to-transparent z-10 pointer-events-none" />
+        <div className="absolute left-0 top-0 bottom-0 w-12 bg-gradient-to-r from-background via-background/80 to-transparent z-10 pointer-events-none sm:w-24 md:w-40 lg:w-48" />
+        <div className="absolute right-0 top-0 bottom-0 w-12 bg-gradient-to-l from-background via-background/80 to-transparent z-10 pointer-events-none sm:w-24 md:w-40 lg:w-48" />
         
         {/* Scrollable Container */}
         <div className="relative group">
@@ -200,7 +200,7 @@ export function HomeHeroCarousel() {
           {/* Carousel Items */}
           <div
             ref={scrollContainerRef}
-            className="flex gap-4 overflow-x-auto scrollbar-hide pb-2"
+            className="flex gap-3 overflow-x-auto scrollbar-hide pb-2 sm:gap-4"
             style={{
               scrollbarWidth: 'none',
               msOverflowStyle: 'none',
@@ -217,7 +217,7 @@ export function HomeHeroCarousel() {
                 style={{ perspective: '1000px' }}
               >
                 <div 
-                  className="relative w-[210px] h-[300px] md:w-[240px] md:h-[345px] lg:w-[270px] lg:h-[390px] rounded-lg overflow-hidden shadow-lg group-hover/card:shadow-[0_20px_50px_rgba(139,92,246,0.4)] transition-all duration-300"
+                  className="relative h-[240px] w-[168px] overflow-hidden rounded-lg shadow-lg transition-all duration-300 group-hover/card:shadow-[0_20px_50px_rgba(139,92,246,0.4)] sm:h-[300px] sm:w-[210px] md:h-[345px] md:w-[240px] lg:h-[390px] lg:w-[270px]"
                   style={{ 
                     transformStyle: 'preserve-3d',
                     transform: 'rotateY(0deg) rotateX(0deg)'

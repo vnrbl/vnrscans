@@ -425,7 +425,7 @@ function AdminPermissions() {
 function PermissionForm({ form, setForm, isEdit }: { form: PermissionForm; setForm: (form: PermissionForm) => void; isEdit?: boolean }) {
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid gap-3 sm:grid-cols-2">
         <div>
           <Label>Role Name *</Label>
           <Input

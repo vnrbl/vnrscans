@@ -68,7 +68,7 @@ const isAsuraUrl = (url: string): boolean => {
 const isNumberedImageUrl = (url: string): boolean => {
   try {
     const filename = new URL(url).pathname.split('/').pop() ?? '';
-    return /^\d{1,4}\.(?:jpe?g|png|webp)$/i.test(filename);
+    return /^(?:page[_-]?)?\d{1,4}\.(?:jpe?g|png|webp)$/i.test(filename);
   } catch {
     return false;
   }
@@ -79,10 +79,12 @@ const isQimanhwaReaderPageImage = (url: string): boolean => {
     const parsed = new URL(url);
     const lowercaseUrl = url.toLowerCase();
     const filename = parsed.pathname.split('/').pop() ?? '';
-    const isNumberedPage = /^\d{1,4}\.(?:jpe?g|png|webp)$/i.test(filename);
+    const isNumberedPage = /^(?:page[_-]?)?\d{1,4}\.(?:jpe?g|png|webp)$/i.test(filename);
     const isReaderPath =
       lowercaseUrl.includes('/file/qiscans/upload/rezo/series/') ||
-      lowercaseUrl.includes('/rezo/series/');
+      lowercaseUrl.includes('/rezo/series/') ||
+      lowercaseUrl.includes('/file/qiscans/upload/upload/series/') ||
+      lowercaseUrl.includes('/upload/upload/series/');
 
     return isNumberedPage && isReaderPath;
   } catch {

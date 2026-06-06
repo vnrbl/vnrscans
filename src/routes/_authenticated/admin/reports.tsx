@@ -49,7 +49,8 @@ function AdminReports() {
       const { data: reports, error } = await supabase
         .from("reports")
         .select("*")
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: false })
+        .limit(100);
       if (error) throw error;
 
       const rows = reports ?? [];
@@ -105,6 +106,7 @@ function AdminReports() {
         };
       });
     },
+    staleTime: 1000 * 60 * 2,
   });
 
   const setStatus = useMutation({
