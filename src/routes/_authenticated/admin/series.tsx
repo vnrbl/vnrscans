@@ -1636,6 +1636,33 @@ export function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack:
     onError: (e: Error) => toast.error(e.message),
   });
 
+  // Handle loading and error states
+  if (series.isLoading) {
+    return (
+      <div className="p-6 text-center">
+        <p className="text-muted-foreground">Loading series...</p>
+      </div>
+    );
+  }
+
+  if (series.error) {
+    return (
+      <div className="p-6 text-center">
+        <p className="text-red-500 mb-4">Error loading series: {series.error instanceof Error ? series.error.message : "Unknown error"}</p>
+        <Button onClick={onBack}>Go back</Button>
+      </div>
+    );
+  }
+
+  if (!series.data) {
+    return (
+      <div className="p-6 text-center">
+        <p className="text-red-500 mb-4">Series not found</p>
+        <Button onClick={onBack}>Go back</Button>
+      </div>
+    );
+  }
+
   return (
     <div>
       <div className="mb-4 flex items-center gap-2">
@@ -1643,7 +1670,7 @@ export function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack:
           <X className="h-4 w-4" />
         </Button>
         <div>
-          <h1 className="text-2xl font-bold">{series.data?.title}</h1>
+          <h1 className="text-2xl font-bold">{series.data.title}</h1>
           <p className="text-sm text-muted-foreground">Manage chapters</p>
         </div>
       </div>
