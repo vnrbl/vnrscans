@@ -44,6 +44,7 @@ import { Route as AuthenticatedAdminBannersRouteImport } from './routes/_authent
 import { Route as AuthenticatedAdminBadgesRouteImport } from './routes/_authenticated/admin/badges'
 import { Route as AuthenticatedAdminAnnouncementsRouteImport } from './routes/_authenticated/admin/announcements'
 import { Route as AuthenticatedAdminAnalyticsRouteImport } from './routes/_authenticated/admin/analytics'
+import { Route as AuthenticatedAdminSeriesChaptersSeriesIdRouteImport } from './routes/_authenticated/admin/series-chapters.$seriesId'
 
 const TagsRoute = TagsRouteImport.update({
   id: '/tags',
@@ -231,6 +232,12 @@ const AuthenticatedAdminAnalyticsRoute =
     path: '/analytics',
     getParentRoute: () => AuthenticatedAdminRoute,
   } as any)
+const AuthenticatedAdminSeriesChaptersSeriesIdRoute =
+  AuthenticatedAdminSeriesChaptersSeriesIdRouteImport.update({
+    id: '/series-chapters/$seriesId',
+    path: '/series-chapters/$seriesId',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -267,6 +274,7 @@ export interface FileRoutesByFullPath {
   '/admin/users': typeof AuthenticatedAdminUsersRoute
   '/title/$titleSlug/$chapterSlug': typeof TitleTitleSlugChapterSlugRoute
   '/admin/': typeof AuthenticatedAdminIndexRoute
+  '/admin/series-chapters/$seriesId': typeof AuthenticatedAdminSeriesChaptersSeriesIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -302,6 +310,7 @@ export interface FileRoutesByTo {
   '/admin/users': typeof AuthenticatedAdminUsersRoute
   '/title/$titleSlug/$chapterSlug': typeof TitleTitleSlugChapterSlugRoute
   '/admin': typeof AuthenticatedAdminIndexRoute
+  '/admin/series-chapters/$seriesId': typeof AuthenticatedAdminSeriesChaptersSeriesIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -340,6 +349,7 @@ export interface FileRoutesById {
   '/_authenticated/admin/users': typeof AuthenticatedAdminUsersRoute
   '/title/$titleSlug/$chapterSlug': typeof TitleTitleSlugChapterSlugRoute
   '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute
+  '/_authenticated/admin/series-chapters/$seriesId': typeof AuthenticatedAdminSeriesChaptersSeriesIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -378,6 +388,7 @@ export interface FileRouteTypes {
     | '/admin/users'
     | '/title/$titleSlug/$chapterSlug'
     | '/admin/'
+    | '/admin/series-chapters/$seriesId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -413,6 +424,7 @@ export interface FileRouteTypes {
     | '/admin/users'
     | '/title/$titleSlug/$chapterSlug'
     | '/admin'
+    | '/admin/series-chapters/$seriesId'
   id:
     | '__root__'
     | '/'
@@ -450,6 +462,7 @@ export interface FileRouteTypes {
     | '/_authenticated/admin/users'
     | '/title/$titleSlug/$chapterSlug'
     | '/_authenticated/admin/'
+    | '/_authenticated/admin/series-chapters/$seriesId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -717,6 +730,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminAnalyticsRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
     }
+    '/_authenticated/admin/series-chapters/$seriesId': {
+      id: '/_authenticated/admin/series-chapters/$seriesId'
+      path: '/series-chapters/$seriesId'
+      fullPath: '/admin/series-chapters/$seriesId'
+      preLoaderRoute: typeof AuthenticatedAdminSeriesChaptersSeriesIdRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
   }
 }
 
@@ -735,6 +755,7 @@ interface AuthenticatedAdminRouteChildren {
   AuthenticatedAdminTagsRoute: typeof AuthenticatedAdminTagsRoute
   AuthenticatedAdminUsersRoute: typeof AuthenticatedAdminUsersRoute
   AuthenticatedAdminIndexRoute: typeof AuthenticatedAdminIndexRoute
+  AuthenticatedAdminSeriesChaptersSeriesIdRoute: typeof AuthenticatedAdminSeriesChaptersSeriesIdRoute
 }
 
 const AuthenticatedAdminRouteChildren: AuthenticatedAdminRouteChildren = {
@@ -752,6 +773,8 @@ const AuthenticatedAdminRouteChildren: AuthenticatedAdminRouteChildren = {
   AuthenticatedAdminTagsRoute: AuthenticatedAdminTagsRoute,
   AuthenticatedAdminUsersRoute: AuthenticatedAdminUsersRoute,
   AuthenticatedAdminIndexRoute: AuthenticatedAdminIndexRoute,
+  AuthenticatedAdminSeriesChaptersSeriesIdRoute:
+    AuthenticatedAdminSeriesChaptersSeriesIdRoute,
 }
 
 const AuthenticatedAdminRouteWithChildren =

@@ -26,6 +26,21 @@ const askQuestion = (query: string): Promise<string> => {
   return new Promise((resolve) => rl.question(query, resolve));
 };
 
+const getImageUrlTypePrefix = (exampleUrl: string): string | null => {
+  try {
+    const parsed = new URL(exampleUrl.trim());
+    const segments = parsed.pathname.split('/').filter(Boolean);
+
+    if (segments.length >= 3) {
+      return `${parsed.origin}/${segments.slice(0, 3).join('/')}/`;
+    }
+
+    return `${parsed.origin}${parsed.pathname.replace(/\/[^/]*$/, '/')}`;
+  } catch {
+    return null;
+  }
+};
+
 async function main() {
   console.log('📚 --- Shadow Shelf CLI Scraper --- 📚\n');
 
@@ -100,6 +115,20 @@ async function main() {
   if (!seriesUrl) {
     console.log('❌ URL is required.');
     process.exit(1);
+  }
+
+  const imageTypeExample = (await askQuestion(
+    'Enter Image URL Example (optional, press Enter to skip): '
+  )).trim();
+  const imageUrlPrefix = imageTypeExample ? getImageUrlTypePrefix(imageTypeExample) : null;
+
+  if (imageTypeExample && !imageUrlPrefix) {
+    console.log('❌ Please enter a valid example image URL to filter by.');
+    process.exit(1);
+  }
+
+  if (imageUrlPrefix) {
+    console.log(`Filtering chapter images by URL pattern: ${imageUrlPrefix}`);
   }
 
   // Ask for scanlation group
@@ -236,11 +265,23 @@ async function main() {
 
       // Step 2: Scrape Images
       console.log('  └─ Extracting image URLs...');
-      const images = extractImageUrls(chHtml, ch.url);
-      console.log(`  └─ Found ${images.length} images.`);
+      const extractedImages = extractImageUrls(chHtml, ch.url);
+      const images = imageUrlPrefix
+        ? extractedImages.filter((url) => url.startsWith(imageUrlPrefix))
+        : extractedImages;
+
+      console.log(`  └─ Found ${extractedImages.length} images.`);
+
+      if (imageUrlPrefix) {
+        console.log(`  └─ Kept ${images.length} images matching the example URL pattern.`);
+      }
 
       if (images.length === 0) {
-        throw new Error('No images found on chapter page.');
+        throw new Error(
+          imageUrlPrefix
+            ? 'No images matching the example URL type were found.'
+            : 'No images found on chapter page.'
+        );
       }
 
       // Step 3: Insert or Update Chapter

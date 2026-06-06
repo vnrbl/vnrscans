@@ -16,15 +16,15 @@ import {
   Award,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { requireAuthenticatedUser } from "@/lib/auth-guards";
 
 export const Route = createFileRoute("/_authenticated/admin")({
   beforeLoad: async ({ location }) => {
-    const { data: u } = await supabase.auth.getUser();
-    if (!u.user) throw redirect({ to: "/auth" });
+    const user = await requireAuthenticatedUser();
     const { data: roles } = await supabase
       .from("user_roles")
       .select("role")
-      .eq("user_id", u.user.id);
+      .eq("user_id", user.id);
     
     const userRoles = (roles ?? []).map((r) => r.role);
     const ok = userRoles.some((role) => role === "admin" || role === "moderator" || role === "uploader");
