@@ -108,14 +108,22 @@ function isProtectedPage(html: string): boolean {
 async function scrapeWithPuppeteer(url: string, isChapterPage: boolean = false): Promise<string> {
   console.log(`[Scraper] Launching Puppeteer browser to bypass Cloudflare protection for: ${url}`);
   const puppeteer = await import('puppeteer');
-  const browser = await puppeteer.default.launch({
-    headless: true, // Run in background to be less intrusive
+  const execPath = process.env.PUPPETEER_EXECUTABLE_PATH || process.env.CHROME_BIN || process.env.GOOGLE_CHROME_BIN || process.env.CHROME_PATH;
+  const launchOptions: any = {
+    headless: true,
     args: [
       '--disable-blink-features=AutomationControlled',
       '--no-sandbox',
       '--disable-setuid-sandbox',
     ],
-  });
+  };
+
+  if (execPath) {
+    console.log('[Scraper] Using provided Chrome executable at', execPath);
+    launchOptions.executablePath = execPath;
+  }
+
+  const browser = await puppeteer.default.launch(launchOptions);
 
   try {
     const page = await browser.newPage();

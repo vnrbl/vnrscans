@@ -10,6 +10,7 @@
     "preview": "vite preview",
     "lint": "eslint .",
     "format": "prettier --write .",
+    "postinstall": "npx puppeteer browsers install chrome",
     "scrape": "npx tsx scripts/scrape-series.ts"
   },
   "dependencies": {
