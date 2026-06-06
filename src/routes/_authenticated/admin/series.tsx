@@ -1344,12 +1344,35 @@ export function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack:
     }
   };
 
+  const isNumberedImageUrl = (url: string) => {
+    try {
+      const filename = new URL(url).pathname.split("/").pop() ?? "";
+      return /^\d{1,4}\.(?:jpe?g|png|webp)$/i.test(filename);
+    } catch {
+      return false;
+    }
+  };
+
+  const isQimanhwaUrl = (url: string) => {
+    try {
+      const hostname = new URL(url).hostname.toLowerCase();
+      return hostname.includes("qimanhwa.com") || hostname.includes("qiscans.org");
+    } catch {
+      return url.toLowerCase().includes("qimanhwa.com") || url.toLowerCase().includes("qiscans");
+    }
+  };
+
   const filterImagesByExampleUrl = (
     images: string[],
     exampleUrl: string,
     imageUrlPrefix: string | null,
   ) => {
     if (!exampleUrl || !imageUrlPrefix) return images;
+
+    if (isQimanhwaUrl(exampleUrl)) {
+      const numberedImages = images.filter((url) => isQimanhwaUrl(url) && isNumberedImageUrl(url));
+      if (numberedImages.length > 0) return numberedImages;
+    }
 
     const prefixMatches = images.filter((url) => url.startsWith(imageUrlPrefix));
     if (prefixMatches.length > 0) return prefixMatches;

@@ -8,6 +8,8 @@ export interface ChapterInfo {
   url: string;
 }
 
+const LIVE_READER_IMAGES_PREFIX = '__LIVE_READER_IMAGES__';
+
 export async function extractChaptersFromSeriesUrl(seriesUrl: string): Promise<ChapterInfo[]> {
   try {
     let html = '';
@@ -163,14 +165,7 @@ async function scrapeWithPuppeteer(url: string, isChapterPage: boolean = false):
     if (isChapterPage) {
       // Scroll down if it's a chapter page to trigger lazy loading of images
       console.log('[Scraper] Triggering lazy-load image scrolling...');
-      await page.evaluate(() => {
-        window.scrollTo(0, document.body.scrollHeight / 2);
-      });
-      await new Promise(r => setTimeout(r, 1500));
-      await page.evaluate(() => {
-        window.scrollTo(0, document.body.scrollHeight);
-      });
-      await new Promise(r => setTimeout(r, 1500));
+      await scrollChapterPageForLazyImages(page);
     } else {
       // Some series pages render chapter rows client-side and only after scrolling.
       await page.waitForFunction(
@@ -199,13 +194,84 @@ async function scrapeWithPuppeteer(url: string, isChapterPage: boolean = false):
     }
 
     const html = await page.content();
+    const liveReaderImages = isChapterPage ? await collectLiveReaderImageUrls(page) : [];
+    const readerImages = isQimanhwaLikeUrl(url)
+      ? liveReaderImages.filter(isQimanhwaReaderPageImage)
+      : liveReaderImages;
+    if (isChapterPage && readerImages.length > 0) {
+      console.log(`[Scraper] Collected ${readerImages.length} live reader image(s).`);
+      return `${LIVE_READER_IMAGES_PREFIX}${JSON.stringify(readerImages)}`;
+    }
+    const liveImageHtml = liveReaderImages.length > 0
+      ? `<script type="application/json">${JSON.stringify(liveReaderImages)}</script>`
+      : '';
     const clientChapterHtml = isChapterPage ? '' : await buildClientChapterLinksHtml(page, url);
-    return `${html}\n${clientChapterHtml}`;
+    return `${html}\n${liveImageHtml}\n${clientChapterHtml}`;
   } catch (error) {
     console.error(`[Scraper] Puppeteer scraping failed for ${url}:`, error);
     throw error;
   } finally {
     await browser.close();
+  }
+}
+
+async function scrollChapterPageForLazyImages(page: any): Promise<void> {
+  let lastHeight = 0;
+  let stablePasses = 0;
+
+  for (let pass = 0; pass < 3 && stablePasses < 2; pass++) {
+    const height = await page.evaluate(() => document.body.scrollHeight);
+    if (height === lastHeight) {
+      stablePasses++;
+    } else {
+      stablePasses = 0;
+      lastHeight = height;
+    }
+
+    const scrollTarget = Math.max(height, 30000);
+    for (let y = 0; y <= scrollTarget; y += 700) {
+      await page.evaluate((scrollY: number) => window.scrollTo(0, scrollY), y);
+      await new Promise((resolve) => setTimeout(resolve, 200));
+    }
+
+    await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+  }
+}
+
+async function collectLiveReaderImageUrls(page: any): Promise<string[]> {
+  try {
+    const urls = await page.evaluate(`
+      Array.from(document.images)
+        .filter((img) => {
+          const className = String(img.className || '').toLowerCase();
+          const alt = String(img.alt || '').toLowerCase();
+          return (
+            className.includes('r-page-img') ||
+            className.includes('reader') ||
+            className.includes('chapter') ||
+            alt.startsWith('page ') ||
+            (img.naturalWidth >= 500 && img.naturalHeight >= 800)
+          );
+        })
+        .flatMap((img) => [
+          img.currentSrc,
+          img.src,
+          img.getAttribute('data-src'),
+          img.getAttribute('data-lazy-src'),
+          img.getAttribute('data-original')
+        ])
+        .filter((value, index, all) =>
+          value &&
+          (String(value).startsWith('http://') || String(value).startsWith('https://')) &&
+          all.indexOf(value) === index
+        )
+    `);
+
+    return urls as string[];
+  } catch (error) {
+    console.warn('[Scraper] Live reader image collection failed:', error);
+    return [];
   }
 }
 
@@ -604,6 +670,9 @@ export async function extractImagesFromChapterUrl(chapterUrl: string): Promise<s
         html = await response.text();
         if (isProtectedPage(html)) {
           usePuppeteerFallback = true;
+        } else if (isQimanhwaLikeUrl(chapterUrl)) {
+          // Qimanhwa renders reader pages client-side; direct HTML often only contains cover/thumbnail URLs.
+          usePuppeteerFallback = true;
         }
       }
     } catch (fetchError) {
@@ -614,6 +683,13 @@ export async function extractImagesFromChapterUrl(chapterUrl: string): Promise<s
     if (usePuppeteerFallback) {
       console.log(`[Scraper] URL ${chapterUrl} seems protected or fetch failed. Bypassing with Puppeteer...`);
       html = await scrapeWithPuppeteer(chapterUrl, true);
+    }
+
+    if (html.startsWith(LIVE_READER_IMAGES_PREFIX)) {
+      const images = JSON.parse(html.slice(LIVE_READER_IMAGES_PREFIX.length));
+      if (Array.isArray(images) && images.every((url) => typeof url === 'string')) {
+        return images;
+      }
     }
     
     // Extract all image URLs from the HTML
@@ -726,7 +802,7 @@ export function extractImageUrls(html: string, baseUrl: string): string[] {
   }
 
   // Remove duplicates and filter valid URLs
-  return [...new Set(images)].filter(url => {
+  const validImages = [...new Set(images)].filter(url => {
     try {
       new URL(url);
       const lowercaseBaseUrl = baseUrl.toLowerCase();
@@ -747,10 +823,47 @@ export function extractImageUrls(html: string, baseUrl: string): string[] {
       if (isElftoon && !lowercaseUrl.includes('/wp-content/uploads/')) {
         return false;
       }
+
+      const isQimanhwa =
+        lowercaseBaseUrl.includes('qimanhwa.com') ||
+        lowercaseUrl.includes('qimanhwa.com') ||
+        lowercaseUrl.includes('qiscans.org');
+      if (isQimanhwa) {
+        return isQimanhwaReaderPageImage(url);
+      }
       
       return true;
     } catch {
       return false;
     }
   });
+
+  return validImages;
+}
+
+function isQimanhwaReaderPageImage(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    const lowercaseUrl = url.toLowerCase();
+    const filename = parsed.pathname.split('/').pop() ?? '';
+    const isNumberedPage = /^\d{1,4}\.(?:jpe?g|png|webp)$/i.test(filename);
+    const isReaderPath =
+      lowercaseUrl.includes('/file/qiscans/upload/rezo/series/') ||
+      lowercaseUrl.includes('/rezo/series/');
+
+    return isNumberedPage && isReaderPath;
+  } catch {
+    return false;
+  }
+}
+
+function isQimanhwaLikeUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    const hostname = parsed.hostname.toLowerCase();
+    return hostname.includes('qimanhwa.com') || hostname.includes('qiscans.org');
+  } catch {
+    const lowercaseUrl = url.toLowerCase();
+    return lowercaseUrl.includes('qimanhwa.com') || lowercaseUrl.includes('qiscans.org');
+  }
 }

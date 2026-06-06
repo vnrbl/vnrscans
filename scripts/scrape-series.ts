@@ -41,9 +41,139 @@ const getImageUrlTypePrefix = (exampleUrl: string): string | null => {
   }
 };
 
+const isQimanhwaUrl = (url: string): boolean => {
+  try {
+    const hostname = new URL(url.trim()).hostname.toLowerCase();
+    return hostname.includes('qimanhwa.com') || hostname.includes('qiscans.org');
+  } catch {
+    const lowercaseUrl = url.toLowerCase();
+    return lowercaseUrl.includes('qimanhwa.com') || lowercaseUrl.includes('qiscans');
+  }
+};
+
+const isNumberedImageUrl = (url: string): boolean => {
+  try {
+    const filename = new URL(url).pathname.split('/').pop() ?? '';
+    return /^\d{1,4}\.(?:jpe?g|png|webp)$/i.test(filename);
+  } catch {
+    return false;
+  }
+};
+
+const isQimanhwaReaderPageImage = (url: string): boolean => {
+  try {
+    const parsed = new URL(url);
+    const lowercaseUrl = url.toLowerCase();
+    const filename = parsed.pathname.split('/').pop() ?? '';
+    const isNumberedPage = /^\d{1,4}\.(?:jpe?g|png|webp)$/i.test(filename);
+    const isReaderPath =
+      lowercaseUrl.includes('/file/qiscans/upload/rezo/series/') ||
+      lowercaseUrl.includes('/rezo/series/');
+
+    return isNumberedPage && isReaderPath;
+  } catch {
+    return false;
+  }
+};
+
+const filterImagesByExampleUrl = (
+  images: string[],
+  exampleUrl: string,
+  imageUrlPrefix: string | null,
+): string[] => {
+  if (!exampleUrl || !imageUrlPrefix) return images;
+
+  if (isQimanhwaUrl(exampleUrl)) {
+    const numberedReaderImages = images.filter(
+      (url) => isQimanhwaUrl(url) && isQimanhwaReaderPageImage(url),
+    );
+    if (numberedReaderImages.length > 0) return numberedReaderImages;
+
+    const numberedImages = images.filter((url) => isQimanhwaUrl(url) && isNumberedImageUrl(url));
+    if (numberedImages.length > 0) return numberedImages;
+  }
+
+  const prefixMatches = images.filter((url) => url.startsWith(imageUrlPrefix));
+  if (prefixMatches.length > 0) return prefixMatches;
+
+  try {
+    const exampleOrigin = new URL(exampleUrl.trim()).origin;
+    const originMatches = images.filter((url) => {
+      try {
+        return new URL(url).origin === exampleOrigin;
+      } catch {
+        return url.startsWith(exampleOrigin);
+      }
+    });
+    if (originMatches.length > 0) return originMatches;
+  } catch {
+    // Validation happens before import starts.
+  }
+
+  return [];
+};
+
 const chapterScanKey = (chapterNumber: number, scanlationGroup: string | null): string => {
   return `${chapterNumber}::${scanlationGroup?.trim() || ''}`;
 };
+
+async function scrollChapterPageForLazyImages(page: any): Promise<void> {
+  let lastHeight = 0;
+  let stablePasses = 0;
+
+  for (let pass = 0; pass < 3 && stablePasses < 2; pass++) {
+    const height = await page.evaluate(() => document.body.scrollHeight);
+    if (height === lastHeight) {
+      stablePasses++;
+    } else {
+      stablePasses = 0;
+      lastHeight = height;
+    }
+
+    const scrollTarget = Math.max(height, 30000);
+    for (let y = 0; y <= scrollTarget; y += 700) {
+      await page.evaluate((scrollY: number) => window.scrollTo(0, scrollY), y);
+      await new Promise((resolve) => setTimeout(resolve, 200));
+    }
+
+    await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+  }
+}
+
+async function collectLiveReaderImageUrls(page: any): Promise<string[]> {
+  try {
+    return (await page.evaluate(() =>
+      Array.from(document.images)
+        .filter((img) => {
+          const className = String(img.className || '').toLowerCase();
+          const alt = String(img.alt || '').toLowerCase();
+          return (
+            className.includes('r-page-img') ||
+            className.includes('reader') ||
+            className.includes('chapter') ||
+            alt.startsWith('page ') ||
+            (img.naturalWidth >= 500 && img.naturalHeight >= 800)
+          );
+        })
+        .flatMap((img) => [
+          img.currentSrc,
+          img.src,
+          img.getAttribute('data-src'),
+          img.getAttribute('data-lazy-src'),
+          img.getAttribute('data-original'),
+        ])
+        .filter((value, index, all): value is string =>
+          Boolean(value) &&
+          (String(value).startsWith('http://') || String(value).startsWith('https://')) &&
+          all.indexOf(value) === index,
+        ),
+    )) as string[];
+  } catch (error) {
+    console.warn('  - Live reader image collection failed:', error);
+    return [];
+  }
+}
 
 async function main() {
   console.log('📚 --- Shadow Shelf CLI Scraper --- 📚\n');
@@ -132,7 +262,11 @@ async function main() {
   }
 
   if (imageUrlPrefix) {
-    console.log(`Filtering chapter images by URL pattern: ${imageUrlPrefix}`);
+    if (isQimanhwaUrl(imageTypeExample)) {
+      console.log('Filtering chapter images by Qi Scans numbered reader pages.');
+    } else {
+      console.log(`Filtering chapter images by URL pattern: ${imageUrlPrefix}`);
+    }
   }
 
   let sourceGroupFallback = '';
@@ -295,32 +429,26 @@ async function main() {
       console.log(`  └─ Opening: ${ch.url}`);
       await page.goto(ch.url, { waitUntil: 'domcontentloaded' });
       
-      // Wait a moment for images to render/lazyload
+      // Wait and scroll through the reader so client-side lazy images populate currentSrc/src.
       await new Promise(r => setTimeout(r, 2000));
-
-      // Scroll page down to trigger lazy loading if needed
-      await page.evaluate(() => {
-        window.scrollTo(0, document.body.scrollHeight / 2);
-      });
-      await new Promise(r => setTimeout(r, 1000));
-      await page.evaluate(() => {
-        window.scrollTo(0, document.body.scrollHeight);
-      });
-      await new Promise(r => setTimeout(r, 1000));
+      await scrollChapterPageForLazyImages(page);
 
       const chHtml = await page.content();
 
       // Step 2: Scrape Images
       console.log('  └─ Extracting image URLs...');
-      const extractedImages = extractImageUrls(chHtml, ch.url);
-      const images = imageUrlPrefix
-        ? extractedImages.filter((url) => url.startsWith(imageUrlPrefix))
-        : extractedImages;
+      const htmlImages = extractImageUrls(chHtml, ch.url);
+      const liveImages = await collectLiveReaderImageUrls(page);
+      const extractedImages = Array.from(new Set([...htmlImages, ...liveImages]));
+      const images = filterImagesByExampleUrl(extractedImages, imageTypeExample, imageUrlPrefix);
 
       console.log(`  └─ Found ${extractedImages.length} images.`);
 
       if (imageUrlPrefix) {
-        console.log(`  └─ Kept ${images.length} images matching the example URL pattern.`);
+        const filterLabel = isQimanhwaUrl(imageTypeExample)
+          ? 'Qi Scans numbered reader pages'
+          : 'the example URL pattern';
+        console.log(`  └─ Kept ${images.length} images matching ${filterLabel}.`);
       }
 
       if (images.length === 0) {
