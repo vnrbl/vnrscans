@@ -1,5 +1,5 @@
 import React, { type ReactNode } from "react";
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, Outlet, useMatch } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { BookOpen, Clock, History, ChevronLeft, ChevronRight, Star, MoreVertical, EyeOff, ArrowRight } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -24,7 +24,7 @@ const FOLLOWED_COVER_CLASS =
 
 type HomeHistorySection = "followed-chapters" | "reading-history" | "latest-updates";
 
-export const Route = createFileRoute("/home")({
+export const Route = createFileRoute("/home/")({
   head: () => ({
     meta: [
       { title: "Home — vnrscans" },
@@ -34,7 +34,7 @@ export const Route = createFileRoute("/home")({
   component: HomePage,
 });
 
-function HomePage() {
+function HomeContent() {
   const { user } = useAuth();
   
   // Hidden sections state (stored in localStorage)
@@ -310,6 +310,10 @@ function HomePage() {
       )}
     </div>
   );
+}
+
+function HomePage() {
+  return <HomeContent />;
 }
 
 // Helper function to get section title from ID
@@ -712,7 +716,7 @@ function SeriesCarouselSection({
                 ) : null}
               </div>
               <div className="p-3">
-                <h3 className="line-clamp-2 text-sm font-semibold leading-tight text-foreground group-hover:text-primary">
+                <h3 className="line-clamp-1 text-sm font-semibold leading-tight text-foreground group-hover:text-primary">
                   {item.title}
                 </h3>
               </div>
@@ -904,7 +908,7 @@ function LatestUpdatesSection({
                             {isNew && !isRead && (
                               <span className="shrink-0 flex items-center gap-1 rounded-full bg-violet-600 px-2 py-0.5 text-[10px] font-bold text-white">
                                 <svg className="h-2.5 w-2.5" fill="currentColor" viewBox="0 0 20 20">
-                                  <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                                  <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8 2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
                                 </svg>
                                 NEW
                               </span>
@@ -1028,7 +1032,7 @@ function FollowedChapterCard({ chapter }: { chapter: RecentChapter }) {
         <Link
           to="/title/$slug"
           params={{ slug: seriesSlug }}
-          className="mt-1 line-clamp-2 text-sm font-semibold leading-snug text-foreground group-hover:text-primary"
+          className="mt-1 line-clamp-1 text-sm font-semibold leading-snug text-foreground group-hover:text-primary"
         >
           {chapter.series?.title}
         </Link>
@@ -1082,13 +1086,13 @@ function RecentChapterCard({
         <Link
           to="/title/$slug"
           params={{ slug: seriesSlug }}
-          className="line-clamp-2 text-sm font-semibold leading-tight text-foreground hover:text-primary"
+          className="line-clamp-1 text-sm font-semibold leading-tight text-foreground hover:text-primary"
         >
           {chapter.series?.title}
         </Link>
         {linkVariant === "seriesOnly" ? (
           <>
-            <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{chapterLabel}</p>
+            <p className="mt-1 line-clamp-1 text-xs text-muted-foreground">{chapterLabel}</p>
             {timeRow}
           </>
         ) : (

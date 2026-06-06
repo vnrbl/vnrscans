@@ -13,7 +13,6 @@ import { Route as TagsRouteImport } from './routes/tags'
 import { Route as SearchRouteImport } from './routes/search'
 import { Route as RecommendationsRouteImport } from './routes/recommendations'
 import { Route as RankingsRouteImport } from './routes/rankings'
-import { Route as HomeRouteImport } from './routes/home'
 import { Route as DmcaRouteImport } from './routes/dmca'
 import { Route as ContactRouteImport } from './routes/contact'
 import { Route as BrowseRouteImport } from './routes/browse'
@@ -21,6 +20,7 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AboutRouteImport } from './routes/about'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as HomeIndexRouteImport } from './routes/home/index'
 import { Route as UserUsernameRouteImport } from './routes/user.$username'
 import { Route as TitleSlugRouteImport } from './routes/title.$slug'
 import { Route as TagsSlugRouteImport } from './routes/tags.$slug'
@@ -67,11 +67,6 @@ const RankingsRoute = RankingsRouteImport.update({
   path: '/rankings',
   getParentRoute: () => rootRouteImport,
 } as any)
-const HomeRoute = HomeRouteImport.update({
-  id: '/home',
-  path: '/home',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const DmcaRoute = DmcaRouteImport.update({
   id: '/dmca',
   path: '/dmca',
@@ -104,6 +99,11 @@ const AuthenticatedRoute = AuthenticatedRouteImport.update({
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const HomeIndexRoute = HomeIndexRouteImport.update({
+  id: '/home/',
+  path: '/home/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const UserUsernameRoute = UserUsernameRouteImport.update({
@@ -159,9 +159,9 @@ const TitleTitleSlugChapterSlugRoute =
     getParentRoute: () => rootRouteImport,
   } as any)
 const HomeHistorySectionRoute = HomeHistorySectionRouteImport.update({
-  id: '/history/$section',
-  path: '/history/$section',
-  getParentRoute: () => HomeRoute,
+  id: '/home/history/$section',
+  path: '/home/history/$section',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedAdminUsersRoute = AuthenticatedAdminUsersRouteImport.update({
   id: '/users',
@@ -252,7 +252,6 @@ export interface FileRoutesByFullPath {
   '/browse': typeof BrowseRoute
   '/contact': typeof ContactRoute
   '/dmca': typeof DmcaRoute
-  '/home': typeof HomeRouteWithChildren
   '/rankings': typeof RankingsRoute
   '/recommendations': typeof RecommendationsRoute
   '/search': typeof SearchRoute
@@ -265,6 +264,7 @@ export interface FileRoutesByFullPath {
   '/tags/$slug': typeof TagsSlugRoute
   '/title/$slug': typeof TitleSlugRoute
   '/user/$username': typeof UserUsernameRoute
+  '/home/': typeof HomeIndexRoute
   '/admin/analytics': typeof AuthenticatedAdminAnalyticsRoute
   '/admin/announcements': typeof AuthenticatedAdminAnnouncementsRoute
   '/admin/badges': typeof AuthenticatedAdminBadgesRoute
@@ -290,7 +290,6 @@ export interface FileRoutesByTo {
   '/browse': typeof BrowseRoute
   '/contact': typeof ContactRoute
   '/dmca': typeof DmcaRoute
-  '/home': typeof HomeRouteWithChildren
   '/rankings': typeof RankingsRoute
   '/recommendations': typeof RecommendationsRoute
   '/search': typeof SearchRoute
@@ -302,6 +301,7 @@ export interface FileRoutesByTo {
   '/tags/$slug': typeof TagsSlugRoute
   '/title/$slug': typeof TitleSlugRoute
   '/user/$username': typeof UserUsernameRoute
+  '/home': typeof HomeIndexRoute
   '/admin/analytics': typeof AuthenticatedAdminAnalyticsRoute
   '/admin/announcements': typeof AuthenticatedAdminAnnouncementsRoute
   '/admin/badges': typeof AuthenticatedAdminBadgesRoute
@@ -329,7 +329,6 @@ export interface FileRoutesById {
   '/browse': typeof BrowseRoute
   '/contact': typeof ContactRoute
   '/dmca': typeof DmcaRoute
-  '/home': typeof HomeRouteWithChildren
   '/rankings': typeof RankingsRoute
   '/recommendations': typeof RecommendationsRoute
   '/search': typeof SearchRoute
@@ -342,6 +341,7 @@ export interface FileRoutesById {
   '/tags/$slug': typeof TagsSlugRoute
   '/title/$slug': typeof TitleSlugRoute
   '/user/$username': typeof UserUsernameRoute
+  '/home/': typeof HomeIndexRoute
   '/_authenticated/admin/analytics': typeof AuthenticatedAdminAnalyticsRoute
   '/_authenticated/admin/announcements': typeof AuthenticatedAdminAnnouncementsRoute
   '/_authenticated/admin/badges': typeof AuthenticatedAdminBadgesRoute
@@ -369,7 +369,6 @@ export interface FileRouteTypes {
     | '/browse'
     | '/contact'
     | '/dmca'
-    | '/home'
     | '/rankings'
     | '/recommendations'
     | '/search'
@@ -382,6 +381,7 @@ export interface FileRouteTypes {
     | '/tags/$slug'
     | '/title/$slug'
     | '/user/$username'
+    | '/home/'
     | '/admin/analytics'
     | '/admin/announcements'
     | '/admin/badges'
@@ -407,7 +407,6 @@ export interface FileRouteTypes {
     | '/browse'
     | '/contact'
     | '/dmca'
-    | '/home'
     | '/rankings'
     | '/recommendations'
     | '/search'
@@ -419,6 +418,7 @@ export interface FileRouteTypes {
     | '/tags/$slug'
     | '/title/$slug'
     | '/user/$username'
+    | '/home'
     | '/admin/analytics'
     | '/admin/announcements'
     | '/admin/badges'
@@ -445,7 +445,6 @@ export interface FileRouteTypes {
     | '/browse'
     | '/contact'
     | '/dmca'
-    | '/home'
     | '/rankings'
     | '/recommendations'
     | '/search'
@@ -458,6 +457,7 @@ export interface FileRouteTypes {
     | '/tags/$slug'
     | '/title/$slug'
     | '/user/$username'
+    | '/home/'
     | '/_authenticated/admin/analytics'
     | '/_authenticated/admin/announcements'
     | '/_authenticated/admin/badges'
@@ -485,13 +485,14 @@ export interface RootRouteChildren {
   BrowseRoute: typeof BrowseRoute
   ContactRoute: typeof ContactRoute
   DmcaRoute: typeof DmcaRoute
-  HomeRoute: typeof HomeRouteWithChildren
   RankingsRoute: typeof RankingsRoute
   RecommendationsRoute: typeof RecommendationsRoute
   SearchRoute: typeof SearchRoute
   TagsRoute: typeof TagsRouteWithChildren
   TitleSlugRoute: typeof TitleSlugRoute
   UserUsernameRoute: typeof UserUsernameRoute
+  HomeIndexRoute: typeof HomeIndexRoute
+  HomeHistorySectionRoute: typeof HomeHistorySectionRoute
   TitleTitleSlugChapterSlugRoute: typeof TitleTitleSlugChapterSlugRoute
 }
 
@@ -523,13 +524,6 @@ declare module '@tanstack/react-router' {
       path: '/rankings'
       fullPath: '/rankings'
       preLoaderRoute: typeof RankingsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/home': {
-      id: '/home'
-      path: '/home'
-      fullPath: '/home'
-      preLoaderRoute: typeof HomeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/dmca': {
@@ -579,6 +573,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/home/': {
+      id: '/home/'
+      path: '/home'
+      fullPath: '/home/'
+      preLoaderRoute: typeof HomeIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/user/$username': {
@@ -653,10 +654,10 @@ declare module '@tanstack/react-router' {
     }
     '/home/history/$section': {
       id: '/home/history/$section'
-      path: '/history/$section'
+      path: '/home/history/$section'
       fullPath: '/home/history/$section'
       preLoaderRoute: typeof HomeHistorySectionRouteImport
-      parentRoute: typeof HomeRoute
+      parentRoute: typeof rootRouteImport
     }
     '/_authenticated/admin/users': {
       id: '/_authenticated/admin/users'
@@ -819,16 +820,6 @@ const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
   AuthenticatedRouteChildren,
 )
 
-interface HomeRouteChildren {
-  HomeHistorySectionRoute: typeof HomeHistorySectionRoute
-}
-
-const HomeRouteChildren: HomeRouteChildren = {
-  HomeHistorySectionRoute: HomeHistorySectionRoute,
-}
-
-const HomeRouteWithChildren = HomeRoute._addFileChildren(HomeRouteChildren)
-
 interface TagsRouteChildren {
   TagsSlugRoute: typeof TagsSlugRoute
 }
@@ -847,13 +838,14 @@ const rootRouteChildren: RootRouteChildren = {
   BrowseRoute: BrowseRoute,
   ContactRoute: ContactRoute,
   DmcaRoute: DmcaRoute,
-  HomeRoute: HomeRouteWithChildren,
   RankingsRoute: RankingsRoute,
   RecommendationsRoute: RecommendationsRoute,
   SearchRoute: SearchRoute,
   TagsRoute: TagsRouteWithChildren,
   TitleSlugRoute: TitleSlugRoute,
   UserUsernameRoute: UserUsernameRoute,
+  HomeIndexRoute: HomeIndexRoute,
+  HomeHistorySectionRoute: HomeHistorySectionRoute,
   TitleTitleSlugChapterSlugRoute: TitleTitleSlugChapterSlugRoute,
 }
 export const routeTree = rootRouteImport

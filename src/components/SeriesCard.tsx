@@ -46,7 +46,7 @@ export function SeriesCard({ s, rank }: { s: Series; rank?: number }) {
         ) : null}
       </div>
       <div className="p-3">
-        <h3 className="line-clamp-2 text-sm font-semibold leading-tight text-foreground group-hover:text-primary">
+        <h3 className="line-clamp-1 text-sm font-semibold leading-tight text-foreground group-hover:text-primary">
           {s.title}
         </h3>
         {s.chapter_count && s.chapter_count > 0 && (
