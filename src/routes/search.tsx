@@ -5,6 +5,12 @@ import { Search as SearchIcon } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { SeriesGrid } from "@/components/SeriesGrid";
 import { Input } from "@/components/ui/input";
+import {
+  buildSeriesSearchOrFilter,
+  getSearchDisplayTerm,
+  prepareSearchInput,
+  rankSeriesResults,
+} from "@/lib/search-utils";
 
 type SearchParams = { q?: string };
 
@@ -18,24 +24,32 @@ function SearchPage() {
   const { q } = Route.useSearch();
   const navigate = useNavigate({ from: "/search" });
   const [value, setValue] = useState(q || "");
+  const prepared = prepareSearchInput(q || "");
+  const displayTerm = getSearchDisplayTerm(q || "");
 
   useEffect(() => {
-    const t = setTimeout(() => navigate({ search: { q: value } }), 250);
+    const t = setTimeout(() => navigate({ search: { q: value } }), 150);
     return () => clearTimeout(t);
   }, [value, navigate]);
 
   const results = useQuery({
     queryKey: ["search", q],
     queryFn: async () => {
-      if (!q || q.length < 2) return [];
+      if (!prepared.primaryTerm || prepared.primaryTerm.length < 2) return [];
+      const searchFilter = buildSeriesSearchOrFilter(prepared.terms);
+      if (!searchFilter) return [];
+
       const { data, error } = await supabase
         .from("series")
-        .select("id,slug,title,cover_url,type,rating_average,status,view_count")
-        .or(`title.ilike.%${q}%,alternative_titles.ilike.%${q}%,author.ilike.%${q}%`)
-        .limit(30);
+        .select("id,slug,title,alternative_titles,description,cover_url,type,rating_average,status,view_count,author,artist,is_trending")
+        .eq("is_hidden", false)
+        .or(searchFilter)
+        .limit(60);
       if (error) throw error;
-      return data ?? [];
+      return rankSeriesResults(data ?? [], prepared).slice(0, 40);
     },
+    enabled: prepared.primaryTerm.length >= 2,
+    staleTime: 1000 * 60 * 5,
   });
 
   return (
@@ -47,14 +61,18 @@ function SearchPage() {
           autoFocus
           value={value}
           onChange={(e) => setValue(e.target.value)}
-          placeholder="Search by title, author, or alt title..."
+          placeholder="Search by title, author, alt title, or paste a link..."
           className="pl-10 h-12 text-base"
         />
       </div>
-      {q && q.length >= 2 ? (
-        <SeriesGrid items={results.data} loading={results.isLoading} emptyMessage={`No results for "${q}"`} />
+      {prepared.primaryTerm.length >= 2 ? (
+        <SeriesGrid
+          items={results.data}
+          loading={results.isLoading}
+          emptyMessage={`No results for "${displayTerm}"`}
+        />
       ) : (
-        <p className="text-sm text-muted-foreground">Type at least 2 characters to search.</p>
+        <p className="text-sm text-muted-foreground">Type at least 2 characters or paste a title link.</p>
       )}
     </div>
   );

@@ -21,6 +21,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Command, CommandGroup, CommandItem } from "@/components/ui/command";
+import { buildSeriesSearchOrFilter, prepareSearchInput, rankSeriesResults } from "@/lib/search-utils";
 
 type BrowseSearch = {
   search?: string;
@@ -214,8 +215,12 @@ function BrowsePage() {
       if (contentRating !== "all") {
         query = query.eq("content_rating", contentRating);
       }
-      if (searchQuery) {
-        query = query.ilike("title", `%${searchQuery}%`);
+      const preparedSearch = prepareSearchInput(searchQuery);
+      if (preparedSearch.primaryTerm) {
+        const searchFilter = buildSeriesSearchOrFilter(preparedSearch.terms);
+        if (searchFilter) {
+          query = query.or(searchFilter);
+        }
       }
 
       // Duration filter (popular in timeframe)
@@ -250,32 +255,38 @@ function BrowsePage() {
       const { data, error } = await query;
       if (error) throw error;
       
-      // Calculate chapter count for series without manual count
-      const seriesWithChapters = await Promise.all(
-        (data ?? []).map(async (s: any) => {
-          // If chapter_count is manually set and > 0, use it
-          if (s.chapter_count && s.chapter_count > 0) {
-            return s;
-          }
-          
-          // Otherwise, calculate from actual chapters
-          const { data: chapters } = await supabase
-            .from("chapters")
-            .select("chapter_number")
-            .eq("series_id", s.id)
-            .eq("status", "published");
-          
-          // Get unique base chapter numbers
-          const uniqueChapters = new Set(
-            (chapters ?? []).map((ch) => Math.floor(ch.chapter_number))
-          );
-          
-          return {
-            ...s,
-            chapter_count: uniqueChapters.size,
-          };
-        })
-      );
+      const fetchedSeries = data ?? [];
+      const missingCountSeriesIds = fetchedSeries
+        .filter((s: any) => !s.chapter_count || s.chapter_count <= 0)
+        .map((s: any) => s.id);
+
+      const chapterCountBySeries = new Map<string, number>();
+      if (missingCountSeriesIds.length > 0) {
+        const { data: chapters } = await supabase
+          .from("chapters")
+          .select("series_id,chapter_number")
+          .in("series_id", missingCountSeriesIds)
+          .eq("status", "published");
+
+        const uniqueChaptersBySeries = new Map<string, Set<number>>();
+        (chapters ?? []).forEach((chapter: any) => {
+          const existing = uniqueChaptersBySeries.get(chapter.series_id) ?? new Set<number>();
+          existing.add(Math.floor(chapter.chapter_number));
+          uniqueChaptersBySeries.set(chapter.series_id, existing);
+        });
+
+        uniqueChaptersBySeries.forEach((chaptersSet, seriesId) => {
+          chapterCountBySeries.set(seriesId, chaptersSet.size);
+        });
+      }
+
+      const seriesWithChapters = fetchedSeries.map((s: any) => ({
+        ...s,
+        chapter_count:
+          s.chapter_count && s.chapter_count > 0
+            ? s.chapter_count
+            : chapterCountBySeries.get(s.id) ?? 0,
+      }));
       
       // Filter by genres if selected - series must have ALL selected genres
       let filtered = seriesWithChapters;
@@ -296,7 +307,7 @@ function BrowsePage() {
         });
       }
       
-      return filtered;
+      return searchQuery ? rankSeriesResults(filtered, preparedSearch) : filtered;
     },
   });
 

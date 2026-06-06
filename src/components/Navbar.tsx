@@ -20,6 +20,12 @@ import {
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
+import {
+  buildSeriesSearchOrFilter,
+  getSearchDisplayTerm,
+  prepareSearchInput,
+  rankSeriesResults,
+} from "@/lib/search-utils";
 
 
 type SearchTab = "comics" | "users" | "groups";
@@ -159,17 +165,19 @@ export function Navbar() {
   // ─── Search with debounce ─────────────────────────────────────────────────
   useEffect(() => {
     const timer = setTimeout(async () => {
-      const q = searchQuery.trim();
+      const prepared = prepareSearchInput(searchQuery);
+      const q = prepared.primaryTerm;
       if (q.length >= 2) {
         setSearching(true);
         try {
+          const seriesFilter = buildSeriesSearchOrFilter(prepared.terms);
           const [seriesRes, usersRes, groupsRes] = await Promise.all([
             supabase
               .from("series")
-              .select("id,slug,title,cover_url,type,rating_average,author,description,view_count,is_trending")
+              .select("id,slug,title,alternative_titles,cover_url,type,rating_average,author,artist,description,view_count,is_trending")
               .eq("is_hidden", false)
-              .or(`title.ilike.%${q}%,alternative_titles.ilike.%${q}%,author.ilike.%${q}%,description.ilike.%${q}%`)
-              .limit(24),
+              .or(seriesFilter)
+              .limit(48),
             supabase
               .from("profiles")
               .select("username,avatar_url")
@@ -182,7 +190,7 @@ export function Navbar() {
               .not("scanlation_group", "is", null)
               .limit(30),
           ]);
-          if (seriesRes.data) setSeriesResults(seriesRes.data);
+          if (seriesRes.data) setSeriesResults(rankSeriesResults(seriesRes.data, prepared).slice(0, 24));
           if (usersRes.data) setUserResults(usersRes.data);
           if (groupsRes.data) {
             const uniqueGroups = Array.from(
@@ -573,6 +581,7 @@ function SeriesSearchPanel({
   items: any[];
   onSelect: (slug: string) => void;
 }) {
+  const displayQuery = getSearchDisplayTerm(query);
   const grouped = readingTypeOrder
     .map((type) => ({
       type,
@@ -583,7 +592,7 @@ function SeriesSearchPanel({
   if (loading) return <SearchLoading />;
 
   if (query.trim().length >= 2 && items.length === 0) {
-    return <SearchEmpty message={`No comics found for "${query}".`} />;
+    return <SearchEmpty message={`No comics found for "${displayQuery}".`} />;
   }
 
   if (!loading && items.length === 0) {

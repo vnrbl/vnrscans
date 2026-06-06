@@ -16,11 +16,14 @@ import {
   Tag,
   Sparkles,
   Search,
+  RefreshCw,
+  Power,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { $extractChaptersFromUrl, $extractImagesFromUrl } from "@/lib/api/scraper.functions";
+import { $extractChaptersFromUrl, $extractImagesFromUrl, $syncImportSource } from "@/lib/api/scraper.functions";
 import type { ChapterInfo } from "@/lib/chapter-scraper";
+import { detectImportSource } from "@/lib/import-source-utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -98,6 +101,34 @@ type SeriesForm = {
   tag_ids: string[];
   new_genres: string;
   new_tags: string;
+};
+
+type ImportSourceRow = {
+  id: string;
+  series_id: string;
+  source_url: string;
+  source_site: string | null;
+  scanlation_group: string | null;
+  image_url_example: string | null;
+  enabled: boolean;
+  auto_publish: boolean;
+  check_interval_minutes: number;
+  last_checked_at: string | null;
+  last_success_at: string | null;
+  last_error: string | null;
+  created_at: string;
+};
+
+type ImportLogRow = {
+  id: string;
+  source_id: string;
+  status: "success" | "partial" | "failed";
+  message: string;
+  chapters_found: number;
+  chapters_imported: number;
+  chapters_skipped: number;
+  chapters_failed: number;
+  created_at: string;
 };
 
 const emptySeriesForm: SeriesForm = {
@@ -1018,6 +1049,38 @@ export function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack:
     retry: 1,
   });
 
+  const importSources = useQuery({
+    queryKey: ["admin", "series-import-sources", seriesId],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from("series_import_sources")
+        .select("*")
+        .eq("series_id", seriesId)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return (data ?? []) as ImportSourceRow[];
+    },
+    retry: 1,
+  });
+
+  const importLogs = useQuery({
+    queryKey: ["admin", "series-import-logs", seriesId, importSources.data?.map((s) => s.id).join(",")],
+    queryFn: async () => {
+      const sourceIds = importSources.data?.map((source) => source.id) ?? [];
+      if (sourceIds.length === 0) return [] as ImportLogRow[];
+      const { data, error } = await (supabase as any)
+        .from("series_import_logs")
+        .select("*")
+        .in("source_id", sourceIds)
+        .order("created_at", { ascending: false })
+        .limit(12);
+      if (error) throw error;
+      return (data ?? []) as ImportLogRow[];
+    },
+    enabled: !!importSources.data,
+    retry: 1,
+  });
+
   const [open, setOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterGroup, setFilterGroup] = useState("all");
@@ -1093,6 +1156,14 @@ export function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack:
   const [bulkProgress, setBulkProgress] = useState({ done: 0, total: 0, phase: "" });
   const [groupSelect, setGroupSelect] = useState(SCANLATION_GROUP_NONE);
   const [groupNewName, setGroupNewName] = useState("");
+  const [autoSourceUrl, setAutoSourceUrl] = useState("");
+  const [autoSourceSite, setAutoSourceSite] = useState("");
+  const [autoSourceGroup, setAutoSourceGroup] = useState("");
+  const [autoSourceImageExample, setAutoSourceImageExample] = useState("");
+  const [autoSourceInterval, setAutoSourceInterval] = useState("60");
+  const [autoSourcePublish, setAutoSourcePublish] = useState(true);
+  const [autoSourceEnabled, setAutoSourceEnabled] = useState(true);
+  const [syncingSourceId, setSyncingSourceId] = useState<string | null>(null);
 
   const resetChapterForm = () => {
     setForm({
@@ -1118,6 +1189,108 @@ export function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack:
     );
 
   const scanlationGroupLabel = (group: string | null) => group || "No Group";
+
+  const handleAutoSourceUrlChange = (value: string) => {
+    setAutoSourceUrl(value);
+    const detected = detectImportSource(value);
+    setAutoSourceSite(detected.sourceSite);
+    setAutoSourceGroup(detected.scanlationGroup);
+    setAutoSourceImageExample(detected.imageUrlExample ?? "");
+  };
+
+  const resetAutoSourceForm = () => {
+    setAutoSourceUrl("");
+    setAutoSourceSite("");
+    setAutoSourceGroup("");
+    setAutoSourceImageExample("");
+    setAutoSourceInterval("60");
+    setAutoSourcePublish(true);
+    setAutoSourceEnabled(true);
+  };
+
+  const saveImportSourceMutation = useMutation({
+    mutationFn: async () => {
+      const sourceUrl = autoSourceUrl.trim();
+      if (!sourceUrl) throw new Error("Source URL is required.");
+      new URL(sourceUrl);
+
+      const detected = detectImportSource(sourceUrl);
+      const interval = Number.parseInt(autoSourceInterval, 10);
+      const { error } = await (supabase as any).from("series_import_sources").insert({
+        series_id: seriesId,
+        source_url: sourceUrl,
+        source_site: autoSourceSite.trim() || detected.sourceSite,
+        scanlation_group: autoSourceGroup.trim() || detected.scanlationGroup || null,
+        image_url_example: autoSourceImageExample.trim() || detected.imageUrlExample || null,
+        enabled: autoSourceEnabled,
+        auto_publish: autoSourcePublish,
+        check_interval_minutes: Number.isFinite(interval) ? Math.max(interval, 10) : 60,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Auto import source saved.");
+      resetAutoSourceForm();
+      qc.invalidateQueries({ queryKey: ["admin", "series-import-sources", seriesId] });
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
+  const updateImportSourceMutation = useMutation({
+    mutationFn: async ({ id, patch }: { id: string; patch: Partial<ImportSourceRow> }) => {
+      const { error } = await (supabase as any)
+        .from("series_import_sources")
+        .update(patch)
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin", "series-import-sources", seriesId] });
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
+  const deleteImportSourceMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await (supabase as any).from("series_import_sources").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Auto import source deleted.");
+      qc.invalidateQueries({ queryKey: ["admin", "series-import-sources", seriesId] });
+      qc.invalidateQueries({ queryKey: ["admin", "series-import-logs", seriesId] });
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
+  const checkImportSourceNow = async (sourceId: string) => {
+    setSyncingSourceId(sourceId);
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData.session?.access_token;
+      if (!accessToken) throw new Error("Please sign in again before running auto import.");
+
+      const result = await $syncImportSource({
+        data: { sourceId, accessToken, maxChapters: 10 },
+      });
+
+      if (!result.success) {
+        throw new Error(result.error || "Auto import failed.");
+      }
+
+      toast.success(
+        `Auto import complete: ${result.imported} imported, ${result.failed} failed.`,
+      );
+      qc.invalidateQueries({ queryKey: ["admin", "chapters", seriesId] });
+      qc.invalidateQueries({ queryKey: ["admin", "scanlation-groups", seriesId] });
+      qc.invalidateQueries({ queryKey: ["admin", "series-import-sources", seriesId] });
+      qc.invalidateQueries({ queryKey: ["admin", "series-import-logs", seriesId] });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Auto import failed.");
+    } finally {
+      setSyncingSourceId(null);
+    }
+  };
 
   const findExistingChapterByNumberAndGroup = async (
     chapterNumber: number,
@@ -1871,6 +2044,189 @@ export function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack:
           <h1 className="text-2xl font-bold">{series.data.title}</h1>
           <p className="text-sm text-muted-foreground">Manage chapters</p>
         </div>
+      </div>
+
+      <div className="mb-5 rounded-lg border border-border/50 bg-card p-4">
+        <div className="mb-3 flex items-start justify-between gap-3">
+          <div>
+            <h2 className="flex items-center gap-2 text-lg font-semibold">
+              <RefreshCw className="h-4 w-4 text-violet-600" />
+              Auto Import Source
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              Save origin URLs once, then check for new chapters without replacing existing group
+              uploads.
+            </p>
+          </div>
+          <Badge variant="outline">
+            {importSources.data?.length ?? 0} source{(importSources.data?.length ?? 0) !== 1 ? "s" : ""}
+          </Badge>
+        </div>
+
+        <div className="grid gap-3 lg:grid-cols-[1.4fr_0.8fr_0.8fr_0.7fr_auto]">
+          <div>
+            <Label>Origin Series URL</Label>
+            <Input
+              placeholder="https://qimanhwa.com/series/high-martial-world..."
+              value={autoSourceUrl}
+              onChange={(e) => handleAutoSourceUrlChange(e.target.value)}
+            />
+          </div>
+          <div>
+            <Label>Detected Site</Label>
+            <Input
+              placeholder="Qi Scans, Asura Scans..."
+              value={autoSourceSite}
+              onChange={(e) => setAutoSourceSite(e.target.value)}
+            />
+          </div>
+          <div>
+            <Label>Group / Scans</Label>
+            <Input
+              placeholder="Auto detected"
+              value={autoSourceGroup}
+              onChange={(e) => setAutoSourceGroup(e.target.value)}
+            />
+          </div>
+          <div>
+            <Label>Every</Label>
+            <Select value={autoSourceInterval} onValueChange={setAutoSourceInterval}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="30">30 min</SelectItem>
+                <SelectItem value="60">1 hour</SelectItem>
+                <SelectItem value="180">3 hours</SelectItem>
+                <SelectItem value="360">6 hours</SelectItem>
+                <SelectItem value="1440">Daily</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex items-end">
+            <Button
+              type="button"
+              onClick={() => saveImportSourceMutation.mutate()}
+              disabled={saveImportSourceMutation.isPending || !autoSourceUrl.trim()}
+              className="w-full bg-violet-600 hover:bg-violet-700"
+            >
+              {saveImportSourceMutation.isPending ? "Saving..." : "Save"}
+            </Button>
+          </div>
+        </div>
+
+        <div className="mt-3 grid gap-3 lg:grid-cols-[1fr_auto_auto]">
+          <div>
+            <Label>Image URL Example</Label>
+            <Input
+              placeholder="Optional; auto-filled for known sources"
+              value={autoSourceImageExample}
+              onChange={(e) => setAutoSourceImageExample(e.target.value)}
+            />
+          </div>
+          <label className="flex items-center gap-2 pt-6 text-sm">
+            <Checkbox
+              checked={autoSourcePublish}
+              onCheckedChange={(checked) => setAutoSourcePublish(checked === true)}
+            />
+            Auto publish
+          </label>
+          <label className="flex items-center gap-2 pt-6 text-sm">
+            <Checkbox
+              checked={autoSourceEnabled}
+              onCheckedChange={(checked) => setAutoSourceEnabled(checked === true)}
+            />
+            Enabled
+          </label>
+        </div>
+
+        {importSources.data && importSources.data.length > 0 && (
+          <div className="mt-4 space-y-3">
+            {importSources.data.map((source) => {
+              const lastLog = importLogs.data?.find((log) => log.source_id === source.id);
+              return (
+                <div
+                  key={source.id}
+                  className="rounded-lg border border-border/40 bg-background p-3"
+                >
+                  <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge className={source.enabled ? "bg-green-600" : "bg-zinc-600"}>
+                          {source.enabled ? "Enabled" : "Paused"}
+                        </Badge>
+                        <span className="font-semibold">
+                          {source.source_site || detectImportSource(source.source_url).sourceSite}
+                        </span>
+                        <span className="text-sm text-muted-foreground">
+                          {scanlationGroupLabel(source.scanlation_group)}
+                        </span>
+                      </div>
+                      <div className="mt-1 truncate text-xs text-muted-foreground">
+                        {source.source_url}
+                      </div>
+                      <div className="mt-1 text-xs text-muted-foreground">
+                        Last checked:{" "}
+                        {source.last_checked_at
+                          ? new Date(source.last_checked_at).toLocaleString()
+                          : "Never"}
+                        {source.last_error ? (
+                          <span className="ml-2 text-red-500">{source.last_error}</span>
+                        ) : null}
+                      </div>
+                      {lastLog && (
+                        <div className="mt-2 text-xs text-muted-foreground">
+                          Last run: {lastLog.message} Found {lastLog.chapters_found}, imported{" "}
+                          {lastLog.chapters_imported}, failed {lastLog.chapters_failed}.
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() =>
+                          updateImportSourceMutation.mutate({
+                            id: source.id,
+                            patch: { enabled: !source.enabled } as Partial<ImportSourceRow>,
+                          })
+                        }
+                        disabled={updateImportSourceMutation.isPending}
+                      >
+                        <Power className="mr-1 h-3.5 w-3.5" />
+                        {source.enabled ? "Pause" : "Enable"}
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={() => checkImportSourceNow(source.id)}
+                        disabled={syncingSourceId === source.id}
+                        className="bg-violet-600 hover:bg-violet-700"
+                      >
+                        <RefreshCw
+                          className={`mr-1 h-3.5 w-3.5 ${syncingSourceId === source.id ? "animate-spin" : ""}`}
+                        />
+                        {syncingSourceId === source.id ? "Checking..." : "Check Now"}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => deleteImportSourceMutation.mutate(source.id)}
+                        disabled={deleteImportSourceMutation.isPending}
+                        className="text-red-500 hover:text-red-600"
+                      >
+                        <Trash2 className="mr-1 h-3.5 w-3.5" />
+                        Delete
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       <div className="flex items-center justify-between">

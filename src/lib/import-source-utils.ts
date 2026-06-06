@@ -1,0 +1,65 @@
+export type ImportSourcePreset = {
+  sourceSite: string;
+  scanlationGroup: string;
+  imageUrlExample?: string;
+};
+
+const SOURCE_PRESETS: Array<{
+  hostIncludes: string;
+  sourceSite: string;
+  scanlationGroup: string;
+  imageUrlExample?: string;
+}> = [
+  {
+    hostIncludes: "qimanhwa.com",
+    sourceSite: "Qi Scans",
+    scanlationGroup: "Qi Scans",
+    imageUrlExample: "https://media.qimanhwa.com/file/qiscans/upload/rezo/series/example/chapter/001.jpg",
+  },
+  {
+    hostIncludes: "qiscans.org",
+    sourceSite: "Qi Scans",
+    scanlationGroup: "Qi Scans",
+    imageUrlExample: "https://media.qimanhwa.com/file/qiscans/upload/rezo/series/example/chapter/001.jpg",
+  },
+  {
+    hostIncludes: "asurascans.com",
+    sourceSite: "Asura Scans",
+    scanlationGroup: "Asura Scans",
+    imageUrlExample: "https://cdn.asurascans.com/asura-images/chapters/example/page-001.webp",
+  },
+];
+
+export function detectImportSource(url: string): ImportSourcePreset {
+  try {
+    const parsed = new URL(url.trim());
+    const hostname = parsed.hostname.replace(/^www\./, "").toLowerCase();
+    const preset = SOURCE_PRESETS.find((entry) => hostname.includes(entry.hostIncludes));
+    if (preset) return preset;
+
+    const label = hostname
+      .split(".")
+      .filter((part) => part && part !== "com" && part !== "org" && part !== "net")
+      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+      .join(" ");
+
+    return {
+      sourceSite: label || hostname,
+      scanlationGroup: label || hostname,
+    };
+  } catch {
+    return {
+      sourceSite: "Custom Source",
+      scanlationGroup: "",
+    };
+  }
+}
+
+export function isKnownImportSource(url: string): boolean {
+  try {
+    const hostname = new URL(url.trim()).hostname.toLowerCase();
+    return SOURCE_PRESETS.some((entry) => hostname.includes(entry.hostIncludes));
+  } catch {
+    return false;
+  }
+}
