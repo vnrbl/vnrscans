@@ -955,41 +955,68 @@ export function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack:
   const series = useQuery({
     queryKey: ["admin", "series", seriesId],
     queryFn: async () => {
-      const { data, error } = await supabase.from("series").select("*").eq("id", seriesId).single();
-      if (error) throw error;
-      return data;
+      try {
+        const { data, error } = await supabase.from("series").select("*").eq("id", seriesId).single();
+        if (error) {
+          console.error("Supabase series query error:", error);
+          throw error;
+        }
+        return data;
+      } catch (err) {
+        console.error("Series fetch failed:", err);
+        throw err;
+      }
     },
+    retry: 1,
   });
 
   const chapters = useQuery({
     queryKey: ["admin", "chapters", seriesId],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("chapters")
-        .select("*")
-        .eq("series_id", seriesId)
-        .order("chapter_number", { ascending: false });
-      if (error) throw error;
-      return data ?? [];
+      try {
+        const { data, error } = await supabase
+          .from("chapters")
+          .select("*")
+          .eq("series_id", seriesId)
+          .order("chapter_number", { ascending: false });
+        if (error) {
+          console.error("Supabase chapters query error:", error);
+          throw error;
+        }
+        return data ?? [];
+      } catch (err) {
+        console.error("Chapters fetch failed:", err);
+        throw err;
+      }
     },
+    retry: 1,
   });
 
   // Get existing scanlation groups for this series only
   const scanlationGroups = useQuery({
     queryKey: ["admin", "scanlation-groups", seriesId],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("chapters")
-        .select("scanlation_group")
-        .eq("series_id", seriesId)
-        .not("scanlation_group", "is", null);
+      try {
+        const { data, error } = await supabase
+          .from("chapters")
+          .select("scanlation_group")
+          .eq("series_id", seriesId)
+          .not("scanlation_group", "is", null);
 
-      if (error) throw error;
+        if (error) {
+          console.error("Supabase scanlation groups query error:", error);
+          throw error;
+        }
 
-      // Get unique groups
-      const uniqueGroups = [...new Set(data?.map((c) => c.scanlation_group).filter(Boolean) ?? [])];
-      return uniqueGroups.sort();
+        // Get unique groups
+        const uniqueGroups = [...new Set(data?.map((c) => c.scanlation_group).filter(Boolean) ?? [])];
+        return uniqueGroups.sort();
+      } catch (err) {
+        console.error("Scanlation groups fetch failed:", err);
+        throw err;
+      }
     },
+    retry: 1,
   });
 
   const [open, setOpen] = useState(false);
