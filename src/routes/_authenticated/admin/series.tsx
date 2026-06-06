@@ -948,7 +948,7 @@ function SeriesFormFields({
   );
 }
 
-function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack: () => void }) {
+export function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack: () => void }) {
   const qc = useQueryClient();
   const { user } = useAuth();
 
