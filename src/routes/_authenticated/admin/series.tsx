@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState, useEffect, useMemo } from "react";
 import { toast } from "sonner";
@@ -248,7 +248,7 @@ async function syncSeriesTaxonomy(seriesId: string, form: SeriesForm) {
 function AdminSeries() {
   const qc = useQueryClient();
   const { user } = useAuth();
-  const [selectedSeries, setSelectedSeries] = useState<string | null>(null);
+  const navigate = useNavigate();
   const [editingSeries, setEditingSeries] = useState<any | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState<string>("all");
@@ -401,9 +401,7 @@ function AdminSeries() {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  if (selectedSeries) {
-    return <ChapterManager seriesId={selectedSeries} onBack={() => setSelectedSeries(null)} />;
-  }
+
 
   return (
     <div>
@@ -548,8 +546,8 @@ function AdminSeries() {
               <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => setSelectedSeries(s.id)}
-                  className="truncate text-left font-medium hover:text-primary"
+                  onClick={() => navigate({ to: "/admin/series-chapters/$seriesId", params: { seriesId: s.id } })}
+                  className="truncate text-left font-medium hover:text-primary cursor-pointer"
                 >
                   {s.title}
                 </button>
@@ -592,7 +590,7 @@ function AdminSeries() {
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => setSelectedSeries(s.id)}
+              onClick={() => navigate({ to: "/admin/series-chapters/$seriesId", params: { seriesId: s.id } })}
               title="Manage Chapters"
             >
               <Upload className="h-4 w-4 text-violet-600" />
