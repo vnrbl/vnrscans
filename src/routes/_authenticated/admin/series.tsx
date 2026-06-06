@@ -1362,6 +1362,14 @@ export function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack:
     }
   };
 
+  const isAsuraUrl = (url: string) => {
+    try {
+      return new URL(url).hostname.toLowerCase().includes("asurascans.com");
+    } catch {
+      return url.toLowerCase().includes("asurascans.com");
+    }
+  };
+
   const filterImagesByExampleUrl = (
     images: string[],
     exampleUrl: string,
@@ -1622,7 +1630,9 @@ export function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack:
       // ── Phase 1: Parallel image extraction (batches of 5) ──────────────
       setBulkProgress({ done: 0, total: uploadableList.length, phase: "Extracting images" });
 
-      const BATCH_SIZE = 5;
+      const isAsuraBulkImport =
+        isAsuraUrl(seriesUrl) || selectedList.some((chapter) => isAsuraUrl(chapter.url));
+      const BATCH_SIZE = isAsuraBulkImport ? 12 : 5;
       type ExtractionResult =
         | { chapter: ChapterInfo; images: string[] }
         | { chapter: ChapterInfo; error: string };

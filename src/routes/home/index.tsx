@@ -18,9 +18,6 @@ import { TITLE_CARD_WIDTH, TITLE_COVER_CLASS } from "@/components/titleCardStyle
 import { HomeHeroCarousel } from "@/components/HomeHeroCarousel";
 import { OptimizedImage } from "@/components/OptimizedImage";
 
-const FOLLOWED_CARD_WIDTH = "w-[132px] shrink-0 sm:w-[150px] md:w-[158px]";
-const FOLLOWED_COVER_CLASS =
-  "relative aspect-[3/4] overflow-hidden rounded-md bg-secondary";
 const LATEST_UPDATES_CHAPTER_LIMIT = 20;
 
 type HomeHistorySection = "followed-chapters" | "reading-history" | "latest-updates";
@@ -583,9 +580,9 @@ function FollowedUpdatesCarouselSection({
       {loading ? (
         <div className="flex gap-4 overflow-hidden">
           {[...Array(6)].map((_, i) => (
-            <div key={i} className={FOLLOWED_CARD_WIDTH}>
-              <div className={`${FOLLOWED_COVER_CLASS} animate-pulse bg-secondary`} />
-              <div className="space-y-2 pt-2">
+            <div key={i} className={`${TITLE_CARD_WIDTH} overflow-hidden rounded-lg border border-border/40 bg-card`}>
+              <div className={`${TITLE_COVER_CLASS} animate-pulse bg-secondary`} />
+              <div className="space-y-2 p-3">
                 <div className="h-4 w-3/4 animate-pulse rounded bg-secondary" />
                 <div className="h-3 w-1/2 animate-pulse rounded bg-secondary" />
               </div>
@@ -600,7 +597,7 @@ function FollowedUpdatesCarouselSection({
           style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
         >
           {chapters.map((chapter) => (
-            <div key={chapter.id} className={FOLLOWED_CARD_WIDTH}>
+            <div key={chapter.id} className={TITLE_CARD_WIDTH}>
               <FollowedChapterCard chapter={chapter} />
             </div>
           ))}
@@ -1021,13 +1018,13 @@ function FollowedChapterCard({ chapter }: { chapter: RecentChapter }) {
   if (!seriesSlug) return null;
 
   return (
-    <article className="group">
+    <article className="group overflow-hidden rounded-lg border border-border/40 bg-card transition-all hover:border-primary/50 hover:shadow-lg hover:shadow-primary/10">
       <Link
         to="/title/$titleSlug/$chapterSlug"
         params={{ titleSlug: seriesSlug, chapterSlug: chapter.slug }}
         className="block"
       >
-        <div className={FOLLOWED_COVER_CLASS}>
+        <div className={TITLE_COVER_CLASS}>
           <OptimizedImage
             src={chapter.series?.cover_url ?? null}
             alt={chapter.series?.title ?? ""}
@@ -1039,7 +1036,7 @@ function FollowedChapterCard({ chapter }: { chapter: RecentChapter }) {
           </Badge>
         </div>
       </Link>
-      <div className="pt-2">
+      <div className="p-3">
         <Link
           to="/title/$titleSlug/$chapterSlug"
           params={{ titleSlug: seriesSlug, chapterSlug: chapter.slug }}

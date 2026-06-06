@@ -217,25 +217,42 @@ async function scrapeWithPuppeteer(url: string, isChapterPage: boolean = false):
 
 async function scrollChapterPageForLazyImages(page: any): Promise<void> {
   let lastHeight = 0;
+  let lastReaderImageCount = 0;
   let stablePasses = 0;
 
   for (let pass = 0; pass < 3 && stablePasses < 2; pass++) {
-    const height = await page.evaluate(() => document.body.scrollHeight);
-    if (height === lastHeight) {
+    const { height, readerImageCount } = await page.evaluate(() => {
+      const readerImageCount = Array.from(document.images).filter((img) => {
+        const className = String(img.className || '').toLowerCase();
+        const alt = String(img.alt || '').toLowerCase();
+        return (
+          className.includes('r-page-img') ||
+          className.includes('reader') ||
+          className.includes('chapter') ||
+          alt.startsWith('page ') ||
+          (img.naturalWidth >= 500 && img.naturalHeight >= 800)
+        );
+      }).length;
+
+      return { height: document.body.scrollHeight, readerImageCount };
+    });
+
+    if (height === lastHeight && readerImageCount === lastReaderImageCount && readerImageCount > 0) {
       stablePasses++;
     } else {
       stablePasses = 0;
       lastHeight = height;
+      lastReaderImageCount = readerImageCount;
     }
 
     const scrollTarget = Math.max(height, 30000);
-    for (let y = 0; y <= scrollTarget; y += 700) {
+    for (let y = 0; y <= scrollTarget; y += 1200) {
       await page.evaluate((scrollY: number) => window.scrollTo(0, scrollY), y);
-      await new Promise((resolve) => setTimeout(resolve, 200));
+      await new Promise((resolve) => setTimeout(resolve, 80));
     }
 
     await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    await new Promise((resolve) => setTimeout(resolve, 500));
   }
 }
 

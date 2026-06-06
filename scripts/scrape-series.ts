@@ -2,7 +2,12 @@ import { createClient } from '@supabase/supabase-js';
 import { config } from 'dotenv';
 import readline from 'readline';
 import puppeteer from 'puppeteer';
-import { buildClientChapterLinksHtml, extractChapterLinks, extractImageUrls } from '../src/lib/chapter-scraper';
+import {
+  buildClientChapterLinksHtml,
+  extractChapterLinks,
+  extractImageUrls,
+  extractImagesFromChapterUrl,
+} from '../src/lib/chapter-scraper';
 import { buildChapterSlug } from '../src/lib/chapter-utils';
 
 config();
@@ -48,6 +53,15 @@ const isQimanhwaUrl = (url: string): boolean => {
   } catch {
     const lowercaseUrl = url.toLowerCase();
     return lowercaseUrl.includes('qimanhwa.com') || lowercaseUrl.includes('qiscans');
+  }
+};
+
+const isAsuraUrl = (url: string): boolean => {
+  try {
+    const hostname = new URL(url.trim()).hostname.toLowerCase();
+    return hostname.includes('asurascans.com');
+  } catch {
+    return url.toLowerCase().includes('asurascans.com');
   }
 };
 
@@ -119,25 +133,42 @@ const chapterScanKey = (chapterNumber: number, scanlationGroup: string | null): 
 
 async function scrollChapterPageForLazyImages(page: any): Promise<void> {
   let lastHeight = 0;
+  let lastReaderImageCount = 0;
   let stablePasses = 0;
 
   for (let pass = 0; pass < 3 && stablePasses < 2; pass++) {
-    const height = await page.evaluate(() => document.body.scrollHeight);
-    if (height === lastHeight) {
+    const { height, readerImageCount } = await page.evaluate(() => {
+      const readerImageCount = Array.from(document.images).filter((img) => {
+        const className = String(img.className || '').toLowerCase();
+        const alt = String(img.alt || '').toLowerCase();
+        return (
+          className.includes('r-page-img') ||
+          className.includes('reader') ||
+          className.includes('chapter') ||
+          alt.startsWith('page ') ||
+          (img.naturalWidth >= 500 && img.naturalHeight >= 800)
+        );
+      }).length;
+
+      return { height: document.body.scrollHeight, readerImageCount };
+    });
+
+    if (height === lastHeight && readerImageCount === lastReaderImageCount && readerImageCount > 0) {
       stablePasses++;
     } else {
       stablePasses = 0;
       lastHeight = height;
+      lastReaderImageCount = readerImageCount;
     }
 
     const scrollTarget = Math.max(height, 30000);
-    for (let y = 0; y <= scrollTarget; y += 700) {
+    for (let y = 0; y <= scrollTarget; y += 1200) {
       await page.evaluate((scrollY: number) => window.scrollTo(0, scrollY), y);
-      await new Promise((resolve) => setTimeout(resolve, 200));
+      await new Promise((resolve) => setTimeout(resolve, 80));
     }
 
     await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    await new Promise((resolve) => setTimeout(resolve, 500));
   }
 }
 
@@ -427,7 +458,14 @@ async function main() {
     try {
       // Step 1: Navigate to chapter page
       console.log(`  └─ Opening: ${ch.url}`);
-      await page.goto(ch.url, { waitUntil: 'domcontentloaded' });
+      console.log('  - Extracting image URLs...');
+      let htmlImages: string[] = [];
+      let liveImages: string[] = [];
+
+      if (isAsuraUrl(ch.url)) {
+        htmlImages = await extractImagesFromChapterUrl(ch.url);
+      } else {
+        await page.goto(ch.url, { waitUntil: 'domcontentloaded' });
       
       // Wait and scroll through the reader so client-side lazy images populate currentSrc/src.
       await new Promise(r => setTimeout(r, 2000));
@@ -437,8 +475,9 @@ async function main() {
 
       // Step 2: Scrape Images
       console.log('  └─ Extracting image URLs...');
-      const htmlImages = extractImageUrls(chHtml, ch.url);
-      const liveImages = await collectLiveReaderImageUrls(page);
+      htmlImages = extractImageUrls(chHtml, ch.url);
+      liveImages = await collectLiveReaderImageUrls(page);
+      }
       const extractedImages = Array.from(new Set([...htmlImages, ...liveImages]));
       const images = filterImagesByExampleUrl(extractedImages, imageTypeExample, imageUrlPrefix);
 
