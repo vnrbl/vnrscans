@@ -21,6 +21,7 @@ import { OptimizedImage } from "@/components/OptimizedImage";
 const FOLLOWED_CARD_WIDTH = "w-[132px] shrink-0 sm:w-[150px] md:w-[158px]";
 const FOLLOWED_COVER_CLASS =
   "relative aspect-[3/4] overflow-hidden rounded-md bg-secondary";
+const LATEST_UPDATES_CHAPTER_LIMIT = 20;
 
 type HomeHistorySection = "followed-chapters" | "reading-history" | "latest-updates";
 
@@ -117,13 +118,22 @@ function HomeContent() {
 
       const { data, error } = await supabase
         .from("chapters")
-        .select("id,slug,title,chapter_number,created_at,series:series_id(slug,title,cover_url)")
+        .select("id,slug,title,chapter_number,created_at,series_id,series:series_id(slug,title,cover_url)")
         .in("series_id", seriesIds)
         .eq("status", "published")
         .order("created_at", { ascending: false })
-        .limit(18);
+        .limit(100);
       if (error) throw error;
-      return data ?? [];
+
+      const uniqueChapterUpdates = new Map<string, any>();
+      (data ?? []).forEach((chapter: any) => {
+        const key = `${chapter.series_id}:${chapter.chapter_number}`;
+        if (!uniqueChapterUpdates.has(key)) {
+          uniqueChapterUpdates.set(key, chapter);
+        }
+      });
+
+      return Array.from(uniqueChapterUpdates.values()).slice(0, 18);
     },
     enabled: !!user,
     staleTime: 1000 * 60 * 2, // 2 minutes
@@ -173,9 +183,14 @@ function HomeContent() {
             recent_chapters: [],
           });
         }
-        // Add chapter to the series (limit to 5 chapters per series)
+        // Add recent chapter numbers to the series card. Keep this high enough for large upload batches.
         const seriesData = seriesMap.get(seriesId);
-        if (seriesData.recent_chapters.length < 5) {
+        const chapterAlreadyListed = seriesData.recent_chapters.some(
+          (existing: any) => existing.chapter_number === ch.chapter_number,
+        );
+        if (chapterAlreadyListed) return;
+
+        if (seriesData.recent_chapters.length < LATEST_UPDATES_CHAPTER_LIMIT) {
           seriesData.recent_chapters.push({
             id: ch.id,
             slug: ch.slug,
@@ -879,9 +894,13 @@ function LatestUpdatesSection({
                   >
                     {item.title}
                   </Link>
+                  <div className="mt-1 text-xs text-muted-foreground">
+                    {item.recent_chapters.length} recent chapter
+                    {item.recent_chapters.length !== 1 ? "s" : ""}
+                  </div>
 
                   {/* Recent Chapters List with Read Status */}
-                  <div className="mt-3 space-y-2">
+                  <div className="mt-3 max-h-[156px] space-y-2 overflow-y-auto pr-1">
                     {item.recent_chapters.map((chapter) => {
                       const isRead = readChapterIds.has(chapter.id);
                       const isNew = isNewChapter(chapter.created_at);

@@ -313,26 +313,10 @@ function Reader() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [prev, next, navigate, seriesSlug]);
 
-  // Keep reader controls visible only at the top or while scrolling upward.
+  // Keep reader controls in the last scroll direction state:
+  // scrolling down hides them, scrolling up shows them and leaves them visible.
   useEffect(() => {
     let ticking = false;
-    let hideTimeout: NodeJS.Timeout | null = null;
-
-    const clearHideTimeout = () => {
-      if (hideTimeout) {
-        clearTimeout(hideTimeout);
-        hideTimeout = null;
-      }
-    };
-
-    const hideAfterScrollStops = () => {
-      clearHideTimeout();
-      hideTimeout = setTimeout(() => {
-        if (window.scrollY > 8 && !showChapters && !showSpeedControl) {
-          setControlsVisible(false);
-        }
-      }, 1000);
-    };
 
     const handleScroll = () => {
       if (!ticking) {
@@ -341,11 +325,9 @@ function Reader() {
           const delta = currentScrollY - lastScrollYRef.current;
 
           if (currentScrollY <= 8) {
-            clearHideTimeout();
             setControlsVisible(true);
             setShowScrollTop(false);
           } else if (showChapters || showSpeedControl) {
-            clearHideTimeout();
             setControlsVisible(true);
             setShowScrollTop(currentScrollY > 300);
           } else if (Math.abs(delta) > 8) {
@@ -353,9 +335,7 @@ function Reader() {
 
             if (isScrollingUp) {
               setControlsVisible(true);
-              hideAfterScrollStops();
             } else {
-              clearHideTimeout();
               setControlsVisible(false);
             }
 
@@ -376,7 +356,6 @@ function Reader() {
     window.addEventListener("scroll", handleScroll, { passive: true });
     return () => {
       window.removeEventListener("scroll", handleScroll);
-      clearHideTimeout();
     };
   }, [showChapters, showSpeedControl]);
 

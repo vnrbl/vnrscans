@@ -1074,6 +1074,7 @@ export function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack:
   const [seriesUrl, setSeriesUrl] = useState("");
   const [imageUrlTypeExample, setImageUrlTypeExample] = useState("");
   const [deleteUrl, setDeleteUrl] = useState("");
+  const [deleteNegativeUrl, setDeleteNegativeUrl] = useState("");
   const [deleteUrlResults, setDeleteUrlResults] = useState<
     {
       id: string;
@@ -1398,18 +1399,42 @@ export function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack:
     }
   };
 
-  const findAndDeleteUrl = async () => {
-    const urlsToDelete = Array.from(
+  type UrlMatcher = { value: string; mode: "exact" | "prefix" };
+
+  const parseUrlMatchers = (value: string): UrlMatcher[] =>
+    Array.from(
       new Set(
-        deleteUrl
+        value
           .split(/\r?\n/)
           .map((url) => url.trim())
           .filter(Boolean),
       ),
-    );
+    )
+      .map((url): UrlMatcher => {
+        if (url.endsWith("*")) {
+          return { value: url.slice(0, -1).trim(), mode: "prefix" };
+        }
 
-    if (urlsToDelete.length === 0) {
-      toast.error("Please enter at least one URL to delete.");
+        if (url.endsWith("...")) {
+          return { value: url.slice(0, -3).trim(), mode: "prefix" };
+        }
+
+        return { value: url, mode: "exact" };
+      })
+      .filter((matcher) => matcher.value.length > 0);
+
+  const matchesUrlRule = (imageUrl: string, matcher: UrlMatcher) =>
+    matcher.mode === "prefix" ? imageUrl.startsWith(matcher.value) : imageUrl === matcher.value;
+
+  const matchesAnyUrlRule = (imageUrl: string, matchers: UrlMatcher[]) =>
+    matchers.some((matcher) => matchesUrlRule(imageUrl, matcher));
+
+  const findAndDeleteUrl = async () => {
+    const positiveMatchers = parseUrlMatchers(deleteUrl);
+    const negativeMatchers = parseUrlMatchers(deleteNegativeUrl);
+
+    if (positiveMatchers.length === 0) {
+      toast.error("Please enter at least one positive URL or prefix to delete.");
       return;
     }
 
@@ -1426,8 +1451,7 @@ export function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack:
     const { data, error } = await supabase
       .from("chapter_pages")
       .select("id, chapter_id, page_number, image_url")
-      .in("chapter_id", chapterIds)
-      .in("image_url", urlsToDelete);
+      .in("chapter_id", chapterIds);
 
     if (error) {
       toast.error(error.message);
@@ -1435,16 +1459,22 @@ export function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack:
       return;
     }
 
-    if (!data || data.length === 0) {
-      setDeleteUrlStatus("No matches found for the provided URL(s).");
-      toast.success("No page entries found with those URL(s).");
+    const matchedPages = (data ?? []).filter(
+      (page) =>
+        matchesAnyUrlRule(page.image_url, positiveMatchers) &&
+        !matchesAnyUrlRule(page.image_url, negativeMatchers),
+    );
+
+    if (matchedPages.length === 0) {
+      setDeleteUrlStatus("No deletable matches found for the provided positive/negative rules.");
+      toast.success("No page entries matched those delete rules.");
       setDeleteUrlLoading(false);
       return;
     }
 
-    setDeleteUrlResults(data);
+    setDeleteUrlResults(matchedPages);
     setDeleteUrlStatus(
-      `Found ${data.length} matching page(s) across ${urlsToDelete.length} URL(s). Deleting...`,
+      `Found ${matchedPages.length} deletable page(s) from ${positiveMatchers.length} positive rule(s)${negativeMatchers.length > 0 ? `, excluding ${negativeMatchers.length} negative rule(s)` : ""}. Deleting...`,
     );
 
     const { error: deleteError } = await supabase
@@ -1452,7 +1482,7 @@ export function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack:
       .delete()
       .in(
         "id",
-        data.map((page) => page.id),
+        matchedPages.map((page) => page.id),
       );
 
     if (deleteError) {
@@ -1461,15 +1491,15 @@ export function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack:
       return;
     }
 
-    const affectedChapterIds = Array.from(new Set(data.map((page) => page.chapter_id)));
+    const affectedChapterIds = Array.from(new Set(matchedPages.map((page) => page.chapter_id)));
     for (const chapterId of affectedChapterIds) {
       await reindexChapterPages(chapterId);
     }
 
     setDeleteUrlStatus(
-      `Deleted ${data.length} page entries from ${affectedChapterIds.length} chapter(s).`,
+      `Deleted ${matchedPages.length} page entries from ${affectedChapterIds.length} chapter(s).`,
     );
-    toast.success(`Deleted ${data.length} matching page entries.`);
+    toast.success(`Deleted ${matchedPages.length} matching page entries.`);
     setDeleteUrlLoading(false);
     qc.invalidateQueries({ queryKey: ["admin", "chapters", seriesId] });
   };
@@ -1968,25 +1998,40 @@ export function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack:
             </DialogTrigger>
             <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
-                <DialogTitle>Delete Chapter Pages by Exact URL</DialogTitle>
+                <DialogTitle>Delete Chapter Pages by URL Rules</DialogTitle>
                 <DialogDescription>
-                  Paste one or more exact image URLs, one per line. This will search all chapter
-                  pages and delete matching entries.
+                  Positive URLs are deleted. Negative URLs are protected and excluded from the
+                  delete result.
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-4">
                 <div>
-                  <Label>Image URLs to delete</Label>
+                  <Label>Positive URLs to delete</Label>
                   <Textarea
                     placeholder={
-                      "https://cdn.example.com/path/to/image-001.jpg\nhttps://cdn.example.com/path/to/image-002.jpg"
+                      "https://cdn.example.com/path/to/image-001.jpg\nhttps://cdn.example.com/path/to/chapter-10/*"
                     }
                     value={deleteUrl}
                     onChange={(e) => setDeleteUrl(e.target.value)}
                     className="min-h-32"
                   />
                   <p className="mt-1 text-xs text-muted-foreground">
-                    One exact URL per line. Duplicate lines are ignored.
+                    One exact URL per line. End a line with * or ... to delete every URL with that
+                    prefix.
+                  </p>
+                </div>
+                <div>
+                  <Label>Negative URLs to keep</Label>
+                  <Textarea
+                    placeholder={
+                      "https://cdn.example.com/path/to/image-003.jpg\nhttps://cdn.example.com/path/to/keep-folder/*"
+                    }
+                    value={deleteNegativeUrl}
+                    onChange={(e) => setDeleteNegativeUrl(e.target.value)}
+                    className="min-h-24"
+                  />
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Optional. Matching URLs are protected even if they match a positive rule.
                   </p>
                 </div>
                 {deleteUrlStatus && (
