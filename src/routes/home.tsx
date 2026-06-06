@@ -1,7 +1,7 @@
 import React, { type ReactNode } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { BookOpen, Clock, History, ChevronLeft, ChevronRight, Star, MoreVertical, EyeOff } from "lucide-react";
+import { BookOpen, Clock, History, ChevronLeft, ChevronRight, Star, MoreVertical, EyeOff, ArrowRight } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -21,6 +21,8 @@ import { OptimizedImage } from "@/components/OptimizedImage";
 const FOLLOWED_CARD_WIDTH = "w-[132px] shrink-0 sm:w-[150px] md:w-[158px]";
 const FOLLOWED_COVER_CLASS =
   "relative aspect-[3/4] overflow-hidden rounded-md bg-secondary";
+
+type HomeHistorySection = "followed-chapters" | "reading-history" | "latest-updates";
 
 export const Route = createFileRoute("/home")({
   head: () => ({
@@ -215,6 +217,7 @@ function HomePage() {
           {!isSectionHidden('followed-chapters') && (
             <FollowedUpdatesCarouselSection
               sectionId="followed-chapters"
+              historySection="followed-chapters"
               onHide={() => toggleSection('followed-chapters')}
               title="New Chapters from Followed"
               description="Latest uploads from series you follow"
@@ -227,6 +230,7 @@ function HomePage() {
           {!isSectionHidden('reading-history') && (
             <ChapterCarouselSection
               sectionId="reading-history"
+              historySection="reading-history"
               onHide={() => toggleSection('reading-history')}
               title="Reading History"
               description="Pick up where you left off"
@@ -245,6 +249,7 @@ function HomePage() {
       {!isSectionHidden('latest-updates') && (
         <LatestUpdatesSection
           sectionId="latest-updates"
+          historySection="latest-updates"
           onHide={() => toggleSection('latest-updates')}
           title="Latest Updates"
           description="Recently updated series with new chapters"
@@ -359,6 +364,7 @@ function ChapterCarouselSection({
   timeField,
   linkVariant,
   sectionId,
+  historySection,
   onHide,
 }: {
   title: string;
@@ -370,6 +376,7 @@ function ChapterCarouselSection({
   timeField: "created" | "updated";
   linkVariant: "split" | "seriesOnly";
   sectionId?: string;
+  historySection?: HomeHistorySection;
   onHide?: () => void;
 }) {
   const { scrollRef, scrollBy, dragHandlers } = useDragScroll<HTMLDivElement>();
@@ -387,6 +394,18 @@ function ChapterCarouselSection({
           )}
         </div>
         <div className="flex items-center gap-2">
+          {historySection && (
+            <Button asChild variant="ghost" size="sm" className="h-8 gap-1 text-xs">
+              <Link
+                to="/home/history/$section"
+                params={{ section: historySection }}
+                search={{ period: "day" }}
+              >
+                View all
+                <ArrowRight className="h-3.5 w-3.5" />
+              </Link>
+            </Button>
+          )}
           {chapters.length > 0 && (
             <div className="hidden gap-2 md:flex">
               <Button
@@ -469,6 +488,7 @@ function FollowedUpdatesCarouselSection({
   emptyMessage,
   chapters,
   sectionId,
+  historySection,
   onHide,
 }: {
   title: string;
@@ -477,6 +497,7 @@ function FollowedUpdatesCarouselSection({
   emptyMessage: string;
   chapters: RecentChapter[];
   sectionId?: string;
+  historySection?: HomeHistorySection;
   onHide?: () => void;
 }) {
   const { scrollRef, scrollBy, dragHandlers } = useDragScroll<HTMLDivElement>();
@@ -490,6 +511,18 @@ function FollowedUpdatesCarouselSection({
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {historySection && (
+            <Button asChild variant="ghost" size="sm" className="h-8 gap-1 text-xs">
+              <Link
+                to="/home/history/$section"
+                params={{ section: historySection }}
+                search={{ period: "day" }}
+              >
+                View all
+                <ArrowRight className="h-3.5 w-3.5" />
+              </Link>
+            </Button>
+          )}
           {chapters.length > 0 && (
             <div className="hidden gap-2 md:flex">
               <Button
@@ -702,6 +735,7 @@ function LatestUpdatesSection({
   loading,
   userId,
   sectionId,
+  historySection,
   onHide,
 }: {
   title: string;
@@ -723,6 +757,7 @@ function LatestUpdatesSection({
   loading: boolean;
   userId?: string;
   sectionId?: string;
+  historySection?: HomeHistorySection;
   onHide?: () => void;
 }) {
   // Fetch reading history to determine read status
@@ -760,21 +795,35 @@ function LatestUpdatesSection({
             <p className="mt-1 text-sm text-muted-foreground">{description}</p>
           )}
         </div>
-        {sectionId && onHide && (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-8 w-8">
-                <MoreVertical className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={onHide}>
-                <EyeOff className="mr-2 h-4 w-4" />
-                Hide this section
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        )}
+        <div className="flex items-center gap-2">
+          {historySection && (
+            <Button asChild variant="ghost" size="sm" className="h-8 gap-1 text-xs">
+              <Link
+                to="/home/history/$section"
+                params={{ section: historySection }}
+                search={{ period: "day" }}
+              >
+                View all
+                <ArrowRight className="h-3.5 w-3.5" />
+              </Link>
+            </Button>
+          )}
+          {sectionId && onHide && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8">
+                  <MoreVertical className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={onHide}>
+                  <EyeOff className="mr-2 h-4 w-4" />
+                  Hide this section
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+        </div>
       </div>
 
       {loading ? (

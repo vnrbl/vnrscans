@@ -31,6 +31,7 @@ import { Route as AuthenticatedLibraryRouteImport } from './routes/_authenticate
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin/index'
 import { Route as TitleTitleSlugChapterSlugRouteImport } from './routes/title.$titleSlug.$chapterSlug'
+import { Route as HomeHistorySectionRouteImport } from './routes/home/history.$section'
 import { Route as AuthenticatedAdminUsersRouteImport } from './routes/_authenticated/admin/users'
 import { Route as AuthenticatedAdminTagsRouteImport } from './routes/_authenticated/admin/tags'
 import { Route as AuthenticatedAdminSeriesRouteImport } from './routes/_authenticated/admin/series'
@@ -157,6 +158,11 @@ const TitleTitleSlugChapterSlugRoute =
     path: '/title/$titleSlug/$chapterSlug',
     getParentRoute: () => rootRouteImport,
   } as any)
+const HomeHistorySectionRoute = HomeHistorySectionRouteImport.update({
+  id: '/history/$section',
+  path: '/history/$section',
+  getParentRoute: () => HomeRoute,
+} as any)
 const AuthenticatedAdminUsersRoute = AuthenticatedAdminUsersRouteImport.update({
   id: '/users',
   path: '/users',
@@ -246,7 +252,7 @@ export interface FileRoutesByFullPath {
   '/browse': typeof BrowseRoute
   '/contact': typeof ContactRoute
   '/dmca': typeof DmcaRoute
-  '/home': typeof HomeRoute
+  '/home': typeof HomeRouteWithChildren
   '/rankings': typeof RankingsRoute
   '/recommendations': typeof RecommendationsRoute
   '/search': typeof SearchRoute
@@ -272,6 +278,7 @@ export interface FileRoutesByFullPath {
   '/admin/series': typeof AuthenticatedAdminSeriesRoute
   '/admin/tags': typeof AuthenticatedAdminTagsRoute
   '/admin/users': typeof AuthenticatedAdminUsersRoute
+  '/home/history/$section': typeof HomeHistorySectionRoute
   '/title/$titleSlug/$chapterSlug': typeof TitleTitleSlugChapterSlugRoute
   '/admin/': typeof AuthenticatedAdminIndexRoute
   '/admin/series-chapters/$seriesId': typeof AuthenticatedAdminSeriesChaptersSeriesIdRoute
@@ -283,7 +290,7 @@ export interface FileRoutesByTo {
   '/browse': typeof BrowseRoute
   '/contact': typeof ContactRoute
   '/dmca': typeof DmcaRoute
-  '/home': typeof HomeRoute
+  '/home': typeof HomeRouteWithChildren
   '/rankings': typeof RankingsRoute
   '/recommendations': typeof RecommendationsRoute
   '/search': typeof SearchRoute
@@ -308,6 +315,7 @@ export interface FileRoutesByTo {
   '/admin/series': typeof AuthenticatedAdminSeriesRoute
   '/admin/tags': typeof AuthenticatedAdminTagsRoute
   '/admin/users': typeof AuthenticatedAdminUsersRoute
+  '/home/history/$section': typeof HomeHistorySectionRoute
   '/title/$titleSlug/$chapterSlug': typeof TitleTitleSlugChapterSlugRoute
   '/admin': typeof AuthenticatedAdminIndexRoute
   '/admin/series-chapters/$seriesId': typeof AuthenticatedAdminSeriesChaptersSeriesIdRoute
@@ -321,7 +329,7 @@ export interface FileRoutesById {
   '/browse': typeof BrowseRoute
   '/contact': typeof ContactRoute
   '/dmca': typeof DmcaRoute
-  '/home': typeof HomeRoute
+  '/home': typeof HomeRouteWithChildren
   '/rankings': typeof RankingsRoute
   '/recommendations': typeof RecommendationsRoute
   '/search': typeof SearchRoute
@@ -347,6 +355,7 @@ export interface FileRoutesById {
   '/_authenticated/admin/series': typeof AuthenticatedAdminSeriesRoute
   '/_authenticated/admin/tags': typeof AuthenticatedAdminTagsRoute
   '/_authenticated/admin/users': typeof AuthenticatedAdminUsersRoute
+  '/home/history/$section': typeof HomeHistorySectionRoute
   '/title/$titleSlug/$chapterSlug': typeof TitleTitleSlugChapterSlugRoute
   '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute
   '/_authenticated/admin/series-chapters/$seriesId': typeof AuthenticatedAdminSeriesChaptersSeriesIdRoute
@@ -386,6 +395,7 @@ export interface FileRouteTypes {
     | '/admin/series'
     | '/admin/tags'
     | '/admin/users'
+    | '/home/history/$section'
     | '/title/$titleSlug/$chapterSlug'
     | '/admin/'
     | '/admin/series-chapters/$seriesId'
@@ -422,6 +432,7 @@ export interface FileRouteTypes {
     | '/admin/series'
     | '/admin/tags'
     | '/admin/users'
+    | '/home/history/$section'
     | '/title/$titleSlug/$chapterSlug'
     | '/admin'
     | '/admin/series-chapters/$seriesId'
@@ -460,6 +471,7 @@ export interface FileRouteTypes {
     | '/_authenticated/admin/series'
     | '/_authenticated/admin/tags'
     | '/_authenticated/admin/users'
+    | '/home/history/$section'
     | '/title/$titleSlug/$chapterSlug'
     | '/_authenticated/admin/'
     | '/_authenticated/admin/series-chapters/$seriesId'
@@ -473,7 +485,7 @@ export interface RootRouteChildren {
   BrowseRoute: typeof BrowseRoute
   ContactRoute: typeof ContactRoute
   DmcaRoute: typeof DmcaRoute
-  HomeRoute: typeof HomeRoute
+  HomeRoute: typeof HomeRouteWithChildren
   RankingsRoute: typeof RankingsRoute
   RecommendationsRoute: typeof RecommendationsRoute
   SearchRoute: typeof SearchRoute
@@ -639,6 +651,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TitleTitleSlugChapterSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/home/history/$section': {
+      id: '/home/history/$section'
+      path: '/history/$section'
+      fullPath: '/home/history/$section'
+      preLoaderRoute: typeof HomeHistorySectionRouteImport
+      parentRoute: typeof HomeRoute
+    }
     '/_authenticated/admin/users': {
       id: '/_authenticated/admin/users'
       path: '/users'
@@ -800,6 +819,16 @@ const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
   AuthenticatedRouteChildren,
 )
 
+interface HomeRouteChildren {
+  HomeHistorySectionRoute: typeof HomeHistorySectionRoute
+}
+
+const HomeRouteChildren: HomeRouteChildren = {
+  HomeHistorySectionRoute: HomeHistorySectionRoute,
+}
+
+const HomeRouteWithChildren = HomeRoute._addFileChildren(HomeRouteChildren)
+
 interface TagsRouteChildren {
   TagsSlugRoute: typeof TagsSlugRoute
 }
@@ -818,7 +847,7 @@ const rootRouteChildren: RootRouteChildren = {
   BrowseRoute: BrowseRoute,
   ContactRoute: ContactRoute,
   DmcaRoute: DmcaRoute,
-  HomeRoute: HomeRoute,
+  HomeRoute: HomeRouteWithChildren,
   RankingsRoute: RankingsRoute,
   RecommendationsRoute: RecommendationsRoute,
   SearchRoute: SearchRoute,
