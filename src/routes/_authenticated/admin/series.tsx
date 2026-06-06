@@ -1074,12 +1074,14 @@ export function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack:
   const [seriesUrl, setSeriesUrl] = useState("");
   const [imageUrlTypeExample, setImageUrlTypeExample] = useState("");
   const [deleteUrl, setDeleteUrl] = useState("");
-  const [deleteUrlResults, setDeleteUrlResults] = useState<{
-    id: string;
-    chapter_id: string;
-    page_number: number;
-    image_url: string;
-  }[]>([]);
+  const [deleteUrlResults, setDeleteUrlResults] = useState<
+    {
+      id: string;
+      chapter_id: string;
+      page_number: number;
+      image_url: string;
+    }[]
+  >([]);
   const [deleteUrlLoading, setDeleteUrlLoading] = useState(false);
   const [deleteUrlStatus, setDeleteUrlStatus] = useState("");
   const [discoveredChapters, setDiscoveredChapters] = useState<ChapterInfo[]>([]);
@@ -1113,6 +1115,28 @@ export function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack:
         : SCANLATION_GROUP_NEW,
       groupNewName,
     );
+
+  const scanlationGroupLabel = (group: string | null) => group || "No Group";
+
+  const findExistingChapterByNumberAndGroup = async (
+    chapterNumber: number,
+    scanlationGroup: string | null,
+  ) => {
+    let query = (supabase as any)
+      .from("chapters")
+      .select("id")
+      .eq("series_id", seriesId)
+      .eq("chapter_number", chapterNumber)
+      .limit(1);
+
+    query = scanlationGroup
+      ? query.eq("scanlation_group", scanlationGroup)
+      : query.is("scanlation_group", null);
+
+    const { data, error } = await query.maybeSingle();
+    if (error) throw error;
+    return data;
+  };
 
   // Get user profile for username
   const userProfile = useQuery({
@@ -1152,6 +1176,16 @@ export function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack:
       const chapterNum = isNaN(parsedNum) ? 0 : parsedNum;
 
       const scanlation_group = getScanlationGroupForUpload();
+
+      const existingChapter = await findExistingChapterByNumberAndGroup(
+        chapterNum,
+        scanlation_group,
+      );
+      if (existingChapter) {
+        throw new Error(
+          `Chapter ${chapterNum} already exists for ${scanlationGroupLabel(scanlation_group)}. Existing chapter was not replaced.`,
+        );
+      }
 
       const { data: chapter, error: chapterError } = await supabase
         .from("chapters")
@@ -1301,9 +1335,46 @@ export function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack:
     }
   };
 
+  const getImageUrlOrigin = (exampleUrl: string): string | null => {
+    try {
+      return new URL(exampleUrl.trim()).origin;
+    } catch {
+      return null;
+    }
+  };
+
+  const filterImagesByExampleUrl = (
+    images: string[],
+    exampleUrl: string,
+    imageUrlPrefix: string | null,
+  ) => {
+    if (!exampleUrl || !imageUrlPrefix) return images;
+
+    const prefixMatches = images.filter((url) => url.startsWith(imageUrlPrefix));
+    if (prefixMatches.length > 0) return prefixMatches;
+
+    const exampleOrigin = getImageUrlOrigin(exampleUrl);
+    if (exampleOrigin) {
+      const originMatches = images.filter((url) => {
+        try {
+          return new URL(url).origin === exampleOrigin;
+        } catch {
+          return url.startsWith(exampleOrigin);
+        }
+      });
+
+      if (originMatches.length > 0) return originMatches;
+    }
+
+    console.info(
+      "Image URL example did not match extracted image paths; using all extracted images for this chapter.",
+    );
+    return images;
+  };
+
   const chapterNumberMap = useMemo(
     () => new Map((chapters.data ?? []).map((ch) => [ch.id, ch.chapter_number])),
-    [chapters.data]
+    [chapters.data],
   );
 
   const reindexChapterPages = async (chapterId: string) => {
@@ -1328,9 +1399,17 @@ export function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack:
   };
 
   const findAndDeleteUrl = async () => {
-    const trimmedUrl = deleteUrl.trim();
-    if (!trimmedUrl) {
-      toast.error("Please enter a URL to delete.");
+    const urlsToDelete = Array.from(
+      new Set(
+        deleteUrl
+          .split(/\r?\n/)
+          .map((url) => url.trim())
+          .filter(Boolean),
+      ),
+    );
+
+    if (urlsToDelete.length === 0) {
+      toast.error("Please enter at least one URL to delete.");
       return;
     }
 
@@ -1348,7 +1427,7 @@ export function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack:
       .from("chapter_pages")
       .select("id, chapter_id, page_number, image_url")
       .in("chapter_id", chapterIds)
-      .eq("image_url", trimmedUrl);
+      .in("image_url", urlsToDelete);
 
     if (error) {
       toast.error(error.message);
@@ -1357,19 +1436,24 @@ export function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack:
     }
 
     if (!data || data.length === 0) {
-      setDeleteUrlStatus("No matches found for that URL.");
-      toast.success("No page entries found with that URL.");
+      setDeleteUrlStatus("No matches found for the provided URL(s).");
+      toast.success("No page entries found with those URL(s).");
       setDeleteUrlLoading(false);
       return;
     }
 
     setDeleteUrlResults(data);
-    setDeleteUrlStatus(`Found ${data.length} matching page(s). Deleting...`);
+    setDeleteUrlStatus(
+      `Found ${data.length} matching page(s) across ${urlsToDelete.length} URL(s). Deleting...`,
+    );
 
     const { error: deleteError } = await supabase
       .from("chapter_pages")
       .delete()
-      .in("id", data.map((page) => page.id));
+      .in(
+        "id",
+        data.map((page) => page.id),
+      );
 
     if (deleteError) {
       toast.error(deleteError.message);
@@ -1382,7 +1466,9 @@ export function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack:
       await reindexChapterPages(chapterId);
     }
 
-    setDeleteUrlStatus(`Deleted ${data.length} page entries from ${affectedChapterIds.length} chapter(s).`);
+    setDeleteUrlStatus(
+      `Deleted ${data.length} page entries from ${affectedChapterIds.length} chapter(s).`,
+    );
     toast.success(`Deleted ${data.length} matching page entries.`);
     setDeleteUrlLoading(false);
     qc.invalidateQueries({ queryKey: ["admin", "chapters", seriesId] });
@@ -1450,9 +1536,38 @@ export function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack:
     try {
       setBulkUploading(true);
       const scanlation_group = getScanlationGroupForUpload();
+      const uploadableList: ChapterInfo[] = [];
+      let skippedExistingCount = 0;
+
+      for (const chapter of selectedList) {
+        const existingChapter = await findExistingChapterByNumberAndGroup(
+          chapter.chapterNumber,
+          scanlation_group,
+        );
+
+        if (existingChapter) {
+          skippedExistingCount++;
+          console.info(
+            `Skipped Chapter ${chapter.chapterNumber}: already exists for ${scanlationGroupLabel(scanlation_group)}.`,
+          );
+        } else {
+          uploadableList.push(chapter);
+        }
+      }
+
+      if (skippedExistingCount > 0) {
+        toast.info(
+          `Skipped ${skippedExistingCount} existing chapter${skippedExistingCount !== 1 ? "s" : ""} for ${scanlationGroupLabel(scanlation_group)}.`,
+        );
+      }
+
+      if (uploadableList.length === 0) {
+        toast.success("All selected chapters already exist for this group. Nothing was replaced.");
+        return;
+      }
 
       // ── Phase 1: Parallel image extraction (batches of 5) ──────────────
-      setBulkProgress({ done: 0, total: selectedList.length, phase: "Extracting images" });
+      setBulkProgress({ done: 0, total: uploadableList.length, phase: "Extracting images" });
 
       const BATCH_SIZE = 5;
       type ExtractionResult =
@@ -1460,8 +1575,8 @@ export function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack:
         | { chapter: ChapterInfo; error: string };
       const extractionResults: ExtractionResult[] = [];
 
-      for (let i = 0; i < selectedList.length; i += BATCH_SIZE) {
-        const batch = selectedList.slice(i, i + BATCH_SIZE);
+      for (let i = 0; i < uploadableList.length; i += BATCH_SIZE) {
+        const batch = uploadableList.slice(i, i + BATCH_SIZE);
         const batchResults = await Promise.allSettled(
           batch.map(async (chapter) => {
             const result = await $extractImagesFromUrl({ data: { url: chapter.url } });
@@ -1469,13 +1584,11 @@ export function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack:
               throw new Error(result.error || "No images found");
             }
 
-            const images = imageUrlPrefix
-              ? result.images.filter((url) => url.startsWith(imageUrlPrefix))
-              : result.images;
-
-            if (imageUrlPrefix && images.length === 0) {
-              throw new Error("No images matching the example URL type were found.");
-            }
+            const images = filterImagesByExampleUrl(
+              result.images,
+              imageTypeExample,
+              imageUrlPrefix,
+            );
 
             return { chapter, images };
           }),
@@ -1517,22 +1630,18 @@ export function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack:
 
       for (const { chapter, images } of succeeded) {
         try {
-          // Check if chapter already exists
           const targetSlug = buildChapterSlug(chapter.chapterNumber, {
             title: null,
             scanlationGroup: scanlation_group,
           });
 
-          const { data: existingChapter } = await supabase
-            .from("chapters")
-            .select("id")
-            .eq("series_id", seriesId)
-            .eq("slug", targetSlug)
-            .maybeSingle();
+          const existingChapter = await findExistingChapterByNumberAndGroup(
+            chapter.chapterNumber,
+            scanlation_group,
+          );
 
           if (existingChapter) {
-            // Chapter already exists, skip it
-            savedCount++;
+            skippedExistingCount++;
           } else {
             // Chapter doesn't exist, create it new
             const { data: newChapter, error: chapterError } = await supabase
@@ -1572,7 +1681,7 @@ export function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack:
       }
 
       toast.success(
-        `Bulk upload complete: ${savedCount} saved${saveFailCount > 0 ? `, ${saveFailCount} failed` : ""}${failed.length > 0 ? `, ${failed.length} skipped` : ""}`,
+        `Bulk upload complete: ${savedCount} saved${skippedExistingCount > 0 ? `, ${skippedExistingCount} existing skipped` : ""}${saveFailCount > 0 ? `, ${saveFailCount} failed` : ""}${failed.length > 0 ? `, ${failed.length} extraction skipped` : ""}`,
       );
       setBulkUploadOpen(false);
       setSeriesUrl("");
@@ -1770,8 +1879,9 @@ export function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack:
                       onChange={(e) => setImageUrlTypeExample(e.target.value)}
                     />
                     <p className="text-xs text-muted-foreground mt-1">
-                      Optional: enter one sample image URL from the source you want. Bulk upload
-                      will keep only images matching that same URL pattern.
+                      Optional: enter one sample image URL from the source you prefer. If no
+                      extracted images match that pattern, bulk upload will use all extracted
+                      images for that chapter.
                     </p>
                   </div>
                 </div>
@@ -1848,7 +1958,10 @@ export function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack:
           </Dialog>
           <Dialog open={deleteUrlOpen} onOpenChange={setDeleteUrlOpen}>
             <DialogTrigger asChild>
-              <Button variant="outline" className="border-amber-600 text-amber-600 hover:bg-amber-600 hover:text-white">
+              <Button
+                variant="outline"
+                className="border-amber-600 text-amber-600 hover:bg-amber-600 hover:text-white"
+              >
                 <Search className="mr-1 h-4 w-4" />
                 Delete by URL
               </Button>
@@ -1857,17 +1970,24 @@ export function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack:
               <DialogHeader>
                 <DialogTitle>Delete Chapter Pages by Exact URL</DialogTitle>
                 <DialogDescription>
-                  Paste the exact image URL you want removed. This will search all chapter pages and delete matching entries.
+                  Paste one or more exact image URLs, one per line. This will search all chapter
+                  pages and delete matching entries.
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-4">
                 <div>
-                  <Label>Image URL to delete</Label>
-                  <Input
-                    placeholder="https://cdn.example.com/path/to/image.jpg"
+                  <Label>Image URLs to delete</Label>
+                  <Textarea
+                    placeholder={
+                      "https://cdn.example.com/path/to/image-001.jpg\nhttps://cdn.example.com/path/to/image-002.jpg"
+                    }
                     value={deleteUrl}
                     onChange={(e) => setDeleteUrl(e.target.value)}
+                    className="min-h-32"
                   />
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    One exact URL per line. Duplicate lines are ignored.
+                  </p>
                 </div>
                 {deleteUrlStatus && (
                   <div className="rounded-lg border border-border/50 bg-muted p-3 text-sm text-muted-foreground">
@@ -1879,10 +1999,19 @@ export function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack:
                     <Label>Matched Pages</Label>
                     <div className="max-h-72 overflow-y-auto rounded-lg border border-border/40 bg-background p-3">
                       {deleteUrlResults.map((result) => (
-                        <div key={result.id} className="rounded-md border border-border/30 p-2 mb-2 last:mb-0">
-                          <div className="text-sm font-medium">Chapter {chapterNumberMap.get(result.chapter_id) ?? "?"}</div>
-                          <div className="text-xs text-muted-foreground">Page {result.page_number}</div>
-                          <div className="text-xs truncate text-foreground/80">{result.image_url}</div>
+                        <div
+                          key={result.id}
+                          className="rounded-md border border-border/30 p-2 mb-2 last:mb-0"
+                        >
+                          <div className="text-sm font-medium">
+                            Chapter {chapterNumberMap.get(result.chapter_id) ?? "?"}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            Page {result.page_number}
+                          </div>
+                          <div className="text-xs truncate text-foreground/80">
+                            {result.image_url}
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -1890,7 +2019,12 @@ export function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack:
                 )}
               </div>
               <DialogFooter>
-                <Button type="button" onClick={findAndDeleteUrl} disabled={deleteUrlLoading} className="bg-amber-600 hover:bg-amber-700">
+                <Button
+                  type="button"
+                  onClick={findAndDeleteUrl}
+                  disabled={deleteUrlLoading || !deleteUrl.trim()}
+                  className="bg-amber-600 hover:bg-amber-700"
+                >
                   {deleteUrlLoading ? "Searching and deleting..." : "Search and Delete"}
                 </Button>
               </DialogFooter>

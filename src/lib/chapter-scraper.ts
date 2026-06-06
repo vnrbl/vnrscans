@@ -108,22 +108,38 @@ function isProtectedPage(html: string): boolean {
 async function scrapeWithPuppeteer(url: string, isChapterPage: boolean = false): Promise<string> {
   console.log(`[Scraper] Launching Puppeteer browser to bypass Cloudflare protection for: ${url}`);
   const puppeteer = await import('puppeteer');
-  const execPath = process.env.PUPPETEER_EXECUTABLE_PATH || process.env.CHROME_BIN || process.env.GOOGLE_CHROME_BIN || process.env.CHROME_PATH;
+  const chrome = await resolveChromeExecutable(puppeteer.default);
   const launchOptions: any = {
-    headless: true,
+    headless: chrome.headless,
     args: [
+      ...chrome.args,
       '--disable-blink-features=AutomationControlled',
       '--no-sandbox',
       '--disable-setuid-sandbox',
     ],
   };
 
-  if (execPath) {
-    console.log('[Scraper] Using provided Chrome executable at', execPath);
-    launchOptions.executablePath = execPath;
+  if (chrome.executablePath) {
+    console.log('[Scraper] Using Chrome executable at', chrome.executablePath);
+    launchOptions.executablePath = chrome.executablePath;
   }
 
-  const browser = await puppeteer.default.launch(launchOptions);
+  let browser: Awaited<ReturnType<typeof puppeteer.default.launch>>;
+  try {
+    browser = await puppeteer.default.launch(launchOptions);
+  } catch (error) {
+    if (error instanceof Error && error.message.includes('Could not find Chrome')) {
+      throw new Error(
+        [
+          'Chrome is not available for the admin scraper runtime.',
+          'Set PUPPETEER_EXECUTABLE_PATH/CHROME_PATH to an installed Chrome binary,',
+          'or run `npx puppeteer browsers install chrome` in the same environment that runs the app.',
+          `Original error: ${error.message}`,
+        ].join(' '),
+      );
+    }
+    throw error;
+  }
 
   try {
     const page = await browser.newPage();
@@ -193,6 +209,66 @@ async function scrapeWithPuppeteer(url: string, isChapterPage: boolean = false):
   }
 }
 
+async function resolveChromeExecutable(
+  puppeteer: typeof import('puppeteer').default,
+): Promise<{ executablePath?: string; args: string[]; headless: boolean | 'shell' }> {
+  const { existsSync } = await import('node:fs');
+
+  const envPath =
+    process.env.PUPPETEER_EXECUTABLE_PATH ||
+    process.env.CHROME_BIN ||
+    process.env.GOOGLE_CHROME_BIN ||
+    process.env.CHROME_PATH;
+
+  const candidatePaths = [
+    envPath,
+    await safePuppeteerExecutablePath(puppeteer),
+    process.env.LOCALAPPDATA
+      ? `${process.env.LOCALAPPDATA}\\Google\\Chrome\\Application\\chrome.exe`
+      : undefined,
+    'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+    'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
+    '/usr/bin/google-chrome-stable',
+    '/usr/bin/google-chrome',
+    '/usr/bin/chromium-browser',
+    '/usr/bin/chromium',
+    '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+  ].filter(Boolean) as string[];
+
+  for (const candidatePath of candidatePaths) {
+    if (existsSync(candidatePath)) {
+      return { executablePath: candidatePath, args: [], headless: true };
+    }
+  }
+
+  try {
+    const chromium = (await import('@sparticuz/chromium')).default;
+    const executablePath = await chromium.executablePath();
+
+    if (executablePath) {
+      return {
+        executablePath,
+        args: chromium.args,
+        headless: true,
+      };
+    }
+  } catch (error) {
+    console.warn('[Scraper] Packaged Chromium fallback unavailable:', error);
+  }
+
+  return { args: [], headless: true };
+}
+
+async function safePuppeteerExecutablePath(
+  puppeteer: typeof import('puppeteer').default,
+): Promise<string | undefined> {
+  try {
+    return await puppeteer.executablePath();
+  } catch {
+    return undefined;
+  }
+}
+
 export async function buildClientChapterLinksHtml(page: any, seriesUrl: string): Promise<string> {
   try {
     const parsed = new URL(seriesUrl);
@@ -204,7 +280,7 @@ export async function buildClientChapterLinksHtml(page: any, seriesUrl: string):
     }
 
     const seriesSlug = decodeURIComponent(rest.join('/'));
-    const chapters = await page.evaluate(async (slug: string) => {
+    const chapters = (await page.evaluate(async (slug: string) => {
       const all: Array<{ slug: string; number: number; title?: string | null }> = [];
       let pageNumber = 1;
       let next: number | null = 1;
@@ -236,7 +312,7 @@ export async function buildClientChapterLinksHtml(page: any, seriesUrl: string):
       }
 
       return all;
-    }, seriesSlug);
+    }, seriesSlug)) as Array<{ slug: string; number: number; title?: string | null }>;
 
     return chapters
       .map((chapter) => {

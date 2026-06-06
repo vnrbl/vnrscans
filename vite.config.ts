@@ -15,11 +15,12 @@ export default defineConfig({
   nitro: {
     // Configure Nitro to use Vercel preset for deployment
     preset: "vercel",
+    // @ts-expect-error @lovable.dev/vite-tanstack-config forwards Vercel-specific Nitro options.
     vercel: {
       regions: ["iad1"],
       functions: {
         memory: 1024,
-        maxDuration: 10,
+        maxDuration: 60,
       },
     },
     rollupConfig: {
