@@ -46,7 +46,14 @@ export async function extractChaptersFromSeriesUrl(seriesUrl: string): Promise<C
     }
 
     // Extract all chapter links from the HTML
-    const chapters = extractChapterLinks(html, seriesUrl);
+    let chapters = extractChapterLinks(html, seriesUrl);
+
+    if (chapters.length === 0) {
+      const readableHtml = await fetchReadablePage(seriesUrl);
+      if (readableHtml) {
+        chapters = extractChapterLinks(readableHtml, seriesUrl);
+      }
+    }
     
     if (chapters.length === 0) {
       throw new Error('No chapters found on the series page. Please check the URL or upload chapters manually.');
@@ -58,6 +65,28 @@ export async function extractChaptersFromSeriesUrl(seriesUrl: string): Promise<C
       throw new Error(`Failed to extract chapters: ${error.message}`);
     }
     throw new Error('Failed to extract chapters from series URL');
+  }
+}
+
+async function fetchReadablePage(url: string): Promise<string | null> {
+  try {
+    const readerUrl = `https://r.jina.ai/http://r.jina.ai/http://${url}`;
+    const response = await fetch(readerUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/plain,text/markdown,*/*',
+      },
+    });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const text = await response.text();
+    return text.length > 0 ? text : null;
+  } catch (error) {
+    console.warn('[Scraper] Readable-page fallback failed:', error);
+    return null;
   }
 }
 
@@ -107,8 +136,8 @@ async function scrapeWithPuppeteer(url: string, isChapterPage: boolean = false):
     // Wait for automatic challenge resolution/redirects
     await new Promise(r => setTimeout(r, 4000));
 
-    // Scroll down if it's a chapter page to trigger lazy loading of images
     if (isChapterPage) {
+      // Scroll down if it's a chapter page to trigger lazy loading of images
       console.log('[Scraper] Triggering lazy-load image scrolling...');
       await page.evaluate(() => {
         window.scrollTo(0, document.body.scrollHeight / 2);
@@ -118,15 +147,99 @@ async function scrapeWithPuppeteer(url: string, isChapterPage: boolean = false):
         window.scrollTo(0, document.body.scrollHeight);
       });
       await new Promise(r => setTimeout(r, 1500));
+    } else {
+      // Some series pages render chapter rows client-side and only after scrolling.
+      await page.waitForFunction(
+        () => /chapter\s*\d+/i.test(document.body.innerText) || document.querySelectorAll('a[href*="chapter"]').length > 0,
+        { timeout: 15000 },
+      ).catch(() => {});
+
+      let previousChapterCount = 0;
+      let stablePasses = 0;
+
+      for (let i = 0; i < 10 && stablePasses < 2; i++) {
+        const chapterCount = await page.evaluate(() => {
+          window.scrollTo(0, document.body.scrollHeight);
+          return (document.body.innerText.match(/chapter\s*\d+/gi) || []).length;
+        });
+
+        if (chapterCount === previousChapterCount) {
+          stablePasses++;
+        } else {
+          stablePasses = 0;
+          previousChapterCount = chapterCount;
+        }
+
+        await new Promise(r => setTimeout(r, 1000));
+      }
     }
 
     const html = await page.content();
-    return html;
+    const clientChapterHtml = isChapterPage ? '' : await buildClientChapterLinksHtml(page, url);
+    return `${html}\n${clientChapterHtml}`;
   } catch (error) {
     console.error(`[Scraper] Puppeteer scraping failed for ${url}:`, error);
     throw error;
   } finally {
     await browser.close();
+  }
+}
+
+export async function buildClientChapterLinksHtml(page: any, seriesUrl: string): Promise<string> {
+  try {
+    const parsed = new URL(seriesUrl);
+    const isQimanhwa = parsed.hostname.includes('qimanhwa.com');
+    const [, section, ...rest] = parsed.pathname.split('/');
+
+    if (!isQimanhwa || section !== 'series' || rest.length === 0) {
+      return '';
+    }
+
+    const seriesSlug = decodeURIComponent(rest.join('/'));
+    const chapters = await page.evaluate(async (slug: string) => {
+      const all: Array<{ slug: string; number: number; title?: string | null }> = [];
+      let pageNumber = 1;
+      let next: number | null = 1;
+
+      while (next && pageNumber <= 20) {
+        const response = await fetch(
+          `https://api.qimanhwa.com/api/v1/series/${encodeURIComponent(slug)}/chapters?page=${pageNumber}`,
+        );
+
+        if (!response.ok) {
+          break;
+        }
+
+        const payload = await response.json();
+        if (Array.isArray(payload.data)) {
+          all.push(
+            ...payload.data
+              .filter((chapter: any) => chapter?.slug && Number.isFinite(Number(chapter?.number)))
+              .map((chapter: any) => ({
+                slug: String(chapter.slug),
+                number: Number(chapter.number),
+                title: chapter.title ? String(chapter.title) : null,
+              })),
+          );
+        }
+
+        next = typeof payload.next === 'number' ? payload.next : null;
+        pageNumber = next ?? pageNumber + 1;
+      }
+
+      return all;
+    }, seriesSlug);
+
+    return chapters
+      .map((chapter) => {
+        const title = chapter.title ? ` ${chapter.title}` : '';
+        const href = `${parsed.origin}/series/${seriesSlug}/${chapter.slug}`;
+        return `<a href="${href}">Chapter ${chapter.number}${title}</a>`;
+      })
+      .join('\n');
+  } catch (error) {
+    console.warn('[Scraper] Client chapter pagination failed:', error);
+    return '';
   }
 }
 
@@ -157,7 +270,8 @@ function isChapterLink(url: string, text: string): boolean {
     lowercaseUrl.includes('ep-') ||
     /\/ch\/\d+/.test(lowercaseUrl) ||
     /\/ep\/\d+/.test(lowercaseUrl) ||
-    /\/chapters\//.test(lowercaseUrl);
+    /\/chapters\//.test(lowercaseUrl) ||
+    /\/chapter[-/]\d+(?:\.\d+)?(?:\/|$)/.test(lowercaseUrl);
 
   // 2. The text has chapter/episode keywords or matches a chapter number pattern
   const hasChapterKeywordInText = 
@@ -199,27 +313,16 @@ export function extractChapterLinks(html: string, baseUrl: string): ChapterInfo[
   const chapters: ChapterInfo[] = [];
   const seenUrls = new Set<string>();
 
-  // Extract all <a> tags with href attributes
-  // Matches <a href="..." otherAttrs>content</a> or <a otherAttrs href="...">content</a>
-  // Account for spaces around equals sign and single/double/no quotes around URL
-  const aTagPattern = /<a\s+[^>]*?href\s*=\s*["']([^"']*)["'][^>]*?>([\s\S]*?)<\/a>/gi;
+  const addChapter = (inputUrl: string, rawText: string) => {
+    let url = inputUrl.trim();
+    if (!url) return;
 
-  let match;
-  while ((match = aTagPattern.exec(html)) !== null) {
-    let url = match[1]?.trim();
-    const rawContent = match[2] || '';
+    const cleanText = rawText.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
 
-    if (!url) continue;
-
-    // Normalize and clean text content by removing inner HTML tags (e.g. <span>, <strong>)
-    const cleanText = rawContent.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
-
-    // Check if the link matches chapter criteria to filter out navigation/other links
     if (!isChapterLink(url, cleanText)) {
-      continue;
+      return;
     }
 
-    // Make URL absolute if relative
     if (!url.startsWith('http')) {
       try {
         const base = new URL(baseUrl);
@@ -229,14 +332,12 @@ export function extractChapterLinks(html: string, baseUrl: string): ChapterInfo[
           url = new URL(url, base.href).href;
         }
       } catch {
-        continue;
+        return;
       }
     }
 
-    // Skip if we've already seen this URL
-    if (seenUrls.has(url)) continue;
+    if (seenUrls.has(url)) return;
 
-    // Extract chapter number
     const chapterNum = extractChapterNumber(url, cleanText);
     if (chapterNum !== null) {
       seenUrls.add(url);
@@ -244,8 +345,38 @@ export function extractChapterLinks(html: string, baseUrl: string): ChapterInfo[
       chapters.push({
         chapterNumber: chapterNum,
         title: title || undefined,
-        url: url,
+        url,
       });
+    }
+  };
+
+  // Extract all <a> tags with href attributes
+  // Matches <a href="..." otherAttrs>content</a> or <a otherAttrs href="...">content</a>
+  // Account for spaces around equals sign and single/double/no quotes around URL
+  const aTagPattern = /<a\b[^>]*?href\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))[^>]*?>([\s\S]*?)<\/a>/gi;
+
+  let match;
+  while ((match = aTagPattern.exec(html)) !== null) {
+    const url = (match[1] || match[2] || match[3] || '')?.trim();
+    const rawContent = match[4] || '';
+    addChapter(url, rawContent);
+  }
+
+  // Extract Markdown links from readable fallbacks.
+  // Example: [Chapter 55](https://site.com/series/title/chapter-55)
+  const markdownLinkPattern = /\[([^\]]*chapter[^\]]*)\]\((https?:\/\/[^)\s]+)\)/gi;
+  while ((match = markdownLinkPattern.exec(html)) !== null) {
+    addChapter(match[2] || '', match[1] || '');
+  }
+
+  for (const line of html.split(/\r?\n/)) {
+    if (!/chapter\s*\d+/i.test(line)) continue;
+
+    const lineWithoutImages = line.replace(/!\[[^\]]*]\([^)]+\)/g, ' ');
+    const lineLinkPattern = /\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/gi;
+    let lineMatch;
+    while ((lineMatch = lineLinkPattern.exec(lineWithoutImages)) !== null) {
+      addChapter(lineMatch[2] || '', lineMatch[1] || '');
     }
   }
 
@@ -315,7 +446,9 @@ function extractChapterNumber(url: string, text: string): number | null {
   // Try to extract from URL
   const urlPatterns = [
     /chapter-(\d+\.?\d*)/i,
+    /chapter\/(\d+\.?\d*)/i,
     /ch-(\d+\.?\d*)/i,
+    /ch\/(\d+\.?\d*)/i,
     /\/(\d+\.?\d*)(?:\/|$)/,
   ];
   

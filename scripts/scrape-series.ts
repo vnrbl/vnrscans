@@ -2,7 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 import { config } from 'dotenv';
 import readline from 'readline';
 import puppeteer from 'puppeteer';
-import { extractChapterLinks, extractImageUrls } from '../src/lib/chapter-scraper';
+import { buildClientChapterLinksHtml, extractChapterLinks, extractImageUrls } from '../src/lib/chapter-scraper';
 import { buildChapterSlug } from '../src/lib/chapter-utils';
 
 config();
@@ -39,6 +39,10 @@ const getImageUrlTypePrefix = (exampleUrl: string): string | null => {
   } catch {
     return null;
   }
+};
+
+const chapterScanKey = (chapterNumber: number, scanlationGroup: string | null): string => {
+  return `${chapterNumber}::${scanlationGroup?.trim() || ''}`;
 };
 
 async function main() {
@@ -131,8 +135,22 @@ async function main() {
     console.log(`Filtering chapter images by URL pattern: ${imageUrlPrefix}`);
   }
 
+  let sourceGroupFallback = '';
+  try {
+    sourceGroupFallback = new URL(seriesUrl).hostname.replace(/^www\./, '');
+  } catch {
+    sourceGroupFallback = '';
+  }
+
   // Ask for scanlation group
-  const scanlationGroup = (await askQuestion('Enter Scanlation Group name (optional, press Enter to skip): ')).trim();
+  const scanlationGroupInput = (await askQuestion(
+    `Enter Scanlation Group name (optional, press Enter to use ${sourceGroupFallback || 'source URL'}): `
+  )).trim();
+  const scanlationGroup = scanlationGroupInput || sourceGroupFallback;
+
+  if (scanlationGroup) {
+    console.log(`Using scan/source group: ${scanlationGroup}`);
+  }
 
   // Ask for uploader username
   const uploadedBy = (await askQuestion('Enter Uploader Username (optional, press Enter to skip): ')).trim();
@@ -178,8 +196,28 @@ async function main() {
   });
 
   console.log('🔍 Extracting chapters from page...');
+  let previousChapterCount = 0;
+  let stablePasses = 0;
+
+  for (let i = 0; i < 10 && stablePasses < 2; i++) {
+    const chapterCount = await page.evaluate(() => {
+      window.scrollTo(0, document.body.scrollHeight);
+      return (document.body.innerText.match(/chapter\s*\d+/gi) || []).length;
+    });
+
+    if (chapterCount === previousChapterCount) {
+      stablePasses++;
+    } else {
+      stablePasses = 0;
+      previousChapterCount = chapterCount;
+    }
+
+    await new Promise(r => setTimeout(r, 1000));
+  }
+
   const html = await page.content();
-  const discovered = extractChapterLinks(html, seriesUrl);
+  const clientChapterHtml = await buildClientChapterLinksHtml(page, seriesUrl);
+  const discovered = extractChapterLinks(`${html}\n${clientChapterHtml}`, seriesUrl);
   console.log(`✅ Discovered ${discovered.length} chapters.`);
 
   if (discovered.length === 0) {
@@ -192,21 +230,30 @@ async function main() {
   // Get existing chapters
   console.log('Checking existing chapters in database...');
   let missing: any[] = [];
-  let existingNumbers = new Set<number>();
+  let exactDuplicateCount = 0;
   try {
     const { data: existing, error } = await supabase
       .from('chapters')
-      .select('chapter_number')
+      .select('chapter_number, scanlation_group')
       .eq('series_id', seriesId);
 
     if (error) throw error;
 
-    existingNumbers = new Set(existing?.map(c => c.chapter_number) || []);
-    missing = discovered.filter(ch => !existingNumbers.has(ch.chapterNumber));
+    const targetGroup = scanlationGroup || null;
+    const existingScanKeys = new Set(
+      existing?.map((c) => chapterScanKey(c.chapter_number, c.scanlation_group)) || [],
+    );
+    missing = discovered.filter((ch) => {
+      const isExactDuplicate = existingScanKeys.has(chapterScanKey(ch.chapterNumber, targetGroup));
+      if (isExactDuplicate) {
+        exactDuplicateCount++;
+      }
+      return !isExactDuplicate;
+    });
 
     console.log(`📊 Stats:`);
     console.log(`  - Discovered: ${discovered.length}`);
-    console.log(`  - Already in DB: ${existingNumbers.size}`);
+    console.log(`  - Already in DB for this scan/group: ${exactDuplicateCount}`);
     console.log(`  - New (to import): ${missing.length}`);
   } catch (error) {
     console.error('❌ Failed to check existing chapters:', error);
@@ -290,12 +337,17 @@ async function main() {
         scanlationGroup: scanlationGroup || null,
       });
 
-      const { data: existingChapter } = await supabase
+      let existingChapterQuery = supabase
         .from('chapters')
         .select('id')
         .eq('series_id', seriesId)
-        .eq('slug', targetSlug)
-        .maybeSingle();
+        .eq('chapter_number', ch.chapterNumber);
+
+      existingChapterQuery = scanlationGroup
+        ? existingChapterQuery.eq('scanlation_group', scanlationGroup)
+        : existingChapterQuery.is('scanlation_group', null);
+
+      const { data: existingChapter } = await existingChapterQuery.maybeSingle();
 
       if (existingChapter) {
         console.log(`  ✅ Chapter ${ch.chapterNumber} already exists in DB. Skipping.\n`);

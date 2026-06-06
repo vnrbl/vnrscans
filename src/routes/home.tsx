@@ -18,6 +18,10 @@ import { TITLE_CARD_WIDTH, TITLE_COVER_CLASS } from "@/components/titleCardStyle
 import { HomeHeroCarousel } from "@/components/HomeHeroCarousel";
 import { OptimizedImage } from "@/components/OptimizedImage";
 
+const FOLLOWED_CARD_WIDTH = "w-[132px] shrink-0 sm:w-[150px] md:w-[158px]";
+const FOLLOWED_COVER_CLASS =
+  "relative aspect-[3/4] overflow-hidden rounded-md bg-secondary";
+
 export const Route = createFileRoute("/home")({
   head: () => ({
     meta: [
@@ -209,7 +213,7 @@ function HomePage() {
       {user && (
         <>
           {!isSectionHidden('followed-chapters') && (
-            <ChapterCarouselSection
+            <FollowedUpdatesCarouselSection
               sectionId="followed-chapters"
               onHide={() => toggleSection('followed-chapters')}
               title="New Chapters from Followed"
@@ -217,8 +221,6 @@ function HomePage() {
               loading={followedChapters.isLoading}
               emptyMessage="Follow series to get new chapter updates here."
               chapters={(followedChapters.data ?? []) as RecentChapter[]}
-              timeField="created"
-              linkVariant="split"
             />
           )}
 
@@ -449,6 +451,105 @@ function ChapterCarouselSection({
                 timeField={timeField}
                 linkVariant={linkVariant}
               />
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="rounded-lg border border-border/40 bg-card p-8 text-center">
+          <p className="text-muted-foreground">{emptyMessage}</p>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function FollowedUpdatesCarouselSection({
+  title,
+  loading,
+  emptyMessage,
+  chapters,
+  sectionId,
+  onHide,
+}: {
+  title: string;
+  description?: string;
+  loading: boolean;
+  emptyMessage: string;
+  chapters: RecentChapter[];
+  sectionId?: string;
+  onHide?: () => void;
+}) {
+  const { scrollRef, scrollBy, dragHandlers } = useDragScroll<HTMLDivElement>();
+
+  return (
+    <section className="container mx-auto px-8 md:px-12 lg:px-16 py-4">
+      <div className="mb-4 flex items-center justify-between">
+        <div>
+          <div className="flex items-center gap-2">
+            <h2 className="text-2xl font-bold">{title}</h2>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          {chapters.length > 0 && (
+            <div className="hidden gap-2 md:flex">
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => scrollBy("left")}
+                className="h-8 w-8"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => scrollBy("right")}
+                className="h-8 w-8"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
+          {sectionId && onHide && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8">
+                  <MoreVertical className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={onHide}>
+                  <EyeOff className="mr-2 h-4 w-4" />
+                  Hide this section
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="flex gap-4 overflow-hidden">
+          {[...Array(6)].map((_, i) => (
+            <div key={i} className={FOLLOWED_CARD_WIDTH}>
+              <div className={`${FOLLOWED_COVER_CLASS} animate-pulse bg-secondary`} />
+              <div className="space-y-2 pt-2">
+                <div className="h-4 w-3/4 animate-pulse rounded bg-secondary" />
+                <div className="h-3 w-1/2 animate-pulse rounded bg-secondary" />
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : chapters.length > 0 ? (
+        <div
+          ref={scrollRef}
+          {...dragHandlers}
+          className={DRAG_SCROLL_CONTAINER_CLASS}
+          style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+        >
+          {chapters.map((chapter) => (
+            <div key={chapter.id} className={FOLLOWED_CARD_WIDTH}>
+              <FollowedChapterCard chapter={chapter} />
             </div>
           ))}
         </div>
@@ -843,6 +944,50 @@ function ChapterFeedSection({
   );
 }
 
+function FollowedChapterCard({ chapter }: { chapter: RecentChapter }) {
+  const seriesSlug = chapter.series?.slug;
+  if (!seriesSlug) return null;
+
+  return (
+    <article className="group">
+      <Link
+        to="/title/$titleSlug/$chapterSlug"
+        params={{ titleSlug: seriesSlug, chapterSlug: chapter.slug }}
+        className="block"
+      >
+        <div className={FOLLOWED_COVER_CLASS}>
+          <OptimizedImage
+            src={chapter.series?.cover_url ?? null}
+            alt={chapter.series?.title ?? ""}
+            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+          />
+          <Badge className="absolute bottom-2 left-2 gap-1 rounded bg-background/85 px-1.5 py-0.5 text-[11px] font-bold text-foreground shadow backdrop-blur">
+            <BookOpen className="h-3 w-3" />
+            Ch.{chapter.chapter_number}
+          </Badge>
+        </div>
+      </Link>
+      <div className="pt-2">
+        <Link
+          to="/title/$titleSlug/$chapterSlug"
+          params={{ titleSlug: seriesSlug, chapterSlug: chapter.slug }}
+          className="flex items-center justify-between gap-2 text-xs text-muted-foreground hover:text-primary"
+        >
+          <span>Ch.{chapter.chapter_number}</span>
+          <span>{formatTimeAgo(chapter.created_at)}</span>
+        </Link>
+        <Link
+          to="/title/$slug"
+          params={{ slug: seriesSlug }}
+          className="mt-1 line-clamp-2 text-sm font-semibold leading-snug text-foreground group-hover:text-primary"
+        >
+          {chapter.series?.title}
+        </Link>
+      </div>
+    </article>
+  );
+}
+
 function RecentChapterCard({
   chapter,
   timeField = "created",
@@ -909,7 +1054,7 @@ function RecentChapterCard({
                 to="/title/$titleSlug/$chapterSlug"
                 params={{ titleSlug: seriesSlug, chapterSlug: chapter.slug }}
               >
-                Ch. {chapter.chapter_number}
+                Chapter {chapter.chapter_number}
               </Link>
             </Button>
             {timeRow}

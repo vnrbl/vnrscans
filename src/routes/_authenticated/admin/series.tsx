@@ -1318,7 +1318,8 @@ export function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack:
     const urlsToDelete = Array.from(
       new Set(
         deleteUrl
-          .split(/[\n,]+/)
+          .split(/\r?\n/)
+          .flatMap((line) => line.split(/\s+/))
           .map((url) => url.trim())
           .filter(Boolean),
       ),
@@ -1339,17 +1340,31 @@ export function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack:
     setDeleteUrlStatus("");
 
     const chapterIds = chapters.data.map((ch) => ch.id);
-    const { data, error } = await supabase
-      .from("chapter_pages")
-      .select("id, chapter_id, page_number, image_url")
-      .in("chapter_id", chapterIds)
-      .in("image_url", urlsToDelete);
+    const urlSet = new Set(urlsToDelete);
+    const allPages: {
+      id: string;
+      chapter_id: string;
+      page_number: number;
+      image_url: string;
+    }[] = [];
 
-    if (error) {
-      toast.error(error.message);
-      setDeleteUrlLoading(false);
-      return;
+    for (let i = 0; i < chapterIds.length; i += 50) {
+      const chapterIdBatch = chapterIds.slice(i, i + 50);
+      const { data: pageBatch, error } = await supabase
+        .from("chapter_pages")
+        .select("id, chapter_id, page_number, image_url")
+        .in("chapter_id", chapterIdBatch);
+
+      if (error) {
+        toast.error(error.message);
+        setDeleteUrlLoading(false);
+        return;
+      }
+
+      allPages.push(...(pageBatch ?? []));
     }
+
+    const data = allPages.filter((page) => urlSet.has(page.image_url));
 
     if (!data || data.length === 0) {
       setDeleteUrlStatus(`No matches found for ${urlsToDelete.length} URL(s).`);
@@ -1364,15 +1379,19 @@ export function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack:
       `Found ${data.length} matching page(s) across ${matchedUrlCount} of ${urlsToDelete.length} URL(s). Deleting...`,
     );
 
-    const { error: deleteError } = await supabase
-      .from("chapter_pages")
-      .delete()
-      .in("id", data.map((page) => page.id));
+    const idsToDelete = data.map((page) => page.id);
+    for (let i = 0; i < idsToDelete.length; i += 100) {
+      const idBatch = idsToDelete.slice(i, i + 100);
+      const { error: deleteError } = await supabase
+        .from("chapter_pages")
+        .delete()
+        .in("id", idBatch);
 
-    if (deleteError) {
-      toast.error(deleteError.message);
-      setDeleteUrlLoading(false);
-      return;
+      if (deleteError) {
+        toast.error(deleteError.message);
+        setDeleteUrlLoading(false);
+        return;
+      }
     }
 
     const affectedChapterIds = Array.from(new Set(data.map((page) => page.chapter_id)));
@@ -1523,12 +1542,17 @@ export function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack:
             scanlationGroup: scanlation_group,
           });
 
-          const { data: existingChapter } = await supabase
+          let existingChapterQuery = supabase
             .from("chapters")
             .select("id")
             .eq("series_id", seriesId)
-            .eq("slug", targetSlug)
-            .maybeSingle();
+            .eq("chapter_number", chapter.chapterNumber);
+
+          existingChapterQuery = scanlation_group
+            ? existingChapterQuery.eq("scanlation_group", scanlation_group)
+            : existingChapterQuery.is("scanlation_group", null);
+
+          const { data: existingChapter } = await existingChapterQuery.maybeSingle();
 
           if (existingChapter) {
             // Chapter already exists, skip it
