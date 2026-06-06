@@ -1,7 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { createClient } from "@supabase/supabase-js";
-import process from "node:process";
 
 /**
  * Create a Supabase admin client with the service role key.
