@@ -28,6 +28,21 @@ const SOURCE_PRESETS: Array<{
     scanlationGroup: "Asura Scans",
     imageUrlExample: "https://cdn.asurascans.com/asura-images/chapters/example/page-001.webp",
   },
+  {
+    hostIncludes: "vortexscans.org",
+    sourceSite: "Vortex Scans",
+    scanlationGroup: "Vortex Scans",
+  },
+  {
+    hostIncludes: "vortexscans.com",
+    sourceSite: "Vortex Scans",
+    scanlationGroup: "Vortex Scans",
+  },
+  {
+    hostIncludes: "vortexscans.net",
+    sourceSite: "Vortex Scans",
+    scanlationGroup: "Vortex Scans",
+  },
 ];
 
 export function detectImportSource(url: string): ImportSourcePreset {

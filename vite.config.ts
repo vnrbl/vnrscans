@@ -21,6 +21,7 @@ export default defineConfig({
       functions: {
         memory: 1024,
         maxDuration: 60,
+        includeFiles: "node_modules/@sparticuz/chromium/bin/**",
       },
     },
     rollupConfig: {

@@ -465,7 +465,9 @@ async function main() {
       let liveImages: string[] = [];
 
       if (isAsuraUrl(ch.url)) {
-        htmlImages = await extractImagesFromChapterUrl(ch.url);
+        htmlImages = await extractImagesFromChapterUrl(ch.url, {
+          imageUrlExample: imageTypeExample,
+        });
       } else {
         await page.goto(ch.url, { waitUntil: 'domcontentloaded' });
       

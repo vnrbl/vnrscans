@@ -130,13 +130,16 @@ export const $syncImportSource = createServerFn({ method: "POST" })
       skipped = discovered.length - missing.length;
       const batchExtractedImages = await extractImagesFromChapterUrls(
         missing.map((chapter) => chapter.url),
-        { concurrency: 2 },
+        { concurrency: 4, imageUrlExample: source.image_url_example },
       );
 
       for (const chapter of missing) {
         try {
           const rawImages =
-            batchExtractedImages.get(chapter.url) ?? (await extractImagesFromChapterUrl(chapter.url));
+            batchExtractedImages.get(chapter.url) ??
+            (await extractImagesFromChapterUrl(chapter.url, {
+              imageUrlExample: source.image_url_example,
+            }));
           const images = filterImagesByExampleUrl(rawImages, source.image_url_example || "");
           if (images.length === 0) {
             throw new Error("No images matching the source image pattern were found");

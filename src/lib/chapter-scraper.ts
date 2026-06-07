@@ -8,6 +8,10 @@ export interface ChapterInfo {
   url: string;
 }
 
+export interface ExtractChapterImagesOptions {
+  imageUrlExample?: string | null;
+}
+
 const LIVE_READER_IMAGES_PREFIX = '__LIVE_READER_IMAGES__';
 
 export async function extractChaptersFromSeriesUrl(seriesUrl: string): Promise<ChapterInfo[]> {
@@ -195,9 +199,7 @@ async function scrapeWithPuppeteer(url: string, isChapterPage: boolean = false):
 
     const html = await page.content();
     const liveReaderImages = isChapterPage ? await collectLiveReaderImageUrls(page) : [];
-    const readerImages = isQimanhwaLikeUrl(url)
-      ? liveReaderImages.filter(isQimanhwaReaderPageImage)
-      : liveReaderImages;
+    const readerImages = filterReaderImagesForSource(liveReaderImages, url);
     if (isChapterPage && readerImages.length > 0) {
       console.log(`[Scraper] Collected ${readerImages.length} live reader image(s).`);
       return `${LIVE_READER_IMAGES_PREFIX}${JSON.stringify(readerImages)}`;
@@ -306,6 +308,14 @@ async function resolveChromeExecutable(
   const candidatePaths = [
     envPath,
     await safePuppeteerExecutablePath(puppeteer),
+    await findPuppeteerCacheChrome(),
+    await findExecutableOnPath([
+      'google-chrome-stable',
+      'google-chrome',
+      'chromium-browser',
+      'chromium',
+      'chrome',
+    ]),
     process.env.LOCALAPPDATA
       ? `${process.env.LOCALAPPDATA}\\Google\\Chrome\\Application\\chrome.exe`
       : undefined,
@@ -350,6 +360,90 @@ async function safePuppeteerExecutablePath(
   } catch {
     return undefined;
   }
+}
+
+async function findPuppeteerCacheChrome(): Promise<string | undefined> {
+  const { existsSync } = await import('node:fs');
+  const { readdir } = await import('node:fs/promises');
+  const { join } = await import('node:path');
+  const { homedir, tmpdir } = await import('node:os');
+
+  const roots = [
+    process.env.PUPPETEER_CACHE_DIR,
+    process.env.HOME ? join(process.env.HOME, '.cache', 'puppeteer') : undefined,
+    homedir() ? join(homedir(), '.cache', 'puppeteer') : undefined,
+    join(tmpdir(), '.cache', 'puppeteer'),
+  ].filter(Boolean) as string[];
+
+  const executableNames =
+    process.platform === 'win32'
+      ? ['chrome.exe']
+      : ['chrome', 'chromium', 'headless_shell'];
+
+  for (const root of roots) {
+    if (!existsSync(root)) continue;
+    const found = await findFirstExecutable(root, executableNames, 5);
+    if (found) return found;
+  }
+
+  return undefined;
+}
+
+async function findFirstExecutable(
+  dir: string,
+  executableNames: string[],
+  maxDepth: number,
+): Promise<string | undefined> {
+  const { existsSync } = await import('node:fs');
+  const { readdir } = await import('node:fs/promises');
+  const { join } = await import('node:path');
+
+  if (maxDepth < 0 || !existsSync(dir)) return undefined;
+
+  let entries: Array<{ name: string; isDirectory: () => boolean; isFile: () => boolean }>;
+  try {
+    entries = await readdir(dir, { withFileTypes: true });
+  } catch {
+    return undefined;
+  }
+
+  for (const entry of entries) {
+    if (!entry.isFile()) continue;
+    if (executableNames.includes(entry.name)) {
+      return join(dir, entry.name);
+    }
+  }
+
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue;
+    const found = await findFirstExecutable(join(dir, entry.name), executableNames, maxDepth - 1);
+    if (found) return found;
+  }
+
+  return undefined;
+}
+
+async function findExecutableOnPath(names: string[]): Promise<string | undefined> {
+  const { existsSync } = await import('node:fs');
+  const { join } = await import('node:path');
+
+  const pathValue = process.env.PATH || process.env.Path || '';
+  const pathDirs = pathValue.split(process.platform === 'win32' ? ';' : ':').filter(Boolean);
+  const extensions =
+    process.platform === 'win32'
+      ? (process.env.PATHEXT || '.EXE;.CMD;.BAT;.COM').split(';')
+      : [''];
+
+  for (const dir of pathDirs) {
+    for (const name of names) {
+      for (const ext of extensions) {
+        const candidate = join(dir, process.platform === 'win32' && !name.toLowerCase().endsWith(ext.toLowerCase()) ? `${name}${ext}` : name);
+        if (existsSync(candidate)) return candidate;
+      }
+    }
+  }
+
+  return undefined;
 }
 
 export async function buildClientChapterLinksHtml(page: any, seriesUrl: string): Promise<string> {
@@ -662,10 +756,14 @@ function extractChapterTitle(text: string): string | null {
   return title.length > 0 && title.length < 100 ? title : null;
 }
 
-export async function extractImagesFromChapterUrl(chapterUrl: string): Promise<string[]> {
+export async function extractImagesFromChapterUrl(
+  chapterUrl: string,
+  options: ExtractChapterImagesOptions = {},
+): Promise<string[]> {
   try {
     let html = '';
     let usePuppeteerFallback = false;
+    const imageUrlExample = options.imageUrlExample?.trim() || '';
 
     try {
       // Fetch the chapter page HTML
@@ -687,9 +785,22 @@ export async function extractImagesFromChapterUrl(chapterUrl: string): Promise<s
         html = await response.text();
         if (isProtectedPage(html)) {
           usePuppeteerFallback = true;
-        } else if (isQimanhwaLikeUrl(chapterUrl)) {
-          // Qimanhwa renders reader pages client-side; direct HTML often only contains cover/thumbnail URLs.
-          usePuppeteerFallback = true;
+        } else {
+          const usesClientRenderedReader =
+            isQimanhwaLikeUrl(chapterUrl) ||
+            isAsuraScansUrl(chapterUrl) ||
+            isVortexLikeUrl(chapterUrl) ||
+            isVortexLikeUrl(imageUrlExample);
+          const exampleModeImages = extractImageUrls(html, chapterUrl);
+          const exampleMatches = findImagesMatchingExampleUrl(exampleModeImages, imageUrlExample);
+          if (exampleMatches.length > 0 && !usesClientRenderedReader) {
+            return exampleMatches;
+          }
+
+          if (usesClientRenderedReader) {
+            // These readers often render chapter pages client-side; direct HTML can miss reader images.
+            usePuppeteerFallback = true;
+          }
         }
       }
     } catch (fetchError) {
@@ -705,12 +816,18 @@ export async function extractImagesFromChapterUrl(chapterUrl: string): Promise<s
     if (html.startsWith(LIVE_READER_IMAGES_PREFIX)) {
       const images = JSON.parse(html.slice(LIVE_READER_IMAGES_PREFIX.length));
       if (Array.isArray(images) && images.every((url) => typeof url === 'string')) {
-        return images;
+        return trimSiteEndingImages(
+          filterReaderImagesForSource(images, chapterUrl, imageUrlExample),
+          chapterUrl,
+        );
       }
     }
     
     // Extract all image URLs from the HTML
-    const images = extractImageUrls(html, chapterUrl);
+    const images = trimSiteEndingImages(
+      filterReaderImagesForSource(extractImageUrls(html, chapterUrl), chapterUrl, imageUrlExample),
+      chapterUrl,
+    );
     
     if (images.length === 0) {
       throw new Error('No images found on the chapter page. Please check the URL or use manual URL input.');
@@ -727,34 +844,35 @@ export async function extractImagesFromChapterUrl(chapterUrl: string): Promise<s
 
 export async function extractImagesFromChapterUrls(
   chapterUrls: string[],
-  options: { concurrency?: number } = {},
+  options: { concurrency?: number; imageUrlExample?: string | null } = {},
 ): Promise<Map<string, string[]>> {
   const uniqueUrls = Array.from(new Set(chapterUrls));
-  const qiUrls = uniqueUrls.filter(isQimanhwaLikeUrl);
-  const otherUrls = uniqueUrls.filter((url) => !isQimanhwaLikeUrl(url));
+  const browserUrls = uniqueUrls.filter((url) => shouldUseSharedReaderBrowser(url, options.imageUrlExample));
+  const directUrls = uniqueUrls.filter((url) => !shouldUseSharedReaderBrowser(url, options.imageUrlExample));
   const results = new Map<string, string[]>();
 
   await Promise.all(
-    otherUrls.map(async (url) => {
-      results.set(url, await extractImagesFromChapterUrl(url));
+    directUrls.map(async (url) => {
+      results.set(url, await extractImagesFromChapterUrl(url, options));
     }),
   );
 
-  if (qiUrls.length === 0) return results;
+  if (browserUrls.length === 0) return results;
 
-  const qiResults = await extractQimanhwaImagesWithSharedBrowser(qiUrls, {
+  const browserResults = await extractReaderImagesWithSharedBrowser(browserUrls, {
     concurrency: options.concurrency ?? 2,
+    imageUrlExample: options.imageUrlExample,
   });
-  qiResults.forEach((images, url) => results.set(url, images));
+  browserResults.forEach((images, url) => results.set(url, images));
 
   return results;
 }
 
-async function extractQimanhwaImagesWithSharedBrowser(
+async function extractReaderImagesWithSharedBrowser(
   urls: string[],
-  options: { concurrency: number },
+  options: { concurrency: number; imageUrlExample?: string | null },
 ): Promise<Map<string, string[]>> {
-  console.log(`[Scraper] Launching one shared browser for ${urls.length} Qi chapter(s)...`);
+  console.log(`[Scraper] Launching one shared browser for ${urls.length} reader chapter(s)...`);
   const puppeteer = await import('puppeteer');
   const chrome = await resolveChromeExecutable(puppeteer.default);
   const launchOptions: any = {
@@ -781,15 +899,27 @@ async function extractQimanhwaImagesWithSharedBrowser(
       const page = await browser.newPage();
       try {
         await prepareScraperPage(page);
-        console.log(`[Scraper] Shared Qi browser extracting: ${url}`);
+        console.log(`[Scraper] Shared reader browser extracting: ${url}`);
         await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
         await new Promise((resolve) => setTimeout(resolve, 2500));
         await scrollChapterPageForLazyImages(page);
 
-        const images = (await collectLiveReaderImageUrls(page)).filter(isQimanhwaReaderPageImage);
+        const images = trimSiteEndingImages(
+          filterReaderImagesForSource(
+            preferImagesMatchingExampleUrl(await collectLiveReaderImageUrls(page), options.imageUrlExample),
+            url,
+          ),
+          url,
+        );
         if (images.length === 0) {
           const html = await page.content();
-          const htmlImages = extractImageUrls(html, url).filter(isQimanhwaReaderPageImage);
+          const htmlImages = trimSiteEndingImages(
+            filterReaderImagesForSource(
+              preferImagesMatchingExampleUrl(extractImageUrls(html, url), options.imageUrlExample),
+              url,
+            ),
+            url,
+          );
           if (htmlImages.length === 0) {
             throw new Error('No images found on the chapter page.');
           }
@@ -922,9 +1052,13 @@ export function extractImageUrls(html: string, baseUrl: string): string[] {
       const lowercaseBaseUrl = baseUrl.toLowerCase();
       const lowercaseUrl = url.toLowerCase();
       
-      // If scraping from asurascans.com, only allow URLs of the pattern: asura-images/chapters/
+      // If scraping from asurascans.com, only allow reader page image URL families.
       const isAsura = lowercaseBaseUrl.includes('asurascans.com') || lowercaseUrl.includes('asurascans.com');
-      if (isAsura && !lowercaseUrl.includes('asura-images/chapters/')) {
+      if (
+        isAsura &&
+        !lowercaseUrl.includes('asura-images/chapters/') &&
+        !lowercaseUrl.includes('asura-images/chapters-restored/')
+      ) {
         return false;
       }
 
@@ -955,6 +1089,204 @@ export function extractImageUrls(html: string, baseUrl: string): string[] {
   return validImages;
 }
 
+function preferImagesMatchingExampleUrl(images: string[], exampleUrl?: string | null): string[] {
+  const matches = findImagesMatchingExampleUrl(images, exampleUrl);
+  return matches.length > 0 ? matches : images;
+}
+
+function trimSiteEndingImages(images: string[], chapterUrl: string): string[] {
+  if (!isAsuraScansUrl(chapterUrl) || images.length <= 1) {
+    return images;
+  }
+
+  const readerImages = images.filter(isAsuraReaderPageImage);
+  if (readerImages.length !== images.length) {
+    return images;
+  }
+
+  // Asura adds a site credit/finished card as the final numbered reader image.
+  return images.slice(0, -1);
+}
+
+function shouldUseSharedReaderBrowser(url: string, exampleUrl?: string | null): boolean {
+  return (
+    isQimanhwaLikeUrl(url) ||
+    isAsuraScansUrl(url) ||
+    isVortexLikeUrl(url) ||
+    isVortexLikeUrl(exampleUrl || '')
+  );
+}
+
+function filterReaderImagesForSource(
+  images: string[],
+  pageUrl: string,
+  exampleUrl?: string | null,
+): string[] {
+  const uniqueImages = Array.from(new Set(images));
+  const exampleMatches = findImagesMatchingExampleUrl(uniqueImages, exampleUrl);
+  const sourceImages = exampleMatches.length > 0 ? exampleMatches : uniqueImages;
+
+  if (isQimanhwaLikeUrl(pageUrl) || isQimanhwaLikeUrl(exampleUrl || '')) {
+    return sourceImages.filter(isQimanhwaReaderPageImage);
+  }
+
+  if (isAsuraScansUrl(pageUrl) || isAsuraScansUrl(exampleUrl || '')) {
+    return sourceImages.filter(isAsuraReaderPageImage);
+  }
+
+  return sourceImages.filter((url) => isLikelyChapterReaderImage(url, pageUrl, exampleUrl));
+}
+
+function findImagesMatchingExampleUrl(images: string[], exampleUrl?: string | null): string[] {
+  const cleanExampleUrl = exampleUrl?.trim();
+  if (!cleanExampleUrl) return [];
+
+  if (isQimanhwaLikeUrl(cleanExampleUrl)) {
+    const numberedReaderImages = images.filter(
+      (url) => isQimanhwaLikeUrl(url) && isQimanhwaReaderPageImage(url),
+    );
+    if (numberedReaderImages.length > 0) return numberedReaderImages;
+  }
+
+  if (isAsuraScansUrl(cleanExampleUrl)) {
+    const asuraImages = images.filter((url) => isAsuraReaderPageImage(url));
+    if (asuraImages.length > 0) return asuraImages;
+  }
+
+  const exampleFamily = getImageUrlFamilyPrefix(cleanExampleUrl);
+  if (exampleFamily) {
+    const prefixMatches = images.filter((url) => url.startsWith(exampleFamily));
+    if (prefixMatches.length > 0) return prefixMatches;
+  }
+
+  const typePrefix = getImageUrlTypePrefix(cleanExampleUrl);
+  if (typePrefix) {
+    const typeMatches = images.filter(
+      (url) => url.startsWith(typePrefix) && isLikelyChapterReaderImage(url, '', cleanExampleUrl),
+    );
+    if (typeMatches.length > 0) return typeMatches;
+  }
+
+  try {
+    const origin = new URL(cleanExampleUrl).origin;
+    return images.filter((url) => {
+      try {
+        return new URL(url).origin === origin && isLikelyChapterReaderImage(url, '', cleanExampleUrl);
+      } catch {
+        return url.startsWith(origin) && isLikelyChapterReaderImage(url, '', cleanExampleUrl);
+      }
+    });
+  } catch {
+    return [];
+  }
+}
+
+function getImageUrlFamilyPrefix(exampleUrl: string): string | null {
+  try {
+    const parsed = new URL(exampleUrl.trim());
+    const filename = parsed.pathname.split('/').pop() ?? '';
+    if (!isNumberedImageFilename(filename)) return null;
+
+    return `${parsed.origin}${parsed.pathname.slice(0, -filename.length)}`;
+  } catch {
+    return null;
+  }
+}
+
+function getImageUrlTypePrefix(exampleUrl: string): string | null {
+  try {
+    const parsed = new URL(exampleUrl.trim());
+    const segments = parsed.pathname.split('/').filter(Boolean);
+
+    if (segments.length >= 3) {
+      return `${parsed.origin}/${segments.slice(0, 3).join('/')}/`;
+    }
+
+    return `${parsed.origin}${parsed.pathname.replace(/\/[^/]*$/, '/')}`;
+  } catch {
+    return null;
+  }
+}
+
+function isLikelyChapterReaderImage(url: string, pageUrl: string = '', exampleUrl?: string | null): boolean {
+  try {
+    const parsed = new URL(url);
+    const lowercaseUrl = url.toLowerCase();
+    const filename = parsed.pathname.split('/').pop() ?? '';
+    const lowercasePageUrl = pageUrl.toLowerCase();
+    const lowercaseExampleUrl = (exampleUrl || '').toLowerCase();
+    const sameExampleOrigin =
+      !!exampleUrl &&
+      (() => {
+        try {
+          return new URL(exampleUrl).origin === parsed.origin;
+        } catch {
+          return false;
+        }
+      })();
+
+    if (!isReaderImageFile(filename)) return false;
+    if (isNonChapterImageUrl(lowercaseUrl)) return false;
+    if (isNumberedImageFilename(filename)) return true;
+    if (sameExampleOrigin && hasReaderPathHint(lowercaseUrl)) return true;
+    if (hasReaderPathHint(lowercaseUrl) && hasChapterNumberNearImagePath(parsed.pathname)) return true;
+    if (lowercasePageUrl && sameHost(url, pageUrl) && hasReaderPathHint(lowercaseUrl)) return true;
+    if (lowercaseExampleUrl && sameHost(url, exampleUrl || '') && hasReaderPathHint(lowercaseUrl)) return true;
+
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+function isReaderImageFile(filename: string): boolean {
+  return /\.(?:jpe?g|png|webp)(?:$|[?#])/i.test(filename);
+}
+
+function isNumberedImageFilename(filename: string): boolean {
+  return /^(?:page[_-]?)?\d{1,4}(?:[_-]\d{1,4})?\.(?:jpe?g|png|webp)$/i.test(filename);
+}
+
+function hasReaderPathHint(lowercaseUrl: string): boolean {
+  return (
+    lowercaseUrl.includes('/chapter') ||
+    lowercaseUrl.includes('/chapters') ||
+    lowercaseUrl.includes('/read') ||
+    lowercaseUrl.includes('/reader') ||
+    lowercaseUrl.includes('/manga') ||
+    lowercaseUrl.includes('/manhwa') ||
+    lowercaseUrl.includes('/series') ||
+    lowercaseUrl.includes('/upload/')
+  );
+}
+
+function hasChapterNumberNearImagePath(pathname: string): boolean {
+  const parts = pathname.split('/').filter(Boolean);
+  return parts.some((part) => /^(?:chapter[-_ ]?)?\d+(?:\.\d+)?$/i.test(part));
+}
+
+function isNonChapterImageUrl(lowercaseUrl: string): boolean {
+  return (
+    lowercaseUrl.includes('logo') ||
+    lowercaseUrl.includes('icon') ||
+    lowercaseUrl.includes('avatar') ||
+    lowercaseUrl.includes('banner') ||
+    lowercaseUrl.includes('placeholder') ||
+    lowercaseUrl.includes('thumb') ||
+    lowercaseUrl.includes('cover') ||
+    lowercaseUrl.includes('/profiles/') ||
+    lowercaseUrl.includes('/profile/')
+  );
+}
+
+function sameHost(firstUrl: string, secondUrl: string): boolean {
+  try {
+    return new URL(firstUrl).hostname === new URL(secondUrl).hostname;
+  } catch {
+    return false;
+  }
+}
+
 function isQimanhwaReaderPageImage(url: string): boolean {
   try {
     const parsed = new URL(url);
@@ -973,6 +1305,20 @@ function isQimanhwaReaderPageImage(url: string): boolean {
   }
 }
 
+function isAsuraReaderPageImage(url: string): boolean {
+  try {
+    const lowercaseUrl = url.toLowerCase();
+    const filename = new URL(url).pathname.split('/').pop() ?? '';
+    const isReaderPath =
+      lowercaseUrl.includes('asura-images/chapters/') ||
+      lowercaseUrl.includes('asura-images/chapters-restored/');
+    const isImageFile = /\.(?:jpe?g|png|webp)(?:$|[?#])/i.test(filename);
+    return isReaderPath && isImageFile;
+  } catch {
+    return false;
+  }
+}
+
 function isQimanhwaLikeUrl(url: string): boolean {
   try {
     const parsed = new URL(url);
@@ -981,5 +1327,22 @@ function isQimanhwaLikeUrl(url: string): boolean {
   } catch {
     const lowercaseUrl = url.toLowerCase();
     return lowercaseUrl.includes('qimanhwa.com') || lowercaseUrl.includes('qiscans.org');
+  }
+}
+
+function isAsuraScansUrl(url: string): boolean {
+  try {
+    return new URL(url).hostname.toLowerCase().includes('asurascans.com');
+  } catch {
+    return url.toLowerCase().includes('asurascans.com');
+  }
+}
+
+function isVortexLikeUrl(url: string): boolean {
+  try {
+    const hostname = new URL(url).hostname.toLowerCase();
+    return hostname.includes('vortexscans') || hostname.includes('vortex');
+  } catch {
+    return url.toLowerCase().includes('vortexscans') || url.toLowerCase().includes('vortex');
   }
 }

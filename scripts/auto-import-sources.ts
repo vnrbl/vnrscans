@@ -82,12 +82,16 @@ async function syncSource(source: any) {
     skipped = discovered.length - missing.length;
     const batchExtractedImages = await extractImagesFromChapterUrls(
       missing.map((chapter) => chapter.url),
-      { concurrency: 2 },
+      { concurrency: 4, imageUrlExample: source.image_url_example },
     );
 
     for (const chapter of missing) {
       try {
-        const images = batchExtractedImages.get(chapter.url) ?? await extractImagesFromChapterUrl(chapter.url);
+        const images =
+          batchExtractedImages.get(chapter.url) ??
+          await extractImagesFromChapterUrl(chapter.url, {
+            imageUrlExample: source.image_url_example,
+          });
         if (images.length === 0) throw new Error('No images found');
 
         const slug = buildChapterSlug(chapter.chapterNumber, {

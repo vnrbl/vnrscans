@@ -731,6 +731,7 @@ function SeriesDetail() {
                           {scanlationGroup && <span className="font-medium text-violet-400">{scanlationGroup}</span>}
                           {uploadedBy && <span>by {uploadedBy}</span>}
                           <span>{new Date(c.created_at).toLocaleDateString()}</span>
+                          <span>{formatChapterAge(c.created_at)}</span>
                         </div>
                       </Link>
                     );
@@ -799,9 +800,10 @@ function SeriesDetail() {
                             )}
                           </td>
                           <td className="px-4 py-3">
-                            <span className="text-sm text-muted-foreground">
-                              {new Date(c.created_at).toLocaleDateString()}
-                            </span>
+                            <div className="text-sm text-muted-foreground">
+                              <span>{new Date(c.created_at).toLocaleDateString()}</span>
+                              <span className="ml-2 text-xs">({formatChapterAge(c.created_at)})</span>
+                            </div>
                           </td>
                           <td className="px-4 py-3 text-right">
                             <Badge variant="outline" className="text-xs uppercase">
@@ -1039,25 +1041,28 @@ function LimitedTagPills({
   tags: Array<{ id: string; name: string; slug: string; color: string; icon: string }>;
 }) {
   const [showAll, setShowAll] = React.useState(false);
+  const mobileTags = showAll ? tags : tags.slice(0, 10);
+  const desktopTags = showAll ? tags : tags.slice(0, 20);
 
   return (
     <>
-      {tags.map((tag, index) => {
-        const hiddenClass = showAll
-          ? ""
-          : index >= 20
-            ? "hidden"
-            : index >= 10
-              ? "hidden md:inline-flex"
-              : "";
-
-        return (
-          <MetaPill key={tag.id} href="/browse" search={{ tag: tag.slug }} className={hiddenClass}>
+      <span className="contents md:hidden">
+        {mobileTags.map((tag) => (
+          <MetaPill key={tag.id} href="/browse" search={{ tag: tag.slug }}>
             {tag.icon && <span className="mr-1">{tag.icon}</span>}
             {tag.name}
           </MetaPill>
-        );
-      })}
+        ))}
+      </span>
+
+      <span className="hidden md:contents">
+        {desktopTags.map((tag) => (
+          <MetaPill key={tag.id} href="/browse" search={{ tag: tag.slug }}>
+            {tag.icon && <span className="mr-1">{tag.icon}</span>}
+            {tag.name}
+          </MetaPill>
+        ))}
+      </span>
 
       {!showAll && tags.length > 10 && (
         <button
@@ -1118,6 +1123,25 @@ function splitNames(value: string | null | undefined): string[] {
     .split(/[,;/|]/)
     .map((part) => part.trim())
     .filter(Boolean);
+}
+
+function formatChapterAge(value: string): string {
+  const date = new Date(value);
+  const diffMs = Date.now() - date.getTime();
+  if (!Number.isFinite(diffMs)) return "";
+
+  const minute = 60 * 1000;
+  const hour = 60 * minute;
+  const day = 24 * hour;
+  const month = 30 * day;
+  const year = 365 * day;
+
+  if (diffMs < minute) return "just now";
+  if (diffMs < hour) return `${Math.floor(diffMs / minute)}m ago`;
+  if (diffMs < day) return `${Math.floor(diffMs / hour)}h ago`;
+  if (diffMs < month) return `${Math.floor(diffMs / day)}d ago`;
+  if (diffMs < year) return `${Math.floor(diffMs / month)}mo ago`;
+  return `${Math.floor(diffMs / year)}y ago`;
 }
 
 function statusLabel(status: string): string {
