@@ -3,8 +3,11 @@
 -- ============================================
 -- Run this in Supabase SQL Editor
 
--- Update the trigger function to allow 30 active items.
-CREATE OR REPLACE FUNCTION check_carousel_item_limit()
+-- Force refresh the trigger and function so old 10-item definitions cannot remain attached.
+DROP TRIGGER IF EXISTS trigger_check_carousel_limit ON public.carousel_items;
+DROP FUNCTION IF EXISTS public.check_carousel_item_limit();
+
+CREATE OR REPLACE FUNCTION public.check_carousel_item_limit()
 RETURNS TRIGGER AS $$
 BEGIN
   IF NEW.is_active = true THEN
@@ -17,6 +20,14 @@ BEGIN
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trigger_check_carousel_limit
+  BEFORE INSERT OR UPDATE ON public.carousel_items
+  FOR EACH ROW
+  EXECUTE FUNCTION public.check_carousel_item_limit();
+
+-- Verify the live function body now contains the 30-item cap.
+SELECT pg_get_functiondef('public.check_carousel_item_limit()'::regprocedure) AS carousel_limit_function;
 
 -- Success message
 DO $$

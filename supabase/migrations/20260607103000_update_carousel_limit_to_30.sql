@@ -1,4 +1,7 @@
--- Update homepage carousel active title limit from 20 to 30.
+-- Update homepage carousel active title limit to 30.
+DROP TRIGGER IF EXISTS trigger_check_carousel_limit ON public.carousel_items;
+DROP FUNCTION IF EXISTS public.check_carousel_item_limit();
+
 CREATE OR REPLACE FUNCTION public.check_carousel_item_limit()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -18,3 +21,8 @@ BEGIN
   RETURN NEW;
 END;
 $$;
+
+CREATE TRIGGER trigger_check_carousel_limit
+  BEFORE INSERT OR UPDATE ON public.carousel_items
+  FOR EACH ROW
+  EXECUTE FUNCTION public.check_carousel_item_limit();

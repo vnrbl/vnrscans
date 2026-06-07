@@ -19,6 +19,11 @@ import { HomeHeroCarousel } from "@/components/HomeHeroCarousel";
 import { OptimizedImage } from "@/components/OptimizedImage";
 
 const LATEST_UPDATES_CHAPTER_LIMIT = 20;
+const LATEST_UPDATES_PAGE_SIZE = 1000;
+const HOME_HORIZONTAL_CARD_LIMIT = 30;
+const LATEST_UPDATES_ROWS_PER_BATCH = 5;
+const LATEST_UPDATES_DESKTOP_COLUMNS = 3;
+const LATEST_UPDATES_BATCH_SIZE = LATEST_UPDATES_ROWS_PER_BATCH * LATEST_UPDATES_DESKTOP_COLUMNS;
 
 type HomeHistorySection = "followed-chapters" | "reading-history" | "latest-updates";
 
@@ -95,8 +100,8 @@ function HomeContent() {
         }
       });
 
-      // Convert back to array and limit to 18
-      return Array.from(seriesMap.values()).slice(0, 18);
+      // Convert back to array and keep enough cards for the horizontal scroll.
+      return Array.from(seriesMap.values()).slice(0, HOME_HORIZONTAL_CARD_LIMIT);
     },
     enabled: !!user,
     staleTime: 1000 * 60, // 1 minute
@@ -131,7 +136,7 @@ function HomeContent() {
         }
       });
 
-      return Array.from(uniqueChapterUpdates.values()).slice(0, 18);
+      return Array.from(uniqueChapterUpdates.values()).slice(0, HOME_HORIZONTAL_CARD_LIMIT);
     },
     enabled: !!user,
     staleTime: 1000 * 60 * 2, // 2 minutes
@@ -158,49 +163,65 @@ function HomeContent() {
   const latestUpdates = useQuery({
     queryKey: ["latest-updates"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("chapters")
-        .select("id,slug,chapter_number,title,created_at,series_id,series:series_id(id,slug,title,cover_url,type,is_hidden)")
-        .eq("status", "published")
-        .order("created_at", { ascending: false })
-        .limit(500);
+      const allChapterRows: any[] = [];
+      let page = 0;
 
-      if (error) throw error;
+      while (true) {
+        const from = page * LATEST_UPDATES_PAGE_SIZE;
+        const to = from + LATEST_UPDATES_PAGE_SIZE - 1;
+        const { data, error } = await supabase
+          .from("chapters")
+          .select("id,slug,chapter_number,title,created_at,series_id,series:series_id!inner(id,slug,title,cover_url,type,is_hidden,updated_at)")
+          .eq("status", "published")
+          .eq("series.is_hidden", false)
+          .order("created_at", { ascending: false })
+          .range(from, to);
 
-      // Group by series and collect recent chapters for each
-      const seriesMap = new Map();
-      (data || []).forEach((ch: any) => {
-        if (!ch.series) return;
-        if (ch.series.is_hidden) return; // Skip hidden series
-        
-        const seriesId = ch.series.id;
-        if (!seriesMap.has(seriesId)) {
-          seriesMap.set(seriesId, {
-            ...ch.series,
-            latest_update: ch.created_at,
-            recent_chapters: [],
-          });
-        }
-        // Add recent chapter numbers to the series card. Keep this high enough for large upload batches.
-        const seriesData = seriesMap.get(seriesId);
-        const chapterAlreadyListed = seriesData.recent_chapters.some(
+        if (error) throw error;
+        allChapterRows.push(...(data ?? []));
+
+        if (!data || data.length < LATEST_UPDATES_PAGE_SIZE) break;
+        page += 1;
+      }
+
+      const seriesById = new Map<string, any>();
+      const chaptersBySeries = new Map<string, any[]>();
+      const latestChapterDateBySeries = new Map<string, string>();
+
+      allChapterRows.forEach((ch: any) => {
+        if (!ch.series?.id) return;
+        seriesById.set(ch.series.id, ch.series);
+
+        const existingChapters = chaptersBySeries.get(ch.series_id) ?? [];
+        const chapterAlreadyListed = existingChapters.some(
           (existing: any) => existing.chapter_number === ch.chapter_number,
         );
-        if (chapterAlreadyListed) return;
 
-        if (seriesData.recent_chapters.length < LATEST_UPDATES_CHAPTER_LIMIT) {
-          seriesData.recent_chapters.push({
+        if (!latestChapterDateBySeries.has(ch.series_id)) {
+          latestChapterDateBySeries.set(ch.series_id, ch.created_at);
+        }
+
+        if (!chapterAlreadyListed && existingChapters.length < LATEST_UPDATES_CHAPTER_LIMIT) {
+          existingChapters.push({
             id: ch.id,
             slug: ch.slug,
             chapter_number: ch.chapter_number,
             title: ch.title,
             created_at: ch.created_at,
           });
+          chaptersBySeries.set(ch.series_id, existingChapters);
         }
       });
 
-      // Keep newest-updated series order, but list each series' chapters by highest chapter number first.
-      return Array.from(seriesMap.values())
+      // Show every visible series that has published chapters, not just the first API page.
+      return Array.from(seriesById.values())
+        .map((series: any) => ({
+          ...series,
+          latest_update: latestChapterDateBySeries.get(series.id) ?? series.updated_at,
+          recent_chapters: chaptersBySeries.get(series.id) ?? [],
+        }))
+        .filter((series: any) => series.recent_chapters.length > 0)
+        .sort((a: any, b: any) => new Date(b.latest_update).getTime() - new Date(a.latest_update).getTime())
         .map((seriesData: any) => ({
           ...seriesData,
           recent_chapters: [...seriesData.recent_chapters].sort((a: any, b: any) => {
@@ -209,8 +230,7 @@ function HomeContent() {
             }
             return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
           }),
-        }))
-        .slice(0, 12);
+        }));
     },
     staleTime: 1000 * 60 * 5,
     gcTime: 1000 * 60 * 20,
@@ -787,6 +807,12 @@ function LatestUpdatesSection({
   historySection?: HomeHistorySection;
   onHide?: () => void;
 }) {
+  const [visibleCount, setVisibleCount] = React.useState(LATEST_UPDATES_BATCH_SIZE);
+
+  React.useEffect(() => {
+    setVisibleCount(LATEST_UPDATES_BATCH_SIZE);
+  }, [series]);
+
   // Fetch reading history to determine read status
   const readingHistoryQuery = useQuery({
     queryKey: ["latest-updates-reading-history", userId],
@@ -804,6 +830,8 @@ function LatestUpdatesSection({
   });
 
   const readChapterIds = new Set(readingHistoryQuery.data ?? []);
+  const visibleSeries = series.slice(0, visibleCount);
+  const hasMoreSeries = visibleCount < series.length;
 
   const isNewChapter = (createdAt: string) => {
     const now = new Date();
@@ -871,88 +899,105 @@ function LatestUpdatesSection({
           ))}
         </div>
       ) : series.length > 0 ? (
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {series.map((item) => (
-            <div
-              key={item.id}
-              className="group overflow-hidden rounded-lg border border-border/40 bg-card transition-all hover:border-primary/50 hover:shadow-lg"
-            >
-              <div className="flex gap-4 p-4">
-                {/* Cover Image */}
-                <Link
-                  to="/title/$slug"
-                  params={{ slug: item.slug }}
-                  className="shrink-0"
-                >
-                  <div className="relative h-[200px] w-[140px] overflow-hidden rounded-lg bg-secondary">
-                    <OptimizedImage
-                      src={item.cover_url}
-                      alt={item.title}
-                      className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-                    />
-                  </div>
-                </Link>
-
-                {/* Series Info and Chapters */}
-                <div className="flex min-w-0 flex-1 flex-col">
+        <>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {visibleSeries.map((item) => (
+              <div
+                key={item.id}
+                className="group overflow-hidden rounded-lg border border-border/40 bg-card transition-all hover:border-primary/50 hover:shadow-lg"
+              >
+                <div className="flex gap-4 p-4">
+                  {/* Cover Image */}
                   <Link
                     to="/title/$slug"
                     params={{ slug: item.slug }}
-                    className="line-clamp-2 text-base font-bold leading-tight hover:text-violet-600"
+                    className="shrink-0"
                   >
-                    {item.title}
+                    <div className="relative h-[200px] w-[140px] overflow-hidden rounded-lg bg-secondary">
+                      <OptimizedImage
+                        src={item.cover_url}
+                        alt={item.title}
+                        className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                      />
+                    </div>
                   </Link>
-                  <div className="mt-1 text-xs text-muted-foreground">
-                    {item.recent_chapters.length} recent chapter
-                    {item.recent_chapters.length !== 1 ? "s" : ""}
-                  </div>
 
-                  {/* Recent Chapters List with Read Status */}
-                  <div className="mt-3 max-h-[156px] space-y-2 overflow-y-auto pr-1">
-                    {item.recent_chapters.map((chapter) => {
-                      const isRead = readChapterIds.has(chapter.id);
-                      const isNew = isNewChapter(chapter.created_at);
+                  {/* Series Info and Chapters */}
+                  <div className="flex min-w-0 flex-1 flex-col">
+                    <Link
+                      to="/title/$slug"
+                      params={{ slug: item.slug }}
+                      className="line-clamp-2 text-base font-bold leading-tight hover:text-violet-600"
+                    >
+                      {item.title}
+                    </Link>
+                    <div className="mt-1 text-xs text-muted-foreground">
+                      {item.recent_chapters.length} recent chapter
+                      {item.recent_chapters.length !== 1 ? "s" : ""}
+                    </div>
 
-                      return (
-                        <Link
-                          key={chapter.id}
-                          to="/title/$titleSlug/$chapterSlug"
-                          params={{ titleSlug: item.slug, chapterSlug: chapter.slug }}
-                          className={`flex items-center justify-between text-sm transition-colors ${isRead
-                              ? 'text-muted-foreground hover:text-muted-foreground/80'
-                              : 'hover:text-violet-600 font-medium'
-                            }`}
-                        >
-                          <div className="flex min-w-0 flex-1 items-center gap-2">
-                            {isRead ? (
-                              <BookOpen className="h-3.5 w-3.5 shrink-0 text-green-600" />
-                            ) : (
-                              <BookOpen className="h-3.5 w-3.5 shrink-0 text-violet-600" />
-                            )}
-                            <span className="truncate">
-                              Chapter {chapter.chapter_number}
-                            </span>
-                            {isNew && !isRead && (
-                              <span className="shrink-0 flex items-center gap-1 rounded-full bg-violet-600 px-2 py-0.5 text-[10px] font-bold text-white">
-                                <svg className="h-2.5 w-2.5" fill="currentColor" viewBox="0 0 20 20">
-                                  <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8 2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                                </svg>
-                                NEW
+                    {/* Recent Chapters List with Read Status */}
+                    <div className="mt-3 max-h-[156px] space-y-2 overflow-y-auto pr-1">
+                      {item.recent_chapters.map((chapter) => {
+                        const isRead = readChapterIds.has(chapter.id);
+                        const isNew = isNewChapter(chapter.created_at);
+
+                        return (
+                          <Link
+                            key={chapter.id}
+                            to="/title/$titleSlug/$chapterSlug"
+                            params={{ titleSlug: item.slug, chapterSlug: chapter.slug }}
+                            className={`flex items-center justify-between text-sm transition-colors ${isRead
+                                ? 'text-muted-foreground hover:text-muted-foreground/80'
+                                : 'hover:text-violet-600 font-medium'
+                              }`}
+                          >
+                            <div className="flex min-w-0 flex-1 items-center gap-2">
+                              {isRead ? (
+                                <BookOpen className="h-3.5 w-3.5 shrink-0 text-green-600" />
+                              ) : (
+                                <BookOpen className="h-3.5 w-3.5 shrink-0 text-violet-600" />
+                              )}
+                              <span className="truncate">
+                                Chapter {chapter.chapter_number}
                               </span>
-                            )}
-                          </div>
-                          <span className="ml-2 shrink-0 text-xs text-muted-foreground">
-                            {formatTimeAgo(chapter.created_at)}
-                          </span>
-                        </Link>
-                      );
-                    })}
+                              {isNew && !isRead && (
+                                <span className="shrink-0 flex items-center gap-1 rounded-full bg-violet-600 px-2 py-0.5 text-[10px] font-bold text-white">
+                                  <svg className="h-2.5 w-2.5" fill="currentColor" viewBox="0 0 20 20">
+                                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8 2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                                  </svg>
+                                  NEW
+                                </span>
+                              )}
+                            </div>
+                            <span className="ml-2 shrink-0 text-xs text-muted-foreground">
+                              {formatTimeAgo(chapter.created_at)}
+                            </span>
+                          </Link>
+                        );
+                      })}
+                    </div>
                   </div>
                 </div>
               </div>
+            ))}
+          </div>
+
+          {hasMoreSeries && (
+            <div className="mt-6 flex justify-center">
+              <Button
+                variant="outline"
+                className="min-w-40 gap-2"
+                onClick={() => setVisibleCount((count) => Math.min(count + LATEST_UPDATES_BATCH_SIZE, series.length))}
+              >
+                Load More
+                <span className="text-xs text-muted-foreground">
+                  {Math.min(visibleCount, series.length)}/{series.length}
+                </span>
+              </Button>
             </div>
-          ))}
-        </div>
+          )}
+        </>
       ) : (
         <div className="rounded-lg border border-border/40 bg-card p-8 text-center">
           <p className="text-muted-foreground">No recent updates available.</p>
