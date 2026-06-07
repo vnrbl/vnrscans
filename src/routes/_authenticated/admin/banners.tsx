@@ -67,6 +67,8 @@ const emptyForm: BannerForm = {
   target_series_id: "",
 };
 
+const CAROUSEL_TITLE_LIMIT = 30;
+
 function AdminBanners() {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
@@ -385,16 +387,16 @@ function AdminBanners() {
               <Sparkles className="h-5 w-5 text-violet-500" />
               Homepage Carousel
             </h2>
-            <p className="text-sm text-muted-foreground">Add titles to homepage hero carousel (Max 20)</p>
+            <p className="text-sm text-muted-foreground">Add titles to homepage hero carousel (Max {CAROUSEL_TITLE_LIMIT})</p>
           </div>
           <Dialog open={carouselDialogOpen} onOpenChange={setCarouselDialogOpen}>
             <DialogTrigger asChild>
               <Button 
-                disabled={(carouselItems.data?.length || 0) >= 20}
+                disabled={(carouselItems.data?.length || 0) >= CAROUSEL_TITLE_LIMIT}
                 variant="outline"
               >
                 <Plus className="mr-1 h-4 w-4" />
-                Add Title ({carouselItems.data?.length || 0}/20)
+                Add Title ({carouselItems.data?.length || 0}/{CAROUSEL_TITLE_LIMIT})
               </Button>
             </DialogTrigger>
             <DialogContent>
