@@ -117,6 +117,7 @@ async function scrapeWithPuppeteer(url: string, isChapterPage: boolean = false):
   const chrome = await resolveChromeExecutable(puppeteer.default);
   const launchOptions: any = {
     headless: chrome.headless,
+    pipe: true,
     args: [
       ...chrome.args,
       '--disable-blink-features=AutomationControlled',
@@ -261,30 +262,66 @@ async function scrollChapterPageForLazyImages(page: any): Promise<void> {
 async function collectLiveReaderImageUrls(page: any): Promise<string[]> {
   try {
     const urls = await page.evaluate(`
-      Array.from(document.images)
-        .filter((img) => {
+      (() => {
+        const imageEntries = Array.from(document.images).map((img, index) => {
+          const rect = img.getBoundingClientRect();
           const className = String(img.className || '').toLowerCase();
           const alt = String(img.alt || '').toLowerCase();
-          return (
-            className.includes('r-page-img') ||
-            className.includes('reader') ||
-            className.includes('chapter') ||
-            alt.startsWith('page ') ||
-            (img.naturalWidth >= 500 && img.naturalHeight >= 800)
-          );
-        })
-        .flatMap((img) => [
-          img.currentSrc,
-          img.src,
-          img.getAttribute('data-src'),
-          img.getAttribute('data-lazy-src'),
-          img.getAttribute('data-original')
-        ])
-        .filter((value, index, all) =>
+          const values = [
+            img.currentSrc,
+            img.src,
+            img.getAttribute('data-src'),
+            img.getAttribute('data-lazy-src'),
+            img.getAttribute('data-original')
+          ].filter(Boolean);
+          const src = String(values[0] || '');
+          const lowercaseSrc = src.toLowerCase();
+          const filename = (() => {
+            try {
+              return new URL(src).pathname.split('/').pop()?.toLowerCase() || '';
+            } catch {
+              return lowercaseSrc.split('/').pop() || '';
+            }
+          })();
+          const isVortexReaderImage =
+            lowercaseSrc.includes('storage.vortexscans.org/upload/series/') &&
+            !lowercaseSrc.includes('/series/featured/') &&
+            /^page[-_]\\d{1,4}/i.test(filename);
+
+          return {
+            index,
+            top: rect.top + window.scrollY,
+            width: rect.width || img.width || img.naturalWidth || 0,
+            values,
+            isVortexReaderImage,
+            isGenericReaderImage:
+              className.includes('r-page-img') ||
+              className.includes('reader') ||
+              className.includes('chapter') ||
+              alt.startsWith('page ') ||
+              (alt.includes('chapter') && alt.includes('page')) ||
+              (img.naturalWidth >= 500 && img.naturalHeight >= 800)
+          };
+        });
+
+        const vortexReaderImages = imageEntries
+          .filter((entry) => entry.isVortexReaderImage && entry.width >= 250)
+          .sort((a, b) => a.top - b.top || a.index - b.index)
+          .flatMap((entry) => entry.values);
+
+        const candidates = vortexReaderImages.length > 0
+          ? vortexReaderImages
+          : imageEntries
+              .filter((entry) => entry.isGenericReaderImage)
+              .sort((a, b) => a.top - b.top || a.index - b.index)
+              .flatMap((entry) => entry.values);
+
+        return candidates.filter((value, index, all) =>
           value &&
           (String(value).startsWith('http://') || String(value).startsWith('https://')) &&
           all.indexOf(value) === index
-        )
+        );
+      })()
     `);
 
     return urls as string[];
@@ -450,7 +487,12 @@ export async function buildClientChapterLinksHtml(page: any, seriesUrl: string):
   try {
     const parsed = new URL(seriesUrl);
     const isQimanhwa = parsed.hostname.includes('qimanhwa.com');
+    const isVortex = isVortexLikeUrl(seriesUrl);
     const [, section, ...rest] = parsed.pathname.split('/');
+
+    if (isVortex) {
+      return await buildVortexChapterLinksHtml(page);
+    }
 
     if (!isQimanhwa || section !== 'series' || rest.length === 0) {
       return '';
@@ -500,6 +542,57 @@ export async function buildClientChapterLinksHtml(page: any, seriesUrl: string):
       .join('\n');
   } catch (error) {
     console.warn('[Scraper] Client chapter pagination failed:', error);
+    return '';
+  }
+}
+
+async function buildVortexChapterLinksHtml(page: any): Promise<string> {
+  try {
+    const chapters = (await page.evaluate(`
+      (async () => {
+        const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+        const getChapterLinks = () =>
+          Array.from(document.querySelectorAll('a[href*="/chapter-"]')).map((anchor) => ({
+            href: anchor.href,
+            text: anchor.textContent?.replace(/\\s+/g, ' ').trim() || '',
+          }));
+
+        let previousCount = 0;
+        let stablePasses = 0;
+
+        for (let pass = 0; pass < 30 && stablePasses < 3; pass++) {
+          window.scrollTo(0, document.body.scrollHeight);
+          await wait(250);
+
+          const clickable = Array.from(document.querySelectorAll('button, [role="button"]')).find(
+            (element) => /show\\s*more/i.test(element.textContent || ''),
+          );
+
+          if (clickable) {
+            clickable.click();
+            await wait(900);
+          } else {
+            await wait(300);
+          }
+
+          const count = getChapterLinks().length;
+          if (count === previousCount) {
+            stablePasses++;
+          } else {
+            previousCount = count;
+            stablePasses = 0;
+          }
+        }
+
+        return getChapterLinks();
+      })()
+    `)) as Array<{ href: string; text: string }>;
+
+    return chapters
+      .map((chapter) => `<a href="${chapter.href}">${chapter.text || chapter.href}</a>`)
+      .join('\n');
+  } catch (error) {
+    console.warn('[Scraper] Vortex chapter expansion failed:', error);
     return '';
   }
 }
@@ -686,7 +779,25 @@ export function extractChapterLinks(html: string, baseUrl: string): ChapterInfo[
 }
 
 function extractChapterNumber(url: string, text: string): number | null {
-  // Try to extract from text first
+  // Prefer URL slugs first because some chapter cards include metadata in their text
+  // (e.g. "Chapter 2 3 months"), which can otherwise be read as chapter 23.
+  const urlPatterns = [
+    /chapter-(\d+\.?\d*)/i,
+    /chapter\/(\d+\.?\d*)/i,
+    /ch-(\d+\.?\d*)/i,
+    /ch\/(\d+\.?\d*)/i,
+    /\/(\d+\.?\d*)(?:\/|$)/,
+  ];
+  
+  for (const pattern of urlPatterns) {
+    const match = url.match(pattern);
+    if (match && match[1]) {
+      const num = parseFloat(match[1]);
+      if (!isNaN(num)) return num;
+    }
+  }
+
+  // Try to extract from text if the URL does not expose a chapter number.
   const textPatterns = [
     /chapter\s*(\d+\.?\d*)/i,
     /ch\.?\s*(\d+\.?\d*)/i,
@@ -703,24 +814,7 @@ function extractChapterNumber(url: string, text: string): number | null {
       if (!isNaN(num)) return num;
     }
   }
-  
-  // Try to extract from URL
-  const urlPatterns = [
-    /chapter-(\d+\.?\d*)/i,
-    /chapter\/(\d+\.?\d*)/i,
-    /ch-(\d+\.?\d*)/i,
-    /ch\/(\d+\.?\d*)/i,
-    /\/(\d+\.?\d*)(?:\/|$)/,
-  ];
-  
-  for (const pattern of urlPatterns) {
-    const match = url.match(pattern);
-    if (match && match[1]) {
-      const num = parseFloat(match[1]);
-      if (!isNaN(num)) return num;
-    }
-  }
-  
+
   return null;
 }
 
@@ -788,13 +882,17 @@ export async function extractImagesFromChapterUrl(
         } else {
           const usesClientRenderedReader =
             isQimanhwaLikeUrl(chapterUrl) ||
-            isAsuraScansUrl(chapterUrl) ||
             isVortexLikeUrl(chapterUrl) ||
             isVortexLikeUrl(imageUrlExample);
           const exampleModeImages = extractImageUrls(html, chapterUrl);
           const exampleMatches = findImagesMatchingExampleUrl(exampleModeImages, imageUrlExample);
+          const sourceImages = filterReaderImagesForSource(exampleModeImages, chapterUrl, imageUrlExample);
           if (exampleMatches.length > 0 && !usesClientRenderedReader) {
             return exampleMatches;
+          }
+
+          if (sourceImages.length > 0) {
+            return sourceImages;
           }
 
           if (usesClientRenderedReader) {
@@ -845,11 +943,20 @@ export async function extractImagesFromChapterUrls(
   const directUrls = uniqueUrls.filter((url) => !shouldUseSharedReaderBrowser(url, options.imageUrlExample));
   const results = new Map<string, string[]>();
 
-  await Promise.all(
+  const directSettled = await Promise.allSettled(
     directUrls.map(async (url) => {
-      results.set(url, await extractImagesFromChapterUrl(url, options));
+      const images = await extractImagesFromChapterUrl(url, options);
+      results.set(url, images);
     }),
   );
+  directSettled.forEach((result, index) => {
+    if (result.status === 'rejected') {
+      console.warn(
+        `[Scraper] Direct extraction failed for ${directUrls[index]}:`,
+        result.reason instanceof Error ? result.reason.message : result.reason,
+      );
+    }
+  });
 
   if (browserUrls.length === 0) return results;
 
@@ -871,6 +978,7 @@ async function extractReaderImagesWithSharedBrowser(
   const chrome = await resolveChromeExecutable(puppeteer.default);
   const launchOptions: any = {
     headless: chrome.headless,
+    pipe: true,
     args: [
       ...chrome.args,
       '--disable-blink-features=AutomationControlled',
@@ -1086,10 +1194,7 @@ function preferImagesMatchingExampleUrl(images: string[], exampleUrl?: string | 
 
 function shouldUseSharedReaderBrowser(url: string, exampleUrl?: string | null): boolean {
   return (
-    isQimanhwaLikeUrl(url) ||
-    isAsuraScansUrl(url) ||
-    isVortexLikeUrl(url) ||
-    isVortexLikeUrl(exampleUrl || '')
+    isQimanhwaLikeUrl(url)
   );
 }
 

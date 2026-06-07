@@ -32,16 +32,22 @@ const SOURCE_PRESETS: Array<{
     hostIncludes: "vortexscans.org",
     sourceSite: "Vortex Scans",
     scanlationGroup: "Vortex Scans",
+    imageUrlExample:
+      "https://storage.vortexscans.org/upload/series/reincarnators-stream/68d990a7-23ab-4fd2-ad8e-f545f4610d18/page-0001_01_1777744448739-752500.jpg",
   },
   {
     hostIncludes: "vortexscans.com",
     sourceSite: "Vortex Scans",
     scanlationGroup: "Vortex Scans",
+    imageUrlExample:
+      "https://storage.vortexscans.org/upload/series/reincarnators-stream/68d990a7-23ab-4fd2-ad8e-f545f4610d18/page-0001_01_1777744448739-752500.jpg",
   },
   {
     hostIncludes: "vortexscans.net",
     sourceSite: "Vortex Scans",
     scanlationGroup: "Vortex Scans",
+    imageUrlExample:
+      "https://storage.vortexscans.org/upload/series/reincarnators-stream/68d990a7-23ab-4fd2-ad8e-f545f4610d18/page-0001_01_1777744448739-752500.jpg",
   },
 ];
 

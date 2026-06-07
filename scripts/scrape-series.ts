@@ -22,6 +22,24 @@ if (!supabaseUrl || !supabaseKey) {
 
 const supabase = createClient(supabaseUrl, supabaseKey);
 
+type ChapterToImport = {
+  chapterNumber: number;
+  title?: string | null;
+  url: string;
+};
+
+type ExtractedChapterImages =
+  | { chapter: ChapterToImport; images: string[] }
+  | { chapter: ChapterToImport; error: string };
+
+const parsePositiveIntegerEnv = (name: string, fallback: number): number => {
+  const value = Number.parseInt(process.env[name] || '', 10);
+  return Number.isFinite(value) && value > 0 ? value : fallback;
+};
+
+const SCRAPE_CONCURRENCY = parsePositiveIntegerEnv('SCRAPE_CONCURRENCY', 4);
+const PAGE_INSERT_CHUNK_SIZE = parsePositiveIntegerEnv('SCRAPE_PAGE_INSERT_CHUNK_SIZE', 1000);
+
 const rl = readline.createInterface({
   input: process.stdin,
   output: process.stdout,
@@ -176,35 +194,221 @@ async function scrollChapterPageForLazyImages(page: any): Promise<void> {
 
 async function collectLiveReaderImageUrls(page: any): Promise<string[]> {
   try {
-    return (await page.evaluate(() =>
-      Array.from(document.images)
-        .filter((img) => {
-          const className = String(img.className || '').toLowerCase();
-          const alt = String(img.alt || '').toLowerCase();
-          return (
-            className.includes('r-page-img') ||
-            className.includes('reader') ||
-            className.includes('chapter') ||
-            alt.startsWith('page ') ||
-            (img.naturalWidth >= 500 && img.naturalHeight >= 800)
-          );
-        })
-        .flatMap((img) => [
+    return (await page.evaluate(() => {
+      const imageEntries = Array.from(document.images).map((img, index) => {
+        const rect = img.getBoundingClientRect();
+        const className = String(img.className || '').toLowerCase();
+        const alt = String(img.alt || '').toLowerCase();
+        const values = [
           img.currentSrc,
           img.src,
           img.getAttribute('data-src'),
           img.getAttribute('data-lazy-src'),
           img.getAttribute('data-original'),
-        ])
-        .filter((value, index, all): value is string =>
+        ].filter(Boolean) as string[];
+        const src = String(values[0] || '');
+        const lowercaseSrc = src.toLowerCase();
+        const filename = (() => {
+          try {
+            return new URL(src).pathname.split('/').pop()?.toLowerCase() || '';
+          } catch {
+            return lowercaseSrc.split('/').pop() || '';
+          }
+        })();
+        const isVortexReaderImage =
+          lowercaseSrc.includes('storage.vortexscans.org/upload/series/') &&
+          !lowercaseSrc.includes('/series/featured/') &&
+          /^page[-_]\d{1,4}/i.test(filename);
+
+        return {
+          index,
+          top: rect.top + window.scrollY,
+          width: rect.width || img.width || img.naturalWidth || 0,
+          values,
+          isVortexReaderImage,
+          isGenericReaderImage:
+            className.includes('r-page-img') ||
+            className.includes('reader') ||
+            className.includes('chapter') ||
+            alt.startsWith('page ') ||
+            (alt.includes('chapter') && alt.includes('page')) ||
+            (img.naturalWidth >= 500 && img.naturalHeight >= 800),
+        };
+      });
+
+      const vortexReaderImages = imageEntries
+        .filter((entry) => entry.isVortexReaderImage && entry.width >= 250)
+        .sort((a, b) => a.top - b.top || a.index - b.index)
+        .flatMap((entry) => entry.values);
+
+      const candidates = vortexReaderImages.length > 0
+        ? vortexReaderImages
+        : imageEntries
+            .filter((entry) => entry.isGenericReaderImage)
+            .sort((a, b) => a.top - b.top || a.index - b.index)
+            .flatMap((entry) => entry.values);
+
+      return candidates.filter((value, index, all): value is string =>
           Boolean(value) &&
           (String(value).startsWith('http://') || String(value).startsWith('https://')) &&
           all.indexOf(value) === index,
-        ),
-    )) as string[];
+        );
+    })) as string[];
   } catch (error) {
     console.warn('  - Live reader image collection failed:', error);
     return [];
+  }
+}
+
+async function prepareChapterPage(page: any): Promise<void> {
+  await page.evaluateOnNewDocument(() => {
+    Object.defineProperty(navigator, 'webdriver', {
+      get: () => undefined,
+    });
+  });
+  await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+}
+
+async function runPool<T, R>(
+  items: T[],
+  concurrency: number,
+  worker: (item: T, index: number) => Promise<R>,
+): Promise<R[]> {
+  const results = new Array<R>(items.length);
+  let nextIndex = 0;
+
+  const runWorker = async () => {
+    while (nextIndex < items.length) {
+      const index = nextIndex++;
+      results[index] = await worker(items[index], index);
+    }
+  };
+
+  const workerCount = Math.max(1, Math.min(concurrency, items.length));
+  await Promise.all(Array.from({ length: workerCount }, runWorker));
+  return results;
+}
+
+async function extractImagesWithVisibleBrowser(
+  browser: any,
+  chapter: ChapterToImport,
+  imageTypeExample: string,
+  imageUrlPrefix: string | null,
+): Promise<string[]> {
+  const page = await browser.newPage();
+
+  try {
+    await prepareChapterPage(page);
+    await page.goto(chapter.url, { waitUntil: 'domcontentloaded', timeout: 60000 });
+
+    // Wait and scroll through the reader so client-side lazy images populate currentSrc/src.
+    await new Promise(r => setTimeout(r, 1500));
+    await scrollChapterPageForLazyImages(page);
+
+    const chHtml = await page.content();
+    const htmlImages = extractImageUrls(chHtml, chapter.url);
+    const liveImages = await collectLiveReaderImageUrls(page);
+    const extractedImages = Array.from(new Set([...htmlImages, ...liveImages]));
+    const images = filterImagesByExampleUrl(extractedImages, imageTypeExample, imageUrlPrefix);
+
+    if (images.length === 0) {
+      throw new Error(
+        imageUrlPrefix
+          ? 'No images matching the example URL type were found.'
+          : 'No images found on chapter page.',
+      );
+    }
+
+    return images;
+  } finally {
+    await page.close().catch(() => {});
+  }
+}
+
+async function extractMissingChapterImages(
+  browser: any,
+  chapters: ChapterToImport[],
+  imageTypeExample: string,
+  imageUrlPrefix: string | null,
+): Promise<ExtractedChapterImages[]> {
+  const asuraChapters = chapters.filter((chapter) => isAsuraUrl(chapter.url));
+  const browserChapters = chapters.filter((chapter) => !isAsuraUrl(chapter.url));
+  const resultsByUrl = new Map<string, ExtractedChapterImages>();
+
+  if (asuraChapters.length > 0) {
+    console.log(
+      `Extracting ${asuraChapters.length} Asura chapter(s) with ${Math.min(SCRAPE_CONCURRENCY, asuraChapters.length)} request(s)...`,
+    );
+
+    const asuraResults = await runPool(asuraChapters, SCRAPE_CONCURRENCY, async (chapter, index) => {
+      console.log(`[${index + 1}/${asuraChapters.length}] Extracting Chapter ${chapter.chapterNumber}...`);
+      try {
+        const extractedImages = await extractImagesFromChapterUrl(chapter.url, {
+          imageUrlExample: imageTypeExample,
+        });
+        const images = filterImagesByExampleUrl(extractedImages, imageTypeExample, imageUrlPrefix);
+        if (images.length === 0) {
+          throw new Error(
+            imageUrlPrefix
+              ? 'No images matching the example URL type were found.'
+            : 'No images found on chapter page.',
+          );
+        }
+        console.log(`  - Chapter ${chapter.chapterNumber}: found ${images.length} image(s).`);
+        return { chapter, images } satisfies ExtractedChapterImages;
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Failed to extract images';
+        console.error(`  - Chapter ${chapter.chapterNumber}: ${message}`);
+        return {
+          chapter,
+          error: message,
+        } satisfies ExtractedChapterImages;
+      }
+    });
+
+    for (const result of asuraResults) {
+      resultsByUrl.set(result.chapter.url, result);
+    }
+  }
+
+  if (browserChapters.length > 0) {
+    console.log(
+      `Extracting ${browserChapters.length} browser chapter(s) with ${Math.min(SCRAPE_CONCURRENCY, browserChapters.length)} tab(s)...`,
+    );
+
+    const browserResults = await runPool(browserChapters, SCRAPE_CONCURRENCY, async (chapter, index) => {
+      console.log(`[${index + 1}/${browserChapters.length}] Extracting Chapter ${chapter.chapterNumber}...`);
+      try {
+        const images = await extractImagesWithVisibleBrowser(
+          browser,
+          chapter,
+          imageTypeExample,
+          imageUrlPrefix,
+        );
+        console.log(`  - Chapter ${chapter.chapterNumber}: found ${images.length} image(s).`);
+        return { chapter, images } satisfies ExtractedChapterImages;
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Failed to extract images';
+        console.error(`  - Chapter ${chapter.chapterNumber}: ${message}`);
+        return { chapter, error: message } satisfies ExtractedChapterImages;
+      }
+    });
+
+    for (const result of browserResults) {
+      resultsByUrl.set(result.chapter.url, result);
+    }
+  }
+
+  return chapters.map((chapter) =>
+    resultsByUrl.get(chapter.url) || { chapter, error: 'Extraction did not run' },
+  );
+}
+
+async function insertInChunks(tableName: string, rows: any[], chunkSize: number): Promise<void> {
+  for (let i = 0; i < rows.length; i += chunkSize) {
+    const chunk = rows.slice(i, i + chunkSize);
+    const { error } = await supabase.from(tableName).insert(chunk);
+    if (error) throw error;
   }
 }
 
@@ -452,6 +656,93 @@ async function main() {
 
   let successCount = 0;
   let failCount = 0;
+
+  console.log(`Using scrape concurrency: ${SCRAPE_CONCURRENCY}`);
+  console.log('Phase 1/2: Extracting chapter images...');
+  const extractionResults = await extractMissingChapterImages(
+    browser,
+    missing,
+    imageTypeExample,
+    imageUrlPrefix,
+  );
+  const extracted = extractionResults.filter(
+    (result): result is { chapter: ChapterToImport; images: string[] } => 'images' in result,
+  );
+  const extractionFailures = extractionResults.filter(
+    (result): result is { chapter: ChapterToImport; error: string } => 'error' in result,
+  );
+
+  failCount += extractionFailures.length;
+
+  if (extractionFailures.length > 0) {
+    console.log('\nExtraction failures:');
+    extractionFailures.forEach((result) => {
+      console.log(`  - Chapter ${result.chapter.chapterNumber}: ${result.error}`);
+    });
+  }
+
+  if (extracted.length > 0) {
+    console.log('\nPhase 2/2: Saving extracted chapters to database...');
+    const chapterRows = extracted.map(({ chapter }) => ({
+      series_id: seriesId,
+      chapter_number: chapter.chapterNumber,
+      title: chapter.title || null,
+      slug: buildChapterSlug(chapter.chapterNumber, {
+        title: chapter.title,
+        scanlationGroup: scanlationGroup || null,
+      }),
+      chapter_type: 'image',
+      status: 'published',
+      uploaded_by: uploadedBy || null,
+      scanlation_group: scanlationGroup || null,
+    }));
+
+    const { data: insertedChapters, error: chapterInsertError } = await supabase
+      .from('chapters')
+      .insert(chapterRows)
+      .select('id, chapter_number, scanlation_group');
+
+    if (chapterInsertError) {
+      console.error('Failed to bulk insert chapters:', chapterInsertError.message);
+      failCount += extracted.length;
+    } else {
+      const insertedByScanKey = new Map(
+        (insertedChapters || []).map((chapter: any) => [
+          chapterScanKey(Number(chapter.chapter_number), chapter.scanlation_group),
+          chapter.id,
+        ]),
+      );
+
+      const pageRows = extracted.flatMap(({ chapter, images }) => {
+        const chapterId = insertedByScanKey.get(
+          chapterScanKey(chapter.chapterNumber, scanlationGroup || null),
+        );
+        if (!chapterId) return [];
+
+        return images.map((url, imgIdx) => ({
+          chapter_id: chapterId,
+          page_number: imgIdx + 1,
+          image_url: url,
+        }));
+      });
+
+      try {
+        console.log(`Saving ${pageRows.length} page row(s) in chunks of ${PAGE_INSERT_CHUNK_SIZE}...`);
+        await insertInChunks('chapter_pages', pageRows, PAGE_INSERT_CHUNK_SIZE);
+        successCount = insertedChapters?.length || 0;
+        console.log(`Saved ${successCount} chapter(s) successfully.`);
+      } catch (error) {
+        console.error(
+          'Failed to bulk insert pages:',
+          error instanceof Error ? error.message : error,
+        );
+        failCount += extracted.length;
+      }
+    }
+  }
+
+  // The legacy loop below is kept unreachable for easy rollback while the CLI uses the faster bulk path.
+  missing = [];
 
   for (let idx = 0; idx < missing.length; idx++) {
     const ch = missing[idx];

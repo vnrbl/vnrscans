@@ -59,10 +59,17 @@ export const $extractChaptersFromUrl = createServerFn({ method: "POST" })
   });
 
 export const $extractImagesFromUrl = createServerFn({ method: "POST" })
-  .inputValidator(z.object({ url: z.string().url() }))
+  .inputValidator(
+    z.object({
+      url: z.string().url(),
+      imageUrlExample: z.string().url().optional().or(z.literal("")),
+    }),
+  )
   .handler(async ({ data }) => {
     try {
-      const images = await extractImagesFromChapterUrl(data.url);
+      const images = await extractImagesFromChapterUrl(data.url, {
+        imageUrlExample: data.imageUrlExample || null,
+      });
       return { success: true, images };
     } catch (error) {
       return { 
@@ -99,6 +106,7 @@ export const $syncImportSource = createServerFn({ method: "POST" })
 
     const sourcePreset = detectImportSource(source.source_url);
     const scanlationGroup = source.scanlation_group || sourcePreset.scanlationGroup || null;
+    const imageUrlExample = source.image_url_example || sourcePreset.imageUrlExample || null;
     let chaptersFound = 0;
     let imported = 0;
     let skipped = 0;
@@ -130,7 +138,7 @@ export const $syncImportSource = createServerFn({ method: "POST" })
       skipped = discovered.length - missing.length;
       const batchExtractedImages = await extractImagesFromChapterUrls(
         missing.map((chapter) => chapter.url),
-        { concurrency: 4, imageUrlExample: source.image_url_example },
+        { concurrency: 4, imageUrlExample },
       );
 
       for (const chapter of missing) {
@@ -138,9 +146,9 @@ export const $syncImportSource = createServerFn({ method: "POST" })
           const rawImages =
             batchExtractedImages.get(chapter.url) ??
             (await extractImagesFromChapterUrl(chapter.url, {
-              imageUrlExample: source.image_url_example,
+              imageUrlExample,
             }));
-          const images = filterImagesByExampleUrl(rawImages, source.image_url_example || "");
+          const images = filterImagesByExampleUrl(rawImages, imageUrlExample || "");
           if (images.length === 0) {
             throw new Error("No images matching the source image pattern were found");
           }
