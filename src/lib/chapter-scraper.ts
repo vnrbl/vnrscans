@@ -816,18 +816,12 @@ export async function extractImagesFromChapterUrl(
     if (html.startsWith(LIVE_READER_IMAGES_PREFIX)) {
       const images = JSON.parse(html.slice(LIVE_READER_IMAGES_PREFIX.length));
       if (Array.isArray(images) && images.every((url) => typeof url === 'string')) {
-        return trimSiteEndingImages(
-          filterReaderImagesForSource(images, chapterUrl, imageUrlExample),
-          chapterUrl,
-        );
+        return filterReaderImagesForSource(images, chapterUrl, imageUrlExample);
       }
     }
     
     // Extract all image URLs from the HTML
-    const images = trimSiteEndingImages(
-      filterReaderImagesForSource(extractImageUrls(html, chapterUrl), chapterUrl, imageUrlExample),
-      chapterUrl,
-    );
+    const images = filterReaderImagesForSource(extractImageUrls(html, chapterUrl), chapterUrl, imageUrlExample);
     
     if (images.length === 0) {
       throw new Error('No images found on the chapter page. Please check the URL or use manual URL input.');
@@ -904,21 +898,17 @@ async function extractReaderImagesWithSharedBrowser(
         await new Promise((resolve) => setTimeout(resolve, 2500));
         await scrollChapterPageForLazyImages(page);
 
-        const images = trimSiteEndingImages(
-          filterReaderImagesForSource(
-            preferImagesMatchingExampleUrl(await collectLiveReaderImageUrls(page), options.imageUrlExample),
-            url,
-          ),
+        const images = filterReaderImagesForSource(
+          preferImagesMatchingExampleUrl(await collectLiveReaderImageUrls(page), options.imageUrlExample),
           url,
+          options.imageUrlExample,
         );
         if (images.length === 0) {
           const html = await page.content();
-          const htmlImages = trimSiteEndingImages(
-            filterReaderImagesForSource(
-              preferImagesMatchingExampleUrl(extractImageUrls(html, url), options.imageUrlExample),
-              url,
-            ),
+          const htmlImages = filterReaderImagesForSource(
+            preferImagesMatchingExampleUrl(extractImageUrls(html, url), options.imageUrlExample),
             url,
+            options.imageUrlExample,
           );
           if (htmlImages.length === 0) {
             throw new Error('No images found on the chapter page.');
@@ -1092,20 +1082,6 @@ export function extractImageUrls(html: string, baseUrl: string): string[] {
 function preferImagesMatchingExampleUrl(images: string[], exampleUrl?: string | null): string[] {
   const matches = findImagesMatchingExampleUrl(images, exampleUrl);
   return matches.length > 0 ? matches : images;
-}
-
-function trimSiteEndingImages(images: string[], chapterUrl: string): string[] {
-  if (!isAsuraScansUrl(chapterUrl) || images.length <= 1) {
-    return images;
-  }
-
-  const readerImages = images.filter(isAsuraReaderPageImage);
-  if (readerImages.length !== images.length) {
-    return images;
-  }
-
-  // Asura adds a site credit/finished card as the final numbered reader image.
-  return images.slice(0, -1);
 }
 
 function shouldUseSharedReaderBrowser(url: string, exampleUrl?: string | null): boolean {

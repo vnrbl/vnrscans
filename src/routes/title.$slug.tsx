@@ -1,6 +1,6 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Star, BookOpen, UserPlus, UserCheck, Users, ArrowUpDown, Search, Trophy, Flag, History, ChevronLeft, ChevronRight, Bookmark } from "lucide-react";
+import { Star, BookOpen, UserPlus, UserCheck, Users, ArrowUpDown, Search, Trophy, Flag, History, ChevronLeft, ChevronRight, Bookmark, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -149,6 +149,14 @@ function SeriesDetail() {
     staleTime: 1000 * 60 * 5,
     gcTime: 1000 * 60 * 20,
   });
+
+  const refreshChapterTable = async () => {
+    await Promise.all([
+      chaptersQ.refetch(),
+      scanlationGroups.refetch(),
+    ]);
+    toast.success("Chapter table refreshed");
+  };
 
   // Count followers
   const followersCount = useQuery({
@@ -655,6 +663,17 @@ function SeriesDetail() {
                   >
                     <ArrowUpDown className="h-4 w-4" />
                     {sortOrder === "desc" ? "Newest First" : "Oldest First"}
+                  </Button>
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={refreshChapterTable}
+                    disabled={chaptersQ.isFetching || scanlationGroups.isFetching}
+                    className="w-full gap-2 sm:w-auto"
+                  >
+                    <RefreshCw className={`h-4 w-4 ${(chaptersQ.isFetching || scanlationGroups.isFetching) ? "animate-spin" : ""}`} />
+                    Refresh
                   </Button>
                 </div>
               </div>
