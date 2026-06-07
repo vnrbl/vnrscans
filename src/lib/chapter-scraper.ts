@@ -788,13 +788,17 @@ export async function extractImagesFromChapterUrl(
         } else {
           const usesClientRenderedReader =
             isQimanhwaLikeUrl(chapterUrl) ||
-            isAsuraScansUrl(chapterUrl) ||
             isVortexLikeUrl(chapterUrl) ||
             isVortexLikeUrl(imageUrlExample);
           const exampleModeImages = extractImageUrls(html, chapterUrl);
           const exampleMatches = findImagesMatchingExampleUrl(exampleModeImages, imageUrlExample);
+          const sourceImages = filterReaderImagesForSource(exampleModeImages, chapterUrl, imageUrlExample);
           if (exampleMatches.length > 0 && !usesClientRenderedReader) {
             return exampleMatches;
+          }
+
+          if (sourceImages.length > 0) {
+            return sourceImages;
           }
 
           if (usesClientRenderedReader) {
@@ -845,11 +849,20 @@ export async function extractImagesFromChapterUrls(
   const directUrls = uniqueUrls.filter((url) => !shouldUseSharedReaderBrowser(url, options.imageUrlExample));
   const results = new Map<string, string[]>();
 
-  await Promise.all(
+  const directSettled = await Promise.allSettled(
     directUrls.map(async (url) => {
-      results.set(url, await extractImagesFromChapterUrl(url, options));
+      const images = await extractImagesFromChapterUrl(url, options);
+      results.set(url, images);
     }),
   );
+  directSettled.forEach((result, index) => {
+    if (result.status === 'rejected') {
+      console.warn(
+        `[Scraper] Direct extraction failed for ${directUrls[index]}:`,
+        result.reason instanceof Error ? result.reason.message : result.reason,
+      );
+    }
+  });
 
   if (browserUrls.length === 0) return results;
 
@@ -1087,7 +1100,6 @@ function preferImagesMatchingExampleUrl(images: string[], exampleUrl?: string | 
 function shouldUseSharedReaderBrowser(url: string, exampleUrl?: string | null): boolean {
   return (
     isQimanhwaLikeUrl(url) ||
-    isAsuraScansUrl(url) ||
     isVortexLikeUrl(url) ||
     isVortexLikeUrl(exampleUrl || '')
   );
