@@ -487,7 +487,12 @@ export async function buildClientChapterLinksHtml(page: any, seriesUrl: string):
   try {
     const parsed = new URL(seriesUrl);
     const isQimanhwa = parsed.hostname.includes('qimanhwa.com');
+    const isVortex = isVortexLikeUrl(seriesUrl);
     const [, section, ...rest] = parsed.pathname.split('/');
+
+    if (isVortex) {
+      return await buildVortexChapterLinksHtml(page);
+    }
 
     if (!isQimanhwa || section !== 'series' || rest.length === 0) {
       return '';
@@ -537,6 +542,57 @@ export async function buildClientChapterLinksHtml(page: any, seriesUrl: string):
       .join('\n');
   } catch (error) {
     console.warn('[Scraper] Client chapter pagination failed:', error);
+    return '';
+  }
+}
+
+async function buildVortexChapterLinksHtml(page: any): Promise<string> {
+  try {
+    const chapters = (await page.evaluate(`
+      (async () => {
+        const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+        const getChapterLinks = () =>
+          Array.from(document.querySelectorAll('a[href*="/chapter-"]')).map((anchor) => ({
+            href: anchor.href,
+            text: anchor.textContent?.replace(/\\s+/g, ' ').trim() || '',
+          }));
+
+        let previousCount = 0;
+        let stablePasses = 0;
+
+        for (let pass = 0; pass < 30 && stablePasses < 3; pass++) {
+          window.scrollTo(0, document.body.scrollHeight);
+          await wait(250);
+
+          const clickable = Array.from(document.querySelectorAll('button, [role="button"]')).find(
+            (element) => /show\\s*more/i.test(element.textContent || ''),
+          );
+
+          if (clickable) {
+            clickable.click();
+            await wait(900);
+          } else {
+            await wait(300);
+          }
+
+          const count = getChapterLinks().length;
+          if (count === previousCount) {
+            stablePasses++;
+          } else {
+            previousCount = count;
+            stablePasses = 0;
+          }
+        }
+
+        return getChapterLinks();
+      })()
+    `)) as Array<{ href: string; text: string }>;
+
+    return chapters
+      .map((chapter) => `<a href="${chapter.href}">${chapter.text || chapter.href}</a>`)
+      .join('\n');
+  } catch (error) {
+    console.warn('[Scraper] Vortex chapter expansion failed:', error);
     return '';
   }
 }
@@ -723,7 +779,25 @@ export function extractChapterLinks(html: string, baseUrl: string): ChapterInfo[
 }
 
 function extractChapterNumber(url: string, text: string): number | null {
-  // Try to extract from text first
+  // Prefer URL slugs first because some chapter cards include metadata in their text
+  // (e.g. "Chapter 2 3 months"), which can otherwise be read as chapter 23.
+  const urlPatterns = [
+    /chapter-(\d+\.?\d*)/i,
+    /chapter\/(\d+\.?\d*)/i,
+    /ch-(\d+\.?\d*)/i,
+    /ch\/(\d+\.?\d*)/i,
+    /\/(\d+\.?\d*)(?:\/|$)/,
+  ];
+  
+  for (const pattern of urlPatterns) {
+    const match = url.match(pattern);
+    if (match && match[1]) {
+      const num = parseFloat(match[1]);
+      if (!isNaN(num)) return num;
+    }
+  }
+
+  // Try to extract from text if the URL does not expose a chapter number.
   const textPatterns = [
     /chapter\s*(\d+\.?\d*)/i,
     /ch\.?\s*(\d+\.?\d*)/i,
@@ -740,24 +814,7 @@ function extractChapterNumber(url: string, text: string): number | null {
       if (!isNaN(num)) return num;
     }
   }
-  
-  // Try to extract from URL
-  const urlPatterns = [
-    /chapter-(\d+\.?\d*)/i,
-    /chapter\/(\d+\.?\d*)/i,
-    /ch-(\d+\.?\d*)/i,
-    /ch\/(\d+\.?\d*)/i,
-    /\/(\d+\.?\d*)(?:\/|$)/,
-  ];
-  
-  for (const pattern of urlPatterns) {
-    const match = url.match(pattern);
-    if (match && match[1]) {
-      const num = parseFloat(match[1]);
-      if (!isNaN(num)) return num;
-    }
-  }
-  
+
   return null;
 }
 
