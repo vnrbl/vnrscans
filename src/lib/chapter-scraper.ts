@@ -117,6 +117,7 @@ async function scrapeWithPuppeteer(url: string, isChapterPage: boolean = false):
   const chrome = await resolveChromeExecutable(puppeteer.default);
   const launchOptions: any = {
     headless: chrome.headless,
+    pipe: true,
     args: [
       ...chrome.args,
       '--disable-blink-features=AutomationControlled',
@@ -261,30 +262,66 @@ async function scrollChapterPageForLazyImages(page: any): Promise<void> {
 async function collectLiveReaderImageUrls(page: any): Promise<string[]> {
   try {
     const urls = await page.evaluate(`
-      Array.from(document.images)
-        .filter((img) => {
+      (() => {
+        const imageEntries = Array.from(document.images).map((img, index) => {
+          const rect = img.getBoundingClientRect();
           const className = String(img.className || '').toLowerCase();
           const alt = String(img.alt || '').toLowerCase();
-          return (
-            className.includes('r-page-img') ||
-            className.includes('reader') ||
-            className.includes('chapter') ||
-            alt.startsWith('page ') ||
-            (img.naturalWidth >= 500 && img.naturalHeight >= 800)
-          );
-        })
-        .flatMap((img) => [
-          img.currentSrc,
-          img.src,
-          img.getAttribute('data-src'),
-          img.getAttribute('data-lazy-src'),
-          img.getAttribute('data-original')
-        ])
-        .filter((value, index, all) =>
+          const values = [
+            img.currentSrc,
+            img.src,
+            img.getAttribute('data-src'),
+            img.getAttribute('data-lazy-src'),
+            img.getAttribute('data-original')
+          ].filter(Boolean);
+          const src = String(values[0] || '');
+          const lowercaseSrc = src.toLowerCase();
+          const filename = (() => {
+            try {
+              return new URL(src).pathname.split('/').pop()?.toLowerCase() || '';
+            } catch {
+              return lowercaseSrc.split('/').pop() || '';
+            }
+          })();
+          const isVortexReaderImage =
+            lowercaseSrc.includes('storage.vortexscans.org/upload/series/') &&
+            !lowercaseSrc.includes('/series/featured/') &&
+            /^page[-_]\\d{1,4}/i.test(filename);
+
+          return {
+            index,
+            top: rect.top + window.scrollY,
+            width: rect.width || img.width || img.naturalWidth || 0,
+            values,
+            isVortexReaderImage,
+            isGenericReaderImage:
+              className.includes('r-page-img') ||
+              className.includes('reader') ||
+              className.includes('chapter') ||
+              alt.startsWith('page ') ||
+              (alt.includes('chapter') && alt.includes('page')) ||
+              (img.naturalWidth >= 500 && img.naturalHeight >= 800)
+          };
+        });
+
+        const vortexReaderImages = imageEntries
+          .filter((entry) => entry.isVortexReaderImage && entry.width >= 250)
+          .sort((a, b) => a.top - b.top || a.index - b.index)
+          .flatMap((entry) => entry.values);
+
+        const candidates = vortexReaderImages.length > 0
+          ? vortexReaderImages
+          : imageEntries
+              .filter((entry) => entry.isGenericReaderImage)
+              .sort((a, b) => a.top - b.top || a.index - b.index)
+              .flatMap((entry) => entry.values);
+
+        return candidates.filter((value, index, all) =>
           value &&
           (String(value).startsWith('http://') || String(value).startsWith('https://')) &&
           all.indexOf(value) === index
-        )
+        );
+      })()
     `);
 
     return urls as string[];
@@ -884,6 +921,7 @@ async function extractReaderImagesWithSharedBrowser(
   const chrome = await resolveChromeExecutable(puppeteer.default);
   const launchOptions: any = {
     headless: chrome.headless,
+    pipe: true,
     args: [
       ...chrome.args,
       '--disable-blink-features=AutomationControlled',
@@ -1099,9 +1137,7 @@ function preferImagesMatchingExampleUrl(images: string[], exampleUrl?: string | 
 
 function shouldUseSharedReaderBrowser(url: string, exampleUrl?: string | null): boolean {
   return (
-    isQimanhwaLikeUrl(url) ||
-    isVortexLikeUrl(url) ||
-    isVortexLikeUrl(exampleUrl || '')
+    isQimanhwaLikeUrl(url)
   );
 }
 

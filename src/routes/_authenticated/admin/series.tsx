@@ -1773,7 +1773,12 @@ export function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack:
 
     try {
       setExtracting(true);
-      const result = await $extractImagesFromUrl({ data: { url: form.chapter_url } });
+      const result = await $extractImagesFromUrl({
+        data: {
+          url: form.chapter_url,
+          imageUrlExample: imageUrlTypeExample.trim(),
+        },
+      });
 
       if (result.success && result.images) {
         setForm({ ...form, image_urls: result.images.join("\n") });
@@ -2142,7 +2147,9 @@ export function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack:
         const batch = uploadableList.slice(i, i + BATCH_SIZE);
         const batchResults = await Promise.allSettled(
           batch.map(async (chapter) => {
-            const result = await $extractImagesFromUrl({ data: { url: chapter.url } });
+            const result = await $extractImagesFromUrl({
+              data: { url: chapter.url, imageUrlExample: imageTypeExample },
+            });
             if (!result.success || !result.images?.length) {
               throw new Error(result.error || "No images found");
             }
@@ -2926,6 +2933,17 @@ export function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack:
                     >
                       {extracting ? "Extracting..." : "Extract"}
                     </Button>
+                  </div>
+                  <div>
+                    <Label>Image URL Example (optional)</Label>
+                    <Input
+                      placeholder="https://storage.vortexscans.org/upload/series/..."
+                      value={imageUrlTypeExample}
+                      onChange={(e) => setImageUrlTypeExample(e.target.value)}
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Optional: enter one sample image URL from the source you prefer.
+                    </p>
                   </div>
                   <p className="text-xs text-muted-foreground">
                     Paste a chapter URL from any manga/manhwa site and we'll automatically extract
