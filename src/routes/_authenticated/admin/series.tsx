@@ -234,7 +234,7 @@ type TagOption = {
 
 function namesFromInput(value: string) {
   return value
-    .split(",")
+    .split(/[\\n,]+/)
     .map((name) => name.trim())
     .filter(Boolean);
 }
@@ -542,6 +542,18 @@ function AdminSeries() {
       if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "series"] }),
+  });
+
+  const deleteTag = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from('tags').delete().eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success('Tag deleted');
+      qc.invalidateQueries({ queryKey: ['admin', 'tags'] });
+    },
+    onError: (e: Error) => toast.error(e.message),
   });
 
   const del = useMutation({
@@ -897,6 +909,46 @@ function SeriesFormFields({
     return [...selectedExistingTags, ...namesFromInput(form.new_tags)];
   }, [form.new_tags, form.tag_ids, tags]);
   const [tagSearch, setTagSearch] = useState("");
+  const [isSuggestingTags, setIsSuggestingTags] = useState(false);
+
+  const suggestTags = async () => {
+    if (!form.title) {
+      toast.error('Please enter a title first');
+      return;
+    }
+    setIsSuggestingTags(true);
+    try {
+      const res = await fetch('https://api.jikan.moe/v4/manga?q=' + encodeURIComponent(form.title) + '&limit=1');
+      if (!res.ok) throw new Error('Failed to fetch suggestions');
+      const json = await res.json();
+      const manga = json.data?.[0];
+      if (!manga) {
+        toast.error('No AI suggestions found for this title');
+        return;
+      }
+      
+      const suggestedNames = [
+        ...(manga.genres?.map((g: any) => g.name) || []),
+        ...(manga.themes?.map((t: any) => t.name) || [])
+      ];
+      
+      if (suggestedNames.length === 0) {
+        toast.info('No relevant tags found');
+        return;
+      }
+      
+      const newTagStr = suggestedNames.join(', ');
+      updateWithAutoRating({ 
+        ...form, 
+        new_tags: form.new_tags ? form.new_tags + ', ' + newTagStr : newTagStr 
+      });
+      toast.success('AI suggested tags added!');
+    } catch (err: any) {
+      toast.error(err.message || 'Error suggesting tags');
+    } finally {
+      setIsSuggestingTags(false);
+    }
+  };
   const [showAllTags, setShowAllTags] = useState(false);
   const filteredTags = useMemo(() => {
     const query = tagSearch.trim().toLowerCase();
@@ -1181,27 +1233,41 @@ function SeriesFormFields({
           {visibleTags.map((tag) => {
             const selected = form.tag_ids.includes(tag.id);
             return (
-              <button
-                key={tag.id}
-                type="button"
-                onClick={() =>
-                  updateWithAutoRating({
-                    ...form,
-                    tag_ids: toggleSelection(form.tag_ids, tag.id),
-                  })
-                }
-                className={`rounded-full border px-3 py-1 text-xs font-medium transition ${
-                  selected
-                    ? "border-violet-600 bg-violet-600 text-white"
-                    : "border-border/60 bg-secondary/40 hover:border-violet-500"
-                }`}
-                style={
-                  !selected && tag.color ? { borderColor: tag.color, color: tag.color } : undefined
-                }
-              >
-                {tag.icon && <span className="mr-1">{tag.icon}</span>}
-                {tag.name}
-              </button>
+              <div key={tag.id} className="group relative flex items-center">
+                <button
+                  type="button"
+                  onClick={() =>
+                    updateWithAutoRating({
+                      ...form,
+                      tag_ids: toggleSelection(form.tag_ids, tag.id),
+                    })
+                  }
+                  className={`rounded-full border px-3 py-1 text-xs font-medium transition ${
+                    selected
+                      ? "border-violet-600 bg-violet-600 text-white"
+                      : "border-border/60 bg-secondary/40 hover:border-violet-500"
+                  }`}
+                  style={
+                    !selected && tag.color ? { borderColor: tag.color, color: tag.color } : undefined
+                  }
+                >
+                  {tag.icon && <span className="mr-1">{tag.icon}</span>}
+                  {tag.name}
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (window.confirm('Delete this tag from the database?')) {
+                      deleteTag.mutate(tag.id);
+                    }
+                  }}
+                  className="absolute -top-1 -right-1 hidden h-4 w-4 rounded-full bg-red-500 text-white hover:bg-red-600 group-hover:flex items-center justify-center"
+                  title="Delete Tag from Database"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
             );
           })}
         </div>
@@ -1215,27 +1281,41 @@ function SeriesFormFields({
           {visibleMobileTags.map((tag) => {
             const selected = form.tag_ids.includes(tag.id);
             return (
-              <button
-                key={tag.id}
-                type="button"
-                onClick={() =>
-                  updateWithAutoRating({
-                    ...form,
-                    tag_ids: toggleSelection(form.tag_ids, tag.id),
-                  })
-                }
-                className={`rounded-full border px-3 py-1 text-xs font-medium transition ${
-                  selected
-                    ? "border-violet-600 bg-violet-600 text-white"
-                    : "border-border/60 bg-secondary/40 hover:border-violet-500"
-                }`}
-                style={
-                  !selected && tag.color ? { borderColor: tag.color, color: tag.color } : undefined
-                }
-              >
-                {tag.icon && <span className="mr-1">{tag.icon}</span>}
-                {tag.name}
-              </button>
+              <div key={tag.id} className="group relative flex items-center">
+                <button
+                  type="button"
+                  onClick={() =>
+                    updateWithAutoRating({
+                      ...form,
+                      tag_ids: toggleSelection(form.tag_ids, tag.id),
+                    })
+                  }
+                  className={`rounded-full border px-3 py-1 text-xs font-medium transition ${
+                    selected
+                      ? "border-violet-600 bg-violet-600 text-white"
+                      : "border-border/60 bg-secondary/40 hover:border-violet-500"
+                  }`}
+                  style={
+                    !selected && tag.color ? { borderColor: tag.color, color: tag.color } : undefined
+                  }
+                >
+                  {tag.icon && <span className="mr-1">{tag.icon}</span>}
+                  {tag.name}
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (window.confirm('Delete this tag from the database?')) {
+                      deleteTag.mutate(tag.id);
+                    }
+                  }}
+                  className="absolute -top-1 -right-1 hidden h-4 w-4 rounded-full bg-red-500 text-white hover:bg-red-600 group-hover:flex items-center justify-center"
+                  title="Delete Tag from Database"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
             );
           })}
         </div>

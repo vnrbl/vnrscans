@@ -1,0 +1,1 @@
+﻿const fs = require('fs'); let content = fs.readFileSync('src/routes/_authenticated/admin/series.tsx', 'utf8'); content = content.split('split(\",\")').join('split(/[\\\\n,]+/)'); fs.writeFileSync('src/routes/_authenticated/admin/series.tsx', content, 'utf8'); console.log('done');
