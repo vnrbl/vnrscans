@@ -79,6 +79,202 @@ export const $extractImagesFromUrl = createServerFn({ method: "POST" })
     }
   });
 
+export const $runCloudScrape = createServerFn({ method: "POST" })
+  .inputValidator(
+    z.object({
+      accessToken: z.string().min(1),
+      seriesId: z.string().uuid().nullable(),
+      url: z.string().url(),
+      imageUrlExample: z.string().url().optional().or(z.literal("")),
+      scanlationGroup: z.string().optional().nullable(),
+      uploader: z.string().optional().nullable(),
+    }),
+  )
+  .handler(async ({ data }) => {
+    await verifyAdmin(data.accessToken);
+
+    const admin = getAdminSupabase();
+    const imageUrlExample = data.imageUrlExample || null;
+    const scanlationGroup = data.scanlationGroup?.trim() || inferSourceGroup(data.url);
+    const uploadedBy = data.uploader?.trim() || null;
+
+    const discovered = await extractChaptersFromSeriesUrl(data.url);
+
+    if (!data.seriesId) {
+      return {
+        success: true,
+        dryRun: true,
+        chaptersFound: discovered.length,
+        imported: 0,
+        skipped: 0,
+        failed: 0,
+        details: discovered.map((chapter) => ({
+          chapter: chapter.chapterNumber,
+          status: "found",
+          url: chapter.url,
+        })),
+      };
+    }
+
+    const { data: existingRows, error: existingError } = await admin
+      .from("chapters")
+      .select("chapter_number,scanlation_group")
+      .eq("series_id", data.seriesId);
+
+    if (existingError) throw existingError;
+
+    const existingKeys = new Set(
+      (existingRows ?? []).map((chapter: any) =>
+        chapterScanKey(Number(chapter.chapter_number), chapter.scanlation_group),
+      ),
+    );
+
+    let exactDuplicateCount = 0;
+    const missing = discovered.filter((chapter) => {
+      const isExactDuplicate = existingKeys.has(chapterScanKey(chapter.chapterNumber, scanlationGroup));
+      if (isExactDuplicate) exactDuplicateCount++;
+      return !isExactDuplicate;
+    });
+
+    const details: Array<{ chapter: number; status: string; message?: string; pages?: number }> = [];
+
+    if (missing.length === 0) {
+      return {
+        success: true,
+        dryRun: false,
+        chaptersFound: discovered.length,
+        imported: 0,
+        skipped: exactDuplicateCount,
+        failed: 0,
+        details,
+      };
+    }
+
+    const extractedImages = await extractImagesFromChapterUrls(
+      missing.map((chapter) => chapter.url),
+      { concurrency: 4, imageUrlExample },
+    );
+
+    const chapterRows: Array<{
+      series_id: string;
+      chapter_number: number;
+      title: string | null;
+      slug: string;
+      chapter_type: "image";
+      status: "published";
+      uploaded_by: string | null;
+      scanlation_group: string | null;
+    }> = [];
+    const chapterImages = new Map<string, string[]>();
+    let failed = 0;
+
+    for (const chapter of missing) {
+      try {
+        const rawImages =
+          extractedImages.get(chapter.url) ??
+          (await extractImagesFromChapterUrl(chapter.url, { imageUrlExample }));
+        const images = filterImagesByExampleUrl(rawImages, imageUrlExample || "");
+
+        if (images.length === 0) {
+          throw new Error(
+            imageUrlExample
+              ? "No images matching the example URL type were found."
+              : "No images found on chapter page.",
+          );
+        }
+
+        const slug = buildChapterSlug(chapter.chapterNumber, {
+          title: chapter.title || null,
+          scanlationGroup,
+        });
+
+        chapterRows.push({
+          series_id: data.seriesId,
+          chapter_number: chapter.chapterNumber,
+          title: chapter.title || null,
+          slug,
+          chapter_type: "image",
+          status: "published",
+          uploaded_by: uploadedBy,
+          scanlation_group: scanlationGroup || null,
+        });
+        chapterImages.set(chapterScanKey(chapter.chapterNumber, scanlationGroup), images);
+      } catch (error) {
+        failed++;
+        details.push({
+          chapter: chapter.chapterNumber,
+          status: "failed",
+          message: error instanceof Error ? error.message : "Unknown error",
+        });
+      }
+    }
+
+    let imported = 0;
+
+    if (chapterRows.length > 0) {
+      const { data: insertedChapters, error: chapterInsertError } = await admin
+        .from("chapters")
+        .insert(chapterRows)
+        .select("id,chapter_number,scanlation_group");
+
+      if (chapterInsertError) {
+        return {
+          success: false,
+          error: chapterInsertError.message,
+          chaptersFound: discovered.length,
+          imported: 0,
+          skipped: exactDuplicateCount,
+          failed: failed + chapterRows.length,
+          details,
+        };
+      }
+
+      const pageRows = (insertedChapters ?? []).flatMap((chapter: any) => {
+        const key = chapterScanKey(Number(chapter.chapter_number), chapter.scanlation_group);
+        const images = chapterImages.get(key) ?? [];
+        return images.map((imageUrl, index) => ({
+          chapter_id: chapter.id,
+          page_number: index + 1,
+          image_url: imageUrl,
+        }));
+      });
+
+      const { error: pagesError } = await admin.from("chapter_pages").insert(pageRows);
+
+      if (pagesError) {
+        return {
+          success: false,
+          error: pagesError.message,
+          chaptersFound: discovered.length,
+          imported: 0,
+          skipped: exactDuplicateCount,
+          failed: failed + chapterRows.length,
+          details,
+        };
+      }
+
+      imported = insertedChapters?.length ?? 0;
+      for (const chapter of insertedChapters ?? []) {
+        const key = chapterScanKey(Number(chapter.chapter_number), chapter.scanlation_group);
+        details.push({
+          chapter: Number(chapter.chapter_number),
+          status: "imported",
+          pages: chapterImages.get(key)?.length ?? 0,
+        });
+      }
+    }
+
+    return {
+      success: true,
+      dryRun: false,
+      chaptersFound: discovered.length,
+      imported,
+      skipped: exactDuplicateCount,
+      failed,
+      details,
+    };
+  });
+
 export const $syncImportSource = createServerFn({ method: "POST" })
   .inputValidator(
     z.object({
@@ -254,6 +450,14 @@ export const $syncImportSource = createServerFn({ method: "POST" })
 
 function chapterScanKey(chapterNumber: number, scanlationGroup: string | null) {
   return `${chapterNumber}::${scanlationGroup?.trim() || ""}`;
+}
+
+function inferSourceGroup(sourceUrl: string) {
+  try {
+    return new URL(sourceUrl).hostname.replace(/^www\./, "");
+  } catch {
+    return "";
+  }
 }
 
 function filterImagesByExampleUrl(images: string[], exampleUrl: string) {

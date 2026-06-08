@@ -35,6 +35,7 @@ import { Route as HomeHistorySectionRouteImport } from './routes/home/history.$s
 import { Route as AuthenticatedAdminUsersRouteImport } from './routes/_authenticated/admin/users'
 import { Route as AuthenticatedAdminTagsRouteImport } from './routes/_authenticated/admin/tags'
 import { Route as AuthenticatedAdminSeriesRouteImport } from './routes/_authenticated/admin/series'
+import { Route as AuthenticatedAdminScrapeTerminalRouteImport } from './routes/_authenticated/admin/scrape-terminal'
 import { Route as AuthenticatedAdminReportsRouteImport } from './routes/_authenticated/admin/reports'
 import { Route as AuthenticatedAdminPermissionsRouteImport } from './routes/_authenticated/admin/permissions'
 import { Route as AuthenticatedAdminModerationRouteImport } from './routes/_authenticated/admin/moderation'
@@ -179,6 +180,12 @@ const AuthenticatedAdminSeriesRoute =
     path: '/series',
     getParentRoute: () => AuthenticatedAdminRoute,
   } as any)
+const AuthenticatedAdminScrapeTerminalRoute =
+  AuthenticatedAdminScrapeTerminalRouteImport.update({
+    id: '/scrape-terminal',
+    path: '/scrape-terminal',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
 const AuthenticatedAdminReportsRoute =
   AuthenticatedAdminReportsRouteImport.update({
     id: '/reports',
@@ -275,6 +282,7 @@ export interface FileRoutesByFullPath {
   '/admin/moderation': typeof AuthenticatedAdminModerationRoute
   '/admin/permissions': typeof AuthenticatedAdminPermissionsRoute
   '/admin/reports': typeof AuthenticatedAdminReportsRoute
+  '/admin/scrape-terminal': typeof AuthenticatedAdminScrapeTerminalRoute
   '/admin/series': typeof AuthenticatedAdminSeriesRoute
   '/admin/tags': typeof AuthenticatedAdminTagsRoute
   '/admin/users': typeof AuthenticatedAdminUsersRoute
@@ -312,6 +320,7 @@ export interface FileRoutesByTo {
   '/admin/moderation': typeof AuthenticatedAdminModerationRoute
   '/admin/permissions': typeof AuthenticatedAdminPermissionsRoute
   '/admin/reports': typeof AuthenticatedAdminReportsRoute
+  '/admin/scrape-terminal': typeof AuthenticatedAdminScrapeTerminalRoute
   '/admin/series': typeof AuthenticatedAdminSeriesRoute
   '/admin/tags': typeof AuthenticatedAdminTagsRoute
   '/admin/users': typeof AuthenticatedAdminUsersRoute
@@ -352,6 +361,7 @@ export interface FileRoutesById {
   '/_authenticated/admin/moderation': typeof AuthenticatedAdminModerationRoute
   '/_authenticated/admin/permissions': typeof AuthenticatedAdminPermissionsRoute
   '/_authenticated/admin/reports': typeof AuthenticatedAdminReportsRoute
+  '/_authenticated/admin/scrape-terminal': typeof AuthenticatedAdminScrapeTerminalRoute
   '/_authenticated/admin/series': typeof AuthenticatedAdminSeriesRoute
   '/_authenticated/admin/tags': typeof AuthenticatedAdminTagsRoute
   '/_authenticated/admin/users': typeof AuthenticatedAdminUsersRoute
@@ -392,6 +402,7 @@ export interface FileRouteTypes {
     | '/admin/moderation'
     | '/admin/permissions'
     | '/admin/reports'
+    | '/admin/scrape-terminal'
     | '/admin/series'
     | '/admin/tags'
     | '/admin/users'
@@ -429,6 +440,7 @@ export interface FileRouteTypes {
     | '/admin/moderation'
     | '/admin/permissions'
     | '/admin/reports'
+    | '/admin/scrape-terminal'
     | '/admin/series'
     | '/admin/tags'
     | '/admin/users'
@@ -468,6 +480,7 @@ export interface FileRouteTypes {
     | '/_authenticated/admin/moderation'
     | '/_authenticated/admin/permissions'
     | '/_authenticated/admin/reports'
+    | '/_authenticated/admin/scrape-terminal'
     | '/_authenticated/admin/series'
     | '/_authenticated/admin/tags'
     | '/_authenticated/admin/users'
@@ -680,6 +693,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminSeriesRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
     }
+    '/_authenticated/admin/scrape-terminal': {
+      id: '/_authenticated/admin/scrape-terminal'
+      path: '/scrape-terminal'
+      fullPath: '/admin/scrape-terminal'
+      preLoaderRoute: typeof AuthenticatedAdminScrapeTerminalRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
     '/_authenticated/admin/reports': {
       id: '/_authenticated/admin/reports'
       path: '/reports'
@@ -771,6 +791,7 @@ interface AuthenticatedAdminRouteChildren {
   AuthenticatedAdminModerationRoute: typeof AuthenticatedAdminModerationRoute
   AuthenticatedAdminPermissionsRoute: typeof AuthenticatedAdminPermissionsRoute
   AuthenticatedAdminReportsRoute: typeof AuthenticatedAdminReportsRoute
+  AuthenticatedAdminScrapeTerminalRoute: typeof AuthenticatedAdminScrapeTerminalRoute
   AuthenticatedAdminSeriesRoute: typeof AuthenticatedAdminSeriesRoute
   AuthenticatedAdminTagsRoute: typeof AuthenticatedAdminTagsRoute
   AuthenticatedAdminUsersRoute: typeof AuthenticatedAdminUsersRoute
@@ -789,6 +810,7 @@ const AuthenticatedAdminRouteChildren: AuthenticatedAdminRouteChildren = {
   AuthenticatedAdminModerationRoute: AuthenticatedAdminModerationRoute,
   AuthenticatedAdminPermissionsRoute: AuthenticatedAdminPermissionsRoute,
   AuthenticatedAdminReportsRoute: AuthenticatedAdminReportsRoute,
+  AuthenticatedAdminScrapeTerminalRoute: AuthenticatedAdminScrapeTerminalRoute,
   AuthenticatedAdminSeriesRoute: AuthenticatedAdminSeriesRoute,
   AuthenticatedAdminTagsRoute: AuthenticatedAdminTagsRoute,
   AuthenticatedAdminUsersRoute: AuthenticatedAdminUsersRoute,

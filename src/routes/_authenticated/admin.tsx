@@ -1,4 +1,4 @@
-import { createFileRoute, Outlet, Link, redirect } from "@tanstack/react-router";
+﻿import { createFileRoute, Outlet, Link, redirect } from "@tanstack/react-router";
 import {
   LayoutDashboard,
   Library,
@@ -14,7 +14,7 @@ import {
   Trophy,
   Gavel,
   Award,
-} from "lucide-react";
+TerminalSquare } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { requireAuthenticatedUser } from "@/lib/auth-guards";
 
@@ -80,6 +80,7 @@ function AdminLayout() {
   const items = [
     { to: "/admin", label: "Dashboard", icon: LayoutDashboard, exact: true, roles: ["admin", "moderator", "uploader"] },
     { to: "/admin/analytics", label: "Analytics", icon: TrendingUp, roles: ["admin"] },
+    { to: "/admin/scrape-terminal", label: "Scrape Terminal", icon: TerminalSquare, roles: ["admin", "moderator", "uploader"] },
     { to: "/admin/announcements", label: "Announcements", icon: Megaphone, roles: ["admin", "moderator"] },
     { to: "/admin/banners", label: "Banners", icon: Image, roles: ["admin", "moderator"] },
     { to: "/admin/series", label: "Titles", icon: Library, roles: ["admin", "moderator", "uploader"] },
@@ -122,3 +123,6 @@ function AdminLayout() {
     </div>
   );
 }
+
+
+
