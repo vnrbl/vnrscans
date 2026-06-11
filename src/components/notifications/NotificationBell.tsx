@@ -105,7 +105,7 @@ export function NotificationBell() {
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-72 p-0">
         <NotificationList
-          notifications={notifications.data || []}
+          notifications={(notifications.data || []).map((n) => ({ ...n, is_read: !!n.is_read })) as any}
           isLoading={notifications.isLoading}
           onMarkAllRead={() => markAllRead.mutate()}
           onClose={() => setOpen(false)}

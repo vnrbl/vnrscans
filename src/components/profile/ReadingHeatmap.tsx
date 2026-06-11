@@ -18,7 +18,7 @@ export function ReadingHeatmap() {
     queryKey: ["reading-heatmap"],
     queryFn: async () => {
       const { data: u } = await supabase.auth.getUser();
-      if (!u.user) return [];
+      if (!u.user) return {};
 
       // Get date 365 days ago
       const oneYearAgo = new Date();

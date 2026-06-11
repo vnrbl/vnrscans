@@ -236,14 +236,14 @@ export function PrivacySettings() {
 
           <div className="border-t border-border/40" />
 
-          {/* Achievements */}
+          {/* Badges & Titles */}
           <div className="flex items-center justify-between gap-4">
             <div className="min-w-0 space-y-1">
               <Label htmlFor="achievements" className="cursor-pointer">
-                Achievements & Badges
+                Badges & Titles
               </Label>
               <p className="text-xs text-muted-foreground">
-                Display your earned achievements and equipped badges
+                Display your equipped badges and titles on your public profile
               </p>
             </div>
             <Switch

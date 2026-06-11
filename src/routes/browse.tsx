@@ -28,6 +28,7 @@ type BrowseSearch = {
   group?: string;
   genre?: string;
   tag?: string;
+  type?: string;
 };
 
 export const Route = createFileRoute("/browse")({
@@ -37,6 +38,7 @@ export const Route = createFileRoute("/browse")({
       group: (search.group as string) || undefined,
       genre: (search.genre as string) || undefined,
       tag: (search.tag as string) || undefined,
+      type: (search.type as string) || undefined,
     };
   },
   head: () => ({
@@ -49,7 +51,7 @@ export const Route = createFileRoute("/browse")({
 });
 
 function BrowsePage() {
-  const { search: urlSearch, group: urlGroup, genre: urlGenre, tag: urlTag } = Route.useSearch();
+  const { search: urlSearch, group: urlGroup, genre: urlGenre, tag: urlTag, type: urlType } = Route.useSearch();
   const navigate = useNavigate();
 
   const [searchQuery, setSearchQuery] = useState(urlSearch || "");
@@ -63,7 +65,7 @@ function BrowsePage() {
     setGroupFilter(urlGroup || "");
   }, [urlGroup]);
 
-  const [typeFilters, setTypeFilters] = useState<string[]>([]);
+  const [typeFilters, setTypeFilters] = useState<string[]>(urlType ? [urlType] : []);
   const [statusFilter, setStatusFilter] = useState("all");
   const [contentRating, setContentRating] = useState("all");
   const [genreFilters, setGenreFilters] = useState<string[]>(urlGenre ? [urlGenre] : []);
@@ -71,6 +73,12 @@ function BrowsePage() {
   const [sortBy, setSortBy] = useState("latest");
   const [duration, setDuration] = useState("all");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+
+  useEffect(() => {
+    if (urlType) {
+      setTypeFilters((prev) => (prev.includes(urlType) ? prev : [...prev, urlType]));
+    }
+  }, [urlType]);
 
   useEffect(() => {
     if (urlGenre) {
@@ -152,7 +160,7 @@ function BrowsePage() {
     setGroupFilter("");
     navigate({
       to: "/browse",
-      search: (prev) => ({ ...prev, group: undefined, genre: undefined, tag: undefined }),
+      search: (prev) => ({ ...prev, group: undefined, genre: undefined, tag: undefined, type: undefined }),
     });
   };
 
@@ -209,15 +217,15 @@ function BrowsePage() {
 
       // Apply type filters (multiple selection)
       if (typeFilters.length > 0) {
-        query = query.in("type", typeFilters);
+        query = query.in("type", typeFilters as any);
       }
       
       // Apply other filters
       if (statusFilter !== "all") {
-        query = query.eq("status", statusFilter);
+        query = query.eq("status", statusFilter as any);
       }
       if (contentRating !== "all") {
-        query = query.eq("content_rating", contentRating);
+        query = query.eq("content_rating", contentRating as any);
       }
       const preparedSearch = prepareSearchInput(searchQuery);
       if (preparedSearch.primaryTerm) {
@@ -409,17 +417,16 @@ function BrowsePage() {
                       className="flex items-center gap-1.5 rounded-md px-2 py-1.5 hover:bg-secondary cursor-pointer transition-colors"
                     >
                       <div 
-                        className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border`}
-                        style={{
-                          borderColor: genreFilters.includes(genre.slug) ? genre.color : undefined,
-                          backgroundColor: genreFilters.includes(genre.slug) ? genre.color : undefined,
-                        }}
+                        className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border ${
+                          genreFilters.includes(genre.slug)
+                            ? "border-violet-600 bg-violet-600"
+                            : "border-input"
+                        }`}
                       >
                         {genreFilters.includes(genre.slug) && (
                           <Check className="h-3 w-3 text-white" />
                         )}
                       </div>
-                      {genre.icon && <span className="text-sm">{genre.icon}</span>}
                       <span className="text-xs truncate">{genre.name}</span>
                     </div>
                   ))}

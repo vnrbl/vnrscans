@@ -66,8 +66,8 @@ function AdminModeration() {
       if (item.source_report_id) {
         await supabase
           .from("reports")
-          .update({ status: status === "approved" ? "dismissed" : "resolved" })
-          .eq("id", item.source_report_id);
+          .update({ status: (status === "approved" ? "dismissed" : "resolved") as any })
+          .eq("id", item.source_report_id as string);
       }
 
       await logAdminAction(`moderation_${status}`, "moderation", id, {
@@ -144,7 +144,7 @@ function AdminModeration() {
                       </Badge>
                       {item.auto_flagged && (
                         <Badge variant="secondary">
-                          🤖 Auto ({Math.round(item.flag_score * 100)}%)
+                          🤖 Auto ({Math.round((item.flag_score ?? 0) * 100)}%)
                         </Badge>
                       )}
                       <Badge variant={statusColors[item.status as keyof typeof statusColors] as any}>

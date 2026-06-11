@@ -47,7 +47,7 @@ function AdminComments() {
       const { data, error } = await supabase
         .from("profiles")
         .select("user_id,username,avatar_url")
-        .in("user_id", userIds);
+        .in("user_id", userIds as string[]);
       if (error) throw error;
       return new Map((data ?? []).map((profile: any) => [profile.user_id, profile]));
     },

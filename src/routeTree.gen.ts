@@ -40,7 +40,6 @@ import { Route as AuthenticatedAdminReportsRouteImport } from './routes/_authent
 import { Route as AuthenticatedAdminPermissionsRouteImport } from './routes/_authenticated/admin/permissions'
 import { Route as AuthenticatedAdminModerationRouteImport } from './routes/_authenticated/admin/moderation'
 import { Route as AuthenticatedAdminLogsRouteImport } from './routes/_authenticated/admin/logs'
-import { Route as AuthenticatedAdminGamificationRouteImport } from './routes/_authenticated/admin/gamification'
 import { Route as AuthenticatedAdminCommentsRouteImport } from './routes/_authenticated/admin/comments'
 import { Route as AuthenticatedAdminBannersRouteImport } from './routes/_authenticated/admin/banners'
 import { Route as AuthenticatedAdminBadgesRouteImport } from './routes/_authenticated/admin/badges'
@@ -209,12 +208,6 @@ const AuthenticatedAdminLogsRoute = AuthenticatedAdminLogsRouteImport.update({
   path: '/logs',
   getParentRoute: () => AuthenticatedAdminRoute,
 } as any)
-const AuthenticatedAdminGamificationRoute =
-  AuthenticatedAdminGamificationRouteImport.update({
-    id: '/gamification',
-    path: '/gamification',
-    getParentRoute: () => AuthenticatedAdminRoute,
-  } as any)
 const AuthenticatedAdminCommentsRoute =
   AuthenticatedAdminCommentsRouteImport.update({
     id: '/comments',
@@ -277,7 +270,6 @@ export interface FileRoutesByFullPath {
   '/admin/badges': typeof AuthenticatedAdminBadgesRoute
   '/admin/banners': typeof AuthenticatedAdminBannersRoute
   '/admin/comments': typeof AuthenticatedAdminCommentsRoute
-  '/admin/gamification': typeof AuthenticatedAdminGamificationRoute
   '/admin/logs': typeof AuthenticatedAdminLogsRoute
   '/admin/moderation': typeof AuthenticatedAdminModerationRoute
   '/admin/permissions': typeof AuthenticatedAdminPermissionsRoute
@@ -315,7 +307,6 @@ export interface FileRoutesByTo {
   '/admin/badges': typeof AuthenticatedAdminBadgesRoute
   '/admin/banners': typeof AuthenticatedAdminBannersRoute
   '/admin/comments': typeof AuthenticatedAdminCommentsRoute
-  '/admin/gamification': typeof AuthenticatedAdminGamificationRoute
   '/admin/logs': typeof AuthenticatedAdminLogsRoute
   '/admin/moderation': typeof AuthenticatedAdminModerationRoute
   '/admin/permissions': typeof AuthenticatedAdminPermissionsRoute
@@ -356,7 +347,6 @@ export interface FileRoutesById {
   '/_authenticated/admin/badges': typeof AuthenticatedAdminBadgesRoute
   '/_authenticated/admin/banners': typeof AuthenticatedAdminBannersRoute
   '/_authenticated/admin/comments': typeof AuthenticatedAdminCommentsRoute
-  '/_authenticated/admin/gamification': typeof AuthenticatedAdminGamificationRoute
   '/_authenticated/admin/logs': typeof AuthenticatedAdminLogsRoute
   '/_authenticated/admin/moderation': typeof AuthenticatedAdminModerationRoute
   '/_authenticated/admin/permissions': typeof AuthenticatedAdminPermissionsRoute
@@ -397,7 +387,6 @@ export interface FileRouteTypes {
     | '/admin/badges'
     | '/admin/banners'
     | '/admin/comments'
-    | '/admin/gamification'
     | '/admin/logs'
     | '/admin/moderation'
     | '/admin/permissions'
@@ -435,7 +424,6 @@ export interface FileRouteTypes {
     | '/admin/badges'
     | '/admin/banners'
     | '/admin/comments'
-    | '/admin/gamification'
     | '/admin/logs'
     | '/admin/moderation'
     | '/admin/permissions'
@@ -475,7 +463,6 @@ export interface FileRouteTypes {
     | '/_authenticated/admin/badges'
     | '/_authenticated/admin/banners'
     | '/_authenticated/admin/comments'
-    | '/_authenticated/admin/gamification'
     | '/_authenticated/admin/logs'
     | '/_authenticated/admin/moderation'
     | '/_authenticated/admin/permissions'
@@ -728,13 +715,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminLogsRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
     }
-    '/_authenticated/admin/gamification': {
-      id: '/_authenticated/admin/gamification'
-      path: '/gamification'
-      fullPath: '/admin/gamification'
-      preLoaderRoute: typeof AuthenticatedAdminGamificationRouteImport
-      parentRoute: typeof AuthenticatedAdminRoute
-    }
     '/_authenticated/admin/comments': {
       id: '/_authenticated/admin/comments'
       path: '/comments'
@@ -786,7 +766,6 @@ interface AuthenticatedAdminRouteChildren {
   AuthenticatedAdminBadgesRoute: typeof AuthenticatedAdminBadgesRoute
   AuthenticatedAdminBannersRoute: typeof AuthenticatedAdminBannersRoute
   AuthenticatedAdminCommentsRoute: typeof AuthenticatedAdminCommentsRoute
-  AuthenticatedAdminGamificationRoute: typeof AuthenticatedAdminGamificationRoute
   AuthenticatedAdminLogsRoute: typeof AuthenticatedAdminLogsRoute
   AuthenticatedAdminModerationRoute: typeof AuthenticatedAdminModerationRoute
   AuthenticatedAdminPermissionsRoute: typeof AuthenticatedAdminPermissionsRoute
@@ -805,7 +784,6 @@ const AuthenticatedAdminRouteChildren: AuthenticatedAdminRouteChildren = {
   AuthenticatedAdminBadgesRoute: AuthenticatedAdminBadgesRoute,
   AuthenticatedAdminBannersRoute: AuthenticatedAdminBannersRoute,
   AuthenticatedAdminCommentsRoute: AuthenticatedAdminCommentsRoute,
-  AuthenticatedAdminGamificationRoute: AuthenticatedAdminGamificationRoute,
   AuthenticatedAdminLogsRoute: AuthenticatedAdminLogsRoute,
   AuthenticatedAdminModerationRoute: AuthenticatedAdminModerationRoute,
   AuthenticatedAdminPermissionsRoute: AuthenticatedAdminPermissionsRoute,

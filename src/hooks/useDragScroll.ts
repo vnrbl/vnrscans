@@ -1,4 +1,4 @@
-import { useRef, useCallback, type DragEvent, type PointerEvent, type RefObject } from "react";
+import { useRef, useCallback, type DragEvent, type PointerEvent, type MouseEvent, type RefObject } from "react";
 
 const DRAG_THRESHOLD = 5;
 
@@ -120,7 +120,7 @@ export function useDragScroll<T extends HTMLElement>() {
     [finishDrag]
   );
 
-  const handleClickCapture = (e: PointerEvent) => {
+  const handleClickCapture = (e: MouseEvent) => {
     if (suppressClick.current) {
       e.preventDefault();
       e.stopPropagation();

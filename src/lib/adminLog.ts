@@ -14,7 +14,7 @@ export async function logAdminAction(
     action,
     resource_type: resourceType,
     resource_id: resourceId ?? null,
-    details: details ?? {},
+    details: (details ?? {}) as any,
     user_agent: typeof navigator !== "undefined" ? navigator.userAgent : null,
   });
 

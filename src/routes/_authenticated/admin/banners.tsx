@@ -124,7 +124,7 @@ function AdminBanners() {
         const { data, error} = await supabase
           .from("carousel_items")
           .select("*, series:series_id(id, title, slug, cover_url)")
-          .order("position", { ascending: true });
+          .order("priority", { ascending: true });
         
         console.log("Carousel items query result:", { data, error });
         if (error) {
@@ -277,7 +277,7 @@ function AdminBanners() {
       
       const { data, error } = await supabase.from("carousel_items").insert({
         series_id: seriesId,
-        position: count,
+        priority: count,
         is_active: true,
       }).select();
       
@@ -316,10 +316,10 @@ function AdminBanners() {
   });
 
   const updateCarouselPosition = useMutation({
-    mutationFn: async ({ id, position }: { id: string; position: number }) => {
+    mutationFn: async ({ id, priority }: { id: string; priority: number }) => {
       const { error } = await supabase
         .from("carousel_items")
-        .update({ position })
+        .update({ priority })
         .eq("id", id);
       if (error) throw error;
     },
@@ -332,10 +332,10 @@ function AdminBanners() {
   const reorderCarouselPositions = async () => {
     const items = carouselItems.data || [];
     for (let i = 0; i < items.length; i++) {
-      if (items[i].position !== i) {
+      if (items[i].priority !== i) {
         await supabase
           .from("carousel_items")
-          .update({ position: i })
+          .update({ priority: i })
           .eq("id", items[i].id);
       }
     }
@@ -351,8 +351,8 @@ function AdminBanners() {
     const item1 = items[index];
     const item2 = items[newIndex];
 
-    updateCarouselPosition.mutate({ id: item1.id, position: newIndex });
-    updateCarouselPosition.mutate({ id: item2.id, position: index });
+    updateCarouselPosition.mutate({ id: item1.id, priority: newIndex });
+    updateCarouselPosition.mutate({ id: item2.id, priority: index });
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
@@ -371,8 +371,8 @@ function AdminBanners() {
     
     // Update positions in database
     newItems.forEach((item, index) => {
-      if (item.position !== index) {
-        updateCarouselPosition.mutate({ id: item.id, position: index });
+      if (item.priority !== index) {
+        updateCarouselPosition.mutate({ id: item.id, priority: index });
       }
     });
   };
@@ -529,7 +529,7 @@ function AdminBanners() {
                     <span>Priority: {item.priority}</span>
                     <span>👁️ {item.view_count}</span>
                     <span>🖱️ {item.click_count}</span>
-                    <span>Starts: {new Date(item.starts_at).toLocaleDateString()}</span>
+                    <span>Starts: {item.starts_at ? new Date(item.starts_at).toLocaleDateString() : ""}</span>
                     {item.expires_at && <span>Expires: {new Date(item.expires_at).toLocaleDateString()}</span>}
                   </div>
                 </div>
@@ -556,8 +556,8 @@ function AdminBanners() {
                       link_text: item.link_text || "Learn More",
                       position: item.position,
                       priority: String(item.priority),
-                      background_color: item.background_color,
-                      text_color: item.text_color,
+                      background_color: item.background_color || "#8B5CF6",
+                      text_color: item.text_color || "#FFFFFF",
                       starts_at: item.starts_at ? new Date(item.starts_at).toISOString().slice(0, 16) : "",
                       expires_at: item.expires_at ? new Date(item.expires_at).toISOString().slice(0, 16) : "",
                       target_series_id: item.target_series_id || "",

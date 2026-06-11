@@ -381,7 +381,7 @@ function AdminTags() {
         )}
         
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {(tags.data || []).map((tag) => (
+          {(tags.data || []).map((tag: any) => (
             <div
               key={tag.id}
               className="group relative overflow-hidden rounded-lg border border-border/40 bg-card p-4 transition-all hover:border-primary/50"

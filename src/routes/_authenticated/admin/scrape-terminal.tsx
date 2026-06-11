@@ -247,7 +247,7 @@ function ScrapeTerminal() {
         appendLine("Import details:");
       }
 
-      result.details.slice(0, 50).forEach((entry) => {
+      result.details.slice(0, 50).forEach((entry: any) => {
         const suffix = entry.pages ? ` (${entry.pages} pages)` : entry.message ? ` - ${entry.message}` : "";
         appendLine(`  - Chapter ${entry.chapter}: ${entry.status}${suffix}`);
       });

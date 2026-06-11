@@ -212,7 +212,8 @@ export function HomeHeroCarousel() {
             {loopedItems.map((item, index) => (
               <Link
                 key={`${item.id}-${index}`}
-                to={`/title/${item.series.slug}`}
+                to="/title/$slug"
+                params={{ slug: item.series.slug }}
                 className="group/card flex-shrink-0 block"
                 style={{ perspective: '1000px' }}
               >

@@ -30,11 +30,19 @@ import {
 
 type ProfileBadge = ProfileBadgeRow;
 
+type DbUserBadge = {
+  id: string;
+  badge_id: string;
+  earned_at: string | null;
+  is_equipped: boolean | null;
+  badge: ProfileBadgeRow;
+};
+
 type UserBadge = {
   id: string;
   badge_id: string;
-  earned_at: string;
-  is_equipped: boolean;
+  earned_at: string | null;
+  is_equipped: boolean | null;
   badge: NormalizedBadge;
 };
 
@@ -112,7 +120,7 @@ export function ProfileBadges({ accentColor }: { accentColor?: string }) {
           console.error("Error fetching user badges:", error);
           return [];
         }
-        return (data || []) as UserBadge[];
+        return (data || []) as unknown as DbUserBadge[];
       } catch (e) {
         console.error("Error fetching user badges:", e);
         return [];
@@ -227,11 +235,11 @@ export function ProfileBadges({ accentColor }: { accentColor?: string }) {
                   <div
                     className="flex h-16 w-16 items-center justify-center rounded-lg p-3 animate-pulse"
                     style={{
-                      backgroundColor: `${getBadgeColor(equippedBadge.badge.name, equippedBadge.badge.badge_color)}20`,
-                      color: getBadgeColor(equippedBadge.badge.name, equippedBadge.badge.badge_color),
+                      backgroundColor: `${getBadgeColor(equippedBadge.badge.name, equippedBadge.badge.badge_color || "#8B5CF6")}20`,
+                      color: getBadgeColor(equippedBadge.badge.name, equippedBadge.badge.badge_color || "#8B5CF6"),
                     }}
                   >
-                    <BadgeIcon icon={equippedBadge.badge.icon} className="h-10 w-10" />
+                    <BadgeIcon icon={equippedBadge.badge.icon || "Award"} className="h-10 w-10" />
                   </div>
                   <div className="flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
@@ -297,11 +305,11 @@ export function ProfileBadges({ accentColor }: { accentColor?: string }) {
                         <div
                           className="flex h-12 w-12 items-center justify-center rounded-lg p-2.5"
                           style={{
-                            backgroundColor: `${getBadgeColor(userBadge.badge.name, userBadge.badge.badge_color)}20`,
-                            color: getBadgeColor(userBadge.badge.name, userBadge.badge.badge_color),
+                            backgroundColor: `${getBadgeColor(userBadge.badge.name, userBadge.badge.badge_color || "#8B5CF6")}20`,
+                            color: getBadgeColor(userBadge.badge.name, userBadge.badge.badge_color || "#8B5CF6"),
                           }}
                         >
-                          <BadgeIcon icon={userBadge.badge.icon} className="h-6 w-6" />
+                          <BadgeIcon icon={userBadge.badge.icon || "Award"} className="h-6 w-6" />
                         </div>
                         <div className="flex-1 min-w-0">
                           <h4 className="font-semibold text-sm truncate">
@@ -350,7 +358,7 @@ export function ProfileBadges({ accentColor }: { accentColor?: string }) {
                     <Card className="p-3 opacity-60 hover:opacity-100 transition-all hover:border-dashed hover:border-violet-500/50 cursor-pointer">
                       <div className="flex flex-col items-center text-center gap-2">
                         <div className="relative flex h-12 w-12 items-center justify-center rounded-lg bg-gray-500/10 text-gray-500/40 p-2.5">
-                          <BadgeIcon icon={badge.icon} className="h-6 w-6 opacity-30" />
+                          <BadgeIcon icon={badge.icon || "Award"} className="h-6 w-6 opacity-30" />
                           <Lock className="absolute h-4 w-4 text-gray-500" />
                         </div>
                         <div>
@@ -407,11 +415,11 @@ export function ProfileBadges({ accentColor }: { accentColor?: string }) {
                 <div
                   className="flex h-24 w-24 items-center justify-center rounded-lg p-5"
                   style={{
-                    backgroundColor: `${getBadgeColor(selectedBadge.badge.name, selectedBadge.badge.badge_color)}20`,
-                    color: getBadgeColor(selectedBadge.badge.name, selectedBadge.badge.badge_color),
+                    backgroundColor: `${getBadgeColor(selectedBadge.badge.name, selectedBadge.badge.badge_color || "#8B5CF6")}20`,
+                    color: getBadgeColor(selectedBadge.badge.name, selectedBadge.badge.badge_color || "#8B5CF6"),
                   }}
                 >
-                  <BadgeIcon icon={selectedBadge.badge.icon} className="h-14 w-14" />
+                  <BadgeIcon icon={selectedBadge.badge.icon || "Award"} className="h-14 w-14" />
                 </div>
                 <div>
                   <h3 className="text-xl font-bold">{selectedBadge.badge.name}</h3>
@@ -426,7 +434,7 @@ export function ProfileBadges({ accentColor }: { accentColor?: string }) {
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Earned</span>
                   <span className="font-medium">
-                    {new Date(selectedBadge.earned_at).toLocaleDateString()}
+                    {selectedBadge.earned_at ? new Date(selectedBadge.earned_at).toLocaleDateString() : "Unknown"}
                   </span>
                 </div>
                 <div className="flex justify-between text-sm">

@@ -339,7 +339,7 @@ function SeriesDetail() {
   });
 
   const setStatus = useMutation({
-    mutationFn: async (status: string) => {
+    mutationFn: async (status: "reading" | "completed" | "plan_to_read" | "dropped") => {
       if (!user || !seriesQ.data) throw new Error("Sign in to set status");
       const { error } = await supabase
         .from("user_library")
@@ -451,7 +451,7 @@ function SeriesDetail() {
               {user && isFollowing.data && (
                 <Select
                   value={libraryStatus.data ?? "reading"}
-                  onValueChange={(v) => setStatus.mutate(v)}
+                  onValueChange={(v) => setStatus.mutate(v as any)}
                 >
                   <SelectTrigger className="h-11 w-full border-primary/40 bg-primary/10 font-semibold text-primary">
                     <div className="flex items-center gap-2">

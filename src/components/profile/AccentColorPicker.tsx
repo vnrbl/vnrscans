@@ -54,7 +54,6 @@ export function AccentColorPicker({ value, onChange }: Props) {
             style={{
               backgroundColor: color.value,
               boxShadow: value === color.value ? `0 0 0 3px var(--background), 0 0 0 5px ${color.value}` : undefined,
-              focusRingColor: color.value,
             }}
             title={color.name}
           >

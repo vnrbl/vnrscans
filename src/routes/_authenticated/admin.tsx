@@ -1,4 +1,4 @@
-﻿import { createFileRoute, Outlet, Link, redirect } from "@tanstack/react-router";
+import { createFileRoute, Outlet, Link, redirect } from "@tanstack/react-router";
 import {
   LayoutDashboard,
   Library,
@@ -11,7 +11,7 @@ import {
   Image,
   Shield,
   ShieldCheck,
-  Trophy,
+
   Gavel,
   Award,
 TerminalSquare } from "lucide-react";
@@ -43,7 +43,6 @@ export const Route = createFileRoute("/_authenticated/admin")({
       "/admin/comments",
       "/admin/reports",
       "/admin/users",
-      "/admin/gamification",
       "/admin/badges"
     ];
 
@@ -90,7 +89,7 @@ function AdminLayout() {
     { to: "/admin/reports", label: "Reports", icon: Flag, roles: ["admin", "moderator"] },
     { to: "/admin/users", label: "Users", icon: Users, roles: ["admin", "moderator"] },
     { to: "/admin/permissions", label: "Roles", icon: ShieldCheck, roles: ["admin", "moderator", "uploader"] },
-    { to: "/admin/gamification", label: "Gamification", icon: Trophy, roles: ["admin", "moderator"] },
+
     { to: "/admin/badges", label: "Realms & Badges", icon: Award, roles: ["admin", "moderator"] },
     { to: "/admin/logs", label: "Security Logs", icon: Shield, roles: ["admin"] },
   ];

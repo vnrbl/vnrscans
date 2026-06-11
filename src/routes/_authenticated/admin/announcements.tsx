@@ -87,7 +87,7 @@ function AdminAnnouncements() {
       };
 
       if (editing?.id) {
-        const { error } = await supabase.from("announcements").update(payload).eq("id", editing.id);
+        const { error } = await supabase.from("announcements").update(payload).eq("id", editing.id as string);
         if (error) throw error;
         await logAdminAction("update", "announcement", String(editing.id), { title: form.title });
       } else {
@@ -133,7 +133,7 @@ function AdminAnnouncements() {
   });
 
   const toggleActive = useMutation({
-    mutationFn: async (item: { id: string; is_active: boolean }) => {
+    mutationFn: async (item: { id: string; is_active: boolean | null }) => {
       const { error } = await supabase
         .from("announcements")
         .update({ is_active: !item.is_active, updated_at: new Date().toISOString() })

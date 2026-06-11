@@ -104,7 +104,7 @@ function TagDetailPage() {
           <div className="flex items-center gap-4">
             {tag.data.icon && <span className="text-4xl">{tag.data.icon}</span>}
             <div>
-              <h1 className="text-3xl font-extrabold tracking-tight" style={{ color: tag.data.color }}>
+              <h1 className="text-3xl font-extrabold tracking-tight" style={{ color: tag.data.color || undefined }}>
                 {tag.data.name}
               </h1>
               <div className="mt-2 flex items-center gap-2">
@@ -112,9 +112,9 @@ function TagDetailPage() {
                   variant="outline"
                   className="text-3xs font-semibold px-2 py-0.5"
                   style={{
-                    borderColor: tag.data.color,
-                    backgroundColor: `${tag.data.color}15`,
-                    color: tag.data.color,
+                    borderColor: tag.data.color || undefined,
+                    backgroundColor: tag.data.color ? `${tag.data.color}15` : undefined,
+                    color: tag.data.color || undefined,
                   }}
                 >
                   {tag.data.usage_count} titles
@@ -152,7 +152,7 @@ function TagDetailPage() {
           {series.data && series.data.length > 0 && (
             <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
               {series.data.map((s: any) => (
-                <SeriesCard key={s.id} series={s} />
+                <SeriesCard key={s.id} s={s} />
               ))}
             </div>
           )}

@@ -326,8 +326,8 @@ function AdminAnalytics() {
                     variant="outline"
                     className="gap-1 px-3 py-1.5 text-sm"
                     style={{ 
-                      borderColor: tag.color,
-                      color: tag.color,
+                      borderColor: tag.color || undefined,
+                      color: tag.color || undefined,
                     }}
                   >
                     {tag.icon && <span>{tag.icon}</span>}

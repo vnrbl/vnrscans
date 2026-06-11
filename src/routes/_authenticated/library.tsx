@@ -36,10 +36,17 @@ function LibraryPage() {
   });
 
   const updateStatus = useMutation({
-    mutationFn: async ({ seriesId, status }: { seriesId: string; status: string }) => {
+    mutationFn: async ({ seriesId, status }: { seriesId: string; status: "reading" | "completed" | "plan_to_read" | "dropped" }) => {
+      const { data: u } = await supabase.auth.getUser();
+      if (!u.user) throw new Error("Not logged in");
       const { error } = await supabase
         .from("user_library")
-        .upsert({ series_id: seriesId, reading_status: status, updated_at: new Date().toISOString() });
+        .upsert({ 
+          user_id: u.user.id,
+          series_id: seriesId, 
+          reading_status: status, 
+          updated_at: new Date().toISOString() 
+        });
       if (error) throw error;
     },
     onSuccess: () => {

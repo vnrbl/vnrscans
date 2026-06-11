@@ -22,6 +22,7 @@ import {
   Lock,
   Orbit,
   Sword,
+  MessageSquare,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SocialLinksDisplay } from "@/components/profile/SocialLinks";
@@ -404,7 +405,7 @@ function PublicProfilePage() {
       }
       return data as any;
     },
-    enabled: !!profile.data?.user_id,
+    enabled: !!profile.data?.user_id && publicStats.data?.show_achievements !== false,
     staleTime: 2 * 60 * 1000,
   });
 
@@ -429,7 +430,6 @@ function PublicProfilePage() {
       qc.invalidateQueries({ queryKey: ["public-profile", username] });
       qc.invalidateQueries({ queryKey: ["public-profile-stats", userId] });
       qc.invalidateQueries({ queryKey: ["public-profile-library", userId] });
-      qc.invalidateQueries({ queryKey: ["public-profile-achievements", userId] });
     };
 
     const channel = supabase
@@ -451,7 +451,7 @@ function PublicProfilePage() {
       )
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "user_achievements", filter: `user_id=eq.${userId}` },
+        { event: "*", schema: "public", table: "user_badges", filter: `user_id=eq.${userId}` },
         refreshPublicProfile
       )
       .subscribe();
@@ -491,23 +491,45 @@ function PublicProfilePage() {
     staleTime: 5 * 60 * 1000,
   });
 
-  // Fetch achievements
-  const achievements = useQuery({
-    queryKey: ["public-profile-achievements", profile.data?.user_id],
+  // Fetch user comment history
+  const commentHistory = useQuery({
+    queryKey: ["public-profile-comments", profile.data?.user_id],
     queryFn: async () => {
       if (!profile.data?.user_id) return [];
-      const { data, error } = await supabase
-        .from("user_achievements" as any)
-        .select("*, achievement:achievement_id(name, description, icon, rarity, xp_reward)")
+      const { data, error } = await (supabase.from("comments") as any)
+        .select("id,content,created_at,chapter_id,series_id,is_spoiler,is_hidden,attachment_type,attachment_url")
         .eq("user_id", profile.data.user_id)
-        .order("unlocked_at", { ascending: false })
-        .limit(8);
-      if (error) return [];
+        .eq("is_hidden", false)
+        .is("parent_id", null)
+        .order("created_at", { ascending: false })
+        .limit(20);
+      if (error) {
+        console.error("Error fetching public comment history:", error);
+        return [];
+      }
       return data || [];
     },
-    enabled: !!profile.data?.user_id && showAchievements,
+    enabled: !!profile.data?.user_id && isProfilePublic,
+    staleTime: 2 * 60 * 1000,
+  });
+
+  // Fetch series info for comment history
+  const commentSeriesIds = Array.from(new Set((commentHistory.data ?? []).map((c: any) => c.series_id).filter(Boolean))) as string[];
+  const commentSeriesInfo = useQuery({
+    queryKey: ["public-profile-comment-series", commentSeriesIds.join(",")],
+    queryFn: async () => {
+      if (commentSeriesIds.length === 0) return new Map();
+      const { data, error } = await supabase
+        .from("series")
+        .select("id,title,slug")
+        .in("id", commentSeriesIds);
+      if (error) return new Map();
+      return new Map((data ?? []).map((s: any) => [s.id, s]));
+    },
+    enabled: commentSeriesIds.length > 0,
     staleTime: 5 * 60 * 1000,
   });
+
 
   // Loading state
   if (profile.isLoading) {
@@ -1148,11 +1170,10 @@ function PublicProfilePage() {
       {/* Stats */}
       {showStatsStrip && (
         <div className="container mx-auto max-w-5xl px-4 sm:px-6 md:px-12 lg:px-16 mt-6">
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <PublicStatCard label="Reading Streak" value={profile.data.reading_streak || 0} suffix=" days" icon={<Flame className="h-6 w-6" />} color="#F97316" />
             <PublicStatCard label="Chapters Read" value={publicStats.data?.chapters_read || 0} icon={<BookOpen className="h-6 w-6" />} color="#3B82F6" />
             <PublicStatCard label="Series Followed" value={publicStats.data?.series_followed || 0} icon={<Star className="h-6 w-6" />} color="#F59E0B" />
-            <PublicStatCard label="Achievements" value={publicStats.data?.achievements_unlocked || 0} icon={<Award className="h-6 w-6" />} color={accentColor} />
           </div>
         </div>
       )}
@@ -1241,47 +1262,102 @@ function PublicProfilePage() {
         </div>
       )}
 
-      {/* Achievements */}
-      {showAchievements && achievements.data && achievements.data.length > 0 && (
-        <div className="container mx-auto max-w-5xl px-4 sm:px-6 md:px-12 lg:px-16 mt-8 pb-12">
-          <h2 className="mb-4 text-xl font-bold">Recent Achievements</h2>
-          <div className="grid gap-3 sm:grid-cols-2">
-            {achievements.data.map((item: any) => (
-              <div
-                key={item.id}
-                className="flex gap-3 rounded-lg border border-border/40 bg-card p-4"
-                style={{ background: `linear-gradient(135deg, ${accentColor}05, transparent)` }}
-              >
-                <div className="flex-shrink-0">
-                  <div
-                    className="flex h-12 w-12 items-center justify-center rounded-lg text-2xl"
-                    style={{ backgroundColor: `${accentColor}20` }}
-                  >
-                    {item.achievement?.icon || "🏆"}
-                  </div>
-                </div>
-                <div className="flex-1">
-                  <div className="flex items-center gap-2">
-                    <h3 className="font-semibold">{item.achievement?.name || "Achievement"}</h3>
-                    <Badge variant="outline" className="text-xs">
-                      {item.achievement?.rarity || "common"}
-                    </Badge>
-                  </div>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    {item.achievement?.description || "No description"}
-                  </p>
-                  <p className="mt-2 text-xs" style={{ color: accentColor }}>
-                    Unlocked {new Date(item.unlocked_at).toLocaleDateString()}
-                  </p>
-                </div>
-              </div>
-            ))}
+      {/* Comment History */}
+      {isProfilePublic && (
+        <div className="container mx-auto max-w-5xl px-4 sm:px-6 md:px-12 lg:px-16 mt-8">
+          <div className="mb-4 flex items-center gap-2">
+            <MessageSquare className="h-5 w-5" style={{ color: accentColor }} />
+            <h2 className="text-xl font-bold">Recent Comments</h2>
           </div>
+
+          {commentHistory.isLoading ? (
+            <div className="space-y-3">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="rounded-lg border border-border/40 bg-card p-4 animate-pulse">
+                  <div className="h-4 w-3/4 bg-secondary/60 rounded" />
+                  <div className="mt-2 h-3 w-1/2 bg-secondary/40 rounded" />
+                </div>
+              ))}
+            </div>
+          ) : commentHistory.data && commentHistory.data.length > 0 ? (
+            <div className="space-y-3">
+              {commentHistory.data.map((comment: any) => {
+                const seriesInfo = commentSeriesInfo.data?.get(comment.series_id);
+                return (
+                  <div
+                    key={comment.id}
+                    className="group rounded-lg border border-border/40 bg-card p-4 transition-all duration-200 hover:border-border hover:shadow-sm"
+                    style={{
+                      background: `linear-gradient(135deg, ${accentColor}03, transparent)`,
+                    }}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        {/* Comment content */}
+                        <p className="text-sm leading-relaxed text-foreground text-left">
+                          {comment.is_spoiler ? (
+                            <span className="italic text-muted-foreground">⚠️ Spoiler comment</span>
+                          ) : (
+                            comment.content?.length > 200 ? comment.content.slice(0, 200) + "..." : comment.content
+                          )}
+                        </p>
+
+                        {/* Attachment indicator */}
+                        {comment.attachment_url && (
+                          <div className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground">
+                            <span>📎</span>
+                            <span>{comment.attachment_type === "gif" ? "GIF" : "Image"} attached</span>
+                          </div>
+                        )}
+
+                        {/* Meta row */}
+                        <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                          <span className="flex items-center gap-1 text-left">
+                            <Calendar className="h-3 w-3" />
+                            {new Date(comment.created_at).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" })}
+                          </span>
+                          <span className="text-border">•</span>
+                          <span>{new Date(comment.created_at).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}</span>
+                          {seriesInfo && (
+                            <>
+                              <span className="text-border">•</span>
+                              <Link
+                                to="/title/$slug"
+                                params={{ slug: seriesInfo.slug }}
+                                className="font-medium transition-colors hover:underline"
+                                style={{ color: accentColor }}
+                              >
+                                {seriesInfo.title}
+                              </Link>
+                            </>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Status badges */}
+                      {comment.is_spoiler && (
+                        <div className="shrink-0">
+                          <Badge variant="outline" className="text-[10px] border-amber-500/30 text-amber-500 bg-amber-500/10">
+                            Spoiler
+                          </Badge>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <Card className="p-6 text-center">
+              <p className="text-sm text-muted-foreground">
+                No recent comments posted.
+              </p>
+            </Card>
+          )}
         </div>
       )}
 
-      {/* Bottom padding if no achievements */}
-      {(!achievements.data || achievements.data.length === 0) && <div className="h-12" />}
+      <div className="h-12" />
     </div>
   );
 }

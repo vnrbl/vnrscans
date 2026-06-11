@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState, useMemo } from "react";
 import { toast } from "sonner";
@@ -15,14 +15,14 @@ import {
   User, 
   Mail, 
   Trophy, 
-  Flame, 
+  Flame,
+  MessageSquare, 
   BookOpen, 
   Star, 
   Calendar,
   Settings,
   Shield,
   Crown,
-  Target,
   TrendingUp,
   Award,
   Code,
@@ -33,7 +33,7 @@ import {
   Sword,
   Lock,
 } from "lucide-react";
-import { ReadingGoals } from "@/components/profile/ReadingGoals";
+
 import { AvatarUpload } from "@/components/profile/AvatarUpload";
 import { ProfileBadges } from "@/components/profile/ProfileBadges";
 import { BadgeIcon, enhanceBadge, type ProfileBadgeRow } from "@/lib/profileBadges";
@@ -422,23 +422,41 @@ function ProfilePage() {
     staleTime: 2 * 60 * 1000,
   });
 
-  // Fetch user achievements
-  const achievements = useQuery({
-    queryKey: ["profile", "achievements"],
+  // Fetch user comment history
+  const commentHistory = useQuery({
+    queryKey: ["profile", "comment-history"],
     queryFn: async () => {
       const { data: u } = await supabase.auth.getUser();
       if (!u.user) return [];
-      const { data, error } = await supabase
-        .from("user_achievements")
-        .select("*, achievement:achievement_id(name, description, icon, rarity, xp_reward)")
+      const { data, error } = await (supabase.from("comments") as any)
+        .select("id,content,created_at,chapter_id,series_id,is_spoiler,is_hidden,attachment_type,attachment_url")
         .eq("user_id", u.user.id)
-        .order("unlocked_at", { ascending: false });
+        .is("parent_id", null)
+        .order("created_at", { ascending: false })
+        .limit(100);
       if (error) {
-        console.error("Error fetching achievements:", error);
+        console.error("Error fetching comment history:", error);
         return [];
       }
       return data || [];
     },
+    staleTime: 2 * 60 * 1000,
+  });
+
+  // Fetch series info for comment history
+  const commentSeriesIds = Array.from(new Set((commentHistory.data ?? []).map((c: any) => c.series_id).filter(Boolean))) as string[];
+  const commentSeriesInfo = useQuery({
+    queryKey: ["profile", "comment-series", commentSeriesIds.join(",")],
+    queryFn: async () => {
+      if (commentSeriesIds.length === 0) return new Map();
+      const { data, error } = await supabase
+        .from("series")
+        .select("id,title,slug")
+        .in("id", commentSeriesIds);
+      if (error) return new Map();
+      return new Map((data ?? []).map((s: any) => [s.id, s]));
+    },
+    enabled: commentSeriesIds.length > 0,
     staleTime: 5 * 60 * 1000,
   });
 
@@ -1380,9 +1398,9 @@ function ProfilePage() {
             accentColor="#F59E0B"
           />
           <StatCard
-            label="Achievements"
-            value={achievements.data?.length || 0}
-            icon={<Award className="h-6 w-6" />}
+            label="Comments"
+            value={readingStats.data?.comments || 0}
+            icon={<MessageSquare className="h-6 w-6" />}
             accentColor={accentColor}
           />
         </div>
@@ -1394,22 +1412,18 @@ function ProfilePage() {
         style={{ animation: "profileFadeInUp 0.6s ease-out 0.2s both" }}
       >
         <Tabs defaultValue="edit" className="w-full">
-          <TabsList className="grid h-11 w-full grid-cols-6 gap-1 p-1">
+          <TabsList className="grid h-11 w-full grid-cols-5 gap-1 p-1">
             <TabsTrigger value="edit" className="h-9 min-w-0 gap-2 px-0 sm:px-3">
               <Settings className="h-4 w-4" />
               <span className="hidden sm:inline">Edit</span>
-            </TabsTrigger>
-            <TabsTrigger value="goals" className="h-9 min-w-0 gap-2 px-0 sm:px-3">
-              <Target className="h-4 w-4" />
-              <span className="hidden sm:inline">Goals</span>
             </TabsTrigger>
             <TabsTrigger value="badges" className="h-9 min-w-0 gap-2 px-0 sm:px-3">
               <Award className="h-4 w-4" />
               <span className="hidden sm:inline">Badges</span>
             </TabsTrigger>
-            <TabsTrigger value="achievements" className="h-9 min-w-0 gap-2 px-0 sm:px-3">
-              <Trophy className="h-4 w-4" />
-              <span className="hidden sm:inline">Achievements</span>
+            <TabsTrigger value="comments" className="h-9 min-w-0 gap-2 px-0 sm:px-3">
+              <MessageSquare className="h-4 w-4" />
+              <span className="hidden sm:inline">Comments</span>
             </TabsTrigger>
             <TabsTrigger value="stats" className="h-9 min-w-0 gap-2 px-0 sm:px-3">
               <TrendingUp className="h-4 w-4" />
@@ -1820,13 +1834,6 @@ function ProfilePage() {
             </Card>
           </TabsContent>
 
-          {/* ─── Reading Goals Tab ─── */}
-          <TabsContent value="goals">
-            <Card className="p-4 sm:p-6">
-              <ReadingGoals />
-            </Card>
-          </TabsContent>
-
           {/* ─── Profile Badges Tab ─── */}
           <TabsContent value="badges">
             <Card className="p-4 sm:p-6">
@@ -1834,52 +1841,107 @@ function ProfilePage() {
             </Card>
           </TabsContent>
 
-          {/* ─── Achievements Tab ─── */}
-          <TabsContent value="achievements">
+          {/* ─── Comment History Tab ─── */}
+          <TabsContent value="comments">
             <Card className="p-4 sm:p-6">
-              <h2 className="mb-4 text-xl font-bold">Unlocked Achievements</h2>
-              {achievements.isLoading ? (
-                <p className="text-sm text-muted-foreground">Loading achievements...</p>
-              ) : achievements.data && achievements.data.length > 0 ? (
-                <div className="grid gap-3 sm:grid-cols-2">
-                  {achievements.data.map((item: any) => (
-                    <div
-                      key={item.id}
-                      className="flex gap-3 rounded-lg border border-border/40 bg-card p-4 transition-all hover:border-border"
-                      style={{
-                        background: `linear-gradient(135deg, ${accentColor}05, transparent)`,
-                      }}
-                    >
-                      <div className="flex-shrink-0">
-                        <div 
-                          className="flex h-12 w-12 items-center justify-center rounded-lg text-2xl"
-                          style={{ backgroundColor: item.achievement?.badge_color ? `${item.achievement.badge_color}20` : `${accentColor}20` }}
-                        >
-                          {item.achievement?.icon || "🏆"}
-                        </div>
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2">
-                          <h3 className="font-semibold">{item.achievement?.name || "Achievement"}</h3>
-                          <Badge variant="outline" className="text-xs">
-                            {item.achievement?.rarity || "common"}
-                          </Badge>
-                        </div>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          {item.achievement?.description || "No description"}
-                        </p>
-                        <p className="mt-2 text-xs" style={{ color: accentColor }}>
-                          +{item.achievement?.xp_reward || 0} XP • Unlocked {new Date(item.unlocked_at).toLocaleDateString()}
-                        </p>
-                      </div>
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-xl font-bold flex items-center gap-2">
+                  <MessageSquare className="h-5 w-5" style={{ color: accentColor }} />
+                  Comment History
+                </h2>
+                <Badge variant="outline" className="text-xs">
+                  {commentHistory.data?.length || 0} comments
+                </Badge>
+              </div>
+              {commentHistory.isLoading ? (
+                <div className="space-y-3">
+                  {[1,2,3].map(i => (
+                    <div key={i} className="rounded-lg border border-border/40 bg-card p-4 animate-pulse">
+                      <div className="h-4 w-3/4 bg-secondary/60 rounded" />
+                      <div className="mt-2 h-3 w-1/2 bg-secondary/40 rounded" />
                     </div>
                   ))}
                 </div>
+              ) : commentHistory.data && commentHistory.data.length > 0 ? (
+                <div className="space-y-3">
+                  {commentHistory.data.map((comment: any) => {
+                    const seriesInfo = commentSeriesInfo.data?.get(comment.series_id);
+                    return (
+                      <div
+                        key={comment.id}
+                        className="group rounded-lg border border-border/40 bg-card p-4 transition-all duration-200 hover:border-border hover:shadow-sm"
+                        style={{
+                          background: `linear-gradient(135deg, ${accentColor}03, transparent)`,
+                        }}
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex-1 min-w-0">
+                            {/* Comment content */}
+                            <p className="text-sm leading-relaxed text-foreground">
+                              {comment.is_spoiler ? (
+                                <span className="italic text-muted-foreground">⚠️ Spoiler comment</span>
+                              ) : comment.is_hidden ? (
+                                <span className="italic text-muted-foreground">🚫 Hidden by moderator</span>
+                              ) : (
+                                comment.content?.length > 200 ? comment.content.slice(0, 200) + "..." : comment.content
+                              )}
+                            </p>
+
+                            {/* Attachment indicator */}
+                            {comment.attachment_url && (
+                              <div className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground">
+                                <span>📎</span>
+                                <span>{comment.attachment_type === "gif" ? "GIF" : "Image"} attached</span>
+                              </div>
+                            )}
+
+                            {/* Meta row */}
+                            <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                              <span className="flex items-center gap-1">
+                                <Calendar className="h-3 w-3" />
+                                {new Date(comment.created_at).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" })}
+                              </span>
+                              <span className="text-border">•</span>
+                              <span>{new Date(comment.created_at).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}</span>
+                              {seriesInfo && (
+                                <>
+                                  <span className="text-border">•</span>
+                                  <Link
+                                    to="/title/$slug"
+                                    params={{ slug: seriesInfo.slug }}
+                                    className="font-medium transition-colors hover:underline"
+                                    style={{ color: accentColor }}
+                                  >
+                                    {seriesInfo.title}
+                                  </Link>
+                                </>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Status badges */}
+                          <div className="flex flex-col items-end gap-1 shrink-0">
+                            {comment.is_spoiler && (
+                              <Badge variant="outline" className="text-[10px] border-amber-500/30 text-amber-500 bg-amber-500/10">
+                                Spoiler
+                              </Badge>
+                            )}
+                            {comment.is_hidden && (
+                              <Badge variant="outline" className="text-[10px] border-red-500/30 text-red-500 bg-red-500/10">
+                                Hidden
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               ) : (
                 <div className="rounded-lg border border-dashed border-border/40 p-8 text-center">
-                  <Trophy className="mx-auto h-12 w-12 text-muted-foreground/50" />
-                  <p className="mt-2 text-sm text-muted-foreground">No achievements unlocked yet</p>
-                  <p className="mt-1 text-xs text-muted-foreground">Start reading to earn achievements!</p>
+                  <MessageSquare className="mx-auto h-12 w-12 text-muted-foreground/50" />
+                  <p className="mt-2 text-sm text-muted-foreground">No comments posted yet</p>
+                  <p className="mt-1 text-xs text-muted-foreground">Start reading and join the conversation!</p>
                 </div>
               )}
             </Card>
@@ -1907,9 +1969,8 @@ function ProfilePage() {
                   <div>
                     <h3 className="mb-3 font-semibold">Community Engagement</h3>
                     <div className="space-y-3">
-                      <StatRow icon={<Target className="h-4 w-4 text-green-500" />} label="Comments Posted" value={readingStats.data?.comments || 0} />
+                      <StatRow icon={<MessageSquare className="h-4 w-4 text-green-500" />} label="Comments Posted" value={readingStats.data?.comments || 0} />
                       <StatRow icon={<Star className="h-4 w-4 text-purple-500" />} label="Ratings Given" value={readingStats.data?.ratings || 0} />
-                      <StatRow icon={<Award className="h-4 w-4" style={{ color: accentColor }} />} label="Achievements Unlocked" value={achievements.data?.length || 0} />
                     </div>
                   </div>
 
@@ -1919,7 +1980,7 @@ function ProfilePage() {
                     <div className="space-y-3">
                       <StatRow icon={<Trophy className="h-4 w-4" style={{ color: accentColor }} />} label="Current Level" value={isAdmin ? "Maxed Out" : `Level ${level}`} />
                       <StatRow icon={<TrendingUp className="h-4 w-4 text-blue-500" />} label="Total XP" value={isAdmin ? "Infinite Aura and XP" : xp} />
-                      <StatRow icon={<Target className="h-4 w-4 text-green-500" />} label="Next Level" value={isAdmin ? "∞" : `${xpForNextLevel - xp} XP needed`} />
+                      <StatRow icon={<TrendingUp className="h-4 w-4 text-green-500" />} label="Next Level" value={isAdmin ? "∞" : `${xpForNextLevel - xp} XP needed`} />
                       <div className="mt-2">
                         <Progress value={isAdmin ? 100 : xpProgress} className="h-2" />
                         <p className="mt-1 text-center text-xs text-muted-foreground">

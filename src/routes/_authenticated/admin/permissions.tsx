@@ -158,7 +158,6 @@ function AdminPermissions() {
           can_manage_roles: form.can_manage_roles,
           can_view_analytics: form.can_view_analytics,
           can_manage_settings: form.can_manage_settings,
-          updated_at: new Date().toISOString(),
         })
         .eq("id", editingItem.id);
       if (error) throw error;

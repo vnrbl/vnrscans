@@ -163,6 +163,7 @@
 
   html {
     text-size-adjust: 100%;
+    scroll-behavior: smooth;
   }
 
   img,
@@ -198,6 +199,18 @@
   }
   .scrollbar-hide::-webkit-scrollbar {
     display: none;
+  }
+
+  /* Render-performance optimizations for scroll performance */
+  .optimize-scroll {
+    content-visibility: auto;
+    contain-intrinsic-size: 100px 500px;
+  }
+  
+  /* GPU acceleration for smoother scroll overlays and cards */
+  .accelerate-gpu {
+    transform: translate3d(0, 0, 0);
+    will-change: transform;
   }
 
   /* Utility classes */

@@ -140,7 +140,7 @@ function TagsPage() {
                         <div className="mb-2 flex items-center justify-between">
                           <div className="flex items-center gap-2">
                             {tag.icon && <span className="text-xl">{tag.icon}</span>}
-                            <h3 className="font-bold transition-colors group-hover:text-primary" style={{ color: tag.color }}>
+                            <h3 className="font-bold transition-colors group-hover:text-primary" style={{ color: tag.color || undefined }}>
                               {tag.name}
                             </h3>
                           </div>
@@ -148,9 +148,9 @@ function TagsPage() {
                             variant="outline"
                             className="text-3xs font-semibold px-2 py-0.5 border-border/50"
                             style={{
-                              borderColor: tag.color,
-                              backgroundColor: `${tag.color}15`,
-                              color: tag.color,
+                              borderColor: tag.color || undefined,
+                              backgroundColor: tag.color ? `${tag.color}15` : undefined,
+                              color: tag.color || undefined,
                             }}
                           >
                             {tag.usage_count}

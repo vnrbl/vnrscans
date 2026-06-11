@@ -213,7 +213,7 @@ function NotificationsPage() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => markAllRead.mutate()}
+            onClick={() => markAllRead.mutate(undefined)}
             disabled={markAllRead.isPending || unreadCount === 0}
             className="gap-2"
           >

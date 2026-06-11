@@ -26,11 +26,12 @@ export type ProfileBadgeRow = {
   id: string;
   name: string;
   description: string | null;
-  icon: string;
-  badge_color: string;
+  icon: string | null;
+  badge_color: string | null;
   requirement_type: string;
   requirement_value: number | null;
-  is_active?: boolean;
+  is_active: boolean | null;
+  created_at: string | null;
 };
 
 export type NormalizedBadge = ProfileBadgeRow & {
@@ -386,6 +387,7 @@ export function fallbackBadgeRows(): ProfileBadgeRow[] {
     requirement_type: b.requirement_type,
     requirement_value: b.requirement_value,
     is_active: true,
+    created_at: null,
   }));
 }
 

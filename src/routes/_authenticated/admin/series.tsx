@@ -218,7 +218,6 @@ function seriesPayloadFromForm(form: SeriesForm) {
     is_featured: form.is_featured,
     is_trending: form.is_trending,
     is_hidden: form.is_hidden,
-    chapter_count: form.chapter_count ? parseInt(form.chapter_count, 10) : null,
     updated_at: new Date().toISOString(),
   };
 }
@@ -434,10 +433,10 @@ function AdminSeries() {
         );
       }
       if (typeFilter !== "all") {
-        query = query.eq("type", typeFilter);
+        query = query.eq("type", typeFilter as any);
       }
       if (statusFilter !== "all") {
-        query = query.eq("status", statusFilter);
+        query = query.eq("status", statusFilter as any);
       }
       if (visibilityFilter === "visible") {
         query = query.eq("is_hidden", false);
@@ -1254,19 +1253,7 @@ function SeriesFormFields({
                   {tag.icon && <span className="mr-1">{tag.icon}</span>}
                   {tag.name}
                 </button>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (window.confirm('Delete this tag from the database?')) {
-                      deleteTag.mutate(tag.id);
-                    }
-                  }}
-                  className="absolute -top-1 -right-1 hidden h-4 w-4 rounded-full bg-red-500 text-white hover:bg-red-600 group-hover:flex items-center justify-center"
-                  title="Delete Tag from Database"
-                >
-                  <X className="h-3 w-3" />
-                </button>
+
               </div>
             );
           })}
@@ -1302,19 +1289,7 @@ function SeriesFormFields({
                   {tag.icon && <span className="mr-1">{tag.icon}</span>}
                   {tag.name}
                 </button>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (window.confirm('Delete this tag from the database?')) {
-                      deleteTag.mutate(tag.id);
-                    }
-                  }}
-                  className="absolute -top-1 -right-1 hidden h-4 w-4 rounded-full bg-red-500 text-white hover:bg-red-600 group-hover:flex items-center justify-center"
-                  title="Delete Tag from Database"
-                >
-                  <X className="h-3 w-3" />
-                </button>
+
               </div>
             );
           })}
@@ -1738,14 +1713,14 @@ export function ChapterManager({ seriesId, onBack }: { seriesId: string; onBack:
   // Auto-fill uploaded_by with username when opening upload dialog
   useEffect(() => {
     if (open && userProfile.data?.username && !form.uploaded_by) {
-      setForm((prev) => ({ ...prev, uploaded_by: userProfile.data.username || "" }));
+      setForm((prev) => ({ ...prev, uploaded_by: userProfile.data?.username || "" }));
     }
   }, [open, userProfile.data?.username]);
 
   // Also auto-fill when bulk upload dialog opens
   useEffect(() => {
     if (bulkUploadOpen && userProfile.data?.username && !form.uploaded_by) {
-      setForm((prev) => ({ ...prev, uploaded_by: userProfile.data.username || "" }));
+      setForm((prev) => ({ ...prev, uploaded_by: userProfile.data?.username || "" }));
     }
   }, [bulkUploadOpen, userProfile.data?.username]);
 
