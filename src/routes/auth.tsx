@@ -601,11 +601,11 @@ function AuthPage() {
           {/* Footer text */}
           <p className="mt-8 text-center text-xs" style={{ color: "oklch(0.45 0.006 286)" }}>
             By continuing, you agree to our{" "}
-            <a href="/about" className="underline underline-offset-2 hover:text-foreground transition-colors">
+            <a href="/terms" className="underline underline-offset-2 hover:text-foreground transition-colors">
               Terms
             </a>{" "}
             and{" "}
-            <a href="/about" className="underline underline-offset-2 hover:text-foreground transition-colors">
+            <a href="/privacy" className="underline underline-offset-2 hover:text-foreground transition-colors">
               Privacy Policy
             </a>
           </p>

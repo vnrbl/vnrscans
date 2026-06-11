@@ -62,6 +62,12 @@ export function Footer() {
                 <Link to="/contact" className="hover:text-primary transition-colors">Inquiries & Contact</Link>
               </li>
               <li>
+                <a href="/privacy" className="hover:text-primary transition-colors">Privacy Policy</a>
+              </li>
+              <li>
+                <a href="/terms" className="hover:text-primary transition-colors">Terms of Service</a>
+              </li>
+              <li>
                 <a href="mailto:hello@vnrscans.com" className="flex items-center gap-1 hover:text-primary transition-colors">
                   <Mail className="h-3 w-3" /> hello@vnrscans.com
                 </a>
