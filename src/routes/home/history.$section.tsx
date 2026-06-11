@@ -51,6 +51,9 @@ const PERIODS: Array<{ value: Period; label: string }> = [
   { value: "all", label: "All Time" },
 ];
 
+const HISTORY_PERIOD_LIMIT = 120;
+const HISTORY_ALL_PAGE_SIZE = 1000;
+
 export const Route = createFileRoute("/home/history/$section")({
   validateSearch: (search: Record<string, unknown>): HistorySearch => {
     const period = search.period;
@@ -169,37 +172,62 @@ async function fetchFollowedChapters(userId: string, period: Period): Promise<Ch
   const seriesIds = ((library ?? []) as unknown as Array<{ series_id: string }>).map((row) => row.series_id);
   if (seriesIds.length === 0) return [];
 
-  let query = supabase
-    .from("chapters")
-    .select("id,slug,title,chapter_number,created_at,series:series_id(slug,title,cover_url)")
-    .in("series_id", seriesIds)
-    .eq("status", "published")
-    .order("created_at", { ascending: false })
-    .limit(120);
-
   const cutoff = getCutoffDate(period);
-  if (cutoff) query = query.gte("created_at", cutoff);
+  const rows: ChapterItem[] = [];
+  let page = 0;
 
-  const { data, error } = await query;
-  if (error) throw error;
-  return (data ?? []) as ChapterItem[];
+  while (true) {
+    const pageSize = period === "all" ? HISTORY_ALL_PAGE_SIZE : HISTORY_PERIOD_LIMIT;
+    const from = page * pageSize;
+    const to = from + pageSize - 1;
+    let query = supabase
+      .from("chapters")
+      .select("id,slug,title,chapter_number,created_at,series:series_id(slug,title,cover_url)")
+      .in("series_id", seriesIds)
+      .eq("status", "published")
+      .order("created_at", { ascending: false })
+      .range(from, to);
+
+    if (cutoff) query = query.gte("created_at", cutoff);
+
+    const { data, error } = await query;
+    if (error) throw error;
+    rows.push(...((data ?? []) as ChapterItem[]));
+
+    if (period !== "all" || !data || data.length < pageSize) break;
+    page += 1;
+  }
+
+  return rows;
 }
 
 async function fetchReadingHistory(userId: string, period: Period): Promise<ChapterItem[]> {
-  let query = supabase
-    .from("reading_history")
-    .select("id,updated_at,series:series_id(slug,title,cover_url),chapters:chapter_id(slug,chapter_number,title)")
-    .eq("user_id", userId)
-    .order("updated_at", { ascending: false })
-    .limit(120);
-
   const cutoff = getCutoffDate(period);
-  if (cutoff) query = query.gte("updated_at", cutoff);
+  const rows: any[] = [];
+  let page = 0;
 
-  const { data, error } = await query;
-  if (error) throw error;
+  while (true) {
+    const pageSize = period === "all" ? HISTORY_ALL_PAGE_SIZE : HISTORY_PERIOD_LIMIT;
+    const from = page * pageSize;
+    const to = from + pageSize - 1;
+    let query = supabase
+      .from("reading_history")
+      .select("id,updated_at,series:series_id(slug,title,cover_url),chapters:chapter_id(slug,chapter_number,title)")
+      .eq("user_id", userId)
+      .order("updated_at", { ascending: false })
+      .range(from, to);
 
-  return ((data ?? []) as any[])
+    if (cutoff) query = query.gte("updated_at", cutoff);
+
+    const { data, error } = await query;
+    if (error) throw error;
+    rows.push(...(data ?? []));
+
+    if (period !== "all" || !data || data.length < pageSize) break;
+    page += 1;
+  }
+
+  return rows
     .filter((row) => row.series?.slug && row.chapters?.slug)
     .map((row) => ({
       id: row.id,
@@ -212,19 +240,32 @@ async function fetchReadingHistory(userId: string, period: Period): Promise<Chap
 }
 
 async function fetchLatestUpdates(period: Period): Promise<ChapterItem[]> {
-  let query = supabase
-    .from("chapters")
-    .select("id,slug,title,chapter_number,created_at,series:series_id(slug,title,cover_url)")
-    .eq("status", "published")
-    .order("created_at", { ascending: false })
-    .limit(120);
-
   const cutoff = getCutoffDate(period);
-  if (cutoff) query = query.gte("created_at", cutoff);
+  const rows: ChapterItem[] = [];
+  let page = 0;
 
-  const { data, error } = await query;
-  if (error) throw error;
-  return (data ?? []) as ChapterItem[];
+  while (true) {
+    const pageSize = period === "all" ? HISTORY_ALL_PAGE_SIZE : HISTORY_PERIOD_LIMIT;
+    const from = page * pageSize;
+    const to = from + pageSize - 1;
+    let query = supabase
+      .from("chapters")
+      .select("id,slug,title,chapter_number,created_at,series:series_id(slug,title,cover_url)")
+      .eq("status", "published")
+      .order("created_at", { ascending: false })
+      .range(from, to);
+
+    if (cutoff) query = query.gte("created_at", cutoff);
+
+    const { data, error } = await query;
+    if (error) throw error;
+    rows.push(...((data ?? []) as ChapterItem[]));
+
+    if (period !== "all" || !data || data.length < pageSize) break;
+    page += 1;
+  }
+
+  return rows;
 }
 
 function HistoryChapterCard({ chapter, timeLabel }: { chapter: ChapterItem; timeLabel: string }) {

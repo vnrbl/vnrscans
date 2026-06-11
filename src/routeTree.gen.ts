@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as TagsRouteImport } from './routes/tags'
 import { Route as SearchRouteImport } from './routes/search'
+import { Route as RequestSeriesRouteImport } from './routes/request-series'
 import { Route as RecommendationsRouteImport } from './routes/recommendations'
 import { Route as RankingsRouteImport } from './routes/rankings'
 import { Route as DmcaRouteImport } from './routes/dmca'
@@ -55,6 +56,11 @@ const TagsRoute = TagsRouteImport.update({
 const SearchRoute = SearchRouteImport.update({
   id: '/search',
   path: '/search',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RequestSeriesRoute = RequestSeriesRouteImport.update({
+  id: '/request-series',
+  path: '/request-series',
   getParentRoute: () => rootRouteImport,
 } as any)
 const RecommendationsRoute = RecommendationsRouteImport.update({
@@ -254,6 +260,7 @@ export interface FileRoutesByFullPath {
   '/dmca': typeof DmcaRoute
   '/rankings': typeof RankingsRoute
   '/recommendations': typeof RecommendationsRoute
+  '/request-series': typeof RequestSeriesRoute
   '/search': typeof SearchRoute
   '/tags': typeof TagsRouteWithChildren
   '/admin': typeof AuthenticatedAdminRouteWithChildren
@@ -292,6 +299,7 @@ export interface FileRoutesByTo {
   '/dmca': typeof DmcaRoute
   '/rankings': typeof RankingsRoute
   '/recommendations': typeof RecommendationsRoute
+  '/request-series': typeof RequestSeriesRoute
   '/search': typeof SearchRoute
   '/tags': typeof TagsRouteWithChildren
   '/library': typeof AuthenticatedLibraryRoute
@@ -331,6 +339,7 @@ export interface FileRoutesById {
   '/dmca': typeof DmcaRoute
   '/rankings': typeof RankingsRoute
   '/recommendations': typeof RecommendationsRoute
+  '/request-series': typeof RequestSeriesRoute
   '/search': typeof SearchRoute
   '/tags': typeof TagsRouteWithChildren
   '/_authenticated/admin': typeof AuthenticatedAdminRouteWithChildren
@@ -371,6 +380,7 @@ export interface FileRouteTypes {
     | '/dmca'
     | '/rankings'
     | '/recommendations'
+    | '/request-series'
     | '/search'
     | '/tags'
     | '/admin'
@@ -409,6 +419,7 @@ export interface FileRouteTypes {
     | '/dmca'
     | '/rankings'
     | '/recommendations'
+    | '/request-series'
     | '/search'
     | '/tags'
     | '/library'
@@ -447,6 +458,7 @@ export interface FileRouteTypes {
     | '/dmca'
     | '/rankings'
     | '/recommendations'
+    | '/request-series'
     | '/search'
     | '/tags'
     | '/_authenticated/admin'
@@ -487,6 +499,7 @@ export interface RootRouteChildren {
   DmcaRoute: typeof DmcaRoute
   RankingsRoute: typeof RankingsRoute
   RecommendationsRoute: typeof RecommendationsRoute
+  RequestSeriesRoute: typeof RequestSeriesRoute
   SearchRoute: typeof SearchRoute
   TagsRoute: typeof TagsRouteWithChildren
   TitleSlugRoute: typeof TitleSlugRoute
@@ -510,6 +523,13 @@ declare module '@tanstack/react-router' {
       path: '/search'
       fullPath: '/search'
       preLoaderRoute: typeof SearchRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/request-series': {
+      id: '/request-series'
+      path: '/request-series'
+      fullPath: '/request-series'
+      preLoaderRoute: typeof RequestSeriesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/recommendations': {
@@ -840,6 +860,7 @@ const rootRouteChildren: RootRouteChildren = {
   DmcaRoute: DmcaRoute,
   RankingsRoute: RankingsRoute,
   RecommendationsRoute: RecommendationsRoute,
+  RequestSeriesRoute: RequestSeriesRoute,
   SearchRoute: SearchRoute,
   TagsRoute: TagsRouteWithChildren,
   TitleSlugRoute: TitleSlugRoute,

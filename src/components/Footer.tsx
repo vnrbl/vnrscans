@@ -42,6 +42,9 @@ export function Footer() {
               <li>
                 <Link to="/recommendations" className="hover:text-primary transition-colors">Recommendations</Link>
               </li>
+              <li>
+                <Link to="/request-series" className="hover:text-primary transition-colors">Request Series</Link>
+              </li>
             </ul>
           </div>
 

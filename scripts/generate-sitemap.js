@@ -31,6 +31,7 @@ async function run() {
     "/contact",
     "/dmca",
     "/auth",
+    "/request-series",
     "/tags"
   ];
 

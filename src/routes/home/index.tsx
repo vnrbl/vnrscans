@@ -18,7 +18,7 @@ import { TITLE_CARD_WIDTH, TITLE_COVER_CLASS } from "@/components/titleCardStyle
 import { HomeHeroCarousel } from "@/components/HomeHeroCarousel";
 import { OptimizedImage } from "@/components/OptimizedImage";
 
-const LATEST_UPDATES_CHAPTER_LIMIT = 20;
+const LATEST_UPDATES_CHAPTER_LIMIT = 7;
 const LATEST_UPDATES_PAGE_SIZE = 1000;
 const HOME_HORIZONTAL_CARD_LIMIT = 30;
 const LATEST_UPDATES_ROWS_PER_BATCH = 5;
@@ -937,7 +937,7 @@ function LatestUpdatesSection({
                     </div>
 
                     {/* Recent Chapters List with Read Status */}
-                    <div className="mt-3 max-h-[156px] space-y-2 overflow-y-auto pr-1">
+                    <div className="mt-3 space-y-2">
                       {item.recent_chapters.map((chapter) => {
                         const isRead = readChapterIds.has(chapter.id);
                         const isNew = isNewChapter(chapter.created_at);

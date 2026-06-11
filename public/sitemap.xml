@@ -2,84 +2,90 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>https://www.vnrscans.com</loc>
-    <lastmod>2026-06-08</lastmod>
+    <lastmod>2026-06-11</lastmod>
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
   </url>
   <url>
     <loc>https://www.vnrscans.com/browse</loc>
-    <lastmod>2026-06-08</lastmod>
+    <lastmod>2026-06-11</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
     <loc>https://www.vnrscans.com/rankings</loc>
-    <lastmod>2026-06-08</lastmod>
+    <lastmod>2026-06-11</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
     <loc>https://www.vnrscans.com/recommendations</loc>
-    <lastmod>2026-06-08</lastmod>
+    <lastmod>2026-06-11</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
     <loc>https://www.vnrscans.com/about</loc>
-    <lastmod>2026-06-08</lastmod>
+    <lastmod>2026-06-11</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
     <loc>https://www.vnrscans.com/contact</loc>
-    <lastmod>2026-06-08</lastmod>
+    <lastmod>2026-06-11</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
     <loc>https://www.vnrscans.com/dmca</loc>
-    <lastmod>2026-06-08</lastmod>
+    <lastmod>2026-06-11</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
     <loc>https://www.vnrscans.com/auth</loc>
-    <lastmod>2026-06-08</lastmod>
+    <lastmod>2026-06-11</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://www.vnrscans.com/request-series</loc>
+    <lastmod>2026-06-11</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
     <loc>https://www.vnrscans.com/tags</loc>
-    <lastmod>2026-06-08</lastmod>
+    <lastmod>2026-06-11</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
+    <loc>https://www.vnrscans.com/title/chronicles-of-the-lazy-sovereign</loc>
+    <lastmod>2026-06-08</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
     <loc>https://www.vnrscans.com/title/frozen-frontiers</loc>
-    <lastmod>2026-06-07</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.7</priority>
-  </url>
-  <url>
-    <loc>https://www.vnrscans.com/title/lookism</loc>
-    <lastmod>2026-06-04</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.7</priority>
-  </url>
-  <url>
-    <loc>https://www.vnrscans.com/title/crimson-reset</loc>
-    <lastmod>2026-06-07</lastmod>
+    <lastmod>2026-06-08</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
     <loc>https://www.vnrscans.com/title/murim-psychopath</loc>
-    <lastmod>2026-06-07</lastmod>
+    <lastmod>2026-06-10</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://www.vnrscans.com/title/chronicles-of-the-lazy-sovereign</loc>
+    <loc>https://www.vnrscans.com/title/lookism</loc>
+    <lastmod>2026-06-08</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://www.vnrscans.com/title/crimson-reset</loc>
     <lastmod>2026-06-08</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
@@ -92,13 +98,7 @@
   </url>
   <url>
     <loc>https://www.vnrscans.com/title/the-nebula-s-civilization</loc>
-    <lastmod>2026-06-07</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.7</priority>
-  </url>
-  <url>
-    <loc>https://www.vnrscans.com/title/nano-machine</loc>
-    <lastmod>2026-06-07</lastmod>
+    <lastmod>2026-06-11</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
@@ -109,14 +109,20 @@
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://www.vnrscans.com/title/pick-me-up-infinite-gacha</loc>
-    <lastmod>2026-06-08</lastmod>
+    <loc>https://www.vnrscans.com/title/nano-machine</loc>
+    <lastmod>2026-06-11</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
     <loc>https://www.vnrscans.com/title/reincarnator-s-stream</loc>
-    <lastmod>2026-06-07</lastmod>
+    <lastmod>2026-06-08</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://www.vnrscans.com/title/pick-me-up-infinite-gacha</loc>
+    <lastmod>2026-06-09</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
@@ -133,20 +139,56 @@
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://www.vnrscans.com/title/the-divine-demon-s-grand-ascension</loc>
-    <lastmod>2026-06-07</lastmod>
+    <loc>https://www.vnrscans.com/title/academy-s-genius-swordmaster</loc>
+    <lastmod>2026-06-08</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://www.vnrscans.com/title/i-am-the-fated-villain</loc>
-    <lastmod>2026-06-07</lastmod>
+    <loc>https://www.vnrscans.com/title/eternally-regressing-knight</loc>
+    <lastmod>2026-06-08</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://www.vnrscans.com/title/the-regressed-mercenary-s-machinations</loc>
+    <lastmod>2026-06-08</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://www.vnrscans.com/title/the-stellar-swordmaster</loc>
+    <lastmod>2026-06-08</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://www.vnrscans.com/title/the-world-after-the-fall</loc>
+    <lastmod>2026-06-09</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://www.vnrscans.com/title/i-killed-an-academy-player</loc>
+    <lastmod>2026-06-09</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
     <loc>https://www.vnrscans.com/title/reincarnation-of-the-fist-king</loc>
-    <lastmod>2026-06-07</lastmod>
+    <lastmod>2026-06-08</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://www.vnrscans.com/title/i-am-the-fated-villain</loc>
+    <lastmod>2026-06-09</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://www.vnrscans.com/title/the-divine-demon-s-grand-ascension</loc>
+    <lastmod>2026-06-08</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
@@ -183,12 +225,6 @@
   <url>
     <loc>https://www.vnrscans.com/title/the-max-level-player-s-100th-regression</loc>
     <lastmod>2026-06-07</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.7</priority>
-  </url>
-  <url>
-    <loc>https://www.vnrscans.com/title/global-superpowers-awakening-the-zixiao-divine-thunder-at-the-beginning</loc>
-    <lastmod>2026-06-06</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
@@ -285,6 +321,12 @@
   <url>
     <loc>https://www.vnrscans.com/title/crimson-reset/chapter-6</loc>
     <lastmod>2026-06-02</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://www.vnrscans.com/title/i-killed-an-academy-player/chapter-1-asura-scans-first-chapter</loc>
+    <lastmod>2026-06-09</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url>
@@ -541,6 +583,12 @@
     <priority>0.5</priority>
   </url>
   <url>
+    <loc>https://www.vnrscans.com/title/i-killed-an-academy-player/chapter-2-asura-scans-nov-6-2023</loc>
+    <lastmod>2026-06-09</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
     <loc>https://www.vnrscans.com/title/reincarnation-of-the-fist-king/chapter-32-qi-scans-the-fist-king-creates-thunderclap-jan-1-1</loc>
     <lastmod>2026-06-06</lastmod>
     <changefreq>monthly</changefreq>
@@ -559,7 +607,7 @@
     <priority>0.5</priority>
   </url>
   <url>
-    <loc>https://www.vnrscans.com/title/my-avatars-path-to-greatness/chapter-73-qi-scans-end-s-1-jan-24-8</loc>
+    <loc>https://www.vnrscans.com/title/crimson-reset/chapter-21-asura-scans</loc>
     <lastmod>2026-06-06</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
@@ -589,8 +637,8 @@
     <priority>0.5</priority>
   </url>
   <url>
-    <loc>https://www.vnrscans.com/title/crimson-reset/chapter-21-asura-scans</loc>
-    <lastmod>2026-06-06</lastmod>
+    <loc>https://www.vnrscans.com/title/i-killed-an-academy-player/chapter-3-asura-scans-nov-6-2023</loc>
+    <lastmod>2026-06-09</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url>
@@ -751,12 +799,6 @@
     <priority>0.5</priority>
   </url>
   <url>
-    <loc>https://www.vnrscans.com/title/reincarnation-of-the-fist-king/chapter-43-qi-scans-sword-demon-the-man-who-would-become-the-demon-god-mar-10-2</loc>
-    <lastmod>2026-06-06</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.5</priority>
-  </url>
-  <url>
     <loc>https://www.vnrscans.com/title/reincarnation-of-the-fist-king/chapter-4-asura-scans-the-fist-king-meets-his-brother-nov-27-2025</loc>
     <lastmod>2026-06-06</lastmod>
     <changefreq>monthly</changefreq>
@@ -841,12 +883,6 @@
     <priority>0.5</priority>
   </url>
   <url>
-    <loc>https://www.vnrscans.com/title/i-am-the-fated-villain/chapter-37</loc>
-    <lastmod>2026-06-05</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.5</priority>
-  </url>
-  <url>
     <loc>https://www.vnrscans.com/title/i-am-the-fated-villain/chapter-251-elf-toon</loc>
     <lastmod>2026-06-05</lastmod>
     <changefreq>monthly</changefreq>
@@ -925,6 +961,12 @@
     <priority>0.5</priority>
   </url>
   <url>
+    <loc>https://www.vnrscans.com/title/academy-s-genius-swordmaster/chapter-136-asura-scans</loc>
+    <lastmod>2026-06-08</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
     <loc>https://www.vnrscans.com/title/reincarnation-of-the-fist-king/chapter-15-qi-scans</loc>
     <lastmod>2026-06-06</lastmod>
     <changefreq>monthly</changefreq>
@@ -945,6 +987,12 @@
   <url>
     <loc>https://www.vnrscans.com/title/murim-psychopath/chapter-21-asura-scans-apr-8-2026</loc>
     <lastmod>2026-06-06</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://www.vnrscans.com/title/academy-s-genius-swordmaster/chapter-137-asura-scans</loc>
+    <lastmod>2026-06-08</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url>
@@ -1107,6 +1155,12 @@
   <url>
     <loc>https://www.vnrscans.com/title/i-am-the-fated-villain/chapter-42</loc>
     <lastmod>2026-06-05</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://www.vnrscans.com/title/i-killed-an-academy-player/chapter-4-asura-scans-nov-7-2023</loc>
+    <lastmod>2026-06-09</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url>
@@ -1645,6 +1699,12 @@
     <priority>0.5</priority>
   </url>
   <url>
+    <loc>https://www.vnrscans.com/title/i-am-the-fated-villain/chapter-37</loc>
+    <lastmod>2026-06-05</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
     <loc>https://www.vnrscans.com/title/crimson-reset/chapter-23-asura-scans</loc>
     <lastmod>2026-06-06</lastmod>
     <changefreq>monthly</changefreq>
@@ -1737,6 +1797,12 @@
   <url>
     <loc>https://www.vnrscans.com/title/i-am-the-fated-villain/chapter-73</loc>
     <lastmod>2026-06-05</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://www.vnrscans.com/title/i-killed-an-academy-player/chapter-5-asura-scans-nov-7-2023</loc>
+    <lastmod>2026-06-09</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url>
@@ -2323,6 +2389,12 @@
     <priority>0.5</priority>
   </url>
   <url>
+    <loc>https://www.vnrscans.com/title/i-am-the-fated-villain/chapter-176</loc>
+    <lastmod>2026-06-05</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
     <loc>https://www.vnrscans.com/title/i-am-the-fated-villain/chapter-187-s-2024</loc>
     <lastmod>2026-06-05</lastmod>
     <changefreq>monthly</changefreq>
@@ -2383,12 +2455,6 @@
     <priority>0.5</priority>
   </url>
   <url>
-    <loc>https://www.vnrscans.com/title/the-nebula-s-civilization/chapter-77-asura-scans-feb-19-2025</loc>
-    <lastmod>2026-06-07</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.5</priority>
-  </url>
-  <url>
     <loc>https://www.vnrscans.com/title/the-nebula-s-civilization/chapter-79-asura-scans-mar-4-2025</loc>
     <lastmod>2026-06-07</lastmod>
     <changefreq>monthly</changefreq>
@@ -2397,6 +2463,12 @@
   <url>
     <loc>https://www.vnrscans.com/title/reincarnation-of-the-fist-king/chapter-37-asura-scans-the-fish-king-has-a-reunion-jan-31-2026</loc>
     <lastmod>2026-06-06</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://www.vnrscans.com/title/i-killed-an-academy-player/chapter-6-asura-scans-nov-7-2023</loc>
+    <lastmod>2026-06-09</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url>
@@ -2432,12 +2504,6 @@
   </url>
   <url>
     <loc>https://www.vnrscans.com/title/got-dropped-into-a-ghost-story-still-gotta-work/chapter-9-vortex-scans</loc>
-    <lastmod>2026-06-06</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.5</priority>
-  </url>
-  <url>
-    <loc>https://www.vnrscans.com/title/my-avatars-path-to-greatness/chapter-52-qi-scans</loc>
     <lastmod>2026-06-06</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
@@ -2522,6 +2588,12 @@
   </url>
   <url>
     <loc>https://www.vnrscans.com/title/got-dropped-into-a-ghost-story-still-gotta-work/chapter-7-qi-scans</loc>
+    <lastmod>2026-06-06</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://www.vnrscans.com/title/my-avatars-path-to-greatness/chapter-52-qi-scans</loc>
     <lastmod>2026-06-06</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
@@ -2749,6 +2821,12 @@
     <priority>0.5</priority>
   </url>
   <url>
+    <loc>https://www.vnrscans.com/title/i-killed-an-academy-player/chapter-7-asura-scans-nov-16-2023</loc>
+    <lastmod>2026-06-09</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
     <loc>https://www.vnrscans.com/title/i-am-the-fated-villain/chapter-317-elf-toon</loc>
     <lastmod>2026-06-05</lastmod>
     <changefreq>monthly</changefreq>
@@ -2943,12 +3021,6 @@
   <url>
     <loc>https://www.vnrscans.com/title/reincarnation-of-the-fist-king/chapter-30-asura-scans-the-fist-king-is-giving-you-special-treatment-dec-2-2025</loc>
     <lastmod>2026-06-06</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.5</priority>
-  </url>
-  <url>
-    <loc>https://www.vnrscans.com/title/the-nebula-s-civilization/chapter-78-asura-scans-feb-23-2025</loc>
-    <lastmod>2026-06-07</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url>
@@ -3199,6 +3271,12 @@
     <priority>0.5</priority>
   </url>
   <url>
+    <loc>https://www.vnrscans.com/title/i-killed-an-academy-player/chapter-8-asura-scans-nov-24-2023</loc>
+    <lastmod>2026-06-09</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
     <loc>https://www.vnrscans.com/title/i-am-the-fated-villain/chapter-219</loc>
     <lastmod>2026-06-05</lastmod>
     <changefreq>monthly</changefreq>
@@ -3344,12 +3422,6 @@
   </url>
   <url>
     <loc>https://www.vnrscans.com/title/i-am-the-fated-villain/chapter-196</loc>
-    <lastmod>2026-06-05</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.5</priority>
-  </url>
-  <url>
-    <loc>https://www.vnrscans.com/title/i-am-the-fated-villain/chapter-176</loc>
     <lastmod>2026-06-05</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
@@ -3859,6 +3931,12 @@
     <priority>0.5</priority>
   </url>
   <url>
+    <loc>https://www.vnrscans.com/title/i-killed-an-academy-player/chapter-9-asura-scans-dec-2-2023</loc>
+    <lastmod>2026-06-09</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
     <loc>https://www.vnrscans.com/title/the-divine-demon-s-grand-ascension/chapter-15-asura-scans-s-2025</loc>
     <lastmod>2026-06-06</lastmod>
     <changefreq>monthly</changefreq>
@@ -4141,7 +4219,7 @@
     <priority>0.5</priority>
   </url>
   <url>
-    <loc>https://www.vnrscans.com/title/my-avatars-path-to-greatness/chapter-14-qi-scans</loc>
+    <loc>https://www.vnrscans.com/title/the-divine-demon-s-grand-ascension/chapter-41-asura-scans-feb-21-2026</loc>
     <lastmod>2026-06-06</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
@@ -4165,6 +4243,12 @@
     <priority>0.5</priority>
   </url>
   <url>
+    <loc>https://www.vnrscans.com/title/i-killed-an-academy-player/chapter-10-asura-scans-dec-8-2023</loc>
+    <lastmod>2026-06-09</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
     <loc>https://www.vnrscans.com/title/my-avatars-path-to-greatness/chapter-55-qi-scans-55-s-2025</loc>
     <lastmod>2026-06-06</lastmod>
     <changefreq>monthly</changefreq>
@@ -4183,7 +4267,7 @@
     <priority>0.5</priority>
   </url>
   <url>
-    <loc>https://www.vnrscans.com/title/the-divine-demon-s-grand-ascension/chapter-41-asura-scans-feb-21-2026</loc>
+    <loc>https://www.vnrscans.com/title/my-avatars-path-to-greatness/chapter-14-qi-scans</loc>
     <lastmod>2026-06-06</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
@@ -4417,8 +4501,8 @@
     <priority>0.5</priority>
   </url>
   <url>
-    <loc>https://www.vnrscans.com/title/reincarnation-of-the-fist-king/chapter-2-qi-scans</loc>
-    <lastmod>2026-06-06</lastmod>
+    <loc>https://www.vnrscans.com/title/i-killed-an-academy-player/chapter-11-asura-scans-dec-13-2023</loc>
+    <lastmod>2026-06-09</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url>
@@ -4633,6 +4717,12 @@
     <priority>0.5</priority>
   </url>
   <url>
+    <loc>https://www.vnrscans.com/title/reincarnation-of-the-fist-king/chapter-2-qi-scans</loc>
+    <lastmod>2026-06-06</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
     <loc>https://www.vnrscans.com/title/i-am-the-fated-villain/chapter-260</loc>
     <lastmod>2026-06-05</lastmod>
     <changefreq>monthly</changefreq>
@@ -4695,6 +4785,12 @@
   <url>
     <loc>https://www.vnrscans.com/title/nano-machine/chapter-131-asura-scans-jan-11-2024</loc>
     <lastmod>2026-06-07</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://www.vnrscans.com/title/i-killed-an-academy-player/chapter-12-asura-scans-dec-20-2023</loc>
+    <lastmod>2026-06-09</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url>
@@ -4771,8 +4867,8 @@
     <priority>0.5</priority>
   </url>
   <url>
-    <loc>https://www.vnrscans.com/title/reincarnation-of-the-fist-king/chapter-42-qi-scans-the-sword-king-at-the-threshold-of-death-mar-8-1</loc>
-    <lastmod>2026-06-06</lastmod>
+    <loc>https://www.vnrscans.com/title/i-killed-an-academy-player/chapter-13-asura-scans-dec-29-2023</loc>
+    <lastmod>2026-06-09</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url>
@@ -4970,12 +5066,6 @@
   </url>
   <url>
     <loc>https://www.vnrscans.com/title/i-am-the-fated-villain/chapter-309</loc>
-    <lastmod>2026-06-05</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.5</priority>
-  </url>
-  <url>
-    <loc>https://www.vnrscans.com/title/i-am-the-fated-villain/chapter-311</loc>
     <lastmod>2026-06-05</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
@@ -5235,6 +5325,12 @@
   <url>
     <loc>https://www.vnrscans.com/title/chronicles-of-the-lazy-sovereign/chapter-23-asura-scans-nov-17-2025</loc>
     <lastmod>2026-06-07</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://www.vnrscans.com/title/i-am-the-fated-villain/chapter-311</loc>
+    <lastmod>2026-06-05</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url>
@@ -5995,6 +6091,12 @@
     <priority>0.5</priority>
   </url>
   <url>
+    <loc>https://www.vnrscans.com/title/i-killed-an-academy-player/chapter-14-asura-scans-jan-4-2024</loc>
+    <lastmod>2026-06-09</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
     <loc>https://www.vnrscans.com/title/the-max-level-player-s-100th-regression/chapter-32-asura-scans-dec-19-2023</loc>
     <lastmod>2026-06-06</lastmod>
     <changefreq>monthly</changefreq>
@@ -6079,12 +6181,6 @@
     <priority>0.5</priority>
   </url>
   <url>
-    <loc>https://www.vnrscans.com/title/pick-me-up-infinite-gacha/chapter-108-asura-scans-aug-7-2024</loc>
-    <lastmod>2026-06-08</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.5</priority>
-  </url>
-  <url>
     <loc>https://www.vnrscans.com/title/pick-me-up-infinite-gacha/chapter-109-asura-scans-aug-14-2024</loc>
     <lastmod>2026-06-08</lastmod>
     <changefreq>monthly</changefreq>
@@ -6134,66 +6230,6 @@
   </url>
   <url>
     <loc>https://www.vnrscans.com/title/pick-me-up-infinite-gacha/chapter-117-asura-scans-oct-9-2024</loc>
-    <lastmod>2026-06-08</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.5</priority>
-  </url>
-  <url>
-    <loc>https://www.vnrscans.com/title/pick-me-up-infinite-gacha/chapter-118-asura-scans-oct-16-2024</loc>
-    <lastmod>2026-06-08</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.5</priority>
-  </url>
-  <url>
-    <loc>https://www.vnrscans.com/title/pick-me-up-infinite-gacha/chapter-119-asura-scans-oct-23-2024</loc>
-    <lastmod>2026-06-08</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.5</priority>
-  </url>
-  <url>
-    <loc>https://www.vnrscans.com/title/pick-me-up-infinite-gacha/chapter-120-asura-scans-oct-30-2024</loc>
-    <lastmod>2026-06-08</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.5</priority>
-  </url>
-  <url>
-    <loc>https://www.vnrscans.com/title/pick-me-up-infinite-gacha/chapter-121-asura-scans-nov-6-2024</loc>
-    <lastmod>2026-06-08</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.5</priority>
-  </url>
-  <url>
-    <loc>https://www.vnrscans.com/title/pick-me-up-infinite-gacha/chapter-122-asura-scans-nov-13-2024</loc>
-    <lastmod>2026-06-08</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.5</priority>
-  </url>
-  <url>
-    <loc>https://www.vnrscans.com/title/pick-me-up-infinite-gacha/chapter-123-asura-scans-nov-20-2024</loc>
-    <lastmod>2026-06-08</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.5</priority>
-  </url>
-  <url>
-    <loc>https://www.vnrscans.com/title/pick-me-up-infinite-gacha/chapter-124-asura-scans-nov-27-2024</loc>
-    <lastmod>2026-06-08</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.5</priority>
-  </url>
-  <url>
-    <loc>https://www.vnrscans.com/title/pick-me-up-infinite-gacha/chapter-125-asura-scans-dec-4-2024</loc>
-    <lastmod>2026-06-08</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.5</priority>
-  </url>
-  <url>
-    <loc>https://www.vnrscans.com/title/pick-me-up-infinite-gacha/chapter-126-asura-scans-dec-11-2024</loc>
-    <lastmod>2026-06-08</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.5</priority>
-  </url>
-  <url>
-    <loc>https://www.vnrscans.com/title/pick-me-up-infinite-gacha/chapter-127-asura-scans-dec-18-2024</loc>
     <lastmod>2026-06-08</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
