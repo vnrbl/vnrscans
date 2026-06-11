@@ -257,9 +257,7 @@ export function Navbar() {
         {/* Logo */}
         <div className="flex-1 flex items-center justify-start">
           <Link to="/home" className="flex shrink-0 items-center gap-2 transition-transform hover:scale-105">
-            <div className="relative grid h-10 w-10 place-items-center rounded-lg bg-primary">
-              <span className="text-lg font-bold text-primary-foreground">VS</span>
-            </div>
+            <img src="/favicon.svg" alt="vnrscans logo" className="h-10 w-10 rounded-lg object-contain" />
             <span className="hidden text-xl font-bold tracking-tight text-primary sm:inline">
               vnrscans
             </span>
