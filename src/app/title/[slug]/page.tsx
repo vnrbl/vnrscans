@@ -67,11 +67,37 @@ export default async function Page({ params }: PageProps) {
     initialChaptersData = await getChaptersData(initialSeriesData.id);
   }
 
+  // Generate the Schema.org JSON-LD object for rich search snippets
+  const jsonLd = initialSeriesData ? {
+    "@context": "https://schema.org",
+    "@type": initialSeriesData.type === "novel" ? "Book" : "ComicSeries",
+    "name": initialSeriesData.title,
+    "alternativeHeadline": initialSeriesData.alternative_titles,
+    "description": initialSeriesData.description,
+    "image": initialSeriesData.cover_url,
+    "author": (initialSeriesData as any).author ? { "@type": "Person", "name": (initialSeriesData as any).author } : undefined,
+    "publisher": {
+      "@type": "Organization",
+      "name": "vnrscans",
+      "url": "https://www.vnrscans.com"
+    },
+    "genre": initialSeriesData.series_genres?.map((g: any) => g.genre?.name).filter(Boolean) || [],
+    "about": initialSeriesData.series_tags?.map((t: any) => t.tag?.name).filter(Boolean) || []
+  } : null;
+
   return (
-    <TitleDetailPageContent
-      slug={slug}
-      initialSeriesData={initialSeriesData}
-      initialChaptersData={initialChaptersData}
-    />
+    <>
+      {jsonLd && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        />
+      )}
+      <TitleDetailPageContent
+        slug={slug}
+        initialSeriesData={initialSeriesData}
+        initialChaptersData={initialChaptersData}
+      />
+    </>
   );
 }

@@ -255,16 +255,13 @@ function BrowsePageContent() {
       if (error) throw error;
       
       const fetchedSeries = data ?? [];
-      const missingCountSeriesIds = fetchedSeries
-        .filter((s: any) => !s.chapter_count || s.chapter_count <= 0)
-        .map((s: any) => s.id);
-
       const chapterCountBySeries = new Map<string, number>();
-      if (missingCountSeriesIds.length > 0) {
+      
+      if (fetchedSeries.length > 0) {
         const { data: chapters } = await supabase
           .from("chapters")
           .select("series_id,chapter_number")
-          .in("series_id", missingCountSeriesIds)
+          .in("series_id", fetchedSeries.map((s: any) => s.id))
           .eq("status", "published");
 
         const uniqueChaptersBySeries = new Map<string, Set<number>>();
@@ -279,13 +276,13 @@ function BrowsePageContent() {
         });
       }
 
-      const seriesWithChapters = fetchedSeries.map((s: any) => ({
-        ...s,
-        chapter_count:
-          s.chapter_count && s.chapter_count > 0
-            ? s.chapter_count
-            : chapterCountBySeries.get(s.id) ?? 0,
-      }));
+      const seriesWithChapters = fetchedSeries.map((s: any) => {
+        const actualCount = chapterCountBySeries.get(s.id) ?? 0;
+        return {
+          ...s,
+          chapter_count: actualCount > 0 ? actualCount : (s.chapter_count ?? 0),
+        };
+      });
       
       // Filter by genres if selected - series must have ALL selected genres
       let filtered = seriesWithChapters;

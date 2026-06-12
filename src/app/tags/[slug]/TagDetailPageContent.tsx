@@ -50,9 +50,38 @@ export default function TagDetailPageContent({ slug }: { slug: string }) {
       if (error) throw error;
       
       // Extract series from nested structure and filter out nulls
-      return (data || [])
+      const fetchedSeries = (data || [])
         .map((item: any) => item.series)
         .filter((s: any) => s !== null);
+
+      if (fetchedSeries.length === 0) return [];
+
+      // Fetch actual chapter counts for all fetched series to ensure sync
+      const { data: chapters } = await supabase
+        .from("chapters")
+        .select("series_id,chapter_number")
+        .in("series_id", fetchedSeries.map((s: any) => s.id))
+        .eq("status", "published");
+
+      const uniqueChaptersBySeries = new Map<string, Set<number>>();
+      (chapters ?? []).forEach((chapter: any) => {
+        const existing = uniqueChaptersBySeries.get(chapter.series_id) ?? new Set<number>();
+        existing.add(Math.floor(chapter.chapter_number));
+        uniqueChaptersBySeries.set(chapter.series_id, existing);
+      });
+
+      const chapterCountBySeries = new Map<string, number>();
+      uniqueChaptersBySeries.forEach((chaptersSet, seriesId) => {
+        chapterCountBySeries.set(seriesId, chaptersSet.size);
+      });
+
+      return fetchedSeries.map((s: any) => {
+        const actualCount = chapterCountBySeries.get(s.id) ?? 0;
+        return {
+          ...s,
+          chapter_count: actualCount > 0 ? actualCount : (s.chapter_count ?? 0),
+        };
+      });
     },
     enabled: !!tag.data?.id,
   });
