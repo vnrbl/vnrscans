@@ -45,6 +45,9 @@ export function Footer() {
               <li>
                 <Link to="/request-series" className="hover:text-primary transition-colors">Request Series</Link>
               </li>
+              <li>
+                <Link to="/data-map" className="hover:text-primary transition-colors">Data Directory Map</Link>
+              </li>
             </ul>
           </div>
 
