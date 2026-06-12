@@ -71,6 +71,16 @@ export function Footer() {
                 <a href="/terms" className="hover:text-primary transition-colors">Terms of Service</a>
               </li>
               <li>
+                <a
+                  href="https://status.vnrscans.com/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1 hover:text-primary transition-colors"
+                >
+                  System Status <ExternalLink className="h-3 w-3" />
+                </a>
+              </li>
+              <li>
                 <a href="mailto:hello@vnrscans.com" className="flex items-center gap-1 hover:text-primary transition-colors">
                   <Mail className="h-3 w-3" /> hello@vnrscans.com
                 </a>
