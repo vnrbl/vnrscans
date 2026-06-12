@@ -97,8 +97,10 @@ export function HomeHeroCarousel() {
     if (!container || shuffledItems.length === 0) return;
 
     const handleScroll = () => {
+      if (container.children.length === 0) return;
       const { scrollLeft, scrollWidth, clientWidth } = container;
-      const itemWidth = 286; // 270px card + 16px gap (1.5x of 196)
+      const firstChild = container.children[0] as HTMLElement;
+      const itemWidth = firstChild.getBoundingClientRect().width + parseFloat(window.getComputedStyle(container).gap || "0");
       const sectionWidth = shuffledItems.length * itemWidth;
       
       // Reset to middle section when reaching edges
@@ -117,11 +119,17 @@ export function HomeHeroCarousel() {
 
   // Initialize scroll to middle section
   useEffect(() => {
-    if (scrollContainerRef.current && shuffledItems.length > 0) {
-      const itemWidth = 286; // 270px card + 16px gap
-      const sectionWidth = shuffledItems.length * itemWidth;
-      scrollContainerRef.current.scrollLeft = sectionWidth;
-      updateArrows();
+    const container = scrollContainerRef.current;
+    if (container && shuffledItems.length > 0) {
+      const timer = setTimeout(() => {
+        if (container.children.length === 0) return;
+        const firstChild = container.children[0] as HTMLElement;
+        const itemWidth = firstChild.getBoundingClientRect().width + parseFloat(window.getComputedStyle(container).gap || "0");
+        const sectionWidth = shuffledItems.length * itemWidth;
+        container.scrollLeft = sectionWidth;
+        updateArrows();
+      }, 50);
+      return () => clearTimeout(timer);
     }
   }, [shuffledItems.length]);
 
@@ -249,6 +257,7 @@ export function HomeHeroCarousel() {
                       alt={item.series.title}
                       className="w-full h-full object-cover"
                       loading="lazy"
+                      referrerPolicy="no-referrer"
                     />
                   ) : (
                     <div className="w-full h-full bg-neutral-950 flex items-center justify-center">

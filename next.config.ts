@@ -8,6 +8,46 @@ const nextConfig: NextConfig = {
         protocol: "https",
         hostname: "*.supabase.co",
       },
+      {
+        protocol: "https",
+        hostname: "meo.comick.pictures",
+      },
+      {
+        protocol: "https",
+        hostname: "roliascan.com",
+      },
+      {
+        protocol: "https",
+        hostname: "cdn.asurascans.com",
+      },
+      {
+        protocol: "https",
+        hostname: "media.qimanhwa.com",
+      },
+      {
+        protocol: "https",
+        hostname: "en-thunderscans.com",
+      },
+      {
+        protocol: "https",
+        hostname: "storage.hivetoon.com",
+      },
+      {
+        protocol: "https",
+        hostname: "storage.vortexscans.org",
+      },
+      {
+        protocol: "https",
+        hostname: "elftoon.com",
+      },
+      {
+        protocol: "https",
+        hostname: "cdn.qiscans.org",
+      },
+      {
+        protocol: "https",
+        hostname: "images.unsplash.com",
+      },
     ],
   },
   env: {

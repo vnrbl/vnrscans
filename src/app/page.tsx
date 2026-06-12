@@ -209,6 +209,7 @@ export default function Home() {
                     src={series.cover_url || "https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?w=500"}
                     alt={series.title}
                     className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
+                    referrerPolicy="no-referrer"
                   />
                   <div className="absolute top-4 left-4 z-20 flex gap-2">
                     <Badge variant="outline" className="capitalize text-3xs font-semibold bg-black/60 text-neutral-300 border-neutral-800 tracking-[0.05em] py-0.5 px-2">

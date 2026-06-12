@@ -6,9 +6,9 @@ export function Footer() {
     <footer className="border-t border-border/40 bg-secondary/10 text-muted-foreground transition-all">
       {/* Top half */}
       <div className="container mx-auto px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16 py-12">
-        <div className="grid gap-8 grid-cols-1 sm:grid-cols-2 md:grid-cols-4 text-center sm:text-left">
+        <div className="grid gap-8 grid-cols-3 lg:grid-cols-4 text-center sm:text-left">
           {/* Logo & Description */}
-          <div className="flex flex-col items-center sm:items-start space-y-4">
+          <div className="col-span-3 lg:col-span-1 flex flex-col items-center sm:items-start text-center sm:text-left space-y-4">
             <Link to="/home" className="flex items-center gap-2.5 transition-transform hover:scale-102 w-fit">
               <div className="relative grid h-9 w-9 place-items-center rounded border border-neutral-800 bg-neutral-950 font-bold text-white text-xs">
                 VS
@@ -144,8 +144,23 @@ export function Footer() {
           <p className="text-3xs text-muted-foreground/80 leading-normal max-w-xl">
             © {new Date().getFullYear()} vnrscans. All rights reserved. vnrscans does not store any files on its servers. We only link to media hosted on third-party services. If you have copyright concerns, please visit our DMCA registry page.
           </p>
-          <div className="flex items-center gap-2 text-3xs text-muted-foreground/50">
-            <span>Powered by React & Supabase</span>
+          <div className="flex items-center gap-3 text-3xs text-muted-foreground/50">
+            <a
+              href="https://status.vnrscans.com/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-block transition-transform hover:scale-102"
+            >
+              <iframe
+                src="https://status.vnrscans.com/badge?theme=dark"
+                width="250"
+                height="30"
+                frameBorder="0"
+                scrolling="no"
+                style={{ colorScheme: "normal", border: "none" }}
+                title="VNR Scans System Status"
+              />
+            </a>
           </div>
         </div>
       </div>

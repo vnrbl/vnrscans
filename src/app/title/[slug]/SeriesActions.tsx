@@ -165,6 +165,7 @@ export const SeriesActions = React.memo(function SeriesActions({
               unoptimized
               sizes="(max-width: 640px) 180px, 220px"
               className="object-cover"
+              referrerPolicy="no-referrer"
             />
           </div>
         ) : (

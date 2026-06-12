@@ -202,6 +202,7 @@ export default function TitleDetailPageContent({
             unoptimized
             sizes="100vw"
             className="object-cover opacity-[0.22] saturate-[1.1]"
+            referrerPolicy="no-referrer"
           />
           <div className="absolute inset-0 bg-gradient-to-b from-transparent via-background/40 to-background" />
         </div>

@@ -265,7 +265,7 @@ export function Navbar() {
           </Link>
         </div>
 
-        <nav className="hidden md:flex items-center justify-center gap-1 absolute left-1/2 -translate-x-1/2">
+        <nav className="hidden lg:flex items-center justify-center gap-1 absolute left-1/2 -translate-x-1/2">
           {links.map((l) => (
             <Link
               key={l.to}
@@ -402,7 +402,7 @@ export function Navbar() {
                 variant="ghost"
                 size="icon"
                 onClick={() => navigate({ to: "/library" })}
-                className="hidden md:flex"
+                className="hidden lg:flex"
                 title="My Library"
               >
                 <Library className="h-5 w-5" />
@@ -505,7 +505,7 @@ export function Navbar() {
           )}
 
           {/* Mobile Menu Toggle */}
-          <button className="md:hidden" onClick={() => setOpen((o) => !o)} aria-label="Menu">
+          <button className="lg:hidden" onClick={() => setOpen((o) => !o)} aria-label="Menu">
             {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </button>
         </div>
@@ -513,7 +513,7 @@ export function Navbar() {
 
       {/* Mobile Menu */}
       {open && (
-        <div className="border-t border-border/50 md:hidden">
+        <div className="border-t border-border/50 lg:hidden">
           <nav className="container mx-auto flex flex-col items-center px-4 py-2">
             {links.map((l) => (
               <Link

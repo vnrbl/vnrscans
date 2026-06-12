@@ -1081,6 +1081,7 @@ function ImageView({
                   loading={idx < 2 ? "eager" : "lazy"}
                   fetchPriority={idx < 2 ? "high" : "auto"}
                   className="mx-auto block w-full transition-transform duration-200"
+                  referrerPolicy="no-referrer"
                   style={{
                     opacity: imageLoading[p.id] ? 0.3 : 1,
                   }}
