@@ -76,5 +76,46 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
 export default async function Page({ params }: PageProps) {
   const { slug, chapterSlug } = await params;
-  return <ChapterReaderContent slug={slug} chapterSlug={chapterSlug} />;
+  const data = await getChapterMetadataDetails(slug, chapterSlug);
+
+  const series = data?.series as unknown as {
+    title: string;
+  } | undefined;
+
+  const breadcrumbLd = data && series ? {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      {
+        "@type": "ListItem",
+        "position": 1,
+        "name": "Home",
+        "item": "https://www.vnrscans.com/home"
+      },
+      {
+        "@type": "ListItem",
+        "position": 2,
+        "name": series.title,
+        "item": `https://www.vnrscans.com/title/${slug}`
+      },
+      {
+        "@type": "ListItem",
+        "position": 3,
+        "name": `Chapter ${data.chapter_number}`,
+        "item": `https://www.vnrscans.com/title/${slug}/${chapterSlug}`
+      }
+    ]
+  } : null;
+
+  return (
+    <>
+      {breadcrumbLd && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbLd) }}
+        />
+      )}
+      <ChapterReaderContent slug={slug} chapterSlug={chapterSlug} />
+    </>
+  );
 }
