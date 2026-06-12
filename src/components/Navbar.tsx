@@ -314,19 +314,19 @@ export function Navbar() {
 
           {/* Search Dialog */}
           <Dialog open={searchOpen} onOpenChange={setSearchOpen}>
-            <DialogContent className="top-[12vh] max-h-[78vh] w-[calc(100vw-1.5rem)] max-w-[620px] translate-y-0 overflow-hidden rounded-md border-border/70 bg-[#202024] p-0 shadow-2xl sm:top-[14vh] [&>button]:hidden">
-              <div className="border-b border-border/60 p-3">
+            <DialogContent className="top-[12vh] max-h-[78vh] w-[calc(100vw-1.5rem)] max-w-[620px] translate-y-0 overflow-hidden rounded border-neutral-800 bg-neutral-950 p-0 shadow-2xl sm:top-[14vh] [&>button]:hidden">
+              <div className="border-b border-neutral-900 p-3">
                 <div className="flex items-center gap-3">
-                  <div className="flex min-w-0 flex-1 items-center gap-2 rounded-lg border border-red-500/70 bg-[#151519] px-3 shadow-[0_0_0_1px_rgba(239,68,68,0.08)] focus-within:border-red-500 focus-within:shadow-[0_0_0_1px_rgba(239,68,68,0.35)]">
-                    <Search className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
+                  <div className="flex min-w-0 flex-1 items-center gap-2 rounded border border-neutral-800 bg-neutral-950 px-3 focus-within:border-neutral-500 transition-colors">
+                    <Search className="h-4 w-4 flex-shrink-0 text-muted-foreground stroke-[1.5]" />
                     <input
                       value={searchQuery}
                       onChange={(event) => setSearchQuery(event.target.value)}
                       autoFocus
                       placeholder="Search manga by title, author or synopsis..."
-                      className="h-10 min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
+                      className="h-10 min-w-0 flex-1 bg-transparent text-sm text-white outline-none placeholder:text-neutral-600"
                     />
-                    {searching && <Loader2 className="h-4 w-4 animate-spin text-red-500" />}
+                    {searching && <Loader2 className="h-4 w-4 animate-spin text-neutral-400" />}
                   </div>
                   <kbd className="hidden rounded border border-border bg-[#2b2b31] px-2 py-1 text-[10px] font-semibold text-muted-foreground sm:inline-flex">
                     ESC
@@ -334,7 +334,7 @@ export function Navbar() {
                   <button
                     type="button"
                     onClick={() => setSearchOpen(false)}
-                    className="grid h-8 w-8 place-items-center rounded-md text-muted-foreground transition hover:bg-secondary hover:text-foreground"
+                    className="grid h-8 w-8 place-items-center rounded border border-neutral-800 text-neutral-400 transition hover:bg-neutral-900 hover:text-white"
                     aria-label="Close search"
                   >
                     <X className="h-4 w-4" />
@@ -342,8 +342,8 @@ export function Navbar() {
                 </div>
               </div>
 
-              <div className="border-b border-border/50 p-3">
-                <div className="grid h-9 grid-cols-3 gap-2 rounded-md bg-[#17171b] p-1">
+              <div className="border-b border-neutral-900 p-3">
+                <div className="grid h-9 grid-cols-3 gap-2 rounded border border-neutral-800 bg-neutral-950 p-1">
                   <SearchTabButton
                     active={activeSearchTab === "comics"}
                     icon={<BookOpen className="h-3.5 w-3.5" />}
@@ -561,10 +561,10 @@ function SearchTabButton({
     <button
       type="button"
       onClick={onClick}
-      className={`flex min-w-0 items-center justify-center gap-2 rounded-md px-2 text-xs font-semibold transition ${
+      className={`flex min-w-0 items-center justify-center gap-2 rounded px-2 text-[10px] font-bold uppercase tracking-wider transition cursor-pointer ${
         active
-          ? "bg-red-600 text-white shadow-[0_8px_20px_rgba(220,38,38,0.25)]"
-          : "text-muted-foreground hover:bg-secondary/80 hover:text-foreground"
+          ? "bg-white text-black"
+          : "text-neutral-400 hover:text-white"
       }`}
     >
       {icon}
@@ -622,7 +622,7 @@ function SeriesSearchPanel({
                 onClick={() => onSelect(series.slug)}
                 className="group min-w-0 text-left"
               >
-                <div className="relative aspect-[2/3] overflow-hidden rounded-md bg-[#151519] shadow-sm ring-1 ring-border/40 transition group-hover:ring-red-500/70">
+                <div className="relative aspect-[2/3] overflow-hidden rounded bg-neutral-950 ring-1 ring-neutral-800 transition group-hover:ring-neutral-500">
                   {series.cover_url ? (
                     <img
                       src={series.cover_url}
@@ -675,7 +675,7 @@ function UserSearchPanel({
           key={userMember.username}
           type="button"
           onClick={() => onSelect(userMember.username)}
-          className="flex items-center gap-3 rounded-md bg-[#19191d] p-3 text-left transition hover:bg-[#24242a]"
+          className="flex items-center gap-3 rounded bg-neutral-900 border border-neutral-850 p-3 text-left transition hover:bg-neutral-800"
         >
           {userMember.avatar_url ? (
             <img
@@ -685,7 +685,7 @@ function UserSearchPanel({
               loading="lazy"
             />
           ) : (
-            <div className="grid h-10 w-10 place-items-center rounded-full bg-red-500/15 text-sm font-bold text-red-300">
+            <div className="grid h-10 w-10 place-items-center rounded border border-neutral-850 bg-neutral-950 text-xs font-mono font-bold text-neutral-300">
               {userMember.username?.charAt(0)?.toUpperCase()}
             </div>
           )}
@@ -724,10 +724,10 @@ function GroupSearchPanel({
           key={group}
           type="button"
           onClick={() => onSelect(group)}
-          className="flex items-center gap-3 rounded-md bg-[#19191d] p-3 text-left transition hover:bg-[#24242a]"
+          className="flex items-center gap-3 rounded bg-neutral-900 border border-neutral-850 p-3 text-left transition hover:bg-neutral-800"
         >
-          <div className="grid h-10 w-10 place-items-center rounded-md bg-red-500/15 text-red-300">
-            <Users className="h-4 w-4" />
+          <div className="grid h-10 w-10 place-items-center rounded border border-neutral-850 bg-neutral-950 text-neutral-400">
+            <Users className="h-4 w-4 stroke-[1.5]" />
           </div>
           <div className="min-w-0">
             <p className="truncate text-sm font-semibold text-foreground">{group}</p>
@@ -741,8 +741,8 @@ function GroupSearchPanel({
 
 function SearchLoading() {
   return (
-    <div className="flex items-center justify-center gap-2 py-12 text-sm text-muted-foreground">
-      <Loader2 className="h-4 w-4 animate-spin text-red-500" />
+    <div className="flex items-center justify-center gap-2 py-12 text-xs font-bold uppercase tracking-wider text-neutral-500">
+      <Loader2 className="h-4 w-4 animate-spin text-neutral-400" />
       Searching...
     </div>
   );
