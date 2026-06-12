@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Link } from "@tanstack/react-router";
+import { Link } from "@/lib/router-compat";
 import { formatDistanceToNow } from "date-fns";
 import { Check, Trophy, BookOpen, Users, MessageSquare, Target, Loader2, CheckCheck } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";

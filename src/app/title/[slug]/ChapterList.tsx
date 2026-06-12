@@ -1,0 +1,450 @@
+"use client";
+
+import React from "react";
+import Link from "next/link";
+import { ArrowUpDown, Search, ChevronLeft, ChevronRight, RefreshCw } from "lucide-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+
+/* ------------------------------------------------------------------ */
+/*  ChapterList — ALL chapter interaction state lives here.           */
+/*  Pagination clicks, search input, and sort toggles only            */
+/*  re-render THIS component, not the entire page.                    */
+/* ------------------------------------------------------------------ */
+
+interface ChapterListProps {
+  slug: string;
+  seriesId: string;
+  initialChaptersData?: any[];
+}
+
+export const ChapterList = React.memo(function ChapterList({
+  slug,
+  seriesId,
+  initialChaptersData,
+}: ChapterListProps) {
+  const { user } = useAuth();
+
+  // Chapter filtering and ordering state — scoped to this component only
+  const [selectedGroup, setSelectedGroup] = React.useState<string>("all");
+  const [sortOrder, setSortByOrder] = React.useState<"desc" | "asc">("desc");
+  const [searchQuery, setSearchQuery] = React.useState<string>("");
+  const [currentPage, setCurrentPage] = React.useState<number>(1);
+  const ITEMS_PER_PAGE = 15;
+
+  React.useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedGroup, sortOrder, searchQuery]);
+
+  const chaptersQ = useQuery({
+    queryKey: ["chapters", slug, selectedGroup, sortOrder],
+    queryFn: async () => {
+      let query = supabase
+        .from("chapters")
+        .select("id,slug,chapter_number,title,chapter_type,created_at,status,scheduled_at,uploaded_by,scanlation_group")
+        .eq("series_id", seriesId)
+        .eq("status", "published");
+
+      if (selectedGroup !== "all") {
+        query = query.eq("scanlation_group", selectedGroup);
+      }
+
+      query = query.order("chapter_number", { ascending: sortOrder === "asc" });
+
+      const { data, error } = await query;
+      if (error) throw error;
+      return (data ?? []).filter((c) => !c.scheduled_at || new Date(c.scheduled_at) <= new Date());
+    },
+    placeholderData: selectedGroup === "all" && sortOrder === "desc" ? initialChaptersData : undefined,
+    staleTime: 1000 * 60 * 2,
+    gcTime: 1000 * 60 * 10,
+  });
+
+  const filteredChapters = React.useMemo(() => {
+    if (!chaptersQ.data) return [];
+    if (!searchQuery.trim()) return chaptersQ.data;
+
+    const query = searchQuery.toLowerCase();
+    return chaptersQ.data.filter((c) => {
+      const chapterNum = c.chapter_number?.toString() || "";
+      const chapterTitle = c.title?.toLowerCase() || "";
+      const uploader = ((c as any).uploaded_by || "").toLowerCase();
+      const group = ((c as any).scanlation_group || "").toLowerCase();
+
+      return (
+        chapterNum.includes(query) ||
+        chapterTitle.includes(query) ||
+        uploader.includes(query) ||
+        group.includes(query)
+      );
+    });
+  }, [chaptersQ.data, searchQuery]);
+
+  const totalPages = Math.ceil(filteredChapters.length / ITEMS_PER_PAGE);
+  const paginatedChapters = React.useMemo(() => {
+    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+    return filteredChapters.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+  }, [filteredChapters, currentPage]);
+
+  const uniqueChapterCount = React.useMemo(() => {
+    if (!chaptersQ.data) return 0;
+    const uniqueChapters = new Set(
+      chaptersQ.data.map((ch) => Math.floor(ch.chapter_number))
+    );
+    return uniqueChapters.size;
+  }, [chaptersQ.data]);
+
+  const scanlationGroups = useQuery({
+    queryKey: ["scanlation-groups", slug],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("chapters")
+        .select("scanlation_group")
+        .eq("series_id", seriesId)
+        .eq("status", "published")
+        .not("scanlation_group", "is", null);
+
+      if (error) throw error;
+
+      const uniqueGroups = [...new Set(data?.map((c) => c.scanlation_group).filter(Boolean) ?? [])];
+      return uniqueGroups.sort();
+    },
+    staleTime: 1000 * 60 * 5,
+    gcTime: 1000 * 60 * 20,
+  });
+
+  const readChapters = useQuery({
+    queryKey: ["read-chapters", slug, user?.id],
+    queryFn: async () => {
+      if (!user) return new Set();
+      const { data } = await supabase
+        .from("reading_history")
+        .select("chapter_id")
+        .eq("user_id", user.id)
+        .eq("series_id", seriesId);
+      return new Set(data?.map((r) => r.chapter_id) ?? []);
+    },
+    enabled: !!user,
+    staleTime: 1000 * 60 * 2,
+  });
+
+  const refreshChapterTable = React.useCallback(async () => {
+    await Promise.all([
+      chaptersQ.refetch(),
+      scanlationGroups.refetch(),
+    ]);
+    toast.success("Chapter table refreshed");
+  }, [chaptersQ, scanlationGroups]);
+
+  return (
+    <section id="chapters-section">
+      <div className="mb-4 flex flex-col gap-4">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <h2 className="text-xl font-bold">
+            Chapters {uniqueChapterCount > 0 && <span className="text-muted-foreground">({uniqueChapterCount})</span>}
+          </h2>
+
+          <div className="grid grid-cols-1 gap-2 min-[420px]:grid-cols-2 sm:flex sm:flex-wrap">
+            {scanlationGroups.data && scanlationGroups.data.length > 0 && (
+              <Select value={selectedGroup} onValueChange={setSelectedGroup}>
+                <SelectTrigger className="w-full sm:w-[180px]">
+                  <SelectValue placeholder="All Groups" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Groups</SelectItem>
+                  {scanlationGroups.data.map((group) => (
+                    <SelectItem key={group} value={group}>
+                      {group}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setSortByOrder((prev) => (prev === "desc" ? "asc" : "desc"))}
+              className="w-full gap-2 sm:w-auto"
+            >
+              <ArrowUpDown className="h-4 w-4" />
+              {sortOrder === "desc" ? "Newest First" : "Oldest First"}
+            </Button>
+
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={refreshChapterTable}
+              disabled={chaptersQ.isFetching || scanlationGroups.isFetching}
+              className="w-full gap-2 sm:w-auto"
+            >
+              <RefreshCw className={`h-4 w-4 ${(chaptersQ.isFetching || scanlationGroups.isFetching) ? "animate-spin" : ""}`} />
+              Refresh
+            </Button>
+          </div>
+        </div>
+
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            type="text"
+            placeholder="Search chapters by number, title, uploader, or group..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-9"
+          />
+        </div>
+      </div>
+
+      {chaptersQ.isLoading ? (
+        <div className="space-y-2">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="h-12 animate-pulse rounded bg-secondary/50" />
+          ))}
+        </div>
+      ) : !filteredChapters || filteredChapters.length === 0 ? (
+        <div className="rounded-lg border border-dashed border-border/50 p-8 text-center text-sm text-muted-foreground">
+          {searchQuery ? (
+            <>No chapters found matching "{searchQuery}"</>
+          ) : selectedGroup !== "all" ? (
+            <>No chapters from {selectedGroup}. Try selecting "All Groups".</>
+          ) : (
+            <>No chapters yet. Check back soon.</>
+          )}
+        </div>
+      ) : (
+        <>
+          {/* Mobile card layout */}
+          <div className="space-y-2 md:hidden">
+            {paginatedChapters.map((c) => {
+              const isRead = readChapters.data?.has(c.id) ?? false;
+              const isNew = new Date(c.created_at) > new Date(Date.now() - 2 * 60 * 60 * 1000);
+              const showNewBadge = isNew && !isRead;
+              const uploadedBy = (c as { uploaded_by?: string }).uploaded_by;
+              const scanlationGroup = (c as { scanlation_group?: string }).scanlation_group;
+
+              return (
+                <Link
+                  key={c.id}
+                  href={`/title/${slug}/${c.slug}`}
+                  className="block rounded-lg border border-border/40 bg-card p-3 transition hover:border-primary/40 hover:bg-secondary/30"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span
+                          className="font-semibold"
+                          style={isRead ? { color: "#7f22fe" } : undefined}
+                        >
+                          Chapter {c.chapter_number}
+                        </span>
+                        {showNewBadge && (
+                          <Badge className="bg-violet-600 text-xs uppercase text-white hover:bg-violet-700">
+                            NEW
+                          </Badge>
+                        )}
+                      </div>
+                      {c.title && (
+                        <p className="mt-1 line-clamp-1 text-sm text-muted-foreground">{c.title}</p>
+                      )}
+                    </div>
+                    <Badge variant="outline" className="shrink-0 text-xs uppercase">
+                      {c.chapter_type === "novel" ? "Novel" : "Pages"}
+                    </Badge>
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                    {scanlationGroup && <span className="font-medium text-violet-400">{scanlationGroup}</span>}
+                    {uploadedBy && <span>by {uploadedBy}</span>}
+                    <span>{new Date(c.created_at).toLocaleDateString()}</span>
+                    <span>{formatChapterAge(c.created_at)}</span>
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+
+          {/* Desktop table layout */}
+          <div className="hidden overflow-x-auto rounded-lg border border-border/40 bg-card md:block">
+            <table className="w-full min-w-[720px]">
+            <thead className="border-b border-border/40 bg-secondary/30">
+              <tr>
+                <th className="px-4 py-3 text-left text-sm font-semibold">Chapter</th>
+                <th className="px-4 py-3 text-left text-sm font-semibold">Uploaded By</th>
+                <th className="px-4 py-3 text-left text-sm font-semibold">Group</th>
+                <th className="px-4 py-3 text-left text-sm font-semibold">Upload Date</th>
+                <th className="px-4 py-3 text-right text-sm font-semibold">Type</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border/40">
+              {paginatedChapters.map((c) => {
+                const isRead = readChapters.data?.has(c.id) ?? false;
+                const isNew = new Date(c.created_at) > new Date(Date.now() - 2 * 60 * 60 * 1000);
+                const showNewBadge = isNew && !isRead;
+
+                return (
+                  <tr key={c.id} className="transition hover:bg-secondary/40">
+                    <td className="px-4 py-3">
+                      <Link
+                        href={`/title/${slug}/${c.slug}`}
+                        className="flex items-center gap-2"
+                      >
+                        <span className="font-medium" style={isRead ? { color: "#7f22fe" } : undefined}>
+                          Chapter {c.chapter_number}
+                        </span>
+                        {showNewBadge && (
+                          <Badge className="bg-violet-600 text-xs uppercase text-white hover:bg-violet-700">
+                            NEW
+                          </Badge>
+                        )}
+                      </Link>
+                    </td>
+                    <td className="px-4 py-3">
+                      {(c as { uploaded_by?: string }).uploaded_by ? (
+                        <Link
+                          href={`/user/${(c as { uploaded_by?: string }).uploaded_by!}`}
+                          className="text-sm text-muted-foreground transition-colors hover:text-violet-600"
+                        >
+                          {(c as { uploaded_by?: string }).uploaded_by}
+                        </Link>
+                      ) : (
+                        <span className="text-sm text-muted-foreground">—</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      {(c as { scanlation_group?: string }).scanlation_group ? (
+                        <Link
+                          href={`/browse?group=${(c as { scanlation_group?: string }).scanlation_group}`}
+                          className="text-sm font-medium text-violet-600 transition-colors hover:text-violet-400"
+                        >
+                          {(c as { scanlation_group?: string }).scanlation_group}
+                        </Link>
+                      ) : (
+                        <span className="text-sm text-muted-foreground">—</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="text-sm text-muted-foreground">
+                        <span>{new Date(c.created_at).toLocaleDateString()}</span>
+                        <span className="ml-2 text-xs">({formatChapterAge(c.created_at)})</span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <Badge variant="outline" className="text-xs uppercase">
+                        {c.chapter_type === "novel" ? "Novel" : "Pages"}
+                      </Badge>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+            </table>
+          </div>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="mt-3 flex flex-col items-center justify-between gap-4 rounded-lg border border-border/40 bg-card px-4 py-4 sm:flex-row md:mt-0 md:rounded-t-none md:border-t-0">
+              <p className="text-sm text-muted-foreground">
+                Showing <span className="font-semibold text-foreground">{(currentPage - 1) * ITEMS_PER_PAGE + 1}</span> to{" "}
+                <span className="font-semibold text-foreground">
+                  {Math.min(currentPage * ITEMS_PER_PAGE, filteredChapters.length)}
+                </span>{" "}
+                of <span className="font-semibold text-foreground">{filteredChapters.length}</span> chapters
+              </p>
+              <div className="flex max-w-full items-center gap-1.5 overflow-x-auto pb-1">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setCurrentPage((prev) => Math.max(prev - 1, 1));
+                    document.getElementById("chapters-section")?.scrollIntoView({ behavior: "smooth" });
+                  }}
+                  disabled={currentPage === 1}
+                  className="h-8 w-8 p-0"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                {Array.from({ length: totalPages }).map((_, idx) => {
+                  const pageNum = idx + 1;
+                  if (totalPages > 5) {
+                    if (
+                      pageNum !== 1 &&
+                      pageNum !== totalPages &&
+                      Math.abs(pageNum - currentPage) > 1
+                    ) {
+                      if (pageNum === 2 && currentPage > 3) {
+                        return <span key="ellipsis-start" className="px-1 text-muted-foreground select-none">...</span>;
+                      }
+                      if (pageNum === totalPages - 1 && currentPage < totalPages - 2) {
+                        return <span key="ellipsis-end" className="px-1 text-muted-foreground select-none">...</span>;
+                      }
+                      return null;
+                    }
+                  }
+                  return (
+                    <Button
+                      key={pageNum}
+                      variant={currentPage === pageNum ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => {
+                        setCurrentPage(pageNum);
+                        document.getElementById("chapters-section")?.scrollIntoView({ behavior: "smooth" });
+                      }}
+                      className={`h-8 w-8 text-xs font-semibold ${currentPage === pageNum ? "bg-primary text-primary-foreground hover:bg-primary/95" : "hover:bg-secondary"}`}
+                    >
+                      {pageNum}
+                    </Button>
+                  );
+                })}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setCurrentPage((prev) => Math.min(prev + 1, totalPages));
+                    document.getElementById("chapters-section")?.scrollIntoView({ behavior: "smooth" });
+                  }}
+                  disabled={currentPage === totalPages}
+                  className="h-8 w-8 p-0"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          )}
+        </>
+      )}
+    </section>
+  );
+});
+
+/* ------------------------------------------------------------------ */
+
+function formatChapterAge(value: string): string {
+  const date = new Date(value);
+  const diffMs = Date.now() - date.getTime();
+  if (!Number.isFinite(diffMs)) return "";
+
+  const minute = 60 * 1000;
+  const hour = 60 * minute;
+  const day = 24 * hour;
+  const month = 30 * day;
+  const year = 365 * day;
+
+  if (diffMs < minute) return "just now";
+  if (diffMs < hour) return `${Math.floor(diffMs / minute)}m ago`;
+  if (diffMs < day) return `${Math.floor(diffMs / hour)}h ago`;
+  if (diffMs < month) return `${Math.floor(diffMs / day)}d ago`;
+  if (diffMs < year) return `${Math.floor(diffMs / month)}mo ago`;
+  return `${Math.floor(diffMs / year)}y ago`;
+}

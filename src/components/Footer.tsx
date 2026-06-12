@@ -1,4 +1,4 @@
-import { Link } from "@tanstack/react-router";
+import { Link } from "@/lib/router-compat";
 import { ShieldCheck, Mail, ExternalLink, Globe } from "lucide-react";
 
 export function Footer() {

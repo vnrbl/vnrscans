@@ -1,4 +1,4 @@
-import { Link } from "@tanstack/react-router";
+import { Link } from "@/lib/router-compat";
 import { Star, BookOpen } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { TITLE_COVER_CLASS } from "@/components/titleCardStyles";

@@ -1,7 +1,9 @@
-import { Link, useNavigate, useRouter } from "@tanstack/react-router";
-import { useState, useEffect } from "react";
+import { Link, useNavigate } from "@/lib/router-compat";
+import { useState, useEffect, lazy, Suspense } from "react";
 import { Menu, X, Search, BookOpen, User as UserIcon, LogOut, ShieldCheck, Library, Home, Sparkles, Trophy, Dice1, Dice2, Dice3, Dice4, Dice5, Dice6, Loader2, Users } from "lucide-react";
-import { DiceRollOverlay, type DiceSeries } from "@/components/DiceRollOverlay";
+import type { DiceSeries } from "@/components/DiceRollOverlay";
+
+const DiceRollOverlay = lazy(() => import("@/components/DiceRollOverlay").then(m => ({ default: m.DiceRollOverlay })));
 import { Button } from "@/components/ui/button";
 import { useAuth, useIsAdmin } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -19,7 +21,7 @@ import {
   DialogContent,
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { NotificationBell } from "@/components/notifications/NotificationBell";
+const NotificationBell = lazy(() => import("@/components/notifications/NotificationBell").then(m => ({ default: m.NotificationBell })));
 import {
   buildSeriesSearchOrFilter,
   getSearchDisplayTerm,
@@ -78,7 +80,6 @@ export function Navbar() {
   else if (isUploader) panelLabel = "Uploader Panel";
 
   const navigate = useNavigate();
-  const router = useRouter();
 
   const links = [
     { to: "/home", label: "Home", icon: Home },
@@ -433,7 +434,9 @@ export function Navbar() {
               })()}
 
               {/* Notifications Bell */}
-              <NotificationBell />
+              <Suspense fallback={null}>
+                <NotificationBell />
+              </Suspense>
 
               {/* User Dropdown with Stats */}
               <DropdownMenu>
@@ -529,14 +532,16 @@ export function Navbar() {
       )}
 
       {/* Dice Roll Overlay */}
-      <DiceRollOverlay
-        open={diceOpen}
-        diceResult={diceResult}
-        series={diceSeries}
-        onClose={handleDiceClose}
-        onNavigate={handleDiceNavigate}
-        onRollAgain={() => { handleDiceClose(); setTimeout(handleRandom, 50); }}
-      />
+      <Suspense fallback={null}>
+        <DiceRollOverlay
+          open={diceOpen}
+          diceResult={diceResult}
+          series={diceSeries}
+          onClose={handleDiceClose}
+          onNavigate={handleDiceNavigate}
+          onRollAgain={() => { handleDiceClose(); setTimeout(handleRandom, 50); }}
+        />
+      </Suspense>
     </header>
   );
 }
