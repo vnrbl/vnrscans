@@ -134,6 +134,14 @@ export default function TitleDetailPageContent({
     staleTime: 1000 * 60 * 2,
   });
 
+  const uniqueChapterCount = React.useMemo(() => {
+    if (!initialChaptersData) return 0;
+    const uniqueChapters = new Set(
+      initialChaptersData.map((ch) => Math.floor(ch.chapter_number))
+    );
+    return uniqueChapters.size;
+  }, [initialChaptersData]);
+
   // --------------- Loading & Error states ---------------
 
   if (seriesQ.isLoading) {
@@ -181,14 +189,6 @@ export default function TitleDetailPageContent({
       ? `${readButtonLabel} Ch. ${readChapterNumber}`
       : readButtonLabel;
 
-  const uniqueChapterCount = React.useMemo(() => {
-    if (!initialChaptersData) return 0;
-    const uniqueChapters = new Set(
-      initialChaptersData.map((ch) => Math.floor(ch.chapter_number))
-    );
-    return uniqueChapters.size;
-  }, [initialChaptersData]);
-
   return (
     <div className="min-h-screen bg-background relative overflow-hidden">
       {/* Background cover image */}
@@ -199,6 +199,7 @@ export default function TitleDetailPageContent({
             alt=""
             fill
             priority
+            unoptimized
             sizes="100vw"
             className="object-cover opacity-[0.22] saturate-[1.1]"
           />
@@ -342,6 +343,7 @@ const RecommendationsSidebar = React.memo(function RecommendationsSidebar({
                     src={title.cover_url}
                     alt={title.title}
                     fill
+                    unoptimized
                     sizes="(max-width: 640px) 150px, (max-width: 768px) 180px, 220px"
                     className="object-cover transition-transform duration-500 group-hover:scale-105"
                     draggable={false}

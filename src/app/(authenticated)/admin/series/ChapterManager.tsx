@@ -77,6 +77,13 @@ function slugify(s: string) {
     .replace(/^-|-$/g, "");
 }
 
+async function requireAccessToken() {
+  const { data } = await supabase.auth.getSession();
+  const token = data.session?.access_token;
+  if (!token) throw new Error("Please sign in again before running the scraper.");
+  return token;
+}
+
 const seriesTypes = ["manga", "manhwa", "manhua", "novel"] as const;
 const seriesStatuses = ["ongoing", "completed", "hiatus"] as const;
 const chapterStatuses = ["draft", "published", "scheduled"] as const;
@@ -874,6 +881,7 @@ export default function ChapterManager({ seriesId, onBack }: { seriesId: string;
         data: {
           url: form.chapter_url,
           imageUrlExample: imageUrlTypeExample.trim(),
+          accessToken: await requireAccessToken(),
         },
       });
 
@@ -898,7 +906,9 @@ export default function ChapterManager({ seriesId, onBack }: { seriesId: string;
 
     try {
       setExtracting(true);
-      const result = await $extractChaptersFromUrl({ data: { url: seriesUrl } });
+      const result = await $extractChaptersFromUrl({
+        data: { url: seriesUrl, accessToken: await requireAccessToken() },
+      });
 
       if (result.success && result.chapters) {
         setDiscoveredChapters(result.chapters);
@@ -1239,13 +1249,18 @@ export default function ChapterManager({ seriesId, onBack }: { seriesId: string;
         | { chapter: ChapterInfo; images: string[] }
         | { chapter: ChapterInfo; error: string };
       const extractionResults: ExtractionResult[] = [];
+      const bulkAccessToken = await requireAccessToken();
 
       for (let i = 0; i < uploadableList.length; i += BATCH_SIZE) {
         const batch = uploadableList.slice(i, i + BATCH_SIZE);
         const batchResults = await Promise.allSettled(
           batch.map(async (chapter) => {
             const result = await $extractImagesFromUrl({
-              data: { url: chapter.url, imageUrlExample: imageTypeExample },
+              data: {
+                url: chapter.url,
+                imageUrlExample: imageTypeExample,
+                accessToken: bulkAccessToken,
+              },
             });
             if (!result.success || !result.images?.length) {
               throw new Error(result.error || "No images found");

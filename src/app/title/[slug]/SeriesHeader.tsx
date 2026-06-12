@@ -1,7 +1,6 @@
 "use client";
 
 import React from "react";
-import Image from "next/image";
 import Link from "next/link";
 import { Star, BookOpen, Trophy, Users } from "lucide-react";
 import { Badge } from "@/components/ui/badge";

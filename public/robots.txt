@@ -1,0 +1,13 @@
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /auth
+Disallow: /library
+Disallow: /notifications
+Disallow: /profile
+Disallow: /settings
+
+User-agent: Mediapartners-Google
+Allow: /
+
+Sitemap: https://www.vnrscans.com/sitemap.xml

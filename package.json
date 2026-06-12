@@ -7,7 +7,7 @@
     "dev": "next dev",
     "build": "next build && node scripts/copy-chromium-assets.js && node scripts/generate-sitemap.js",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "eslint .",
     "format": "prettier --write .",
     "postinstall": "npx puppeteer browsers install chrome",
     "scrape": "npx tsx scripts/scrape-series.ts",

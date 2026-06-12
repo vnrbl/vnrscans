@@ -552,9 +552,9 @@ export default function ProfilePage() {
     }
 
     // Compute current streak
-    let hasActivityTodayOrYesterday = dates.includes(todayStr) || dates.includes(yesterdayStr);
+    const hasActivityTodayOrYesterday = dates.includes(todayStr) || dates.includes(yesterdayStr);
     if (hasActivityTodayOrYesterday) {
-      let searchDate = dates.includes(todayStr) ? new Date() : yesterday;
+      const searchDate = dates.includes(todayStr) ? new Date() : yesterday;
       let searchStr = searchDate.toISOString().split("T")[0];
       
       while (dates.includes(searchStr)) {

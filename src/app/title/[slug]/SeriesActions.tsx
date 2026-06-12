@@ -162,6 +162,7 @@ export const SeriesActions = React.memo(function SeriesActions({
               alt={title}
               fill
               priority
+              unoptimized
               sizes="(max-width: 640px) 180px, 220px"
               className="object-cover"
             />

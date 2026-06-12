@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Providers } from "@/components/Providers";
 import "@/styles.css";
 
+
 export const metadata: Metadata = {
   title: "vnrscans — Read Manga, Manhwa, Manhua & Novels",
   description: "Discover manhwa stories drawn by imagination. Fast, free, and premium reading experience.",
@@ -38,6 +39,12 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className="dark" suppressHydrationWarning>
+      <head>
+        {/* Font preconnects — SpaceX design system (Barlow Condensed as D-DIN substitute) */}
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link rel="preconnect" href="https://api.fontshare.com" />
+      </head>
       <body suppressHydrationWarning>
         <Providers>{children}</Providers>
       </body>

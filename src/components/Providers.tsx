@@ -14,6 +14,7 @@ import { isReaderLayoutPath } from "@/lib/layout";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { ReaderSettingsProvider } from "@/contexts/ReaderSettingsContext";
 import { AuthProvider } from "@/hooks/useAuth";
+import { NavigationProgress } from "@/components/NavigationProgress";
 
 export function Providers({ children }: { children: ReactNode }) {
   const [queryClient] = useState(
@@ -71,6 +72,7 @@ function AppShell({ children }: { children: ReactNode }) {
   if (bare) {
     return (
       <>
+        <NavigationProgress />
         {children}
         <Toaster />
         <Analytics />
@@ -80,6 +82,7 @@ function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="flex min-h-screen flex-col">
+      <NavigationProgress />
       <AnnouncementBanner />
       <Navbar />
       <main className="flex-1">

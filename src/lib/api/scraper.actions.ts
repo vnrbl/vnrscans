@@ -48,17 +48,21 @@ async function verifyAdmin(requestUserToken: string) {
 export async function $extractChaptersFromUrl(args: {
   data: {
     url: string;
+    accessToken: string;
   };
 }) {
   const { data } = args;
-  const validated = z.object({ url: z.string().url() }).parse(data);
+  const validated = z
+    .object({ url: z.string().url(), accessToken: z.string().min(1) })
+    .parse(data);
+  await verifyAdmin(validated.accessToken);
   try {
     const chapters = await extractChaptersFromSeriesUrl(validated.url);
     return { success: true, chapters };
   } catch (error) {
-    return { 
-      success: false, 
-      error: error instanceof Error ? error.message : "Failed to extract chapters" 
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to extract chapters"
     };
   }
 }
@@ -67,6 +71,7 @@ export async function $extractImagesFromUrl(args: {
   data: {
     url: string;
     imageUrlExample?: string;
+    accessToken: string;
   };
 }) {
   const { data } = args;
@@ -74,8 +79,10 @@ export async function $extractImagesFromUrl(args: {
     .object({
       url: z.string().url(),
       imageUrlExample: z.string().url().optional().or(z.literal("")),
+      accessToken: z.string().min(1),
     })
     .parse(data);
+  await verifyAdmin(validated.accessToken);
   try {
     const images = await extractImagesFromChapterUrl(validated.url, {
       imageUrlExample: validated.imageUrlExample || null,

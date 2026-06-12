@@ -39,7 +39,7 @@ export function Link({ to, params, search, children, activeProps, activeOptions,
   }
 
   return (
-    <NextLink href={href} className={finalClassName} {...mergedProps}>
+    <NextLink href={href} className={finalClassName} prefetch={true} {...mergedProps}>
       {children}
     </NextLink>
   );

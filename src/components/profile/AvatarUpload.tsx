@@ -116,8 +116,8 @@ export function AvatarUpload({ currentAvatarUrl, username, onAvatarUpdated }: Pr
       const { data: userData } = await supabase.auth.getUser();
       if (!userData.user) throw new Error("Not authenticated");
 
-      // Generate unique filename
-      const filename = `avatar-${userData.user.id}-${Date.now()}.jpg`;
+      // Per-user folder is required by the avatars storage RLS policy
+      const filename = `${userData.user.id}/avatar-${Date.now()}.jpg`;
 
       // Upload to Supabase Storage
       const { error: uploadError } = await supabase.storage
