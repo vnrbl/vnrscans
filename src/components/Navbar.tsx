@@ -265,17 +265,16 @@ export function Navbar() {
           </Link>
         </div>
 
-        {/* Desktop Navigation */}
         <nav className="hidden md:flex items-center justify-center gap-1 absolute left-1/2 -translate-x-1/2">
           {links.map((l) => (
             <Link
               key={l.to}
               to={l.to}
-              className="flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium text-muted-foreground transition-all hover:bg-secondary hover:text-foreground"
-              activeProps={{ className: "text-foreground bg-secondary" }}
+              className="flex items-center gap-2 px-3 py-1.5 text-xs font-bold uppercase tracking-[0.08em] text-muted-foreground transition-all hover:text-white"
+              activeProps={{ className: "text-white" }}
               activeOptions={{ exact: l.to === "/" }}
             >
-              <l.icon className="h-4 w-4" />
+              <l.icon className="h-4 w-4 stroke-[1.5]" />
               {l.label}
             </Link>
           ))}
@@ -521,9 +520,10 @@ export function Navbar() {
                 key={l.to}
                 to={l.to}
                 onClick={() => setOpen(false)}
-                className="flex items-center justify-center gap-2 w-full max-w-[200px] rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-secondary hover:text-foreground"
+                className="flex items-center justify-center gap-2 w-full max-w-[200px] px-3 py-2.5 text-xs font-bold uppercase tracking-[0.08em] text-muted-foreground hover:text-white transition-all"
+                activeProps={{ className: "text-white" }}
               >
-                <l.icon className="h-4 w-4" />
+                <l.icon className="h-4 w-4 stroke-[1.5]" />
                 {l.label}
               </Link>
             ))}

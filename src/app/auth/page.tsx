@@ -6,7 +6,6 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { SITE_NAME } from "@/lib/brand";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -16,19 +15,19 @@ function GoogleIcon({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" aria-hidden>
       <path
-        fill="#4285F4"
+        fill="#FFFFFF"
         d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
       />
       <path
-        fill="#34A853"
+        fill="#E0E0E0"
         d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
       />
       <path
-        fill="#FBBC05"
+        fill="#CCCCCC"
         d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
       />
       <path
-        fill="#EA4335"
+        fill="#F0F0F0"
         d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
       />
     </svg>
@@ -43,88 +42,11 @@ function DiscordIcon({ className }: { className?: string }) {
   );
 }
 
-function FloatingOrbs() {
-  return (
-    <div className="pointer-events-none absolute inset-0 overflow-hidden">
-      {/* Large purple orb */}
-      <div
-        className="absolute rounded-full opacity-30 blur-[80px]"
-        style={{
-          width: 420,
-          height: 420,
-          background: "oklch(0.68 0.22 305)",
-          top: "10%",
-          left: "15%",
-          animation: "floatOrb1 14s ease-in-out infinite",
-        }}
-      />
-      {/* Medium cyan orb */}
-      <div
-        className="absolute rounded-full opacity-25 blur-[60px]"
-        style={{
-          width: 280,
-          height: 280,
-          background: "oklch(0.78 0.16 200)",
-          bottom: "15%",
-          right: "10%",
-          animation: "floatOrb2 18s ease-in-out infinite",
-        }}
-      />
-      {/* Small accent orb */}
-      <div
-        className="absolute rounded-full opacity-20 blur-[50px]"
-        style={{
-          width: 180,
-          height: 180,
-          background: "oklch(0.72 0.20 260)",
-          top: "55%",
-          left: "55%",
-          animation: "floatOrb3 12s ease-in-out infinite",
-        }}
-      />
-    </div>
-  );
-}
-
-const keyframeStyles = `
-@keyframes floatOrb1 {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  33% { transform: translate(30px, -40px) scale(1.05); }
-  66% { transform: translate(-20px, 20px) scale(0.95); }
-}
-@keyframes floatOrb2 {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  33% { transform: translate(-25px, 30px) scale(1.08); }
-  66% { transform: translate(35px, -15px) scale(0.92); }
-}
-@keyframes floatOrb3 {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  50% { transform: translate(20px, -30px) scale(1.1); }
-}
-@keyframes fadeInUp {
-  from { opacity: 0; transform: translateY(16px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-@keyframes shimmer {
-  0% { background-position: -200% center; }
-  100% { background-position: 200% center; }
-}
-@keyframes pulseGlow {
-  0%, 100% { box-shadow: 0 0 20px oklch(0.68 0.22 305 / 0.3), 0 0 40px oklch(0.68 0.22 305 / 0.1); }
-  50% { box-shadow: 0 0 30px oklch(0.68 0.22 305 / 0.5), 0 0 60px oklch(0.68 0.22 305 / 0.2); }
-}
-@keyframes slideInLeft {
-  from { opacity: 0; transform: translateX(-30px); }
-  to { opacity: 1; transform: translateX(0); }
-}
-`;
-
 export default function AuthPage() {
   const { user } = useAuth();
   const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
   const [showSignUpPassword, setShowSignUpPassword] = useState(false);
-  const stylesInjected = useRef(false);
 
   useEffect(() => {
     if (user) router.push("/home");
@@ -136,18 +58,6 @@ export default function AuthPage() {
       const desc = new URLSearchParams(hash.slice(1)).get("error_description");
       if (desc) toast.error(decodeURIComponent(desc.replace(/\+/g, " ")));
     }
-  }, []);
-
-  // Inject keyframes once
-  useEffect(() => {
-    if (stylesInjected.current) return;
-    stylesInjected.current = true;
-    const style = document.createElement("style");
-    style.textContent = keyframeStyles;
-    document.head.appendChild(style);
-    return () => {
-      style.remove();
-    };
   }, []);
 
   const [loading, setLoading] = useState(false);
@@ -212,142 +122,66 @@ export default function AuthPage() {
   };
 
   return (
-    <div className="grid min-h-screen lg:grid-cols-2 bg-background">
+    <div className="grid min-h-screen lg:grid-cols-2 bg-black text-foreground">
       {/* ─── Left hero panel (desktop only) ─── */}
-      <div
-        className="relative hidden lg:flex flex-col items-center justify-center overflow-hidden"
-        style={{
-          background: "linear-gradient(145deg, oklch(0.18 0.01 286), oklch(0.14 0.02 305), oklch(0.16 0.015 240))",
-        }}
-      >
-        <FloatingOrbs />
-
+      <div className="relative hidden lg:flex flex-col items-center justify-center overflow-hidden bg-black border-r border-neutral-900">
         {/* Grid pattern overlay */}
         <div
-          className="pointer-events-none absolute inset-0 opacity-[0.04]"
+          className="pointer-events-none absolute inset-0 opacity-[0.03]"
           style={{
             backgroundImage:
-              "linear-gradient(oklch(0.97 0 0 / 0.3) 1px, transparent 1px), linear-gradient(90deg, oklch(0.97 0 0 / 0.3) 1px, transparent 1px)",
-            backgroundSize: "40px 40px",
+              "linear-gradient(to right, #ffffff 1px, transparent 1px), linear-gradient(to bottom, #ffffff 1px, transparent 1px)",
+            backgroundSize: "60px 60px",
           }}
         />
 
         {/* Hero content */}
-        <div
-          className="relative z-10 flex max-w-md flex-col items-center px-6 text-center xl:px-12"
-          style={{ animation: "slideInLeft 0.8s ease-out both" }}
-        >
+        <div className="relative z-10 flex max-w-md flex-col items-center px-6 text-center xl:px-12">
           {/* Logo mark */}
-          <div
-            className="mb-8 grid h-20 w-20 place-items-center rounded-2xl"
-            style={{
-              background: "linear-gradient(135deg, oklch(0.68 0.22 305), oklch(0.55 0.25 290))",
-              animation: "pulseGlow 4s ease-in-out infinite",
-            }}
-          >
-            <BookOpen className="h-10 w-10 text-white" strokeWidth={2} />
+          <div className="mb-8 grid h-16 w-16 place-items-center rounded border border-neutral-800 bg-neutral-950 text-white">
+            <BookOpen className="h-8 w-8 stroke-[1.5]" />
           </div>
 
-          <h1
-            className="mb-4 text-4xl font-extrabold tracking-tight"
-            style={{
-              background: "linear-gradient(135deg, oklch(0.95 0.01 286), oklch(0.78 0.16 200), oklch(0.68 0.22 305))",
-              WebkitBackgroundClip: "text",
-              backgroundClip: "text",
-              color: "transparent",
-            }}
-          >
+          <h1 className="mb-4 text-4xl font-bold uppercase tracking-[0.08em] text-white">
             {SITE_NAME}
           </h1>
 
-          <p
-            className="mb-10 text-lg leading-relaxed"
-            style={{ color: "oklch(0.7 0.01 286)" }}
-          >
+          <p className="mb-12 text-sm leading-relaxed text-neutral-400 font-light tracking-[0.01em]">
             Your ultimate destination for discovering, reading, and tracking your favorite manhwa series.
           </p>
 
           {/* Feature pills */}
           <div className="flex flex-wrap justify-center gap-3">
-            {["Track Progress", "Bookmark Series", "Get Notified"].map((label, i) => (
+            {["Track Progress", "Bookmark Series", "Get Notified"].map((label) => (
               <span
                 key={label}
-                className="inline-flex items-center gap-1.5 rounded-full border px-4 py-1.5 text-sm font-medium"
-                style={{
-                  borderColor: "oklch(0.68 0.22 305 / 0.3)",
-                  background: "oklch(0.68 0.22 305 / 0.08)",
-                  color: "oklch(0.82 0.12 305)",
-                  animation: `fadeInUp 0.5s ease-out ${0.3 + i * 0.15}s both`,
-                }}
+                className="inline-flex items-center gap-1.5 rounded border border-neutral-800 bg-neutral-950/50 px-4 py-1.5 text-xs font-semibold uppercase tracking-wider text-neutral-400"
               >
-                <Sparkles className="h-3.5 w-3.5" />
+                <Sparkles className="h-3.5 w-3.5 stroke-[1.5]" />
                 {label}
               </span>
             ))}
           </div>
         </div>
-
-        {/* Bottom fade */}
-        <div
-          className="pointer-events-none absolute inset-x-0 bottom-0 h-32"
-          style={{
-            background: "linear-gradient(to top, oklch(0.14 0.02 305), transparent)",
-          }}
-        />
       </div>
 
       {/* ─── Right auth panel ─── */}
-      <div
-        className="relative flex items-center justify-center p-6 sm:p-10"
-        style={{
-          background: "linear-gradient(180deg, oklch(0.21 0.006 286), oklch(0.19 0.008 300))",
-        }}
-      >
-        {/* Subtle glow behind the card */}
-        <div
-          className="pointer-events-none absolute opacity-40 blur-[100px] lg:hidden"
-          style={{
-            width: 300,
-            height: 300,
-            background: "oklch(0.68 0.22 305)",
-            top: "10%",
-            left: "50%",
-            transform: "translateX(-50%)",
-          }}
-        />
-
-        <div
-          className="relative z-10 w-full max-w-[440px]"
-          style={{ animation: "fadeInUp 0.6s ease-out both" }}
-        >
+      <div className="relative flex items-center justify-center p-6 sm:p-10 bg-black">
+        <div className="relative z-10 w-full max-w-[440px] card-spacex bg-surface-1 p-8 hover:border-hairline-strong transition-all duration-300">
           {/* Mobile-only branding */}
           <div className="mb-8 flex flex-col items-center lg:hidden">
-            <div
-              className="mb-4 grid h-14 w-14 place-items-center rounded-xl"
-              style={{
-                background: "linear-gradient(135deg, oklch(0.68 0.22 305), oklch(0.55 0.25 290))",
-                boxShadow: "0 0 30px oklch(0.68 0.22 305 / 0.4)",
-              }}
-            >
-              <BookOpen className="h-7 w-7 text-white" />
+            <div className="mb-4 grid h-14 w-14 place-items-center rounded border border-neutral-850 bg-neutral-950">
+              <BookOpen className="h-7 w-7 text-white stroke-[1.5]" />
             </div>
-            <h1
-              className="text-2xl font-extrabold tracking-tight"
-              style={{
-                background: "linear-gradient(135deg, oklch(0.95 0.01 286), oklch(0.78 0.16 200))",
-                WebkitBackgroundClip: "text",
-                backgroundClip: "text",
-                color: "transparent",
-              }}
-            >
+            <h1 className="text-2xl font-bold uppercase tracking-[0.08em] text-white">
               {SITE_NAME}
             </h1>
           </div>
 
           {/* Welcome heading */}
-          <div className="mb-6">
-            <h2 className="text-2xl font-bold text-foreground">Welcome back</h2>
-            <p className="mt-1 text-sm" style={{ color: "oklch(0.6 0.006 286)" }}>
+          <div className="mb-8">
+            <h2 className="text-xl font-bold uppercase tracking-[0.04em] text-white">Welcome back</h2>
+            <p className="mt-2 text-xs text-neutral-400 font-light">
               Sign in to your account to continue reading
             </p>
           </div>
@@ -359,22 +193,9 @@ export default function AuthPage() {
               onClick={onGoogle}
               disabled={loading}
               id="auth-google-btn"
-              className="group relative flex h-12 w-full items-center justify-center gap-3 rounded-xl border text-sm font-semibold transition-all duration-200 hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50 disabled:pointer-events-none"
-              style={{
-                borderColor: "oklch(0.35 0.004 286 / 0.6)",
-                background: "oklch(0.255 0.004 286)",
-                color: "oklch(0.92 0.003 286)",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.borderColor = "oklch(0.68 0.22 305 / 0.5)";
-                e.currentTarget.style.background = "oklch(0.28 0.006 286)";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.borderColor = "oklch(0.35 0.004 286 / 0.6)";
-                e.currentTarget.style.background = "oklch(0.255 0.004 286)";
-              }}
+              className="group relative flex h-12 w-full items-center justify-center gap-3 rounded border border-neutral-800 bg-neutral-950 text-xs font-bold uppercase tracking-[0.08em] text-white transition-all hover:border-neutral-500 disabled:opacity-50 disabled:pointer-events-none cursor-pointer"
             >
-              <GoogleIcon className="h-5 w-5" />
+              <GoogleIcon className="h-4.5 w-4.5" />
               Continue with Google
             </button>
 
@@ -383,79 +204,60 @@ export default function AuthPage() {
               onClick={onDiscord}
               disabled={loading}
               id="auth-discord-btn"
-              className="group relative flex h-12 w-full items-center justify-center gap-3 rounded-xl border text-sm font-semibold transition-all duration-200 hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50 disabled:pointer-events-none"
-              style={{
-                borderColor: "oklch(0.35 0.004 286 / 0.6)",
-                background: "oklch(0.255 0.004 286)",
-                color: "oklch(0.92 0.003 286)",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.borderColor = "oklch(0.55 0.18 265 / 0.6)";
-                e.currentTarget.style.background = "oklch(0.28 0.006 286)";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.borderColor = "oklch(0.35 0.004 286 / 0.6)";
-                e.currentTarget.style.background = "oklch(0.255 0.004 286)";
-              }}
+              className="group relative flex h-12 w-full items-center justify-center gap-3 rounded border border-neutral-800 bg-neutral-950 text-xs font-bold uppercase tracking-[0.08em] text-white transition-all hover:border-neutral-500 disabled:opacity-50 disabled:pointer-events-none cursor-pointer"
             >
-              <DiscordIcon className="h-5 w-5" />
+              <DiscordIcon className="h-4.5 w-4.5 text-neutral-300" />
               Continue with Discord
             </button>
           </div>
 
           {/* ─── Divider ─── */}
-          <div className="my-6 flex items-center gap-4">
-            <div className="h-px flex-1" style={{ background: "oklch(0.35 0.004 286 / 0.5)" }} />
-            <span
-              className="text-xs font-medium uppercase tracking-widest"
-              style={{ color: "oklch(0.5 0.006 286)" }}
-            >
+          <div className="my-8 flex items-center gap-4">
+            <div className="h-px flex-1 bg-neutral-900" />
+            <span className="text-3xs font-bold uppercase tracking-widest text-neutral-550">
               or continue with email
             </span>
-            <div className="h-px flex-1" style={{ background: "oklch(0.35 0.004 286 / 0.5)" }} />
+            <div className="h-px flex-1 bg-neutral-900" />
           </div>
 
           {/* ─── Tabs ─── */}
           <Tabs defaultValue="signin" className="w-full">
-            <TabsList className="grid w-full grid-cols-2 rounded-xl p-1" style={{ background: "oklch(0.24 0.004 286)" }}>
+            <TabsList className="grid w-full grid-cols-2 rounded border border-neutral-800 bg-neutral-950 p-1">
               <TabsTrigger
                 value="signin"
-                className="rounded-lg text-sm font-semibold data-[state=active]:bg-gradient-to-r data-[state=active]:from-primary data-[state=active]:to-accent data-[state=active]:text-primary-foreground transition-all"
+                className="rounded text-xs font-bold uppercase tracking-[0.08em] text-neutral-400 data-[state=active]:bg-white data-[state=active]:text-black transition-all py-2 cursor-pointer"
               >
                 Sign in
               </TabsTrigger>
               <TabsTrigger
                 value="signup"
-                className="rounded-lg text-sm font-semibold data-[state=active]:bg-gradient-to-r data-[state=active]:from-primary data-[state=active]:to-accent data-[state=active]:text-primary-foreground transition-all"
+                className="rounded text-xs font-bold uppercase tracking-[0.08em] text-neutral-400 data-[state=active]:bg-white data-[state=active]:text-black transition-all py-2 cursor-pointer"
               >
                 Create account
               </TabsTrigger>
             </TabsList>
 
             {/* Sign In form */}
-            <TabsContent value="signin" className="mt-5">
-              <form onSubmit={onSignIn} className="space-y-4">
+            <TabsContent value="signin" className="mt-6">
+              <form onSubmit={onSignIn} className="space-y-5">
                 <div className="space-y-2">
-                  <Label className="text-sm font-medium text-foreground">Email</Label>
+                  <Label className="text-xs font-bold uppercase tracking-[0.04em] text-neutral-300">Email</Label>
                   <div className="relative">
-                    <Mail className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2" style={{ color: "oklch(0.5 0.006 286)" }} />
+                    <Mail className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-500" />
                     <Input
                       name="email"
                       type="email"
                       required
                       placeholder="you@example.com"
                       id="signin-email"
-                      className="h-12 rounded-xl border pl-11 text-sm placeholder:text-muted-foreground/50 focus-visible:ring-2 focus-visible:ring-primary/50 transition-all bg-card"
-                      style={{
-                        borderColor: "oklch(0.35 0.004 286 / 0.5)",
-                      }}
+                      className="h-12 rounded border border-neutral-800 bg-neutral-950 pl-11 text-sm text-white placeholder:text-neutral-600 focus-visible:ring-1 focus-visible:ring-neutral-500 transition-all"
                     />
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-sm font-medium text-foreground">Password</Label>
+                  <Label className="text-xs font-bold uppercase tracking-[0.04em] text-neutral-300">Password</Label>
                   <div className="relative">
-                    <Lock className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2" style={{ color: "oklch(0.5 0.006 286)" }} />
+                    <Lock className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-500" />
                     <Input
                       name="password"
                       type={showPassword ? "text" : "password"}
@@ -463,16 +265,12 @@ export default function AuthPage() {
                       minLength={6}
                       placeholder="••••••••"
                       id="signin-password"
-                      className="h-12 rounded-xl border pl-11 pr-11 text-sm placeholder:text-muted-foreground/50 focus-visible:ring-2 focus-visible:ring-primary/50 transition-all bg-card"
-                      style={{
-                        borderColor: "oklch(0.35 0.004 286 / 0.5)",
-                      }}
+                      className="h-12 rounded border border-neutral-800 bg-neutral-950 pl-11 pr-11 text-sm text-white placeholder:text-neutral-600 focus-visible:ring-1 focus-visible:ring-neutral-500 transition-all"
                     />
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3.5 top-1/2 -translate-y-1/2 p-0.5 rounded-md transition-colors hover:bg-secondary"
-                      style={{ color: "oklch(0.5 0.006 286)" }}
+                      className="absolute right-3.5 top-1/2 -translate-y-1/2 p-0.5 rounded transition-colors text-neutral-500 hover:text-white"
                       tabIndex={-1}
                     >
                       {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -480,65 +278,53 @@ export default function AuthPage() {
                   </div>
                 </div>
 
-                <Button
+                <button
                   type="submit"
                   disabled={loading}
                   id="signin-submit-btn"
-                  className="group relative h-12 w-full rounded-xl text-sm font-bold text-primary-foreground transition-all duration-200 hover:scale-[1.01] active:scale-[0.99] overflow-hidden"
-                  style={{
-                    background: "linear-gradient(135deg, oklch(0.68 0.22 305), oklch(0.60 0.24 280))",
-                    boxShadow: "0 4px 20px oklch(0.68 0.22 305 / 0.35)",
-                  }}
+                  className="group relative h-12 w-full rounded bg-white hover:bg-neutral-200 text-black text-xs font-bold uppercase tracking-[0.08em] transition-all flex items-center justify-center gap-2 cursor-pointer"
                 >
-                  <span className="relative z-10 flex items-center justify-center gap-2">
-                    Sign in
-                    <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-                  </span>
-                </Button>
+                  Sign in
+                  <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5 stroke-[2]" />
+                </button>
               </form>
             </TabsContent>
 
             {/* Sign Up form */}
-            <TabsContent value="signup" className="mt-5">
-              <form onSubmit={onSignUp} className="space-y-4">
+            <TabsContent value="signup" className="mt-6">
+              <form onSubmit={onSignUp} className="space-y-5">
                 <div className="space-y-2">
-                  <Label className="text-sm font-medium text-foreground">Username</Label>
+                  <Label className="text-xs font-bold uppercase tracking-[0.04em] text-neutral-300">Username</Label>
                   <div className="relative">
-                    <User className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2" style={{ color: "oklch(0.5 0.006 286)" }} />
+                    <User className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-500" />
                     <Input
                       name="username"
                       required
                       minLength={3}
                       placeholder="your_username"
                       id="signup-username"
-                      className="h-12 rounded-xl border pl-11 text-sm placeholder:text-muted-foreground/50 focus-visible:ring-2 focus-visible:ring-primary/50 transition-all bg-card"
-                      style={{
-                        borderColor: "oklch(0.35 0.004 286 / 0.5)",
-                      }}
+                      className="h-12 rounded border border-neutral-800 bg-neutral-950 pl-11 text-sm text-white placeholder:text-neutral-600 focus-visible:ring-1 focus-visible:ring-neutral-500 transition-all"
                     />
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-sm font-medium text-foreground">Email</Label>
+                  <Label className="text-xs font-bold uppercase tracking-[0.04em] text-neutral-300">Email</Label>
                   <div className="relative">
-                    <Mail className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2" style={{ color: "oklch(0.5 0.006 286)" }} />
+                    <Mail className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-500" />
                     <Input
                       name="email"
                       type="email"
                       required
                       placeholder="you@example.com"
                       id="signup-email"
-                      className="h-12 rounded-xl border pl-11 text-sm placeholder:text-muted-foreground/50 focus-visible:ring-2 focus-visible:ring-primary/50 transition-all bg-card"
-                      style={{
-                        borderColor: "oklch(0.35 0.004 286 / 0.5)",
-                      }}
+                      className="h-12 rounded border border-neutral-800 bg-neutral-950 pl-11 text-sm text-white placeholder:text-neutral-600 focus-visible:ring-1 focus-visible:ring-neutral-500 transition-all"
                     />
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-sm font-medium text-foreground">Password</Label>
+                  <Label className="text-xs font-bold uppercase tracking-[0.04em] text-neutral-300">Password</Label>
                   <div className="relative">
-                    <Lock className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2" style={{ color: "oklch(0.5 0.006 286)" }} />
+                    <Lock className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-500" />
                     <Input
                       name="password"
                       type={showSignUpPassword ? "text" : "password"}
@@ -546,16 +332,12 @@ export default function AuthPage() {
                       minLength={6}
                       placeholder="Min. 6 characters"
                       id="signup-password"
-                      className="h-12 rounded-xl border pl-11 pr-11 text-sm placeholder:text-muted-foreground/50 focus-visible:ring-2 focus-visible:ring-primary/50 transition-all bg-card"
-                      style={{
-                        borderColor: "oklch(0.35 0.004 286 / 0.5)",
-                      }}
+                      className="h-12 rounded border border-neutral-800 bg-neutral-950 pl-11 pr-11 text-sm text-white placeholder:text-neutral-600 focus-visible:ring-1 focus-visible:ring-neutral-500 transition-all"
                     />
                     <button
                       type="button"
                       onClick={() => setShowSignUpPassword(!showSignUpPassword)}
-                      className="absolute right-3.5 top-1/2 -translate-y-1/2 p-0.5 rounded-md transition-colors hover:bg-secondary"
-                      style={{ color: "oklch(0.5 0.006 286)" }}
+                      className="absolute right-3.5 top-1/2 -translate-y-1/2 p-0.5 rounded transition-colors text-neutral-500 hover:text-white"
                       tabIndex={-1}
                     >
                       {showSignUpPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -563,33 +345,27 @@ export default function AuthPage() {
                   </div>
                 </div>
 
-                <Button
+                <button
                   type="submit"
                   disabled={loading}
                   id="signup-submit-btn"
-                  className="group relative h-12 w-full rounded-xl text-sm font-bold text-primary-foreground transition-all duration-200 hover:scale-[1.01] active:scale-[0.99] overflow-hidden"
-                  style={{
-                    background: "linear-gradient(135deg, oklch(0.68 0.22 305), oklch(0.60 0.24 280))",
-                    boxShadow: "0 4px 20px oklch(0.68 0.22 305 / 0.35)",
-                  }}
+                  className="group relative h-12 w-full rounded bg-white hover:bg-neutral-200 text-black text-xs font-bold uppercase tracking-[0.08em] transition-all flex items-center justify-center gap-2 cursor-pointer"
                 >
-                  <span className="relative z-10 flex items-center justify-center gap-2">
-                    Create account
-                    <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-                  </span>
-                </Button>
+                  Create account
+                  <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5 stroke-[2]" />
+                </button>
               </form>
             </TabsContent>
           </Tabs>
 
           {/* Footer text */}
-          <p className="mt-8 text-center text-xs" style={{ color: "oklch(0.45 0.006 286)" }}>
+          <p className="mt-8 text-center text-3xs tracking-wide text-neutral-500">
             By continuing, you agree to our{" "}
-            <a href="/terms" className="underline underline-offset-2 hover:text-foreground transition-colors">
+            <a href="/terms" className="underline underline-offset-2 hover:text-white transition-colors">
               Terms
             </a>{" "}
             and{" "}
-            <a href="/privacy" className="underline underline-offset-2 hover:text-foreground transition-colors">
+            <a href="/privacy" className="underline underline-offset-2 hover:text-white transition-colors">
               Privacy Policy
             </a>
           </p>

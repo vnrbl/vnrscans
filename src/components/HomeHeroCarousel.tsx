@@ -177,11 +177,11 @@ export function HomeHeroCarousel() {
   if (carouselSeries.isLoading || items.length === 0) return null;
 
   return (
-    <section className="relative w-full overflow-hidden bg-gradient-to-b from-background via-background/95 to-background/90 py-6 mt-8">
+    <section className="relative w-full overflow-hidden bg-background py-6 mt-8">
       <div className="container mx-auto px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16">
         {/* Vignette fade effect on left and right edges */}
-        <div className="absolute left-0 top-0 bottom-0 w-12 bg-gradient-to-r from-background via-background/80 to-transparent z-10 pointer-events-none sm:w-24 md:w-40 lg:w-48" />
-        <div className="absolute right-0 top-0 bottom-0 w-12 bg-gradient-to-l from-background via-background/80 to-transparent z-10 pointer-events-none sm:w-24 md:w-40 lg:w-48" />
+        <div className="absolute left-0 top-0 bottom-0 w-12 bg-gradient-to-r from-background to-transparent z-10 pointer-events-none sm:w-24 md:w-40 lg:w-48" />
+        <div className="absolute right-0 top-0 bottom-0 w-12 bg-gradient-to-l from-background to-transparent z-10 pointer-events-none sm:w-24 md:w-40 lg:w-48" />
         
         {/* Scrollable Container */}
         <div className="relative group">
@@ -190,10 +190,10 @@ export function HomeHeroCarousel() {
             <Button
               variant="secondary"
               size="icon"
-              className="absolute left-0 top-1/2 z-20 -translate-y-1/2 h-12 w-12 rounded-full bg-black/80 hover:bg-black/90 text-white shadow-xl opacity-0 group-hover:opacity-100 transition-opacity"
+              className="absolute left-0 top-1/2 z-20 -translate-y-1/2 h-12 w-12 rounded bg-black/85 border border-neutral-800 text-white opacity-0 group-hover:opacity-100 transition-opacity"
               onClick={() => scroll('left')}
             >
-              <ChevronLeft className="h-6 w-6" />
+              <ChevronLeft className="h-6 w-6 stroke-[1.5]" />
             </Button>
           )}
 
@@ -218,7 +218,7 @@ export function HomeHeroCarousel() {
                 style={{ perspective: '1000px' }}
               >
                 <div 
-                  className="relative h-[240px] w-[168px] overflow-hidden rounded-lg shadow-lg transition-all duration-300 group-hover/card:shadow-[0_20px_50px_rgba(139,92,246,0.4)] sm:h-[300px] sm:w-[210px] md:h-[345px] md:w-[240px] lg:h-[390px] lg:w-[270px]"
+                  className="relative h-[240px] w-[168px] overflow-hidden rounded border border-neutral-800 transition-all duration-300 group-hover/card:border-neutral-500 sm:h-[300px] sm:w-[210px] md:h-[345px] md:w-[240px] lg:h-[390px] lg:w-[270px]"
                   style={{ 
                     transformStyle: 'preserve-3d',
                     transform: 'rotateY(0deg) rotateX(0deg)'
@@ -251,8 +251,8 @@ export function HomeHeroCarousel() {
                       loading="lazy"
                     />
                   ) : (
-                    <div className="w-full h-full bg-gradient-to-br from-violet-900/20 to-violet-600/20 flex items-center justify-center">
-                      <span className="text-muted-foreground text-sm">No Cover</span>
+                    <div className="w-full h-full bg-neutral-950 flex items-center justify-center">
+                      <span className="text-muted-foreground text-sm font-light uppercase tracking-wider">No Cover</span>
                     </div>
                   )}
                   
@@ -260,35 +260,32 @@ export function HomeHeroCarousel() {
                   <div className="absolute inset-0 opacity-0 group-hover/card:opacity-100 transition-opacity duration-500 pointer-events-none">
                     {/* Animated glass reflection sweep */}
                     <div className="absolute inset-0 overflow-hidden">
-                      <div className="absolute -inset-full animate-shine bg-gradient-to-r from-transparent via-white/30 to-transparent skew-x-12" />
+                      <div className="absolute -inset-full animate-shine bg-gradient-to-r from-transparent via-white/20 to-transparent skew-x-12" />
                     </div>
                     
                     {/* Glass overlay */}
-                    <div className="absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-transparent backdrop-blur-[1px]" />
-                    
-                    {/* Subtle shimmer */}
-                    <div className="absolute top-0 left-0 right-0 h-1/3 bg-gradient-to-b from-white/20 to-transparent" />
+                    <div className="absolute inset-0 bg-gradient-to-br from-white/5 via-transparent to-transparent backdrop-blur-[0.5px]" />
                   </div>
                   
                   {/* Dark Gradient Overlay on Hover */}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover/card:opacity-100 transition-opacity duration-300" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/40 to-transparent opacity-0 group-hover/card:opacity-100 transition-opacity duration-300" />
                   
                   {/* Title on Hover */}
-                  <div className="absolute bottom-0 left-0 right-0 p-3 transform translate-y-full group-hover/card:translate-y-0 transition-transform duration-300">
-                    <h3 className="text-white text-sm font-semibold line-clamp-2 drop-shadow-lg">
+                  <div className="absolute bottom-0 left-0 right-0 p-4 transform translate-y-full group-hover/card:translate-y-0 transition-transform duration-350">
+                    <h3 className="text-white text-xs font-bold uppercase tracking-[0.02em] leading-tight line-clamp-2">
                       {item.series.title}
                     </h3>
-                    <p className="text-white/80 text-xs mt-1">
+                    <p className="text-neutral-400 text-3xs font-semibold uppercase tracking-wider mt-1.5">
                       {item.series.type}
                     </p>
                   </div>
 
                   {/* Subtle Border with glass effect */}
-                  <div className="absolute inset-0 border border-white/20 rounded-lg pointer-events-none group-hover/card:border-white/40 transition-colors" />
+                  <div className="absolute inset-0 border border-white/10 rounded pointer-events-none group-hover/card:border-white/30 transition-colors" />
                   
                   {/* Corner highlights for glass effect */}
-                  <div className="absolute top-0 left-0 w-16 h-16 bg-gradient-to-br from-white/30 to-transparent opacity-0 group-hover/card:opacity-100 transition-opacity rounded-tl-lg" />
-                  <div className="absolute bottom-0 right-0 w-16 h-16 bg-gradient-to-tl from-white/20 to-transparent opacity-0 group-hover/card:opacity-100 transition-opacity rounded-br-lg" />
+                  <div className="absolute top-0 left-0 w-16 h-16 bg-gradient-to-br from-white/10 to-transparent opacity-0 group-hover/card:opacity-100 transition-opacity rounded-tl" />
+                  <div className="absolute bottom-0 right-0 w-16 h-16 bg-gradient-to-tl from-white/10 to-transparent opacity-0 group-hover/card:opacity-100 transition-opacity rounded-br" />
                 </div>
               </Link>
             ))}
@@ -299,10 +296,10 @@ export function HomeHeroCarousel() {
             <Button
               variant="secondary"
               size="icon"
-              className="absolute right-0 top-1/2 z-20 -translate-y-1/2 h-12 w-12 rounded-full bg-black/80 hover:bg-black/90 text-white shadow-xl opacity-0 group-hover:opacity-100 transition-opacity"
+              className="absolute right-0 top-1/2 z-20 -translate-y-1/2 h-12 w-12 rounded bg-black/85 border border-neutral-800 text-white opacity-0 group-hover:opacity-100 transition-opacity"
               onClick={() => scroll('right')}
             >
-              <ChevronRight className="h-6 w-6" />
+              <ChevronRight className="h-6 w-6 stroke-[1.5]" />
             </Button>
           )}
         </div>
