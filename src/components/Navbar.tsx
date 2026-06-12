@@ -259,13 +259,10 @@ export function Navbar() {
         <div className="flex-1 flex items-center justify-start">
           <Link to="/home" className="flex shrink-0 items-center gap-2 transition-transform hover:scale-105">
             <img src="/favicon.svg" alt="vnrscans logo" className="h-10 w-10 rounded-lg object-contain" />
-            <span className="hidden text-xl font-bold tracking-tight text-primary sm:inline">
-              vnrscans
-            </span>
           </Link>
         </div>
 
-        <nav className="hidden lg:flex items-center justify-center gap-1 absolute left-1/2 -translate-x-1/2">
+        <nav className="hidden xl:flex items-center justify-center gap-1 absolute left-1/2 -translate-x-1/2">
           {links.map((l) => (
             <Link
               key={l.to}
@@ -286,10 +283,12 @@ export function Navbar() {
           <button
             onClick={() => setSearchOpen(true)}
             title="Search (Ctrl+K)"
-            className="hidden sm:flex items-center gap-2 min-w-[200px] lg:min-w-[260px] h-9 rounded-lg border border-border/60 bg-secondary/50 px-3 text-sm text-muted-foreground transition-all hover:border-border hover:bg-secondary hover:text-foreground focus:outline-none"
+            className="hidden sm:flex items-center gap-2 w-[180px] md:w-[220px] xl:w-[260px] h-9 rounded-lg border border-border/60 bg-secondary/50 px-3 text-sm text-muted-foreground transition-all hover:border-border hover:bg-secondary hover:text-foreground focus:outline-none"
           >
             <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
-            <span className="flex-1 text-left truncate">Search titles, authors…</span>
+            <span className="flex-1 truncate text-left font-sans font-normal tracking-normal text-muted-foreground">
+              Search titles, authors...
+            </span>
             <kbd className="hidden lg:inline-flex items-center rounded border border-border/60 bg-background/60 px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground">
               Ctrl K
             </kbd>
@@ -324,7 +323,7 @@ export function Navbar() {
                       onChange={(event) => setSearchQuery(event.target.value)}
                       autoFocus
                       placeholder="Search manga by title, author or synopsis..."
-                      className="h-10 min-w-0 flex-1 bg-transparent text-sm text-white outline-none placeholder:text-neutral-600"
+                      className="h-10 min-w-0 flex-1 bg-transparent font-sans text-sm font-normal tracking-normal text-white outline-none placeholder:text-neutral-500 placeholder:opacity-100"
                     />
                     {searching && <Loader2 className="h-4 w-4 animate-spin text-neutral-400" />}
                   </div>
@@ -462,7 +461,7 @@ export function Navbar() {
                         </div>
                         <div className="mt-2 text-xs font-normal text-muted-foreground">
                           <div className="flex items-center gap-1">
-                            🔥 Streak: {userStats.data.reading_streak} days
+                            Streak: {userStats.data.reading_streak} days
                           </div>
                           <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-secondary">
                             <div
@@ -505,7 +504,7 @@ export function Navbar() {
           )}
 
           {/* Mobile Menu Toggle */}
-          <button className="lg:hidden" onClick={() => setOpen((o) => !o)} aria-label="Menu">
+          <button className="xl:hidden" onClick={() => setOpen((o) => !o)} aria-label="Menu">
             {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </button>
         </div>
@@ -513,7 +512,7 @@ export function Navbar() {
 
       {/* Mobile Menu */}
       {open && (
-        <div className="border-t border-border/50 lg:hidden">
+        <div className="border-t border-border/50 xl:hidden">
           <nav className="container mx-auto flex flex-col items-center px-4 py-2">
             {links.map((l) => (
               <Link
