@@ -6,9 +6,21 @@ import { Compass, BookOpen, Tag, Clock, ArrowRight } from "lucide-react";
 export const metadata: Metadata = {
   title: "Platform Data Directory & Sitemap — vnrscans",
   description: "Navigate the complete indexing structure of vnrscans. Browse all comic series, web novels, catalog genres, and sitemap directories.",
+  keywords: ["vnrscans sitemap", "vnrscans directory", "manga directory", "manhwa sitemap", "web novels list"],
   alternates: {
-    canonical: "https://www.vnrscans.com/data-map",
+    canonical: "/data-map",
   },
+  openGraph: {
+    title: "Platform Data Directory & Sitemap — vnrscans",
+    description: "Navigate the complete indexing structure of vnrscans. Browse all comic series, web novels, catalog genres, and sitemap directories.",
+    url: "https://www.vnrscans.com/data-map",
+    type: "website",
+  },
+  twitter: {
+    card: "summary",
+    title: "Platform Data Directory & Sitemap — vnrscans",
+    description: "Navigate the complete indexing structure of vnrscans. Browse all comic series, web novels, catalog genres, and sitemap directories.",
+  }
 };
 
 // Server-side prefetch for sitemap mapping

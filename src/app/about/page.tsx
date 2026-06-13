@@ -5,8 +5,23 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 
 export const metadata: Metadata = {
-  title: "About Us — vnrscans",
-  description: "Discover vnrscans — a premium, community-driven manhwa and manga reader built for speed, safety, and creator respect.",
+  title: "About Us — vnrscans - Ultimate Manga Reader",
+  description: "Learn more about vnrscans, a premium, community-driven manhwa and manga reader built for speed, safety, and creator respect.",
+  keywords: ["about vnrscans", "manga reader platform", "read manga online free", "vnrscans about", "manhwa reader"],
+  alternates: {
+    canonical: "/about",
+  },
+  openGraph: {
+    title: "About Us — vnrscans - Ultimate Manga Reader",
+    description: "Learn more about vnrscans, a premium, community-driven manhwa and manga reader built for speed, safety, and creator respect.",
+    url: "https://www.vnrscans.com/about",
+    type: "website",
+  },
+  twitter: {
+    card: "summary",
+    title: "About Us — vnrscans - Ultimate Manga Reader",
+    description: "Learn more about vnrscans, a premium, community-driven manhwa and manga reader built for speed, safety, and creator respect.",
+  }
 };
 
 export default function AboutPage() {

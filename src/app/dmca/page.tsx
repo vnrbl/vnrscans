@@ -5,7 +5,22 @@ import { Card } from "@/components/ui/card";
 
 export const metadata: Metadata = {
   title: "DMCA Copyright Policy — vnrscans",
-  description: "vnrscans DMCA and copyright protection policy. Guidelines for submitting copyright removal requests.",
+  description: "Read the DMCA copyright policy for vnrscans. Find guidelines and contact details for submitting intellectual property copyright removal notices.",
+  keywords: ["dmca policy vnrscans", "vnrscans copyright policy", "manga copyright removal", "dmca notice", "vnrscans dmca"],
+  alternates: {
+    canonical: "/dmca",
+  },
+  openGraph: {
+    title: "DMCA Copyright Policy — vnrscans",
+    description: "Read the DMCA copyright policy for vnrscans. Find guidelines and contact details for submitting intellectual property copyright removal notices.",
+    url: "https://www.vnrscans.com/dmca",
+    type: "website",
+  },
+  twitter: {
+    card: "summary",
+    title: "DMCA Copyright Policy — vnrscans",
+    description: "Read the DMCA copyright policy for vnrscans. Find guidelines and contact details for submitting intellectual property copyright removal notices.",
+  }
 };
 
 export default function DmcaPage() {

@@ -579,6 +579,8 @@ export default function Reader({ slug, chapterSlug }: { slug: string; chapterSlu
                 })
               }
               seriesSlug={seriesSlug}
+              seriesTitle={c.series?.title ?? ""}
+              chapterNumber={c.chapter_number}
             />
           ) : (
             <ImageView
@@ -603,6 +605,8 @@ export default function Reader({ slug, chapterSlug }: { slug: string; chapterSlu
                 })
               }
               seriesSlug={seriesSlug}
+              seriesTitle={c.series?.title ?? ""}
+              chapterNumber={c.chapter_number}
             />
           )}
         </div>
@@ -821,6 +825,10 @@ function ReaderTopBar({
           <div className="min-w-0">
             <div className="truncate font-semibold">{seriesTitle}</div>
             <div className="truncate text-xs text-muted-foreground">{title}</div>
+            {/* Screen-reader-only h1 tag for absolute SEO compliance and hierarchy */}
+            <h1 className="sr-only">
+              Read {seriesTitle} {title.includes("Ch. ") ? `Chapter ${title.replace("Ch. ", "")}` : title} Online Free
+            </h1>
           </div>
         </Link>
         <div className="flex items-center gap-2">
@@ -888,6 +896,8 @@ function ImageView({
   onPrev,
   onNext,
   seriesSlug,
+  seriesTitle,
+  chapterNumber,
 }: {
   pages?: any[];
   loading: boolean;
@@ -898,6 +908,8 @@ function ImageView({
   onPrev: () => void;
   onNext: () => void;
   seriesSlug: string;
+  seriesTitle: string;
+  chapterNumber: number;
 }) {
   // ALL HOOKS MUST BE AT THE TOP - BEFORE ANY CONDITIONAL RETURNS
   const { user } = useAuth();
@@ -1077,7 +1089,7 @@ function ImageView({
                 <img
                   data-page-id={p.id}
                   src={p.image_url}
-                  alt={`Page ${p.page_number}`}
+                  alt={`${seriesTitle || "Manga"} Chapter ${chapterNumber} Page ${p.page_number} - vnrscans`}
                   loading={idx < 2 ? "eager" : "lazy"}
                   fetchPriority={idx < 2 ? "high" : "auto"}
                   className="mx-auto block w-full transition-transform duration-200"
@@ -1118,6 +1130,8 @@ function NovelView({
   onPrev,
   onNext,
   seriesSlug,
+  seriesTitle,
+  chapterNumber,
 }: {
   content: string;
   chapterId: string;
@@ -1127,6 +1141,8 @@ function NovelView({
   onPrev: () => void;
   onNext: () => void;
   seriesSlug: string;
+  seriesTitle: string;
+  chapterNumber: number;
 }) {
   // Scroll position restoration for novels
   useEffect(() => {
@@ -1186,6 +1202,14 @@ function NovelView({
           lineHeight: "var(--novel-line-height, 1.7)",
         }}
       >
+        <header className="mb-8 border-b border-border pb-6">
+          <h1 className="text-3xl font-bold tracking-tight mb-2">
+            {seriesTitle || "Novel"} — Chapter {chapterNumber}
+          </h1>
+          <p className="text-muted-foreground text-sm">
+            Read the full chapter online at vnrscans.
+          </p>
+        </header>
         {content.split(/\n{2,}/).map((p, i) => (
           <p key={i} className="mb-4 whitespace-pre-wrap">
             {p}
