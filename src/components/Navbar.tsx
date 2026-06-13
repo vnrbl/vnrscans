@@ -258,7 +258,7 @@ export function Navbar() {
         {/* Logo */}
         <div className="flex-1 flex items-center justify-start">
           <Link to="/home" className="flex shrink-0 items-center gap-2 transition-transform hover:scale-105">
-            <img src="/favicon.svg" alt="vnrscans logo" className="h-10 w-10 rounded-lg object-contain" />
+            <img src="/favicon.svg" alt="vnrscans logo" width={40} height={40} className="h-10 w-10 rounded-lg object-contain" />
           </Link>
         </div>
 
@@ -626,8 +626,11 @@ function SeriesSearchPanel({
                     <img
                       src={series.cover_url}
                       alt={series.title}
+                      width={200}
+                      height={300}
                       className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
                       loading="lazy"
+                      decoding="async"
                     />
                   ) : (
                     <div className="grid h-full w-full place-items-center text-muted-foreground">
@@ -680,8 +683,11 @@ function UserSearchPanel({
             <img
               src={userMember.avatar_url}
               alt={userMember.username}
+              width={40}
+              height={40}
               className="h-10 w-10 rounded-full object-cover"
               loading="lazy"
+              decoding="async"
             />
           ) : (
             <div className="grid h-10 w-10 place-items-center rounded border border-neutral-850 bg-neutral-950 text-xs font-mono font-bold text-neutral-300">
@@ -756,56 +762,19 @@ function SearchEmpty({ message }: { message: string }) {
 }
 
 /* ─── Navbar Mini Avatar with Frame ─── */
-const navFrameKeyframes = `
-@keyframes navRotCW { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-@keyframes navRotCCW { 0% { transform: rotate(360deg); } 100% { transform: rotate(0deg); } }
-@keyframes navPulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.06); } }
-@keyframes navGlitch { 0%,100% { filter: hue-rotate(0deg); } 50% { filter: hue-rotate(30deg); } }
-@keyframes fireTongue {
-  0%, 100% {
-    transform: scaleY(1) skewX(0deg) scaleX(1);
-    opacity: 0.85;
-    filter: blur(1px) brightness(1);
-  }
-  25% {
-    transform: scaleY(1.25) skewX(3deg) scaleX(0.95);
-    opacity: 1;
-    filter: blur(0.5px) brightness(1.25);
-  }
-  50% {
-    transform: scaleY(0.9) skewX(-2deg) scaleX(1.05);
-    opacity: 0.75;
-    filter: blur(1.5px) brightness(0.9);
-  }
-  75% {
-    transform: scaleY(1.3) skewX(-3deg) scaleX(0.9);
-    opacity: 0.95;
-    filter: blur(0.5px) brightness(1.35);
-  }
-}
-`;
+/* Keyframes for the frame live in styles.css — no runtime style injection. */
 
-let navFrameStylesInjected = false;
-
-function NavbarAvatarFrame({ 
-  avatarUrl, 
-  avatarFrame, 
-  accentColor, 
-  username 
-}: { 
-  avatarUrl?: string | null; 
-  avatarFrame: string; 
-  accentColor: string; 
-  username?: string | null; 
+function NavbarAvatarFrame({
+  avatarUrl,
+  avatarFrame,
+  accentColor,
+  username
+}: {
+  avatarUrl?: string | null;
+  avatarFrame: string;
+  accentColor: string;
+  username?: string | null;
 }) {
-  // Inject keyframes once
-  if (!navFrameStylesInjected && typeof document !== 'undefined') {
-    const style = document.createElement("style");
-    style.textContent = navFrameKeyframes;
-    document.head.appendChild(style);
-    navFrameStylesInjected = true;
-  }
-
   const size = 36; // px
   const borderWidth = avatarFrame === "creator" ? 3 : 2; // px
   const innerSize = size - borderWidth * 2;
@@ -895,10 +864,13 @@ function NavbarAvatarFrame({
         }}
       >
         {avatarUrl ? (
-          <img 
-            src={avatarUrl} 
-            alt={username || "Profile"} 
+          <img
+            src={avatarUrl}
+            alt={username || "Profile"}
+            width={innerSize}
+            height={innerSize}
             className="h-full w-full object-cover rounded-full"
+            decoding="async"
           />
         ) : (
           <div 

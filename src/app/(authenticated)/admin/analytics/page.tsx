@@ -2,7 +2,7 @@
 
 import { Link, useNavigate } from "@/lib/router-compat";
 import { useQuery } from "@tanstack/react-query";
-import { TrendingUp, Users, BookOpen, Eye, Heart, MessageSquare, Star, Clock, Flame } from "lucide-react";
+import { TrendingUp, Users, BookOpen, Eye, Heart, MessageSquare, Star, Clock, Flame, Circle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -73,43 +73,35 @@ export default function AdminAnalytics() {
     staleTime: 5 * 60 * 1000,
   });
 
-  // Most active users (by reading sessions)
-  const activeUsers = useQuery({
-    queryKey: ["analytics", "active-users"],
+  // Live users — anyone who opened a chapter in the last 5 minutes.
+  // We dedupe by user_id and surface the most recent session per user so we can
+  // show what they're currently reading + when they started.
+  const liveUsers = useQuery({
+    queryKey: ["analytics", "live-users"],
     queryFn: async () => {
-      const sevenDaysAgo = new Date();
-      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-      
+      const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+
       const { data, error } = await supabase
         .from("reading_sessions")
-        .select("user_id, profiles!inner(username, avatar_url, reading_streak)")
-        .gte("started_at", sevenDaysAgo.toISOString())
+        .select(
+          "user_id, started_at, device_type, chapter_id, profiles!inner(username, avatar_url, reading_streak), series:series_id(title, slug), chapter:chapter_id(chapter_number)"
+        )
+        .gte("started_at", fiveMinAgo)
         .not("user_id", "is", null)
+        .order("started_at", { ascending: false })
         .limit(1000);
-      
+
       if (error) throw error;
-      
-      // Count sessions per user
-      const userSessions = (data || []).reduce((acc: any, session: any) => {
-        const userId = session.user_id;
-        if (!acc[userId]) {
-          acc[userId] = {
-            user_id: userId,
-            username: session.profiles?.username || "Anonymous",
-            avatar_url: session.profiles?.avatar_url,
-            reading_streak: session.profiles?.reading_streak || 0,
-            session_count: 0,
-          };
-        }
-        acc[userId].session_count++;
-        return acc;
-      }, {});
-      
-      return Object.values(userSessions)
-        .sort((a: any, b: any) => b.session_count - a.session_count)
-        .slice(0, 10);
+
+      // Keep only the most recent session per user (data is already DESC by started_at).
+      const seen = new Map<string, any>();
+      for (const row of data ?? []) {
+        if (!seen.has(row.user_id)) seen.set(row.user_id, row);
+      }
+      return Array.from(seen.values());
     },
-    staleTime: 5 * 60 * 1000,
+    staleTime: 15 * 1000,
+    refetchInterval: 30 * 1000, // poll every 30s for a "live" feel
   });
 
   // Recent chapters uploaded
@@ -207,7 +199,7 @@ export default function AdminAnalytics() {
       <Tabs defaultValue="trending" className="space-y-4">
         <TabsList>
           <TabsTrigger value="trending">Trending Content</TabsTrigger>
-          <TabsTrigger value="users">Active Users</TabsTrigger>
+          <TabsTrigger value="users">Live Now</TabsTrigger>
           <TabsTrigger value="tags">Popular Genres</TabsTrigger>
           <TabsTrigger value="recent">Recent Uploads</TabsTrigger>
         </TabsList>

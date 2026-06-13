@@ -74,7 +74,10 @@ export function OptimizedImage({
         <img
           src={src}
           alt={alt}
+          width={300}
+          height={450}
           loading={priority ? "eager" : "lazy"}
+          fetchPriority={priority ? "high" : "auto"}
           decoding="async"
           onLoad={handleLoad}
           onError={handleError}

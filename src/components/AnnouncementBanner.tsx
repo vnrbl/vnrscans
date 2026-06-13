@@ -75,10 +75,13 @@ export function AnnouncementBanner() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["announcements"] }),
   });
 
-  if (!announcements.data?.length) return null;
+  // Reserve the banner's footprint up-front so a late mount doesn't push everything
+  // below it down — a major contributor to CLS. The slot collapses to 0 only when
+  // we've confirmed there's nothing to render.
+  const loading = announcements.isLoading || (!!user && readIds.isLoading);
 
-  const visible = announcements.data.filter((a) => {
-    if (sessionStorage.getItem(`announcement_dismissed_${a.id}`)) return false;
+  const visible = (announcements.data ?? []).filter((a) => {
+    if (typeof window !== "undefined" && sessionStorage.getItem(`announcement_dismissed_${a.id}`)) return false;
     if (user && readIds.data?.has(a.id)) return false;
     if (a.target_audience === "vip" && !profile.data?.is_vip) return false;
     if (a.target_audience === "new_users") {
@@ -89,10 +92,17 @@ export function AnnouncementBanner() {
   });
 
   const top = visible[0];
-  if (!top) return null;
+
+  if (!loading && !top) return null;
+
+  if (!top) {
+    // Render an invisible placeholder matching the banner height while loading,
+    // so the eventual paint doesn't shift everything below it.
+    return <div aria-hidden className="border-b border-transparent" style={{ height: 64 }} />;
+  }
 
   return (
-    <div className="relative overflow-hidden border-b border-border/50 bg-gradient-to-r from-gray-900 via-purple-900/20 to-gray-900">
+    <div className="relative overflow-hidden border-b border-border/50 bg-gradient-to-r from-gray-900 via-purple-900/20 to-gray-900" style={{ minHeight: 64 }}>
       {/* Background pattern */}
       <div className="absolute inset-0 bg-[linear-gradient(to_right,#4f4f4f2e_1px,transparent_1px),linear-gradient(to_bottom,#4f4f4f2e_1px,transparent_1px)] bg-[size:14px_24px] opacity-20" />
       

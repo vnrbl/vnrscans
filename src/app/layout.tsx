@@ -1,14 +1,38 @@
 import type { Metadata, Viewport } from "next";
+import { Barlow, Barlow_Condensed } from "next/font/google";
 import { Providers } from "@/components/Providers";
 import "@/styles.css";
 
+const barlow = Barlow({
+  subsets: ["latin"],
+  weight: ["300", "400", "500"],
+  display: "swap",
+  variable: "--font-barlow",
+  adjustFontFallback: true,
+  preload: true,
+});
+
+const barlowCondensed = Barlow_Condensed({
+  subsets: ["latin"],
+  weight: ["300", "400", "500", "600", "700"],
+  display: "swap",
+  variable: "--font-barlow-condensed",
+  adjustFontFallback: true,
+  preload: true,
+});
+
 export const metadata: Metadata = {
+  metadataBase: new URL("https://www.vnrscans.com"),
   title: "vnrscans - Read Manga, Manhwa, Manhua & Novels",
   description: "Discover manhwa stories drawn by imagination. Fast, free, and premium reading experience.",
+  alternates: {
+    canonical: "/",
+  },
   openGraph: {
     title: "vnrscans",
     description: "Read manga, manhwa, manhua, and novels on vnrscans.",
     type: "website",
+    url: "https://www.vnrscans.com",
   },
   twitter: {
     card: "summary",
@@ -35,13 +59,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className="dark" suppressHydrationWarning>
-      <head>
-        {/* Font preconnects for the condensed display system. */}
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link rel="preconnect" href="https://api.fontshare.com" />
-      </head>
+    <html
+      lang="en"
+      className={`dark ${barlow.variable} ${barlowCondensed.variable}`}
+      suppressHydrationWarning
+    >
       <body suppressHydrationWarning>
         <Providers>{children}</Providers>
       </body>

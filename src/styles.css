@@ -31,10 +31,8 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-/* D-DIN via Fontshare CDN (free, closest public match to D-DIN) */
-@import url("https://api.fontshare.com/v2/css?f[]=clash-display@400,500,600,700&display=swap");
-/* Barlow Condensed as the D-DIN fallback for body — tight, industrial */
-@import url("https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=Barlow:wght@300;400;500&display=swap");
+/* Fonts are loaded via next/font in app/layout.tsx (self-hosted, render-blocking-free).
+   They are exposed as CSS variables --font-barlow and --font-barlow-condensed. */
 
 @custom-variant dark (&:is(.dark *));
 
@@ -241,7 +239,7 @@
      *   Letters track positively (+0.32px body, +1.17px caps)
      *   Leading is TIGHT on display (0.95), normal on body (1.5–1.7)
      */
-    font-family: "Barlow Condensed", "Arial Narrow", Arial, Verdana, sans-serif;
+    font-family: var(--font-barlow), var(--font-barlow-condensed), "Barlow", "Arial Narrow", Arial, Verdana, sans-serif;
     letter-spacing: 0.02em;   /* SpaceX body: +0.32px at 16px ≈ 0.02em */
     line-height: 1.6;
     -webkit-font-smoothing: antialiased;
@@ -259,28 +257,28 @@
    * We apply condensed bold + tight leading to all headings.
    */
   h1 {
-    font-family: "Barlow Condensed", "Arial Narrow", Arial, sans-serif;
+    font-family: var(--font-barlow-condensed), "Barlow Condensed", "Arial Narrow", Arial, sans-serif;
     font-weight: 700;
     line-height: 0.95;
     letter-spacing: 0.08em;   /* +1.6px at 20px ≈ SpaceX display-xxl tracking */
     text-transform: uppercase;
   }
   h2 {
-    font-family: "Barlow Condensed", "Arial Narrow", Arial, sans-serif;
+    font-family: var(--font-barlow-condensed), "Barlow Condensed", "Arial Narrow", Arial, sans-serif;
     font-weight: 700;
     line-height: 1.1;
     letter-spacing: 0.05em;
     text-transform: uppercase;
   }
   h3, h4 {
-    font-family: "Barlow Condensed", "Arial Narrow", Arial, sans-serif;
+    font-family: var(--font-barlow-condensed), "Barlow Condensed", "Arial Narrow", Arial, sans-serif;
     font-weight: 600;
     line-height: 1.2;
     letter-spacing: 0.04em;
     text-transform: uppercase;
   }
   h5, h6 {
-    font-family: "Barlow Condensed", "Arial Narrow", Arial, sans-serif;
+    font-family: var(--font-barlow-condensed), "Barlow Condensed", "Arial Narrow", Arial, sans-serif;
     font-weight: 500;
     line-height: 1.3;
     letter-spacing: 0.04em;
@@ -314,6 +312,26 @@
     scrollbar-width: none;
   }
   .scrollbar-hide::-webkit-scrollbar { display: none; }
+
+  /* Hero carousel shine sweep — used by HomeHeroCarousel */
+  @keyframes shine {
+    0%   { transform: translateX(-100%) skewX(-12deg); }
+    100% { transform: translateX(200%)  skewX(-12deg); }
+  }
+  .animate-shine { animation: shine 1.5s ease-in-out; }
+
+  /* Navbar avatar frame animations — moved here so we don't inject a <style>
+     tag from JS on every component render (was a hidden INP cost). */
+  @keyframes navRotCW  { 0% { transform: rotate(0deg); }   100% { transform: rotate(360deg); } }
+  @keyframes navRotCCW { 0% { transform: rotate(360deg); } 100% { transform: rotate(0deg); } }
+  @keyframes navPulse  { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.06); } }
+  @keyframes navGlitch { 0%, 100% { filter: hue-rotate(0deg); } 50% { filter: hue-rotate(30deg); } }
+  @keyframes fireTongue {
+    0%, 100% { transform: scaleY(1) skewX(0deg) scaleX(1);     opacity: 0.85; filter: blur(1px) brightness(1); }
+    25%      { transform: scaleY(1.25) skewX(3deg) scaleX(0.95); opacity: 1;    filter: blur(0.5px) brightness(1.25); }
+    50%      { transform: scaleY(0.9) skewX(-2deg) scaleX(1.05); opacity: 0.75; filter: blur(1.5px) brightness(0.9); }
+    75%      { transform: scaleY(1.3) skewX(-3deg) scaleX(0.9);  opacity: 0.95; filter: blur(0.5px) brightness(1.35); }
+  }
 
   .optimize-scroll {
     content-visibility: auto;
@@ -419,7 +437,7 @@
    * D-DIN, 12px, 2.0 leading, +0.96px tracking.
    */
   .eyebrow {
-    font-family: "Barlow Condensed", "Arial Narrow", Arial, sans-serif;
+    font-family: var(--font-barlow-condensed), "Barlow Condensed", "Arial Narrow", Arial, sans-serif;
     font-size: 0.75rem;          /* 12px */
     font-weight: 400;
     letter-spacing: 0.08em;      /* +0.96px at 12px */

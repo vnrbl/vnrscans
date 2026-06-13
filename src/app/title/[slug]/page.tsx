@@ -44,6 +44,9 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   return {
     title,
     description,
+    alternates: {
+      canonical: `/title/${slug}`,
+    },
     // Preload cover image in the <head> so the browser discovers it before JS hydration
     ...(series?.cover_url
       ? {
