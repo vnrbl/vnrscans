@@ -224,6 +224,7 @@ function RankingList({
                 alt={series.title}
                 className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
                 loading="lazy"
+                referrerPolicy="no-referrer"
               />
             ) : (
               <div className="flex h-full w-full items-center justify-center text-muted-foreground">

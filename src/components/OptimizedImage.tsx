@@ -79,6 +79,7 @@ export function OptimizedImage({
           loading={priority ? "eager" : "lazy"}
           fetchPriority={priority ? "high" : "auto"}
           decoding="async"
+          referrerPolicy="no-referrer"
           onLoad={handleLoad}
           onError={handleError}
           className={`h-full w-full object-cover transition-opacity duration-300 ${

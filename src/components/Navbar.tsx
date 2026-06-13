@@ -631,6 +631,7 @@ function SeriesSearchPanel({
                       className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
                       loading="lazy"
                       decoding="async"
+                      referrerPolicy="no-referrer"
                     />
                   ) : (
                     <div className="grid h-full w-full place-items-center text-muted-foreground">
