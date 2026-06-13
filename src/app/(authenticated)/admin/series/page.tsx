@@ -22,6 +22,7 @@ import {
   Power,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { logAdminAction } from "@/lib/adminLog";
 import { useAuth } from "@/hooks/useAuth";
 import { $extractChaptersFromUrl, $extractImagesFromUrl, $syncImportSource } from "@/lib/api/scraper.actions";
 import type { ChapterInfo } from "@/lib/chapter-scraper";
@@ -496,6 +497,7 @@ export default function AdminSeries() {
         .single();
       if (error) throw error;
       await syncSeriesTaxonomy(data.id, form);
+      await logAdminAction("create", "series", data.id, { title: form.title });
     },
     onSuccess: () => {
       toast.success("Series created");
@@ -518,6 +520,7 @@ export default function AdminSeries() {
         .eq("id", editingSeries.id);
       if (error) throw error;
       await syncSeriesTaxonomy(editingSeries.id, form);
+      await logAdminAction("update", "series", editingSeries.id, { title: form.title });
     },
     onSuccess: () => {
       toast.success("Series updated");
@@ -537,6 +540,9 @@ export default function AdminSeries() {
         .update({ is_hidden: !s.is_hidden })
         .eq("id", s.id);
       if (error) throw error;
+      await logAdminAction(s.is_hidden ? "unhide" : "hide", "series", s.id, {
+        title: s.title,
+      });
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "series"] }),
   });
@@ -545,6 +551,7 @@ export default function AdminSeries() {
     mutationFn: async (id: string) => {
       const { error } = await supabase.from('tags').delete().eq('id', id);
       if (error) throw error;
+      await logAdminAction("delete", "tag", id);
     },
     onSuccess: () => {
       toast.success('Tag deleted');
@@ -557,6 +564,7 @@ export default function AdminSeries() {
     mutationFn: async (id: string) => {
       const { error } = await supabase.from("series").delete().eq("id", id);
       if (error) throw error;
+      await logAdminAction("delete", "series", id);
     },
     onSuccess: () => {
       toast.success("Series deleted");

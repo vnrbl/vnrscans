@@ -1,12 +1,24 @@
 "use client";
 
-import { Link, useNavigate } from "@/lib/router-compat";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
-import { Pencil, Trash2, AlertTriangle, Search } from "lucide-react";
+import { useMemo, useState } from "react";
+import {
+  Pencil,
+  Trash2,
+  AlertTriangle,
+  Search,
+  Shield,
+  Ban,
+  ShieldOff,
+  Crown,
+  Download,
+  Flame,
+  ChevronDown,
+} from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { $deleteUser } from "@/lib/api/admin.actions";
+import { $deleteUser, $listUserEmails } from "@/lib/api/admin.actions";
+import { logAdminAction } from "@/lib/adminLog";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -26,30 +38,111 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuCheckboxItem,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
 
+type ProfileRow = {
+  id: string;
+  user_id: string;
+  username: string | null;
+  bio: string | null;
+  avatar_url: string | null;
+  created_at: string;
+  is_banned: boolean | null;
+  ban_reason: string | null;
+  is_vip: boolean | null;
+  user_level: number | null;
+  reading_streak: number | null;
+  last_read_date: string | null;
+};
+
+const ASSIGNABLE_ROLES = ["admin", "moderator", "uploader", "user"] as const;
+type AssignableRole = (typeof ASSIGNABLE_ROLES)[number];
+
+const roleBadgeVariant: Record<string, "destructive" | "default" | "secondary" | "outline"> = {
+  admin: "destructive",
+  moderator: "default",
+  uploader: "secondary",
+  user: "outline",
+};
+
+type StatusFilter = "all" | "admin" | "moderator" | "vip" | "banned";
 
 export default function AdminUsers() {
   const qc = useQueryClient();
-  const [editingUser, setEditingUser] = useState<any | null>(null);
-  const [deletingUser, setDeletingUser] = useState<any | null>(null);
+  const [editingUser, setEditingUser] = useState<ProfileRow | null>(null);
+  const [deletingUser, setDeletingUser] = useState<ProfileRow | null>(null);
+  const [banningUser, setBanningUser] = useState<ProfileRow | null>(null);
+  const [banReason, setBanReason] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [form, setForm] = useState({ username: "", bio: "", avatar_url: "" });
+
+  /* ---------------------------------------------------------------- */
+  /*  Data: profiles, roles, and (admin-only) emails                  */
+  /* ---------------------------------------------------------------- */
 
   const q = useQuery({
     queryKey: ["admin", "users"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("profiles")
-        .select("id,username,bio,avatar_url,created_at,user_id")
+        .select(
+          "id,username,bio,avatar_url,created_at,user_id,is_banned,ban_reason,is_vip,user_level,reading_streak,last_read_date"
+        )
         .order("created_at", { ascending: false })
         .limit(200);
       if (error) throw error;
-      return data ?? [];
+      return (data ?? []) as ProfileRow[];
     },
   });
+
+  const rolesQuery = useQuery({
+    queryKey: ["admin", "users", "roles"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("user_roles").select("id,user_id,role");
+      if (error) throw error;
+      const map = new Map<string, Array<{ id: string; role: string }>>();
+      (data ?? []).forEach((r) => {
+        const list = map.get(r.user_id) ?? [];
+        list.push({ id: r.id, role: r.role });
+        map.set(r.user_id, list);
+      });
+      return map;
+    },
+  });
+
+  const emailsQuery = useQuery({
+    queryKey: ["admin", "users", "emails", q.data?.length ?? 0],
+    enabled: !!q.data && q.data.length > 0,
+    staleTime: 5 * 60 * 1000,
+    queryFn: async () => {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+      if (!token) throw new Error("Not authenticated");
+      const targetUserIds = (q.data ?? []).map((u) => u.user_id).filter(Boolean);
+      const result = await $listUserEmails({ data: { targetUserIds, accessToken: token } });
+      if (!result.success) throw new Error(result.error || "Failed to load emails");
+      return result.emails as Record<string, string>;
+    },
+  });
+
+  const rolesFor = (userId: string) => rolesQuery.data?.get(userId) ?? [];
+  const emailFor = (userId: string) => emailsQuery.data?.[userId] ?? "";
+
+  /* ---------------------------------------------------------------- */
+  /*  Mutations                                                        */
+  /* ---------------------------------------------------------------- */
 
   const updateUser = useMutation({
     mutationFn: async () => {
@@ -63,6 +156,7 @@ export default function AdminUsers() {
         })
         .eq("id", editingUser.id);
       if (error) throw error;
+      await logAdminAction("update", "user", editingUser.id, { username: form.username });
     },
     onSuccess: () => {
       toast.success("User updated");
@@ -82,6 +176,7 @@ export default function AdminUsers() {
         data: { targetUserId, accessToken: token },
       });
       if (!result.success) throw new Error(result.error || "Failed to delete user");
+      await logAdminAction("delete", "user", targetUserId);
       return result;
     },
     onSuccess: () => {
@@ -92,16 +187,157 @@ export default function AdminUsers() {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  // Filter users by search query
-  const filteredUsers = (q.data ?? []).filter((u) => {
-    if (!searchQuery.trim()) return true;
-    const query = searchQuery.toLowerCase();
-    return (
-      u.username?.toLowerCase().includes(query) ||
-      u.user_id?.toLowerCase().includes(query) ||
-      u.bio?.toLowerCase().includes(query)
-    );
+  // Add or remove a role for a user, then refresh the role map.
+  const toggleRole = useMutation({
+    mutationFn: async ({
+      user,
+      role,
+      hasRole,
+    }: {
+      user: ProfileRow;
+      role: AssignableRole;
+      hasRole: boolean;
+    }) => {
+      if (hasRole) {
+        const existing = rolesFor(user.user_id).find((r) => r.role === role);
+        if (!existing) return;
+        const { error } = await supabase.from("user_roles").delete().eq("id", existing.id);
+        if (error) throw error;
+        await logAdminAction("revoke_role", "user_role", user.user_id, { role });
+      } else {
+        const { error } = await supabase
+          .from("user_roles")
+          .insert({ user_id: user.user_id, role });
+        if (error) throw error;
+        await logAdminAction("assign_role", "user_role", user.user_id, { role });
+      }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin", "users", "roles"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
   });
+
+  // Ban (with reason) or unban a user via the is_banned flag.
+  const setBan = useMutation({
+    mutationFn: async ({ user, banned, reason }: { user: ProfileRow; banned: boolean; reason?: string }) => {
+      const { error } = await supabase
+        .from("profiles")
+        .update({
+          is_banned: banned,
+          ban_reason: banned ? reason || null : null,
+          banned_at: banned ? new Date().toISOString() : null,
+        })
+        .eq("id", user.id);
+      if (error) throw error;
+      await logAdminAction(banned ? "ban_user" : "unban_user", "profile", user.user_id, {
+        reason: banned ? reason : undefined,
+      });
+    },
+    onSuccess: (_data, vars) => {
+      toast.success(vars.banned ? "User banned" : "User unbanned");
+      setBanningUser(null);
+      setBanReason("");
+      qc.invalidateQueries({ queryKey: ["admin", "users"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  /* ---------------------------------------------------------------- */
+  /*  Filtering                                                        */
+  /* ---------------------------------------------------------------- */
+
+  const filteredUsers = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    return (q.data ?? []).filter((u) => {
+      if (query) {
+        const matches =
+          u.username?.toLowerCase().includes(query) ||
+          u.user_id?.toLowerCase().includes(query) ||
+          u.bio?.toLowerCase().includes(query) ||
+          emailFor(u.user_id).toLowerCase().includes(query);
+        if (!matches) return false;
+      }
+      switch (statusFilter) {
+        case "admin":
+          return rolesFor(u.user_id).some((r) => r.role === "admin");
+        case "moderator":
+          return rolesFor(u.user_id).some((r) => r.role === "moderator");
+        case "vip":
+          return !!u.is_vip;
+        case "banned":
+          return !!u.is_banned;
+        default:
+          return true;
+      }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [q.data, searchQuery, statusFilter, rolesQuery.data, emailsQuery.data]);
+
+  /* ---------------------------------------------------------------- */
+  /*  CSV export (respects current filter)                            */
+  /* ---------------------------------------------------------------- */
+
+  const exportCsv = () => {
+    const rows = filteredUsers;
+    if (rows.length === 0) {
+      toast.error("Nothing to export");
+      return;
+    }
+    const header = [
+      "username",
+      "email",
+      "user_id",
+      "roles",
+      "level",
+      "reading_streak",
+      "is_vip",
+      "is_banned",
+      "ban_reason",
+      "last_read_date",
+      "created_at",
+    ];
+    const escape = (val: unknown) => {
+      const s = val == null ? "" : String(val);
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const lines = rows.map((u) =>
+      [
+        u.username ?? "",
+        emailFor(u.user_id),
+        u.user_id,
+        rolesFor(u.user_id)
+          .map((r) => r.role)
+          .join("|"),
+        u.user_level ?? "",
+        u.reading_streak ?? "",
+        u.is_vip ? "yes" : "no",
+        u.is_banned ? "yes" : "no",
+        u.ban_reason ?? "",
+        u.last_read_date ?? "",
+        u.created_at,
+      ]
+        .map(escape)
+        .join(",")
+    );
+    const csv = [header.join(","), ...lines].join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `users-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success(`Exported ${rows.length} users`);
+  };
+
+  const filterTabs: Array<{ key: StatusFilter; label: string }> = [
+    { key: "all", label: "All" },
+    { key: "admin", label: "Admins" },
+    { key: "moderator", label: "Moderators" },
+    { key: "vip", label: "VIP" },
+    { key: "banned", label: "Banned" },
+  ];
 
   return (
     <div>
@@ -110,64 +346,193 @@ export default function AdminUsers() {
           <h1 className="text-2xl font-bold tracking-tight">Users</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             {q.data?.length ?? 0} total users
+            {statusFilter !== "all" && ` · ${filteredUsers.length} shown`}
           </p>
         </div>
 
-        {/* Search */}
-        <div className="relative w-full sm:max-w-xs">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Search users..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9"
-          />
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={exportCsv} disabled={filteredUsers.length === 0}>
+            <Download className="mr-1.5 h-4 w-4" />
+            Export CSV
+          </Button>
+          {/* Search */}
+          <div className="relative w-full sm:max-w-xs">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Search users..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9"
+            />
+          </div>
         </div>
       </div>
 
-      <div className="mt-6 divide-y divide-border/40 rounded-lg border border-border/40 bg-card">
+      {/* Filter chips */}
+      <div className="mt-4 flex flex-wrap gap-2">
+        {filterTabs.map((t) => (
+          <button
+            key={t.key}
+            onClick={() => setStatusFilter(t.key)}
+            className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+              statusFilter === t.key
+                ? "border-primary bg-primary/10 text-primary"
+                : "border-border/40 text-muted-foreground hover:bg-secondary/40"
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      <div className="mt-4 divide-y divide-border/40 rounded-lg border border-border/40 bg-card">
         {q.isLoading && <div className="p-6 text-sm text-muted-foreground">Loading...</div>}
         {!q.isLoading && filteredUsers.length === 0 && (
-          <div className="p-6 text-sm text-muted-foreground text-center">
-            {searchQuery ? "No users match your search" : "No users found"}
+          <div className="p-6 text-center text-sm text-muted-foreground">
+            {searchQuery || statusFilter !== "all" ? "No users match your filters" : "No users found"}
           </div>
         )}
-        {filteredUsers.map((u) => (
-          <div key={u.id} className="flex items-center gap-3 p-3 hover:bg-secondary/30 transition-colors">
-            {u.avatar_url ? (
-              <img src={u.avatar_url} alt="" className="h-9 w-9 rounded-full object-cover" />
-            ) : (
-              <div className="grid h-9 w-9 place-items-center rounded-full bg-secondary text-sm">{u.username?.[0]?.toUpperCase()}</div>
-            )}
-            <div className="flex-1 min-w-0">
-              <div className="font-medium truncate">{u.username}</div>
-              <div className="text-xs text-muted-foreground truncate">{u.bio || u.user_id}</div>
+        {filteredUsers.map((u) => {
+          const userRoles = rolesFor(u.user_id);
+          const email = emailFor(u.user_id);
+          return (
+            <div key={u.id} className="flex items-center gap-3 p-3 transition-colors hover:bg-secondary/30">
+              {u.avatar_url ? (
+                <img src={u.avatar_url} alt="" className="h-9 w-9 rounded-full object-cover" />
+              ) : (
+                <div className="grid h-9 w-9 place-items-center rounded-full bg-secondary text-sm">
+                  {u.username?.[0]?.toUpperCase()}
+                </div>
+              )}
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <span className="truncate font-medium">{u.username}</span>
+                  {u.is_vip && <Crown className="h-3.5 w-3.5 shrink-0 text-amber-400" aria-label="VIP" />}
+                  {u.is_banned && (
+                    <Badge variant="destructive" className="h-4 px-1.5 text-[10px]">
+                      Banned
+                    </Badge>
+                  )}
+                  {userRoles
+                    .filter((r) => r.role !== "user")
+                    .map((r) => (
+                      <Badge
+                        key={r.id}
+                        variant={roleBadgeVariant[r.role] ?? "outline"}
+                        className="h-4 px-1.5 text-[10px]"
+                      >
+                        {r.role}
+                      </Badge>
+                    ))}
+                </div>
+                <div className="truncate text-xs text-muted-foreground">{email || u.bio || u.user_id}</div>
+              </div>
+
+              {/* Stats */}
+              <div className="hidden items-center gap-3 text-xs text-muted-foreground md:flex">
+                <span title="Level">Lv {u.user_level ?? 1}</span>
+                {(u.reading_streak ?? 0) > 0 && (
+                  <span className="flex items-center gap-0.5" title="Reading streak">
+                    <Flame className="h-3 w-3 text-orange-400" />
+                    {u.reading_streak}
+                  </span>
+                )}
+                <span title="Last read">
+                  {u.last_read_date ? new Date(u.last_read_date).toLocaleDateString() : "—"}
+                </span>
+              </div>
+
+              <div className="hidden text-xs text-muted-foreground sm:block">
+                {new Date(u.created_at).toLocaleDateString()}
+              </div>
+
+              <div className="flex items-center gap-1">
+                {/* Role management */}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="sm" className="h-8 gap-1 px-2" title="Manage roles">
+                      <Shield className="h-4 w-4" />
+                      <ChevronDown className="h-3 w-3" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuLabel>Roles</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    {ASSIGNABLE_ROLES.map((role) => {
+                      const hasRole = userRoles.some((r) => r.role === role);
+                      return (
+                        <DropdownMenuCheckboxItem
+                          key={role}
+                          checked={hasRole}
+                          disabled={toggleRole.isPending}
+                          onSelect={(e) => {
+                            e.preventDefault();
+                            toggleRole.mutate({ user: u, role, hasRole });
+                          }}
+                          className="capitalize"
+                        >
+                          {role}
+                        </DropdownMenuCheckboxItem>
+                      );
+                    })}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+
+                {/* Ban / unban */}
+                {u.is_banned ? (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setBan.mutate({ user: u, banned: false })}
+                    disabled={setBan.isPending}
+                    title="Unban user"
+                    className="text-emerald-500 hover:bg-emerald-500/10 hover:text-emerald-500"
+                  >
+                    <ShieldOff className="h-4 w-4" />
+                  </Button>
+                ) : (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => {
+                      setBanningUser(u);
+                      setBanReason("");
+                    }}
+                    title="Ban user"
+                    className="text-amber-500 hover:bg-amber-500/10 hover:text-amber-500"
+                  >
+                    <Ban className="h-4 w-4" />
+                  </Button>
+                )}
+
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => {
+                    setEditingUser(u);
+                    setForm({
+                      username: u.username ?? "",
+                      bio: u.bio ?? "",
+                      avatar_url: u.avatar_url ?? "",
+                    });
+                  }}
+                  title="Edit user"
+                >
+                  <Pencil className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setDeletingUser(u)}
+                  title="Delete user"
+                  className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
-            <div className="text-xs text-muted-foreground hidden sm:block">{new Date(u.created_at).toLocaleDateString()}</div>
-            <div className="flex items-center gap-1">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => {
-                  setEditingUser(u);
-                  setForm({ username: u.username ?? "", bio: u.bio ?? "", avatar_url: u.avatar_url ?? "" });
-                }}
-                title="Edit user"
-              >
-                <Pencil className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setDeletingUser(u)}
-                title="Delete user"
-                className="text-destructive hover:text-destructive hover:bg-destructive/10"
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* Edit user dialog */}
@@ -175,7 +540,7 @@ export default function AdminUsers() {
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>Edit user data</DialogTitle>
-            <DialogDescription>Update the user's profile information.</DialogDescription>
+            <DialogDescription>Update the user&apos;s profile information.</DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
             <div>
@@ -194,6 +559,42 @@ export default function AdminUsers() {
           <DialogFooter>
             <Button onClick={() => updateUser.mutate()} disabled={!form.username || updateUser.isPending}>
               {updateUser.isPending ? "Saving..." : "Save changes"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Ban dialog (with reason) */}
+      <Dialog open={!!banningUser} onOpenChange={(v) => { if (!v) { setBanningUser(null); setBanReason(""); } }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Ban className="h-5 w-5 text-amber-500" />
+              Ban {banningUser?.username}
+            </DialogTitle>
+            <DialogDescription>
+              The user will be signed out and blocked from using the site. You can unban them later.
+            </DialogDescription>
+          </DialogHeader>
+          <div>
+            <Label>Reason (optional)</Label>
+            <Textarea
+              rows={3}
+              placeholder="e.g. Repeated spam in comments"
+              value={banReason}
+              onChange={(e) => setBanReason(e.target.value)}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setBanningUser(null); setBanReason(""); }}>
+              Cancel
+            </Button>
+            <Button
+              className="bg-amber-600 text-white hover:bg-amber-600/90"
+              disabled={setBan.isPending}
+              onClick={() => banningUser && setBan.mutate({ user: banningUser, banned: true, reason: banReason })}
+            >
+              {setBan.isPending ? "Banning..." : "Ban user"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -218,9 +619,7 @@ export default function AdminUsers() {
                 • Role assignments<br />
                 • Reading history and library
               </span>
-              <span className="block font-medium text-destructive">
-                This action cannot be undone.
-              </span>
+              <span className="block font-medium text-destructive">This action cannot be undone.</span>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

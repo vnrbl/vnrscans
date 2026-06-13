@@ -22,6 +22,7 @@ import {
   Power,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { logAdminAction } from "@/lib/adminLog";
 import { useAuth } from "@/hooks/useAuth";
 import { $extractChaptersFromUrl, $extractImagesFromUrl, $syncImportSource } from "@/lib/api/scraper.actions";
 import type { ChapterInfo } from "@/lib/chapter-scraper";
@@ -827,6 +828,12 @@ export default function ChapterManager({ seriesId, onBack }: { seriesId: string;
 
       const { error: pagesError } = await supabase.from("chapter_pages").insert(pages);
       if (pagesError) throw pagesError;
+      await logAdminAction("create", "chapter", chapter.id, {
+        series_id: seriesId,
+        chapter_number: chapterNum,
+        scanlation_group,
+        pages: urls.length,
+      });
     },
     onSuccess: () => {
       toast.success("Chapter uploaded");
@@ -1180,6 +1187,10 @@ export default function ChapterManager({ seriesId, onBack }: { seriesId: string;
 
       const { error } = await supabase.from("chapters").delete().in("id", chapterIds);
       if (error) throw error;
+      await logAdminAction("bulk_delete", "chapter", undefined, {
+        series_id: seriesId,
+        count: chapterIds.length,
+      });
     },
     onSuccess: () => {
       setSelectedChapterIds(new Set());
@@ -1429,6 +1440,10 @@ export default function ChapterManager({ seriesId, onBack }: { seriesId: string;
         })),
       );
       if (pagesError) throw pagesError;
+      await logAdminAction("update", "chapter", editingChapter.id, {
+        series_id: seriesId,
+        chapter_number: chapterNum,
+      });
     },
     onSuccess: () => {
       toast.success("Chapter updated");
@@ -1445,6 +1460,7 @@ export default function ChapterManager({ seriesId, onBack }: { seriesId: string;
       await supabase.from("chapter_pages").delete().eq("chapter_id", chapterId);
       const { error } = await supabase.from("chapters").delete().eq("id", chapterId);
       if (error) throw error;
+      await logAdminAction("delete", "chapter", chapterId, { series_id: seriesId });
     },
     onSuccess: () => {
       toast.success("Chapter deleted");

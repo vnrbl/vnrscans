@@ -5,6 +5,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { EyeOff, Eye, Trash2, Pin, PinOff, Search, Image as ImageIcon, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { logAdminAction } from "@/lib/adminLog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -56,6 +57,8 @@ export default function AdminComments() {
     mutationFn: async ({ id, patch }: { id: string; patch: Record<string, unknown> }) => {
       const { error } = await (supabase.from("comments") as any).update(patch).eq("id", id);
       if (error) throw error;
+      const action = "is_hidden" in patch ? (patch.is_hidden ? "hide" : "unhide") : "update";
+      await logAdminAction(action, "comment", id, patch);
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "comments"] }),
     onError: (error: Error) => toast.error(error.message),
@@ -65,6 +68,7 @@ export default function AdminComments() {
     mutationFn: async (id: string) => {
       const { error } = await supabase.from("comments").delete().eq("id", id);
       if (error) throw error;
+      await logAdminAction("delete", "comment", id);
     },
     onSuccess: () => {
       toast.success("Deleted");

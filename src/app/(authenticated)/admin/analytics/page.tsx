@@ -246,50 +246,123 @@ export default function AdminAnalytics() {
           </Card>
         </TabsContent>
 
-        {/* Active Users */}
+        {/* Live Users — anyone with a reading session started in the last 5 minutes */}
         <TabsContent value="users" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Users className="h-5 w-5 text-blue-600" />
-                Most Active Readers (Last 7 Days)
-              </CardTitle>
-              <CardDescription>Users with the most reading sessions</CardDescription>
+              <div className="flex items-center justify-between gap-2">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <span className="relative flex h-2.5 w-2.5">
+                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500 opacity-75" />
+                      <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500" />
+                    </span>
+                    Live Now
+                  </CardTitle>
+                  <CardDescription>
+                    Users reading right now (active in the last 5 minutes)
+                  </CardDescription>
+                </div>
+                <Badge variant="outline" className="gap-1">
+                  <Users className="h-3 w-3" />
+                  {(liveUsers.data || []).length} online
+                </Badge>
+              </div>
             </CardHeader>
             <CardContent>
-              <div className="space-y-3">
-                {activeUsers.isLoading && (
-                  <p className="text-sm text-muted-foreground">Loading...</p>
-                )}
-                {(activeUsers.data || []).map((user: any, idx: number) => (
-                  <div key={user.user_id} className="flex items-center gap-3 rounded-lg border border-border/40 bg-card p-3">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-blue-600 to-cyan-600 text-sm font-bold text-white">
-                      {idx + 1}
-                    </div>
-                    {user.avatar_url ? (
-                      <img src={user.avatar_url} alt="" className="h-10 w-10 rounded-full object-cover" />
-                    ) : (
-                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-secondary text-sm font-bold">
-                        {user.username?.[0]?.toUpperCase() || "?"}
-                      </div>
-                    )}
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate font-semibold">{user.username}</p>
-                      <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                        <span className="flex items-center gap-1">
-                          <BookOpen className="h-3 w-3" />
-                          {user.session_count} chapters read
-                        </span>
-                        {user.reading_streak > 0 && (
-                          <span className="flex items-center gap-1">
-                            <Flame className="h-3 w-3 text-orange-600" />
-                            {user.reading_streak} day streak
+              {liveUsers.isLoading && (
+                <p className="text-sm text-muted-foreground">Loading…</p>
+              )}
+              {!liveUsers.isLoading && (liveUsers.data || []).length === 0 && (
+                <div className="rounded-lg border border-dashed border-border/60 bg-card p-8 text-center">
+                  <Circle className="mx-auto mb-2 h-6 w-6 text-muted-foreground" />
+                  <p className="text-sm text-muted-foreground">
+                    No users are reading right now.
+                  </p>
+                </div>
+              )}
+              <div className="max-h-[70vh] space-y-3 overflow-y-auto pr-1">
+                {(liveUsers.data || []).map((user: any) => {
+                  const startedMs = new Date(user.started_at).getTime();
+                  const minutesAgo = Math.max(0, Math.floor((Date.now() - startedMs) / 60000));
+                  const seriesTitle = user.series?.title;
+                  const seriesSlug = user.series?.slug;
+                  const chapterNum = user.chapter?.chapter_number;
+                  return (
+                    <div
+                      key={user.user_id}
+                      className="flex items-center gap-3 rounded-lg border border-border/40 bg-card p-3"
+                    >
+                      <span
+                        className="relative flex h-2.5 w-2.5 shrink-0"
+                        title="Live"
+                      >
+                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500 opacity-75" />
+                        <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500" />
+                      </span>
+                      {user.profiles?.avatar_url ? (
+                        <img
+                          src={user.profiles.avatar_url}
+                          alt=""
+                          width={40}
+                          height={40}
+                          className="h-10 w-10 rounded-full object-cover"
+                          loading="lazy"
+                          decoding="async"
+                        />
+                      ) : (
+                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-secondary text-sm font-bold">
+                          {user.profiles?.username?.[0]?.toUpperCase() || "?"}
+                        </div>
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <p className="truncate font-semibold">
+                            {user.profiles?.username || "Anonymous"}
+                          </p>
+                          {user.profiles?.reading_streak > 0 && (
+                            <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                              <Flame className="h-3 w-3 text-orange-600" />
+                              {user.profiles.reading_streak}
+                            </span>
+                          )}
+                          {user.device_type && (
+                            <Badge variant="outline" className="h-5 text-[10px] uppercase">
+                              {user.device_type}
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
+                          {seriesTitle ? (
+                            <span className="flex min-w-0 items-center gap-1">
+                              <BookOpen className="h-3 w-3 shrink-0" />
+                              <Link
+                                to="/title/$slug"
+                                params={{ slug: seriesSlug }}
+                                className="truncate hover:text-primary"
+                              >
+                                {seriesTitle}
+                              </Link>
+                              {chapterNum !== undefined && (
+                                <span className="shrink-0">· Ch. {chapterNum}</span>
+                              )}
+                            </span>
+                          ) : (
+                            <span className="flex items-center gap-1">
+                              <BookOpen className="h-3 w-3" />
+                              Reading
+                            </span>
+                          )}
+                          <span className="shrink-0">·</span>
+                          <span className="flex items-center gap-1 shrink-0">
+                            <Clock className="h-3 w-3" />
+                            {minutesAgo === 0 ? "just now" : `${minutesAgo}m ago`}
                           </span>
-                        )}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </CardContent>
           </Card>

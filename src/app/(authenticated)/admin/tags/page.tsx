@@ -6,6 +6,7 @@ import { useState } from "react";
 import { ArrowRight, Plus, Pencil, Trash2, Tag as TagIcon, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { logAdminAction } from "@/lib/adminLog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -81,6 +82,7 @@ export default function AdminTags() {
         slug: slugify(genreForm.name),
       });
       if (error) throw error;
+      await logAdminAction("create", "genre", undefined, { name: genreForm.name });
     },
     onSuccess: () => {
       toast.success("Genre created");
@@ -102,6 +104,7 @@ export default function AdminTags() {
         })
         .eq("id", editingGenre.id);
       if (error) throw error;
+      await logAdminAction("update", "genre", editingGenre.id, { name: genreForm.name });
     },
     onSuccess: () => {
       toast.success("Genre updated");
@@ -116,6 +119,7 @@ export default function AdminTags() {
     mutationFn: async (id: string) => {
       const { error } = await supabase.from("genres").delete().eq("id", id);
       if (error) throw error;
+      await logAdminAction("delete", "genre", id);
     },
     onSuccess: () => {
       toast.success("Genre deleted");
@@ -134,6 +138,7 @@ export default function AdminTags() {
         icon: form.icon || null,
       });
       if (error) throw error;
+      await logAdminAction("create", "tag", undefined, { name: form.name });
     },
     onSuccess: () => {
       toast.success("Tag created");
@@ -159,6 +164,7 @@ export default function AdminTags() {
         })
         .eq("id", editingTag.id);
       if (error) throw error;
+      await logAdminAction("update", "tag", editingTag.id, { name: form.name });
     },
     onSuccess: () => {
       toast.success("Tag updated");
@@ -173,6 +179,7 @@ export default function AdminTags() {
     mutationFn: async (id: string) => {
       const { error } = await (supabase as any).from("tags").delete().eq("id", id);
       if (error) throw error;
+      await logAdminAction("delete", "tag", id);
     },
     onSuccess: () => {
       toast.success("Tag deleted");
@@ -234,6 +241,7 @@ export default function AdminTags() {
         .in("id", sourceTagIds);
       if (deleteTagsError) throw deleteTagsError;
 
+      await logAdminAction("migrate", "tag", undefined, { count: sourceTags.length });
       return sourceTags.length;
     },
     onSuccess: (count) => {

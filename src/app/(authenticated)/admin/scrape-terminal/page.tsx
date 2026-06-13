@@ -4,6 +4,7 @@ import { Link, useNavigate } from "@/lib/router-compat";
 import { useState, useRef, useEffect } from "react";
 import { $runCloudScrape } from "@/lib/api/scraper.actions";
 import { supabase } from "@/integrations/supabase/client";
+import { logAdminAction } from "@/lib/adminLog";
 
 
 type Step =
@@ -257,6 +258,14 @@ export default function ScrapeTerminal() {
 
       appendLine("");
       appendLine("📊 --- Import Complete --- 📊");
+      await logAdminAction("scrape", "series", undefined, {
+        url,
+        chaptersFound: result.chaptersFound,
+        imported: result.imported,
+        failed: result.failed,
+        skipped: result.skipped,
+        dryRun: !!result.dryRun,
+      });
     } catch (err: unknown) {
       if (runToken !== runTokenRef.current) return;
       appendLine("❌ Fatal Error: " + (err instanceof Error ? err.message : "Cloud scrape failed"));

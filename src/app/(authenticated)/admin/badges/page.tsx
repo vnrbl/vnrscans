@@ -6,6 +6,7 @@ import { useState } from "react";
 import { Plus, Pencil, Trash2, ShieldAlert, Award, Star } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { logAdminAction } from "@/lib/adminLog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -101,6 +102,7 @@ export default function AdminBadges() {
         is_active: form.is_active,
       });
       if (error) throw error;
+      await logAdminAction("create", "badge", undefined, { name: form.name.trim() });
     },
     onSuccess: () => {
       toast.success("Badge/Title created successfully");
@@ -134,6 +136,7 @@ export default function AdminBadges() {
         })
         .eq("id", editingBadge.id);
       if (error) throw error;
+      await logAdminAction("update", "badge", editingBadge.id, { name: form.name.trim() });
     },
     onSuccess: () => {
       toast.success("Badge/Title updated successfully");
@@ -150,6 +153,7 @@ export default function AdminBadges() {
     mutationFn: async (id: string) => {
       const { error } = await supabase.from("profile_badges" as any).delete().eq("id", id);
       if (error) throw error;
+      await logAdminAction("delete", "badge", id);
     },
     onSuccess: () => {
       toast.success("Badge/Title deleted successfully");
