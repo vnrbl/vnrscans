@@ -12,7 +12,8 @@
       "Bash(node *)",
       "Bash(sort -k2)",
       "Bash(npx supabase *)",
-      "Bash(git ls-tree *)"
+      "Bash(git ls-tree *)",
+      "Bash(npx --no-install tsc --noEmit -p tsconfig.json)"
     ]
   }
 }

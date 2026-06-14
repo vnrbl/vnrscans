@@ -327,6 +327,7 @@ export type Database = {
           series_id: string
           updated_at: string
           user_id: string
+          xp_awarded: boolean
         }
         Insert: {
           chapter_id: string
@@ -335,6 +336,7 @@ export type Database = {
           series_id: string
           updated_at?: string
           user_id: string
+          xp_awarded?: boolean
         }
         Update: {
           chapter_id?: string
@@ -343,6 +345,7 @@ export type Database = {
           series_id?: string
           updated_at?: string
           user_id?: string
+          xp_awarded?: boolean
         }
         Relationships: [
           {
@@ -1616,6 +1619,17 @@ export type Database = {
           target_user_id: string
         }
         Returns: undefined
+      }
+      award_chapter_completion_xp: {
+        Args: {
+          _chapter_id: string
+        }
+        Returns: {
+          xp_gained: number
+          total_xp: number
+          new_level: number
+          leveled_up: boolean
+        }[]
       }
     }
     Enums: {

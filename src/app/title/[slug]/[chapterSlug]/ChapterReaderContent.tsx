@@ -270,6 +270,64 @@ export default function Reader({ slug, chapterSlug }: { slug: string; chapterSlu
     };
   }, [user, chapterQ.data]);
 
+  // Award XP once per chapter completion (>= 90% scroll, or chapters that fit
+  // entirely on screen). The RPC itself is idempotent per (user, chapter).
+  const xpAwardedRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!user || !chapterQ.data) return;
+
+    const chapterId = chapterQ.data.id;
+    let cancelled = false;
+
+    const awardXp = async () => {
+      if (xpAwardedRef.current === chapterId) return;
+      xpAwardedRef.current = chapterId;
+
+      const { data, error } = await supabase.rpc("award_chapter_completion_xp", {
+        _chapter_id: chapterId,
+      });
+      if (cancelled || error) return;
+
+      const result = Array.isArray(data) ? data[0] : data;
+      if (!result || !result.xp_gained || result.xp_gained <= 0) return;
+
+      qc.invalidateQueries({ queryKey: ["profile"] });
+      qc.invalidateQueries({ queryKey: ["user-stats"] });
+
+      if (result.leveled_up) {
+        toast.success(`+${result.xp_gained} XP — Level up! You're now Level ${result.new_level}`);
+      } else {
+        toast.success(`+${result.xp_gained} XP earned — chapter complete!`);
+      }
+    };
+
+    const checkCompletion = () => {
+      const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+      const scrollHeight = document.documentElement.scrollHeight - window.innerHeight;
+      // Chapter shorter than the viewport — nothing to scroll, count as read.
+      if (scrollHeight <= 0) {
+        awardXp();
+        return;
+      }
+      const progress = (scrollTop / scrollHeight) * 100;
+      if (progress >= 90) {
+        awardXp();
+      }
+    };
+
+    // Run once shortly after mount for short chapters / restored scroll
+    // positions that already exceed the threshold.
+    const initialTimeout = setTimeout(checkCompletion, 800);
+    window.addEventListener("scroll", checkCompletion, { passive: true });
+
+    return () => {
+      cancelled = true;
+      clearTimeout(initialTimeout);
+      window.removeEventListener("scroll", checkCompletion);
+    };
+  }, [user, chapterQ.data, qc]);
+
+
   useEffect(() => {
     if (!chapterQ.data?.id) return;
     supabase.rpc("increment_chapter_view", { _chapter_id: chapterQ.data.id }).then(({ error }) => {
