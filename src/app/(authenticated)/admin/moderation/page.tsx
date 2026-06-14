@@ -296,7 +296,7 @@ async function applyModerationAction(item: Record<string, unknown>, action: stri
   if (action === "user_banned" && contentType === "comment") {
     const { data: comment } = await supabase.from("comments").select("user_id").eq("id", contentId).single();
     if (comment?.user_id) {
-      await supabase.from("profiles").update({ is_banned: true }).eq("id", comment.user_id);
+      await supabase.from("profiles").update({ is_banned: true }).eq("user_id", comment.user_id);
     }
   }
 }

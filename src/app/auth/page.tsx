@@ -64,7 +64,7 @@ export default function AuthPage() {
 
   const onGoogle = async () => {
     setLoading(true);
-    const redirectTo = `${window.location.origin}/home`;
+    const redirectTo = `${window.location.origin}/auth/callback`;
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
@@ -80,7 +80,7 @@ export default function AuthPage() {
 
   const onDiscord = async () => {
     setLoading(true);
-    const redirectTo = `${window.location.origin}/home`;
+    const redirectTo = `${window.location.origin}/auth/callback`;
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "discord",
       options: { redirectTo },
