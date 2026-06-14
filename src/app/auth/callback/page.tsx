@@ -38,15 +38,19 @@ export default function AuthCallbackPage() {
     const hasHashToken = window.location.hash.includes("access_token");
     const isExchanging = hasCode || hasHashToken;
 
-    if (!loading) {
-      if (user) {
-        router.replace("/home");
-      } else if (!isExchanging || timedOut) {
-        router.replace("/auth");
-        if (timedOut) {
-          toast.error("Authentication timed out or failed. Please try again.");
-        }
-      }
+    if (user) {
+      router.replace("/home");
+      return;
+    }
+
+    if (timedOut) {
+      router.replace("/auth");
+      toast.error("Authentication timed out or failed. Please try again.");
+      return;
+    }
+
+    if (!loading && !isExchanging) {
+      router.replace("/auth");
     }
   }, [user, loading, timedOut, router]);
 
