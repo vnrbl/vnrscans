@@ -81,20 +81,11 @@ export function AnnouncementBanner() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["announcements"] }),
   });
 
-<<<<<<< HEAD
   const loading = announcements.isLoading || (!!user && readIds.isLoading);
 
   if (!mounted || loading || !announcements.data?.length) return null;
 
   const visible = announcements.data.filter((a) => {
-=======
-  // Reserve the banner's footprint up-front so a late mount doesn't push everything
-  // below it down — a major contributor to CLS. The slot collapses to 0 only when
-  // we've confirmed there's nothing to render.
-  const loading = announcements.isLoading || (!!user && readIds.isLoading);
-
-  const visible = (announcements.data ?? []).filter((a) => {
->>>>>>> 494169f7ef27f1625e7a0c5e41aa4c0dea1d9493
     if (typeof window !== "undefined" && sessionStorage.getItem(`announcement_dismissed_${a.id}`)) return false;
     if (user && readIds.data?.has(a.id)) return false;
     if (a.target_audience === "vip" && !profile.data?.is_vip) return false;
@@ -107,13 +98,7 @@ export function AnnouncementBanner() {
 
   const top = visible[0];
 
-  if (!loading && !top) return null;
-
-  if (!top) {
-    // Render an invisible placeholder matching the banner height while loading,
-    // so the eventual paint doesn't shift everything below it.
-    return <div aria-hidden className="border-b border-transparent" style={{ height: 64 }} />;
-  }
+  if (!top) return null;
 
   return (
     <div className="relative overflow-hidden border-b border-border/50 bg-gradient-to-r from-gray-900 via-purple-900/20 to-gray-900" style={{ minHeight: 64 }}>

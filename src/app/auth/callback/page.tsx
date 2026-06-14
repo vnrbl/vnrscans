@@ -1,20 +1,13 @@
 "use client";
 
-<<<<<<< HEAD
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
-=======
-import { useEffect } from "react";
-import { useRouter } from "next/navigation";
-import { useAuth } from "@/hooks/useAuth";
->>>>>>> 494169f7ef27f1625e7a0c5e41aa4c0dea1d9493
 
 export default function AuthCallbackPage() {
   const { user, loading } = useAuth();
   const router = useRouter();
-<<<<<<< HEAD
   const [timedOut, setTimedOut] = useState(false);
 
   useEffect(() => {
@@ -72,18 +65,6 @@ export default function AuthCallbackPage() {
       return () => clearTimeout(timer);
     }
   }, []);
-=======
-
-  useEffect(() => {
-    if (!loading) {
-      if (user) {
-        router.replace("/home");
-      } else {
-        router.replace("/auth");
-      }
-    }
-  }, [user, loading, router]);
->>>>>>> 494169f7ef27f1625e7a0c5e41aa4c0dea1d9493
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-black text-white">
