@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import { Link } from "@/lib/router-compat";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, BookOpen, Clock } from "lucide-react";
@@ -11,6 +12,19 @@ import { OptimizedImage } from "@/components/OptimizedImage";
 
 type HistorySection = "followed-chapters" | "reading-history" | "latest-updates";
 type Period = "day" | "week" | "month" | "all";
+
+interface GroupedSeries {
+  title: string;
+  slug: string;
+  cover_url: string | null;
+  chapters: Array<{
+    id: string;
+    slug: string;
+    chapter_number: number;
+    title: string | null;
+    created_at: string;
+  }>;
+}
 
 type HistorySearch = {
   period?: Period;
@@ -76,6 +90,40 @@ export default function HomeHistoryContent({ section, period = "day" }: { sectio
     staleTime: 1000 * 60 * 2,
   });
 
+  const groupedData = useMemo(() => {
+    if (!chapters.data) return [];
+    if (sectionKey !== "latest-updates" && sectionKey !== "followed-chapters") return [];
+
+    const seriesMap = new Map<string, GroupedSeries>();
+    
+    chapters.data.forEach((ch) => {
+      const seriesSlug = ch.series?.slug;
+      if (!seriesSlug) return;
+
+      if (!seriesMap.has(seriesSlug)) {
+        seriesMap.set(seriesSlug, {
+          title: ch.series?.title || "",
+          slug: seriesSlug,
+          cover_url: ch.series?.cover_url || null,
+          chapters: [],
+        });
+      }
+
+      const existing = seriesMap.get(seriesSlug)!;
+      if (!existing.chapters.some((c) => c.id === ch.id)) {
+        existing.chapters.push({
+          id: ch.id,
+          slug: ch.slug,
+          chapter_number: ch.chapter_number,
+          title: ch.title,
+          created_at: ch.created_at,
+        });
+      }
+    });
+
+    return Array.from(seriesMap.values());
+  }, [chapters.data, sectionKey]);
+
   if (!sectionKey || !meta) {
     return (
       <main className="container mx-auto min-h-screen px-4 py-24">
@@ -134,11 +182,19 @@ export default function HomeHistoryContent({ section, period = "day" }: { sectio
       ) : chapters.isLoading || authLoading ? (
         <HistoryGridSkeleton />
       ) : (chapters.data ?? []).length > 0 ? (
-        <div className="grid grid-cols-1 gap-3 min-[380px]:grid-cols-2 sm:grid-cols-3 md:grid-cols-4 md:gap-4 lg:grid-cols-5 xl:grid-cols-6">
-          {(chapters.data ?? []).map((chapter) => (
-            <HistoryChapterCard key={chapter.id} chapter={chapter} timeLabel={meta.timeLabel} />
-          ))}
-        </div>
+        sectionKey === "latest-updates" || sectionKey === "followed-chapters" ? (
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {groupedData.map((item) => (
+              <GroupedSeriesCard key={item.slug} item={item} timeLabel={meta.timeLabel} />
+            ))}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-3 min-[380px]:grid-cols-2 sm:grid-cols-3 md:grid-cols-4 md:gap-4 lg:grid-cols-5 xl:grid-cols-6">
+            {(chapters.data ?? []).map((chapter) => (
+              <HistoryChapterCard key={chapter.id} chapter={chapter} timeLabel={meta.timeLabel} />
+            ))}
+          </div>
+        )
       ) : (
         <div className="rounded-lg border border-border/40 bg-card p-8 text-center text-muted-foreground">
           No chapters found for this period.
@@ -252,6 +308,64 @@ async function fetchLatestUpdates(period: Period): Promise<ChapterItem[]> {
   }
 
   return rows;
+}
+
+function GroupedSeriesCard({ item, timeLabel }: { item: GroupedSeries; timeLabel: string }) {
+  return (
+    <article className="group overflow-hidden rounded-lg border border-border/40 bg-card p-4 transition-all hover:border-primary/50 hover:shadow-lg hover:shadow-primary/10">
+      <div className="flex gap-4">
+        {/* Cover Image */}
+        <Link
+          to="/title/$slug"
+          params={{ slug: item.slug }}
+          className="shrink-0"
+        >
+          <div className="relative h-[160px] w-[110px] overflow-hidden rounded-lg bg-secondary">
+            <OptimizedImage
+              src={item.cover_url}
+              alt={item.title}
+              className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+            />
+          </div>
+        </Link>
+
+        {/* Series Info & Chapters */}
+        <div className="flex min-w-0 flex-1 flex-col justify-between">
+          <div>
+            <Link
+              to="/title/$slug"
+              params={{ slug: item.slug }}
+              className="line-clamp-2 text-base font-bold leading-tight hover:text-primary"
+            >
+              {item.title}
+            </Link>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {item.chapters.length} new chapter{item.chapters.length !== 1 ? "s" : ""}
+            </p>
+          </div>
+
+          <div className="mt-3 space-y-1.5 max-h-[96px] overflow-y-auto pr-1">
+            {item.chapters.map((chapter) => (
+              <Link
+                key={chapter.id}
+                to="/title/$titleSlug/$chapterSlug"
+                params={{ titleSlug: item.slug, chapterSlug: chapter.slug }}
+                className="flex items-center justify-between text-xs hover:text-primary transition-colors font-medium text-muted-foreground hover:text-foreground"
+              >
+                <div className="flex min-w-0 flex-1 items-center gap-1.5">
+                  <BookOpen className="h-3.5 w-3.5 shrink-0 text-primary/70" />
+                  <span className="truncate font-semibold text-white group-hover:text-primary">Ch. {chapter.chapter_number}</span>
+                </div>
+                <span className="ml-2 shrink-0 text-[10px] text-muted-foreground">
+                  {formatTimeAgo(chapter.created_at)}
+                </span>
+              </Link>
+            ))}
+          </div>
+        </div>
+      </div>
+    </article>
+  );
 }
 
 function HistoryChapterCard({ chapter, timeLabel }: { chapter: ChapterItem; timeLabel: string }) {
