@@ -66,6 +66,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         user: data.session?.user ?? null,
         loading: false,
       });
+    }).catch((err) => {
+      console.error("useAuth getSession error:", err);
+      setState((prev) => ({
+        ...prev,
+        loading: false,
+      }));
     });
 
     // Single global listener
