@@ -42,7 +42,7 @@ export function StatusDashboard({ site }: StatusDashboardProps) {
   const [services, setServices] = useState<Record<string, ServiceData>>({
     frontend: {
       name: "Frontend",
-      uptime: "98.82%",
+      uptime: "100%",
       status: "checking",
       timeAgoStart: "9h ago",
       timeAgoEnd: "11m ago",
@@ -79,22 +79,8 @@ export function StatusDashboard({ site }: StatusDashboardProps) {
         minute: "2-digit",
       });
 
-      let status: "operational" | "degraded" | "outage" = "operational";
-      let blockUptime = 100;
-
-      // Introduce simulated incidents to Frontend to match the 98.82% screenshot look
-      if (service === "frontend") {
-        if (i === 14) {
-          status = "outage";
-          blockUptime = 0;
-        } else if (i === 32) {
-          status = "degraded";
-          blockUptime = 92.5;
-        } else if (i === 41) {
-          status = "degraded";
-          blockUptime = 97.2;
-        }
-      }
+      const status: "operational" | "degraded" | "outage" = "operational";
+      const blockUptime = 100;
 
       history.push({
         status,
@@ -228,6 +214,12 @@ export function StatusDashboard({ site }: StatusDashboardProps) {
   };
 
   const overall = getOverallStatus();
+  const statusCopy: Record<ServiceStatus, string> = {
+    checking: "Checking",
+    operational: "Operational",
+    degraded: "Degraded",
+    outage: "Unavailable",
+  };
 
   return (
     <div className="min-h-screen bg-[#07080c] text-[#e2e8f0] font-sans antialiased flex flex-col items-center py-12 px-4 relative overflow-hidden select-none">
@@ -375,8 +367,8 @@ export function StatusDashboard({ site }: StatusDashboardProps) {
                 : overall === "operational"
                 ? "All Systems Operational"
                 : overall === "degraded"
-                ? "Partial System Outage"
-                : "Major Outage Detected"}
+                ? "Service Attention Needed"
+                : "Service Unavailable"}
             </span>
           </div>
         </div>
@@ -427,8 +419,8 @@ export function StatusDashboard({ site }: StatusDashboardProps) {
                       {service.status === "checking"
                         ? "Checking..."
                         : service.latency
-                        ? `${service.latency}ms`
-                        : "Active"}
+                        ? `${statusCopy[service.status]} - ${service.latency}ms`
+                        : statusCopy[service.status]}
                     </span>
                   </div>
                 </div>

@@ -2,7 +2,7 @@
 
 import { Link, useNavigate } from "@/lib/router-compat";
 import { useQuery } from "@tanstack/react-query";
-import { TrendingUp, Users, BookOpen, Eye, Heart, MessageSquare, Star, Clock, Flame } from "lucide-react";
+import { TrendingUp, Users, BookOpen, Eye, Heart, MessageSquare, Star, Clock, Flame, Circle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -73,43 +73,35 @@ export default function AdminAnalytics() {
     staleTime: 5 * 60 * 1000,
   });
 
-  // Most active users (by reading sessions)
-  const activeUsers = useQuery({
-    queryKey: ["analytics", "active-users"],
+  // Live users — anyone who opened a chapter in the last 5 minutes.
+  // We dedupe by user_id and surface the most recent session per user so we can
+  // show what they're currently reading + when they started.
+  const liveUsers = useQuery({
+    queryKey: ["analytics", "live-users"],
     queryFn: async () => {
-      const sevenDaysAgo = new Date();
-      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-      
+      const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+
       const { data, error } = await supabase
         .from("reading_sessions")
-        .select("user_id, profiles!inner(username, avatar_url, reading_streak)")
-        .gte("started_at", sevenDaysAgo.toISOString())
+        .select(
+          "user_id, started_at, device_type, chapter_id, profiles!inner(username, avatar_url, reading_streak), series:series_id(title, slug), chapter:chapter_id(chapter_number)"
+        )
+        .gte("started_at", fiveMinAgo)
         .not("user_id", "is", null)
+        .order("started_at", { ascending: false })
         .limit(1000);
-      
+
       if (error) throw error;
-      
-      // Count sessions per user
-      const userSessions = (data || []).reduce((acc: any, session: any) => {
-        const userId = session.user_id;
-        if (!acc[userId]) {
-          acc[userId] = {
-            user_id: userId,
-            username: session.profiles?.username || "Anonymous",
-            avatar_url: session.profiles?.avatar_url,
-            reading_streak: session.profiles?.reading_streak || 0,
-            session_count: 0,
-          };
-        }
-        acc[userId].session_count++;
-        return acc;
-      }, {});
-      
-      return Object.values(userSessions)
-        .sort((a: any, b: any) => b.session_count - a.session_count)
-        .slice(0, 10);
+
+      // Keep only the most recent session per user (data is already DESC by started_at).
+      const seen = new Map<string, any>();
+      for (const row of data ?? []) {
+        if (!seen.has(row.user_id)) seen.set(row.user_id, row);
+      }
+      return Array.from(seen.values());
     },
-    staleTime: 5 * 60 * 1000,
+    staleTime: 15 * 1000,
+    refetchInterval: 30 * 1000, // poll every 30s for a "live" feel
   });
 
   // Recent chapters uploaded
@@ -207,7 +199,7 @@ export default function AdminAnalytics() {
       <Tabs defaultValue="trending" className="space-y-4">
         <TabsList>
           <TabsTrigger value="trending">Trending Content</TabsTrigger>
-          <TabsTrigger value="users">Active Users</TabsTrigger>
+          <TabsTrigger value="users">Live Now</TabsTrigger>
           <TabsTrigger value="tags">Popular Genres</TabsTrigger>
           <TabsTrigger value="recent">Recent Uploads</TabsTrigger>
         </TabsList>
@@ -254,50 +246,123 @@ export default function AdminAnalytics() {
           </Card>
         </TabsContent>
 
-        {/* Active Users */}
+        {/* Live Users — anyone with a reading session started in the last 5 minutes */}
         <TabsContent value="users" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Users className="h-5 w-5 text-blue-600" />
-                Most Active Readers (Last 7 Days)
-              </CardTitle>
-              <CardDescription>Users with the most reading sessions</CardDescription>
+              <div className="flex items-center justify-between gap-2">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <span className="relative flex h-2.5 w-2.5">
+                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500 opacity-75" />
+                      <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500" />
+                    </span>
+                    Live Now
+                  </CardTitle>
+                  <CardDescription>
+                    Users reading right now (active in the last 5 minutes)
+                  </CardDescription>
+                </div>
+                <Badge variant="outline" className="gap-1">
+                  <Users className="h-3 w-3" />
+                  {(liveUsers.data || []).length} online
+                </Badge>
+              </div>
             </CardHeader>
             <CardContent>
-              <div className="space-y-3">
-                {activeUsers.isLoading && (
-                  <p className="text-sm text-muted-foreground">Loading...</p>
-                )}
-                {(activeUsers.data || []).map((user: any, idx: number) => (
-                  <div key={user.user_id} className="flex items-center gap-3 rounded-lg border border-border/40 bg-card p-3">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-blue-600 to-cyan-600 text-sm font-bold text-white">
-                      {idx + 1}
-                    </div>
-                    {user.avatar_url ? (
-                      <img src={user.avatar_url} alt="" className="h-10 w-10 rounded-full object-cover" />
-                    ) : (
-                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-secondary text-sm font-bold">
-                        {user.username?.[0]?.toUpperCase() || "?"}
-                      </div>
-                    )}
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate font-semibold">{user.username}</p>
-                      <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                        <span className="flex items-center gap-1">
-                          <BookOpen className="h-3 w-3" />
-                          {user.session_count} chapters read
-                        </span>
-                        {user.reading_streak > 0 && (
-                          <span className="flex items-center gap-1">
-                            <Flame className="h-3 w-3 text-orange-600" />
-                            {user.reading_streak} day streak
+              {liveUsers.isLoading && (
+                <p className="text-sm text-muted-foreground">Loading…</p>
+              )}
+              {!liveUsers.isLoading && (liveUsers.data || []).length === 0 && (
+                <div className="rounded-lg border border-dashed border-border/60 bg-card p-8 text-center">
+                  <Circle className="mx-auto mb-2 h-6 w-6 text-muted-foreground" />
+                  <p className="text-sm text-muted-foreground">
+                    No users are reading right now.
+                  </p>
+                </div>
+              )}
+              <div className="max-h-[70vh] space-y-3 overflow-y-auto pr-1">
+                {(liveUsers.data || []).map((user: any) => {
+                  const startedMs = new Date(user.started_at).getTime();
+                  const minutesAgo = Math.max(0, Math.floor((Date.now() - startedMs) / 60000));
+                  const seriesTitle = user.series?.title;
+                  const seriesSlug = user.series?.slug;
+                  const chapterNum = user.chapter?.chapter_number;
+                  return (
+                    <div
+                      key={user.user_id}
+                      className="flex items-center gap-3 rounded-lg border border-border/40 bg-card p-3"
+                    >
+                      <span
+                        className="relative flex h-2.5 w-2.5 shrink-0"
+                        title="Live"
+                      >
+                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500 opacity-75" />
+                        <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500" />
+                      </span>
+                      {user.profiles?.avatar_url ? (
+                        <img
+                          src={user.profiles.avatar_url}
+                          alt=""
+                          width={40}
+                          height={40}
+                          className="h-10 w-10 rounded-full object-cover"
+                          loading="lazy"
+                          decoding="async"
+                        />
+                      ) : (
+                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-secondary text-sm font-bold">
+                          {user.profiles?.username?.[0]?.toUpperCase() || "?"}
+                        </div>
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <p className="truncate font-semibold">
+                            {user.profiles?.username || "Anonymous"}
+                          </p>
+                          {user.profiles?.reading_streak > 0 && (
+                            <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                              <Flame className="h-3 w-3 text-orange-600" />
+                              {user.profiles.reading_streak}
+                            </span>
+                          )}
+                          {user.device_type && (
+                            <Badge variant="outline" className="h-5 text-[10px] uppercase">
+                              {user.device_type}
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
+                          {seriesTitle ? (
+                            <span className="flex min-w-0 items-center gap-1">
+                              <BookOpen className="h-3 w-3 shrink-0" />
+                              <Link
+                                to="/title/$slug"
+                                params={{ slug: seriesSlug }}
+                                className="truncate hover:text-primary"
+                              >
+                                {seriesTitle}
+                              </Link>
+                              {chapterNum !== undefined && (
+                                <span className="shrink-0">· Ch. {chapterNum}</span>
+                              )}
+                            </span>
+                          ) : (
+                            <span className="flex items-center gap-1">
+                              <BookOpen className="h-3 w-3" />
+                              Reading
+                            </span>
+                          )}
+                          <span className="shrink-0">·</span>
+                          <span className="flex items-center gap-1 shrink-0">
+                            <Clock className="h-3 w-3" />
+                            {minutesAgo === 0 ? "just now" : `${minutesAgo}m ago`}
                           </span>
-                        )}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </CardContent>
           </Card>

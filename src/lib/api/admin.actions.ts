@@ -38,6 +38,48 @@ async function verifyAdmin(requestUserToken: string) {
   return user;
 }
 
+export async function $listUserEmails(args: {
+  data: {
+    targetUserIds: string[];
+    accessToken: string;
+  };
+}) {
+  const { data } = args;
+  const validated = z
+    .object({
+      targetUserIds: z.array(z.string().uuid()).max(1000),
+      accessToken: z.string().min(1),
+    })
+    .parse(data);
+
+  // Only admins may read emails (PII).
+  await verifyAdmin(validated.accessToken);
+
+  const supabaseAdmin = getAdminSupabase();
+  const wanted = new Set(validated.targetUserIds);
+  const emailMap: Record<string, string> = {};
+
+  // The admin API only supports paginated listing, so page through until we've
+  // matched everyone we care about (or run out of users).
+  const perPage = 1000;
+  for (let page = 1; ; page++) {
+    const { data: list, error } = await supabaseAdmin.auth.admin.listUsers({
+      page,
+      perPage,
+    });
+    if (error) return { success: false as const, error: error.message };
+
+    for (const u of list.users) {
+      if (wanted.has(u.id) && u.email) emailMap[u.id] = u.email;
+    }
+
+    if (list.users.length < perPage) break;
+    if (Object.keys(emailMap).length >= wanted.size) break;
+  }
+
+  return { success: true as const, emails: emailMap };
+}
+
 export async function $deleteUser(args: {
   data: {
     targetUserId: string;

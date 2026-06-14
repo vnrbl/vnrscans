@@ -135,7 +135,7 @@ export function ProfileWidgets() {
           <div className="flex items-center gap-3">
             <div className="h-12 w-12 rounded-full overflow-hidden bg-violet-500/20">
               {avatar_url ? (
-                <img src={avatar_url} alt={username} className="h-full w-full object-cover" />
+                <img src={avatar_url} alt={username} className="h-full w-full object-cover" referrerPolicy="no-referrer" />
               ) : (
                 <div className="h-full w-full flex items-center justify-center font-bold text-violet-500">
                   {username?.charAt(0)?.toUpperCase()}
@@ -160,7 +160,7 @@ export function ProfileWidgets() {
           <div className="flex items-center gap-4">
             <div className="h-20 w-20 rounded-full overflow-hidden bg-violet-500/20">
               {avatar_url ? (
-                <img src={avatar_url} alt={username} className="h-full w-full object-cover" />
+                <img src={avatar_url} alt={username} className="h-full w-full object-cover" referrerPolicy="no-referrer" />
               ) : (
                 <div className="h-full w-full flex items-center justify-center text-2xl font-bold text-violet-500">
                   {username?.charAt(0)?.toUpperCase()}
@@ -196,7 +196,7 @@ export function ProfileWidgets() {
         <div className="text-center">
           <div className="h-24 w-24 rounded-full overflow-hidden mx-auto bg-violet-500/20">
             {avatar_url ? (
-              <img src={avatar_url} alt={username} className="h-full w-full object-cover" />
+              <img src={avatar_url} alt={username} className="h-full w-full object-cover" referrerPolicy="no-referrer" />
             ) : (
               <div className="h-full w-full flex items-center justify-center text-3xl font-bold text-violet-500">
                 {username?.charAt(0)?.toUpperCase()}

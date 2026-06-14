@@ -142,7 +142,7 @@ export function Footer() {
       <div className="border-t border-border/20 bg-secondary/5 py-6">
         <div className="container mx-auto px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16 flex flex-col sm:flex-row items-center justify-between gap-4 text-center sm:text-left">
           <p className="text-3xs text-muted-foreground/80 leading-normal max-w-xl">
-            © {new Date().getFullYear()} vnrscans. All rights reserved. vnrscans does not store any files on its servers. We only link to media hosted on third-party services. If you have copyright concerns, please visit our DMCA registry page.
+            Copyright {new Date().getFullYear()} vnrscans. All rights reserved. vnrscans does not store any files on its servers. We only link to media hosted on third-party services. If you have copyright concerns, please visit our DMCA registry page.
           </p>
           <div className="flex items-center gap-3 text-3xs text-muted-foreground/50">
             <a

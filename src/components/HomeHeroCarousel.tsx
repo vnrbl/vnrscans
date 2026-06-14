@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useMemo } from "react";
+import { useCallback, useEffect, useRef, useState, useMemo } from "react";
 import { Link } from "@/lib/router-compat";
 import { useQuery } from "@tanstack/react-query";
 import { ChevronLeft, ChevronRight } from "lucide-react";
@@ -23,7 +23,14 @@ export function HomeHeroCarousel() {
   const [showRightArrow, setShowRightArrow] = useState(true);
   const [isAutoScrolling, setIsAutoScrolling] = useState(true);
   const [isPaused, setIsPaused] = useState(false);
-  const autoScrollIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const autoScrollRafRef = useRef<number | null>(null);
+  const tiltRafByCard = useRef<WeakMap<HTMLElement, number>>(new WeakMap());
+  const prefersReducedMotion = useRef<boolean>(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return;
+    prefersReducedMotion.current = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  }, []);
 
   // Fetch carousel series items
   const carouselSeries = useQuery({
@@ -133,28 +140,66 @@ export function HomeHeroCarousel() {
     }
   }, [shuffledItems.length]);
 
-  // Auto-scroll animation
+  // Auto-scroll animation — rAF based, time-normalized, throttled when tab hidden.
+  // setInterval(30ms) caused 33 layout-thrashing scrolls/sec, dominating INP and main thread.
   useEffect(() => {
     const container = scrollContainerRef.current;
     if (!container || shuffledItems.length === 0 || isPaused || !isAutoScrolling) return;
+    if (prefersReducedMotion.current) return;
 
-    const startAutoScroll = () => {
-      autoScrollIntervalRef.current = setInterval(() => {
-        if (container && !isPaused) {
-          // Smooth continuous scroll (1px every 30ms = ~33px per second)
-          container.scrollLeft += 1;
-        }
-      }, 30);
+    let lastTime = performance.now();
+    const PX_PER_MS = 33 / 1000; // matches previous ~33 px/sec
+
+    const tick = (now: number) => {
+      const delta = now - lastTime;
+      lastTime = now;
+      if (!isPaused && document.visibilityState === "visible") {
+        container.scrollLeft += delta * PX_PER_MS;
+      }
+      autoScrollRafRef.current = requestAnimationFrame(tick);
     };
-
-    startAutoScroll();
+    autoScrollRafRef.current = requestAnimationFrame(tick);
 
     return () => {
-      if (autoScrollIntervalRef.current) {
-        clearInterval(autoScrollIntervalRef.current);
+      if (autoScrollRafRef.current !== null) {
+        cancelAnimationFrame(autoScrollRafRef.current);
+        autoScrollRafRef.current = null;
       }
     };
   }, [shuffledItems.length, isPaused, isAutoScrolling]);
+
+  // rAF-throttled 3D tilt: previous handler ran on every mousemove (60+/sec)
+  // and called getBoundingClientRect synchronously, forcing layout each event.
+  const handleCardTilt = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    if (prefersReducedMotion.current) return;
+    const card = e.currentTarget;
+    const rect = card.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    const centerX = rect.width / 2;
+    const centerY = rect.height / 2;
+    const rotateX = ((y - centerY) / centerY) * -10;
+    const rotateY = ((x - centerX) / centerX) * 10;
+
+    const map = tiltRafByCard.current;
+    const pending = map.get(card);
+    if (pending) cancelAnimationFrame(pending);
+    const handle = requestAnimationFrame(() => {
+      card.style.transform = `rotateY(${rotateY}deg) rotateX(${rotateX}deg)`;
+      map.delete(card);
+    });
+    map.set(card, handle);
+  }, []);
+
+  const resetCardTilt = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    const card = e.currentTarget;
+    const pending = tiltRafByCard.current.get(card);
+    if (pending) {
+      cancelAnimationFrame(pending);
+      tiltRafByCard.current.delete(card);
+    }
+    card.style.transform = 'rotateY(0deg) rotateX(0deg)';
+  }, []);
 
   const scroll = (direction: 'left' | 'right') => {
     if (!scrollContainerRef.current) return;
@@ -217,7 +262,12 @@ export function HomeHeroCarousel() {
             onMouseEnter={handleMouseEnter}
             onMouseLeave={handleMouseLeave}
           >
-            {loopedItems.map((item, index) => (
+            {loopedItems.map((item, index) => {
+              // Only the first window of cards (the LCP candidates) get eager + fetchpriority.
+              // After the carousel resets to its middle section, those cards drop off-screen,
+              // but the browser has already prioritized the right first-paint asset.
+              const isAboveFold = index < shuffledItems.length + 4;
+              return (
               <Link
                 key={`${item.id}-${index}`}
                 to="/title/$slug"
@@ -225,38 +275,26 @@ export function HomeHeroCarousel() {
                 className="group/card flex-shrink-0 block"
                 style={{ perspective: '1000px' }}
               >
-                <div 
+                <div
                   className="relative h-[240px] w-[168px] overflow-hidden rounded border border-neutral-800 transition-all duration-300 group-hover/card:border-neutral-500 sm:h-[300px] sm:w-[210px] md:h-[345px] md:w-[240px] lg:h-[390px] lg:w-[270px]"
-                  style={{ 
+                  style={{
                     transformStyle: 'preserve-3d',
                     transform: 'rotateY(0deg) rotateX(0deg)'
                   }}
-                  onMouseMove={(e) => {
-                    const card = e.currentTarget;
-                    const rect = card.getBoundingClientRect();
-                    const x = e.clientX - rect.left;
-                    const y = e.clientY - rect.top;
-                    
-                    const centerX = rect.width / 2;
-                    const centerY = rect.height / 2;
-                    
-                    const rotateX = ((y - centerY) / centerY) * -10; // -10 to 10 degrees
-                    const rotateY = ((x - centerX) / centerX) * 10; // -10 to 10 degrees
-                    
-                    card.style.transform = `rotateY(${rotateY}deg) rotateX(${rotateX}deg)`;
-                  }}
-                  onMouseLeave={(e) => {
-                    const card = e.currentTarget;
-                    card.style.transform = 'rotateY(0deg) rotateX(0deg)';
-                  }}
+                  onMouseMove={handleCardTilt}
+                  onMouseLeave={resetCardTilt}
                 >
                   {/* Cover Image */}
                   {item.series.cover_url ? (
                     <img
                       src={item.series.cover_url}
                       alt={item.series.title}
+                      width={270}
+                      height={390}
                       className="w-full h-full object-cover"
-                      loading="lazy"
+                      loading={isAboveFold ? "eager" : "lazy"}
+                      fetchPriority={index < 3 ? "high" : "auto"}
+                      decoding="async"
                       referrerPolicy="no-referrer"
                     />
                   ) : (
@@ -297,7 +335,8 @@ export function HomeHeroCarousel() {
                   <div className="absolute bottom-0 right-0 w-16 h-16 bg-gradient-to-tl from-white/10 to-transparent opacity-0 group-hover/card:opacity-100 transition-opacity rounded-br" />
                 </div>
               </Link>
-            ))}
+              );
+            })}
           </div>
 
           {/* Right Arrow */}
@@ -314,24 +353,6 @@ export function HomeHeroCarousel() {
         </div>
       </div>
 
-      <style>{`
-        .scrollbar-hide::-webkit-scrollbar {
-          display: none;
-        }
-        
-        @keyframes shine {
-          0% {
-            transform: translateX(-100%) skewX(-12deg);
-          }
-          100% {
-            transform: translateX(200%) skewX(-12deg);
-          }
-        }
-        
-        .animate-shine {
-          animation: shine 1.5s ease-in-out;
-        }
-      `}</style>
     </section>
   );
 }

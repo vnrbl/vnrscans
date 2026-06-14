@@ -8,6 +8,7 @@ import {
   type ReactNode,
 } from "react";
 import type { Session, User } from "@supabase/supabase-js";
+import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 
 /* ------------------------------------------------------------------ */
@@ -38,8 +39,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   });
 
   useEffect(() => {
+    // Sign out and clear state if the account has been banned by an admin.
+    // Returns true if the user was banned (and thus signed out).
+    async function enforceBan(session: Session | null): Promise<boolean> {
+      if (!session?.user) return false;
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("is_banned")
+        .eq("user_id", session.user.id)
+        .maybeSingle();
+
+      if (profile?.is_banned) {
+        await supabase.auth.signOut();
+        setState({ session: null, user: null, loading: false });
+        toast.error("Your account has been suspended. Contact support if you believe this is a mistake.");
+        return true;
+      }
+      return false;
+    }
+
     // Hydrate initial session
-    supabase.auth.getSession().then(({ data }) => {
+    supabase.auth.getSession().then(async ({ data }) => {
+      if (await enforceBan(data.session)) return;
       setState({
         session: data.session,
         user: data.session?.user ?? null,
@@ -50,7 +71,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Single global listener
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      if (await enforceBan(session)) return;
       setState({
         session,
         user: session?.user ?? null,

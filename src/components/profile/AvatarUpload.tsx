@@ -190,6 +190,7 @@ export function AvatarUpload({ currentAvatarUrl, username, onAvatarUpdated }: Pr
               src={currentAvatarUrl}
               alt={username}
               className="h-full w-full object-cover"
+              referrerPolicy="no-referrer"
             />
           ) : (
             <div className="flex h-full w-full items-center justify-center text-4xl font-bold text-violet-500">

@@ -752,7 +752,7 @@ export default function UserProfileContent({ username }: { username: string }) {
               <div className="h-full w-full rounded-full overflow-hidden relative z-10 flex items-center justify-center">
                 <div className="h-full w-full overflow-hidden rounded-full bg-gradient-to-br from-violet-500/20 to-purple-500/20">
                   {avatarUrl ? (
-                    <img src={avatarUrl} alt={username} className="h-full w-full object-cover" />
+                    <img src={avatarUrl} alt={username} className="h-full w-full object-cover" referrerPolicy="no-referrer" />
                   ) : (
                     <div className="flex h-full w-full items-center justify-center text-4xl font-bold" style={{ color: accentColor }}>
                       {username?.charAt(0)?.toUpperCase() || "?"}
@@ -1213,6 +1213,7 @@ export default function UserProfileContent({ username }: { username: string }) {
                           alt={item.series_title}
                           className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
                           loading="lazy"
+                          referrerPolicy="no-referrer"
                         />
                       ) : (
                         <div className="flex h-full w-full items-center justify-center text-muted-foreground">

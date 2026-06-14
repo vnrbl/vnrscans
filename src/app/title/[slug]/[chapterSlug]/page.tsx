@@ -55,15 +55,32 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   // Concise description with search keywords
   const description = `Read ${seriesTitle} Chapter ${chapterNum} online in high quality. Enjoy the latest updates of this ${seriesType} on vnrscans - your premium reading home.`;
 
+  const keywords = [
+    seriesTitle,
+    `read ${seriesTitle} chapter ${chapterNum}`,
+    `read ${seriesTitle} chapter ${chapterNum} online`,
+    `${seriesTitle} chapter ${chapterNum} english`,
+    `${seriesTitle} chapter ${chapterNum} free`,
+    `${seriesTitle} ch ${chapterNum}`,
+    `chapter ${chapterNum}`,
+    `chapter ${chapterNum} online`,
+    "vnrscans",
+    seriesType,
+  ].filter(Boolean);
+
   return {
     title,
     description,
+    keywords,
+    alternates: {
+      canonical: `/title/${slug}/${chapterSlug}`,
+    },
     openGraph: {
       title,
       description,
       type: "article",
       url: `https://www.vnrscans.com/title/${slug}/${chapterSlug}`,
-      images: series.cover_url ? [{ url: series.cover_url }] : [],
+      images: series.cover_url ? [{ url: series.cover_url, alt: `${seriesTitle} Chapter ${chapterNum} Cover` }] : [],
     },
     twitter: {
       card: "summary_large_image",

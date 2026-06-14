@@ -3,6 +3,7 @@
 import { Link, useNavigate } from "@/lib/router-compat";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { logAdminAction } from "@/lib/adminLog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import type { Database } from "@/integrations/supabase/types";
@@ -111,6 +112,7 @@ export default function AdminReports() {
     mutationFn: async ({ id, status }: { id: string; status: ReportStatus }) => {
       const { error } = await supabase.from("reports").update({ status }).eq("id", id);
       if (error) throw error;
+      await logAdminAction(`status_${status}`, "report", id, { status });
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "reports"] }),
   });

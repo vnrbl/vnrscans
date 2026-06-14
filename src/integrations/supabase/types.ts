@@ -205,6 +205,7 @@ export type Database = {
           experience_points: number
           id: string
           reading_streak: number | null
+          last_read_date: string | null
           user_id: string
           username: string
           user_level: number
@@ -219,6 +220,8 @@ export type Database = {
           is_vip: boolean
           avatar_frame: string | null
           is_banned: boolean | null
+          ban_reason: string | null
+          banned_at: string | null
           profile_visibility: string | null
           show_reading_history: boolean | null
           show_achievements: boolean | null
@@ -231,6 +234,7 @@ export type Database = {
           experience_points?: number
           id?: string
           reading_streak?: number | null
+          last_read_date?: string | null
           user_id: string
           username: string
           user_level?: number
@@ -245,6 +249,8 @@ export type Database = {
           is_vip?: boolean
           avatar_frame?: string | null
           is_banned?: boolean | null
+          ban_reason?: string | null
+          banned_at?: string | null
           profile_visibility?: string | null
           show_reading_history?: boolean | null
           show_achievements?: boolean | null
@@ -257,6 +263,7 @@ export type Database = {
           experience_points?: number
           id?: string
           reading_streak?: number | null
+          last_read_date?: string | null
           user_id?: string
           username?: string
           user_level?: number
@@ -271,6 +278,8 @@ export type Database = {
           is_vip?: boolean
           avatar_frame?: string | null
           is_banned?: boolean | null
+          ban_reason?: string | null
+          banned_at?: string | null
           profile_visibility?: string | null
           show_reading_history?: boolean | null
           show_achievements?: boolean | null
