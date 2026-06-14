@@ -180,7 +180,7 @@ async function fetchFollowedChapters(userId: string, period: Period): Promise<Ch
     if (error) throw error;
     rows.push(...((data ?? []) as ChapterItem[]));
 
-    if (period !== "all" || !data || data.length < pageSize) break;
+    if (period !== "all" || !data || data.length < pageSize || rows.length >= 1000) break;
     page += 1;
   }
 
@@ -209,7 +209,7 @@ async function fetchReadingHistory(userId: string, period: Period): Promise<Chap
     if (error) throw error;
     rows.push(...(data ?? []));
 
-    if (period !== "all" || !data || data.length < pageSize) break;
+    if (period !== "all" || !data || data.length < pageSize || rows.length >= 1000) break;
     page += 1;
   }
 
@@ -247,7 +247,7 @@ async function fetchLatestUpdates(period: Period): Promise<ChapterItem[]> {
     if (error) throw error;
     rows.push(...((data ?? []) as ChapterItem[]));
 
-    if (period !== "all" || !data || data.length < pageSize) break;
+    if (period !== "all" || !data || data.length < pageSize || rows.length >= 1000) break;
     page += 1;
   }
 

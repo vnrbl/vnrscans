@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { X, Crown } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -19,6 +20,11 @@ type Announcement = {
 export function AnnouncementBanner() {
   const { user } = useAuth();
   const qc = useQueryClient();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const profile = useQuery({
     queryKey: ["profile", user?.id],
@@ -27,7 +33,7 @@ export function AnnouncementBanner() {
       const { data, error } = await supabase
         .from("profiles")
         .select("is_vip, created_at")
-        .eq("id", user!.id)
+        .eq("user_id", user!.id)
         .single();
       if (error) throw error;
       return data;
@@ -75,10 +81,12 @@ export function AnnouncementBanner() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["announcements"] }),
   });
 
-  if (!announcements.data?.length) return null;
+  const loading = announcements.isLoading || (!!user && readIds.isLoading);
+
+  if (!mounted || loading || !announcements.data?.length) return null;
 
   const visible = announcements.data.filter((a) => {
-    if (sessionStorage.getItem(`announcement_dismissed_${a.id}`)) return false;
+    if (typeof window !== "undefined" && sessionStorage.getItem(`announcement_dismissed_${a.id}`)) return false;
     if (user && readIds.data?.has(a.id)) return false;
     if (a.target_audience === "vip" && !profile.data?.is_vip) return false;
     if (a.target_audience === "new_users") {

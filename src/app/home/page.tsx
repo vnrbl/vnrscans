@@ -155,26 +155,16 @@ function HomeContent() {
   const latestUpdates = useQuery({
     queryKey: ["latest-updates"],
     queryFn: async () => {
-      const allChapterRows: any[] = [];
-      let page = 0;
+      const { data, error } = await supabase
+        .from("chapters")
+        .select("id,slug,chapter_number,title,created_at,series_id,series:series_id!inner(id,slug,title,cover_url,type,is_hidden,updated_at)")
+        .eq("status", "published")
+        .eq("series.is_hidden", false)
+        .order("created_at", { ascending: false })
+        .limit(300);
 
-      while (true) {
-        const from = page * LATEST_UPDATES_PAGE_SIZE;
-        const to = from + LATEST_UPDATES_PAGE_SIZE - 1;
-        const { data, error } = await supabase
-          .from("chapters")
-          .select("id,slug,chapter_number,title,created_at,series_id,series:series_id!inner(id,slug,title,cover_url,type,is_hidden,updated_at)")
-          .eq("status", "published")
-          .eq("series.is_hidden", false)
-          .order("created_at", { ascending: false })
-          .range(from, to);
-
-        if (error) throw error;
-        allChapterRows.push(...(data ?? []));
-
-        if (!data || data.length < LATEST_UPDATES_PAGE_SIZE) break;
-        page += 1;
-      }
+      if (error) throw error;
+      const allChapterRows = data ?? [];
 
       const seriesById = new Map<string, any>();
       const chaptersBySeries = new Map<string, any[]>();
