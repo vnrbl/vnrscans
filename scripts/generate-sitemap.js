@@ -1,8 +1,8 @@
-import { createClient } from '@supabase/supabase-js';
-import dotenv from 'dotenv';
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
+import { createClient } from "@supabase/supabase-js";
+import dotenv from "dotenv";
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
 
 dotenv.config();
 
@@ -17,94 +17,142 @@ if (!supabaseUrl || !supabaseServiceKey) {
 }
 
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
+const DOMAIN = "https://www.vnrscans.com";
+const PAGE_SIZE = 1000;
+const seenUrls = new Set();
+
+function escapeXml(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&apos;");
+}
+
+function formatDate(value, fallback) {
+  if (!value) return fallback;
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? fallback : parsed.toISOString().split("T")[0];
+}
+
+function addUrl(xmlParts, routePath, lastmod, changefreq, priority) {
+  const loc = `${DOMAIN}${routePath}`;
+  if (seenUrls.has(loc)) return;
+
+  seenUrls.add(loc);
+  xmlParts.push("  <url>");
+  xmlParts.push(`    <loc>${escapeXml(loc)}</loc>`);
+  xmlParts.push(`    <lastmod>${escapeXml(lastmod)}</lastmod>`);
+  xmlParts.push(`    <changefreq>${changefreq}</changefreq>`);
+  xmlParts.push(`    <priority>${priority}</priority>`);
+  xmlParts.push("  </url>");
+}
+
+async function fetchAll(buildQuery) {
+  const rows = [];
+
+  for (let from = 0; ; from += PAGE_SIZE) {
+    const { data, error } = await buildQuery().range(from, from + PAGE_SIZE - 1);
+
+    if (error) throw error;
+    rows.push(...(data || []));
+
+    if (!data || data.length < PAGE_SIZE) break;
+  }
+
+  return rows;
+}
 
 async function run() {
   console.log("Generating sitemap...");
 
-  const domain = "https://www.vnrscans.com";
+  const now = new Date();
+  const nowString = now.toISOString().split("T")[0];
   const staticPages = [
     "",
+    "/home",
     "/browse",
     "/rankings",
-    "/recommendations",
     "/about",
     "/contact",
     "/dmca",
-    "/auth",
     "/request-series",
-    "/tags"
+    "/tags",
+    "/data-map",
   ];
 
-  let xml = `<?xml version="1.0" encoding="UTF-8"?>\n`;
-  xml += `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n`;
+  const xmlParts = [
+    '<?xml version="1.0" encoding="UTF-8"?>',
+    '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
+  ];
 
-  const nowString = new Date().toISOString().split('T')[0];
-
-  // 1. Add static pages
   for (const page of staticPages) {
-    xml += `  <url>\n`;
-    xml += `    <loc>${domain}${page}</loc>\n`;
-    xml += `    <lastmod>${nowString}</lastmod>\n`;
-    xml += `    <changefreq>daily</changefreq>\n`;
-    xml += `    <priority>${page === "" ? "1.0" : "0.8"}</priority>\n`;
-    xml += `  </url>\n`;
+    addUrl(xmlParts, page, nowString, "daily", page === "" || page === "/home" ? "1.0" : "0.8");
   }
 
-  // 2. Fetch all series
   console.log("Fetching series for sitemap...");
-  const { data: series, error: seriesError } = await supabase
-    .from('series')
-    .select('slug, updated_at')
-    .eq('is_hidden', false);
-
-  if (seriesError) {
-    console.error("Error fetching series:", seriesError);
-  } else {
-    for (const s of (series || [])) {
-      const lastMod = s.updated_at ? s.updated_at.split('T')[0] : nowString;
-      xml += `  <url>\n`;
-      xml += `    <loc>${domain}/title/${s.slug}</loc>\n`;
-      xml += `    <lastmod>${lastMod}</lastmod>\n`;
-      xml += `    <changefreq>weekly</changefreq>\n`;
-      xml += `    <priority>0.7</priority>\n`;
-      xml += `  </url>\n`;
-    }
+  let series = [];
+  try {
+    series = await fetchAll(() =>
+      supabase
+        .from("series")
+        .select("id, slug, updated_at")
+        .eq("is_hidden", false)
+        .not("slug", "is", null)
+        .order("updated_at", { ascending: false })
+    );
+  } catch (error) {
+    console.error("Error fetching series:", error);
   }
 
-  // 3. Fetch all chapters
+  const publicSeriesIds = new Set();
+  for (const item of series) {
+    if (!item.id || !item.slug) continue;
+    publicSeriesIds.add(item.id);
+    addUrl(xmlParts, `/title/${item.slug}`, formatDate(item.updated_at, nowString), "weekly", "0.7");
+  }
+
   console.log("Fetching chapters for sitemap...");
-  const { data: chapters, error: chaptersError } = await supabase
-    .from('chapters')
-    .select('slug, created_at, series:series_id(slug)')
-    .eq('status', 'published');
-
-  if (chaptersError) {
-    console.error("Error fetching chapters:", chaptersError);
-  } else {
-    for (const c of (chapters || [])) {
-      const seriesSlug = c.series?.slug;
-      if (!seriesSlug || !c.slug) continue;
-      const lastMod = c.created_at ? c.created_at.split('T')[0] : nowString;
-      xml += `  <url>\n`;
-      xml += `    <loc>${domain}/title/${seriesSlug}/${c.slug}</loc>\n`;
-      xml += `    <lastmod>${lastMod}</lastmod>\n`;
-      xml += `    <changefreq>monthly</changefreq>\n`;
-      xml += `    <priority>0.5</priority>\n`;
-      xml += `  </url>\n`;
-    }
+  let chapters = [];
+  try {
+    chapters = await fetchAll(() =>
+      supabase
+        .from("chapters")
+        .select("slug, created_at, updated_at, scheduled_at, series_id, series:series_id(slug)")
+        .eq("status", "published")
+        .not("slug", "is", null)
+        .order("created_at", { ascending: false })
+    );
+  } catch (error) {
+    console.error("Error fetching chapters:", error);
   }
 
-  xml += `</urlset>\n`;
+  for (const item of chapters) {
+    const seriesSlug = item.series?.slug;
+    if (!seriesSlug || !item.slug || !publicSeriesIds.has(item.series_id)) continue;
+    if (item.scheduled_at && new Date(item.scheduled_at) > now) continue;
 
-  const publicDir = path.join(__dirname, '../public');
+    addUrl(
+      xmlParts,
+      `/title/${seriesSlug}/${item.slug}`,
+      formatDate(item.updated_at || item.created_at, nowString),
+      "monthly",
+      "0.5"
+    );
+  }
+
+  xmlParts.push("</urlset>");
+
+  const publicDir = path.join(__dirname, "../public");
   if (!fs.existsSync(publicDir)) {
     fs.mkdirSync(publicDir, { recursive: true });
   }
 
-  const sitemapPath = path.join(publicDir, 'sitemap.xml');
-  fs.writeFileSync(sitemapPath, xml, 'utf8');
+  const sitemapPath = path.join(publicDir, "sitemap.xml");
+  fs.writeFileSync(sitemapPath, `${xmlParts.join("\n")}\n`, "utf8");
 
-  console.log(`✅ Sitemap successfully generated at: ${sitemapPath}`);
+  console.log(`Sitemap successfully generated at: ${sitemapPath}`);
 }
 
 run();

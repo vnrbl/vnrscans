@@ -208,7 +208,8 @@ function BrowsePageContent({ initialData }: { initialData?: BrowseInitialData })
     queryFn: async () => {
       let query = supabase
         .from("series")
-        .select("id,slug,title,alternative_titles,description,cover_url,type,rating_average,status,author,artist,release_year,created_at,updated_at,view_count,content_rating,chapter_count,series_genres(genre:genres(id,name,slug)),series_tags(tag:tags(id,name,slug))");
+        .select("id,slug,title,alternative_titles,description,cover_url,type,rating_average,status,author,artist,release_year,created_at,updated_at,view_count,content_rating,chapter_count,series_genres(genre:genres(id,name,slug)),series_tags(tag:tags(id,name,slug))")
+        .eq("is_hidden", false);
 
       // Apply scanlation group filter
       if (groupFilter) {

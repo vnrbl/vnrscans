@@ -1,17 +1,18 @@
 "use client";
  
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
- 
+
+const exchangedCodes = new Set<string>();
+
 export default function AuthCallbackPage() {
   const { user, loading } = useAuth();
   const router = useRouter();
   const [timedOut, setTimedOut] = useState(false);
-  const exchangeStarted = useRef(false);
- 
+
   useEffect(() => {
     if (typeof window === "undefined") return;
  
@@ -45,8 +46,8 @@ export default function AuthCallbackPage() {
       return;
     }
  
-    if (code && !exchangeStarted.current) {
-      exchangeStarted.current = true;
+    if (code && !exchangedCodes.has(code)) {
+      exchangedCodes.add(code);
       supabase.auth.exchangeCodeForSession(code)
         .then(({ error }) => {
           if (error) {
