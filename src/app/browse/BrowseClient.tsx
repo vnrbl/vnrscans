@@ -26,7 +26,15 @@ import {
 import { Command, CommandGroup, CommandItem } from "@/components/ui/command";
 import { buildSeriesSearchOrFilter, prepareSearchInput, rankSeriesResults } from "@/lib/search-utils";
 
-function BrowsePageContent() {
+export type BrowseGenre = { id: string; name: string; slug: string };
+export type BrowseTag = { id: string; name: string; slug: string; color: string | null; icon: string | null };
+export type BrowseInitialData = {
+  genres?: BrowseGenre[];
+  tags?: BrowseTag[];
+  defaultManhwa?: any[];
+};
+
+function BrowsePageContent({ initialData }: { initialData?: BrowseInitialData }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const pathname = usePathname();
@@ -78,6 +86,7 @@ function BrowsePageContent() {
   // Fetch genres
   const genres = useQuery({
     queryKey: ["genres"],
+    initialData: initialData?.genres,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("genres")
@@ -93,6 +102,7 @@ function BrowsePageContent() {
   // Fetch tags
   const tags = useQuery({
     queryKey: ["tags"],
+    initialData: initialData?.tags,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("tags")
@@ -178,9 +188,23 @@ function BrowsePageContent() {
     }
   };
 
+  // Use server-prefetched data only when the user hasn't changed any filter yet
+  // (i.e. landed on /browse with no query string and no toggled filters).
+  const isDefaultBrowseState =
+    typeFilters.length === 0 &&
+    statusFilter === "all" &&
+    contentRating === "all" &&
+    genreFilters.length === 0 &&
+    tagFilters.length === 0 &&
+    sortBy === "latest" &&
+    duration === "all" &&
+    !searchQuery &&
+    !groupFilter;
+
   // All manhwa
   const allManhwa = useQuery({
     queryKey: ["browse-manhwa", typeFilters, statusFilter, contentRating, genreFilters, tagFilters, sortBy, duration, searchQuery, groupFilter],
+    initialData: isDefaultBrowseState ? initialData?.defaultManhwa : undefined,
     queryFn: async () => {
       let query = supabase
         .from("series")
@@ -740,10 +764,10 @@ function SeriesList({ items, loading }: { items?: any[]; loading: boolean }) {
   );
 }
 
-export default function BrowsePage() {
+export default function BrowsePage({ initialData }: { initialData?: BrowseInitialData }) {
   return (
     <Suspense fallback={<div className="container mx-auto px-4 py-8 text-center text-muted-foreground">Loading browse page...</div>}>
-      <BrowsePageContent />
+      <BrowsePageContent initialData={initialData} />
     </Suspense>
   );
 }

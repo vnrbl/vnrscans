@@ -18,7 +18,8 @@
       "Bash(npm install *)",
       "Bash(cross-env ANALYZE=true npx next build)",
       "Bash(ANALYZE=true npx next build)",
-      "Read(//tmp/**)"
+      "Read(//tmp/**)",
+      "Bash(git mv *)"
     ]
   }
 }

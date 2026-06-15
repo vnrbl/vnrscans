@@ -29,7 +29,39 @@ const LATEST_UPDATES_BATCH_SIZE = LATEST_UPDATES_ROWS_PER_BATCH * LATEST_UPDATES
 
 type HomeHistorySection = "followed-chapters" | "reading-history" | "latest-updates";
 
-function HomeContent() {
+export type HomeSeriesCard = {
+  id: string;
+  slug: string;
+  title: string;
+  cover_url: string | null;
+  type: string;
+  rating_average: number | null;
+  status: string;
+  view_count: number | null;
+};
+
+export type HomeLatestUpdate = {
+  id: string;
+  slug: string;
+  title: string;
+  cover_url: string | null;
+  type: string;
+  recent_chapters: {
+    id: string;
+    slug: string;
+    chapter_number: number;
+    title: string | null;
+    created_at: string;
+  }[];
+};
+
+export type HomeInitialData = {
+  latestUpdates?: HomeLatestUpdate[];
+  popular?: HomeSeriesCard[];
+  highScore?: HomeSeriesCard[];
+};
+
+function HomeContent({ initialData }: { initialData?: HomeInitialData }) {
   const { user } = useAuth();
   
   // Hidden sections state (stored in localStorage)
@@ -140,6 +172,7 @@ function HomeContent() {
   // Popular manhwa
   const popular = useQuery({
     queryKey: ["popular"],
+    initialData: initialData?.popular,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("series")
@@ -176,12 +209,14 @@ function HomeContent() {
         })),
       }));
     },
+    initialData: initialData?.latestUpdates,
     staleTime: 1000 * 60 * 5,
     gcTime: 1000 * 60 * 20,
   });
   // High score manhwa
   const highScore = useQuery({
     queryKey: ["high-score"],
+    initialData: initialData?.highScore,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("series")
@@ -296,8 +331,8 @@ function HomeContent() {
   );
 }
 
-export default function HomePage() {
-  return <HomeContent />;
+export default function HomePage({ initialData }: { initialData?: HomeInitialData }) {
+  return <HomeContent initialData={initialData} />;
 }
 
 // Helper function to get section title from ID
