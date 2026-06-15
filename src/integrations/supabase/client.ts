@@ -2,6 +2,28 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
+export const REMEMBER_ME_KEY = 'sb-remember-me';
+
+function createSwitchableStorage(): Storage | undefined {
+  if (typeof window === 'undefined') return undefined;
+
+  const pick = (): Storage =>
+    window.localStorage.getItem(REMEMBER_ME_KEY) === '0'
+      ? window.sessionStorage
+      : window.localStorage;
+
+  return {
+    getItem: (key) => pick().getItem(key),
+    setItem: (key, value) => pick().setItem(key, value),
+    removeItem: (key) => pick().removeItem(key),
+    clear: () => pick().clear(),
+    key: (index) => pick().key(index),
+    get length() {
+      return pick().length;
+    },
+  };
+}
+
 function createSupabaseClient() {
   // Use import.meta.env for client-side (Vite build-time replacement)
   // Fall back to process.env for SSR (server-side rendering)
@@ -28,7 +50,7 @@ function createSupabaseClient() {
 
   return createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
     auth: {
-      storage: typeof window !== 'undefined' ? localStorage : undefined,
+      storage: createSwitchableStorage(),
       persistSession: true,
       autoRefreshToken: true,
       detectSessionInUrl: false,

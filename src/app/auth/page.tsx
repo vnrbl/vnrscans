@@ -3,11 +3,12 @@
 import { useEffect, useState } from "react";
 import { BookOpen, Mail, Lock, User, ArrowRight, Sparkles, Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase, REMEMBER_ME_KEY } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { SITE_NAME } from "@/lib/brand";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useRouter } from "next/navigation";
 
@@ -16,6 +17,7 @@ export default function AuthPage() {
   const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
   const [showSignUpPassword, setShowSignUpPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(true);
 
   useEffect(() => {
     if (user) router.push("/home");
@@ -27,6 +29,9 @@ export default function AuthPage() {
     e.preventDefault();
     setLoading(true);
     const fd = new FormData(e.currentTarget);
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(REMEMBER_ME_KEY, rememberMe ? "1" : "0");
+    }
     const { error } = await supabase.auth.signInWithPassword({
       email: String(fd.get("email")),
       password: String(fd.get("password")),
@@ -174,6 +179,21 @@ export default function AuthPage() {
                       {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     </button>
                   </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id="remember-me"
+                    checked={rememberMe}
+                    onCheckedChange={(v) => setRememberMe(v === true)}
+                    className="border-neutral-700 data-[state=checked]:bg-white data-[state=checked]:text-black data-[state=checked]:border-white"
+                  />
+                  <Label
+                    htmlFor="remember-me"
+                    className="cursor-pointer text-xs font-medium text-neutral-300 select-none"
+                  >
+                    Remember me for 2 weeks
+                  </Label>
                 </div>
 
                 <button
