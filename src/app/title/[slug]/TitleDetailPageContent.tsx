@@ -246,6 +246,7 @@ export default function TitleDetailPageContent({
           <ChapterList
             slug={slug}
             seriesId={s.id}
+            seriesStatus={s.status}
             initialChaptersData={initialChaptersData}
           />
 

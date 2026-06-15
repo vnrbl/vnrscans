@@ -288,16 +288,39 @@ export default function Reader({ slug, chapterSlug }: { slug: string; chapterSlu
       });
       if (cancelled || error) return;
 
-      const result = Array.isArray(data) ? data[0] : data;
-      if (!result || !result.xp_gained || result.xp_gained <= 0) return;
+      const rows = Array.isArray(data) ? data : data ? [data] : [];
+      if (rows.length === 0) return;
 
-      qc.invalidateQueries({ queryKey: ["profile"] });
-      qc.invalidateQueries({ queryKey: ["user-stats"] });
+      let invalidated = false;
+      for (const row of rows) {
+        if (!row) continue;
+        if (row.source === "summary") {
+          if (row.leveled_up) {
+            toast.success(`Level up! You're now Level ${row.new_level}`);
+          }
+          continue;
+        }
+        if (!row.xp_gained || row.xp_gained <= 0) continue;
+        invalidated = true;
+        const label =
+          row.source === "chapter_complete"
+            ? "Chapter complete"
+            : row.source === "caught_up"
+            ? "Caught up to latest"
+            : row.source === "series_complete"
+            ? "Title finished"
+            : "XP earned";
+        toast.success(`+${row.xp_gained} XP — ${label}`, {
+          description: row.description ?? undefined,
+        });
+      }
 
-      if (result.leveled_up) {
-        toast.success(`+${result.xp_gained} XP — Level up! You're now Level ${result.new_level}`);
-      } else {
-        toast.success(`+${result.xp_gained} XP earned — chapter complete!`);
+      if (invalidated) {
+        qc.invalidateQueries({ queryKey: ["profile"] });
+        qc.invalidateQueries({ queryKey: ["user-stats"] });
+        qc.invalidateQueries({ queryKey: ["xp-history"] });
+        qc.invalidateQueries({ queryKey: ["chapter-reader-counts"] });
+        qc.invalidateQueries({ queryKey: ["read-chapters"] });
       }
     };
 

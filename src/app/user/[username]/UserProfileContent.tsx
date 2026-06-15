@@ -1062,7 +1062,7 @@ export default function UserProfileContent({ username }: { username: string }) {
                     <span 
                       className="absolute bottom-0 left-0 right-0 h-[1.5px] pointer-events-none"
                       style={{ 
-                        background: `linear-gradient(90deg, transparent, ${titleColor}50, ${titleColor}, ${titleColor}50, transparent)`,
+                        backgroundImage: `linear-gradient(90deg, transparent, ${titleColor}50, ${titleColor}, ${titleColor}50, transparent)`,
                         backgroundSize: '200% 100%',
                         animation: 'titleUnderlineSweep 3s linear infinite',
                       }}
@@ -1072,7 +1072,7 @@ export default function UserProfileContent({ username }: { username: string }) {
                     <span 
                       className="absolute inset-0 pointer-events-none opacity-0 group-hover/title:opacity-100 transition-opacity"
                       style={{ 
-                        background: `linear-gradient(105deg, transparent 40%, ${titleColor}12 50%, transparent 60%)`,
+                        backgroundImage: `linear-gradient(105deg, transparent 40%, ${titleColor}12 50%, transparent 60%)`,
                         backgroundSize: '250% 100%',
                         animation: 'titleShimmerSweep 2s ease-in-out infinite',
                       }}

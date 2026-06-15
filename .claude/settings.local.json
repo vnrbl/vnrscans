@@ -13,7 +13,12 @@
       "Bash(sort -k2)",
       "Bash(npx supabase *)",
       "Bash(git ls-tree *)",
-      "Bash(npx --no-install tsc --noEmit -p tsconfig.json)"
+      "Bash(npx --no-install tsc --noEmit -p tsconfig.json)",
+      "Bash(bun add *)",
+      "Bash(npm install *)",
+      "Bash(cross-env ANALYZE=true npx next build)",
+      "Bash(ANALYZE=true npx next build)",
+      "Read(//tmp/**)"
     ]
   }
 }

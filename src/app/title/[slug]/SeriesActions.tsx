@@ -16,6 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { XP_AMOUNTS } from "@/lib/xp";
 
 /* ------------------------------------------------------------------ */
 /*  SeriesActions — cover image + follow/rate/library action buttons.  */
@@ -97,20 +98,28 @@ export const SeriesActions = React.memo(function SeriesActions({
       if (!user) throw new Error("Sign in to follow");
       if (isFollowing.data) {
         await supabase.from("user_library").delete().eq("user_id", user.id).eq("series_id", seriesId);
-      } else {
-        await supabase.from("user_library").insert({
-          user_id: user.id,
-          series_id: seriesId,
-          reading_status: "reading",
-        });
+        return { wasFollowing: true };
       }
+      await supabase.from("user_library").insert({
+        user_id: user.id,
+        series_id: seriesId,
+        reading_status: "reading",
+      });
+      return { wasFollowing: false };
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
       qc.invalidateQueries({ queryKey: ["following", slug] });
       qc.invalidateQueries({ queryKey: ["library-status", slug] });
       qc.invalidateQueries({ queryKey: ["library"] });
       qc.invalidateQueries({ queryKey: ["followers-count", slug] });
-      toast.success(isFollowing.data ? "Unfollowed" : "Following");
+      qc.invalidateQueries({ queryKey: ["profile"] });
+      qc.invalidateQueries({ queryKey: ["user-stats"] });
+      qc.invalidateQueries({ queryKey: ["xp-history"] });
+      if (result?.wasFollowing) {
+        toast.success("Unfollowed");
+      } else {
+        toast.success(`Following — +${XP_AMOUNTS.follow_series} XP earned`);
+      }
     },
     onError: (e: Error) => toast.error(e.message),
   });

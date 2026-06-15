@@ -20,7 +20,7 @@ import { TITLE_CARD_WIDTH, TITLE_COVER_CLASS } from "@/components/titleCardStyle
 import { HomeHeroCarousel } from "@/components/HomeHeroCarousel";
 import { OptimizedImage } from "@/components/OptimizedImage";
 
-const LATEST_UPDATES_CHAPTER_LIMIT = 7;
+const LATEST_UPDATES_CHAPTER_LIMIT = 5;
 const LATEST_UPDATES_PAGE_SIZE = 1000;
 const HOME_HORIZONTAL_CARD_LIMIT = 30;
 const LATEST_UPDATES_ROWS_PER_BATCH = 5;
@@ -64,6 +64,7 @@ function HomeContent() {
         .select("id,slug,title,chapter_number,created_at,series:series_id(slug,title,cover_url)")
         .eq("status", "published")
         .order("created_at", { ascending: false })
+        .order("chapter_number", { ascending: false })
         .limit(18);
       if (error) throw error;
       return data ?? [];
@@ -117,6 +118,7 @@ function HomeContent() {
         .in("series_id", seriesIds)
         .eq("status", "published")
         .order("created_at", { ascending: false })
+        .order("chapter_number", { ascending: false })
         .limit(100);
       if (error) throw error;
 
@@ -156,63 +158,23 @@ function HomeContent() {
     queryKey: ["latest-updates"],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("chapters")
-        .select("id,slug,chapter_number,title,created_at,series_id,series:series_id!inner(id,slug,title,cover_url,type,is_hidden,updated_at)")
-        .eq("status", "published")
-        .eq("series.is_hidden", false)
-        .order("created_at", { ascending: false })
-        .limit(300);
+        .rpc("get_series_with_latest_chapters", { limit_count: 100 });
 
       if (error) throw error;
-      const allChapterRows = data ?? [];
-
-      const seriesById = new Map<string, any>();
-      const chaptersBySeries = new Map<string, any[]>();
-      const latestChapterDateBySeries = new Map<string, string>();
-
-      allChapterRows.forEach((ch: any) => {
-        if (!ch.series?.id) return;
-        seriesById.set(ch.series.id, ch.series);
-
-        const existingChapters = chaptersBySeries.get(ch.series_id) ?? [];
-        const chapterAlreadyListed = existingChapters.some(
-          (existing: any) => existing.chapter_number === ch.chapter_number,
-        );
-
-        if (!latestChapterDateBySeries.has(ch.series_id)) {
-          latestChapterDateBySeries.set(ch.series_id, ch.created_at);
-        }
-
-        if (!chapterAlreadyListed && existingChapters.length < LATEST_UPDATES_CHAPTER_LIMIT) {
-          existingChapters.push({
-            id: ch.id,
-            slug: ch.slug,
-            chapter_number: ch.chapter_number,
-            title: ch.title,
-            created_at: ch.created_at,
-          });
-          chaptersBySeries.set(ch.series_id, existingChapters);
-        }
-      });
-
-      // Show every visible series that has published chapters, not just the first API page.
-      return Array.from(seriesById.values())
-        .map((series: any) => ({
-          ...series,
-          latest_update: latestChapterDateBySeries.get(series.id) ?? series.updated_at,
-          recent_chapters: chaptersBySeries.get(series.id) ?? [],
-        }))
-        .filter((series: any) => series.recent_chapters.length > 0)
-        .sort((a: any, b: any) => new Date(b.latest_update).getTime() - new Date(a.latest_update).getTime())
-        .map((seriesData: any) => ({
-          ...seriesData,
-          recent_chapters: [...seriesData.recent_chapters].sort((a: any, b: any) => {
-            if (b.chapter_number !== a.chapter_number) {
-              return b.chapter_number - a.chapter_number;
-            }
-            return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-          }),
-        }));
+      return (data ?? []).map((series: any) => ({
+        id: series.id,
+        slug: series.slug,
+        title: series.title,
+        cover_url: series.cover_url,
+        type: series.type,
+        recent_chapters: (series.recent_chapters ?? []).map((ch: any) => ({
+          id: ch.id,
+          slug: ch.slug,
+          chapter_number: Number(ch.chapter_number),
+          title: ch.title,
+          created_at: ch.created_at,
+        })),
+      }));
     },
     staleTime: 1000 * 60 * 5,
     gcTime: 1000 * 60 * 20,
@@ -869,8 +831,7 @@ function LatestUpdatesSection({
                       {item.title}
                     </Link>
                     <div className="mt-1 text-xs text-muted-foreground">
-                      {item.recent_chapters.length} recent chapter
-                      {item.recent_chapters.length !== 1 ? "s" : ""}
+                      {item.recent_chapters.length} recent chapter{item.recent_chapters.length !== 1 ? "s" : ""}
                     </div>
 
                     {/* Recent Chapters List with Read Status */}

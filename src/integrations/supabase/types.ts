@@ -1574,6 +1574,39 @@ export type Database = {
           }
         ]
       }
+      xp_transactions: {
+        Row: {
+          id: string
+          user_id: string
+          amount: number
+          source: string
+          reference_id: string | null
+          reference_type: string | null
+          description: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          amount: number
+          source: string
+          reference_id?: string | null
+          reference_type?: string | null
+          description?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          amount?: number
+          source?: string
+          reference_id?: string | null
+          reference_type?: string | null
+          description?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -1626,9 +1659,35 @@ export type Database = {
         }
         Returns: {
           xp_gained: number
-          total_xp: number
-          new_level: number
-          leveled_up: boolean
+          source: string
+          description: string | null
+          total_xp: number | null
+          new_level: number | null
+          leveled_up: boolean | null
+        }[]
+      }
+      get_chapter_reader_counts: {
+        Args: {
+          _series_id: string
+        }
+        Returns: {
+          chapter_id: string
+          reader_count: number
+        }[]
+      }
+      get_series_with_latest_chapters: {
+        Args: {
+          limit_count: number
+          offset_count?: number
+        }
+        Returns: {
+          id: string
+          slug: string
+          title: string
+          cover_url: string | null
+          type: string
+          latest_chapter_created_at: string
+          recent_chapters: any
         }[]
       }
     }

@@ -2,7 +2,7 @@
 
 import React from "react";
 import Link from "next/link";
-import { ArrowUpDown, Search, ChevronLeft, ChevronRight, RefreshCw } from "lucide-react";
+import { ArrowUpDown, Search, ChevronLeft, ChevronRight, RefreshCw, Sparkles, Eye } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -17,6 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { XP_AMOUNTS } from "@/lib/xp";
 
 /* ------------------------------------------------------------------ */
 /*  ChapterList — ALL chapter interaction state lives here.           */
@@ -27,12 +28,14 @@ import {
 interface ChapterListProps {
   slug: string;
   seriesId: string;
+  seriesStatus?: string | null;
   initialChaptersData?: any[];
 }
 
 export const ChapterList = React.memo(function ChapterList({
   slug,
   seriesId,
+  seriesStatus,
   initialChaptersData,
 }: ChapterListProps) {
   const { user } = useAuth();
@@ -106,6 +109,18 @@ export const ChapterList = React.memo(function ChapterList({
     return uniqueChapters.size;
   }, [chaptersQ.data]);
 
+  // Latest published chapter — used to hint at the catch-up / series-complete
+  // bonus on the row the user has to read to unlock it.
+  const latestChapterId = React.useMemo(() => {
+    if (!chaptersQ.data || chaptersQ.data.length === 0) return null;
+    return chaptersQ.data.reduce(
+      (best, c) => (best === null || c.chapter_number > best.chapter_number ? c : best),
+      null as null | (typeof chaptersQ.data)[number],
+    )?.id ?? null;
+  }, [chaptersQ.data]);
+
+  const isSeriesCompleted = seriesStatus === "completed";
+
   const scanlationGroups = useQuery({
     queryKey: ["scanlation-groups", slug],
     queryFn: async () => {
@@ -138,6 +153,20 @@ export const ChapterList = React.memo(function ChapterList({
     },
     enabled: !!user,
     staleTime: 1000 * 60 * 2,
+  });
+
+  // Per-chapter reader counts (distinct users who have read each chapter).
+  const readerCounts = useQuery({
+    queryKey: ["chapter-reader-counts", seriesId],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("get_chapter_reader_counts", {
+        _series_id: seriesId,
+      });
+      if (error) throw error;
+      return new Map((data ?? []).map((row) => [row.chapter_id, Number(row.reader_count ?? 0)]));
+    },
+    staleTime: 1000 * 60 * 2,
+    gcTime: 1000 * 60 * 10,
   });
 
   const refreshChapterTable = React.useCallback(async () => {
@@ -234,6 +263,8 @@ export const ChapterList = React.memo(function ChapterList({
               const showNewBadge = isNew && !isRead;
               const uploadedBy = (c as { uploaded_by?: string }).uploaded_by;
               const scanlationGroup = (c as { scanlation_group?: string }).scanlation_group;
+              const isLatest = latestChapterId === c.id;
+              const readerCount = readerCounts.data?.get(c.id) ?? 0;
 
               return (
                 <Link
@@ -255,13 +286,19 @@ export const ChapterList = React.memo(function ChapterList({
                             NEW
                           </Badge>
                         )}
+                        <XpBadge
+                          isRead={isRead}
+                          isLatest={isLatest}
+                          isSeriesCompleted={isSeriesCompleted}
+                        />
                       </div>
                       {c.title && (
                         <p className="mt-1 line-clamp-1 text-sm text-muted-foreground">{c.title}</p>
                       )}
                     </div>
-                    <Badge variant="outline" className="shrink-0 text-xs uppercase">
-                      {c.chapter_type === "novel" ? "Novel" : "Pages"}
+                    <Badge variant="outline" className="shrink-0 gap-1 text-xs">
+                      <Eye className="h-3 w-3" />
+                      {formatReaderCount(readerCount)}
                     </Badge>
                   </div>
                   <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
@@ -277,14 +314,15 @@ export const ChapterList = React.memo(function ChapterList({
 
           {/* Desktop table layout */}
           <div className="hidden overflow-x-auto rounded-lg border border-border/40 bg-card md:block">
-            <table className="w-full min-w-[720px]">
+            <table className="w-full min-w-[820px]">
             <thead className="border-b border-border/40 bg-secondary/30">
               <tr>
                 <th className="px-4 py-3 text-left text-sm font-semibold">Chapter</th>
                 <th className="px-4 py-3 text-left text-sm font-semibold">Uploaded By</th>
                 <th className="px-4 py-3 text-left text-sm font-semibold">Group</th>
                 <th className="px-4 py-3 text-left text-sm font-semibold">Upload Date</th>
-                <th className="px-4 py-3 text-right text-sm font-semibold">Type</th>
+                <th className="px-4 py-3 text-left text-sm font-semibold">XP</th>
+                <th className="px-4 py-3 text-right text-sm font-semibold">Readers</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border/40">
@@ -292,6 +330,8 @@ export const ChapterList = React.memo(function ChapterList({
                 const isRead = readChapters.data?.has(c.id) ?? false;
                 const isNew = new Date(c.created_at) > new Date(Date.now() - 2 * 60 * 60 * 1000);
                 const showNewBadge = isNew && !isRead;
+                const isLatest = latestChapterId === c.id;
+                const readerCount = readerCounts.data?.get(c.id) ?? 0;
 
                 return (
                   <tr key={c.id} className="transition hover:bg-secondary/40">
@@ -340,10 +380,15 @@ export const ChapterList = React.memo(function ChapterList({
                         <span className="ml-2 text-xs">({formatChapterAge(c.created_at)})</span>
                       </div>
                     </td>
+                    <td className="px-4 py-3">
+                      <XpBadge
+                        isRead={isRead}
+                        isLatest={isLatest}
+                        isSeriesCompleted={isSeriesCompleted}
+                      />
+                    </td>
                     <td className="px-4 py-3 text-right">
-                      <Badge variant="outline" className="text-xs uppercase">
-                        {c.chapter_type === "novel" ? "Novel" : "Pages"}
-                      </Badge>
+                      <ReaderCount count={readerCount} loading={readerCounts.isLoading} />
                     </td>
                   </tr>
                 );
@@ -430,6 +475,107 @@ export const ChapterList = React.memo(function ChapterList({
 
 /* ------------------------------------------------------------------ */
 
+function XpBadge({
+  isRead,
+  isLatest,
+  isSeriesCompleted,
+}: {
+  isRead: boolean;
+  isLatest: boolean;
+  isSeriesCompleted: boolean;
+}) {
+  const tooltipParts = [`+${XP_AMOUNTS.chapter_complete} XP for finishing this chapter`];
+  if (isLatest) {
+    tooltipParts.push(
+      `+${XP_AMOUNTS.caught_up} XP bonus for catching up to the latest chapter`,
+    );
+    if (isSeriesCompleted) {
+      tooltipParts.push(
+        `+${XP_AMOUNTS.series_complete} XP bonus for finishing the entire title`,
+      );
+    }
+  }
+
+  let earnedXp = XP_AMOUNTS.chapter_complete;
+  if (isLatest) {
+    if (isSeriesCompleted) {
+      earnedXp += XP_AMOUNTS.series_complete;
+    } else {
+      earnedXp += XP_AMOUNTS.caught_up;
+    }
+  }
+
+  if (isRead) {
+    return (
+      <Badge
+        variant="outline"
+        title={`${tooltipParts.join("\n")}\n\nAlready earned.`}
+        className="border-zinc-800 bg-zinc-900/30 text-zinc-500 text-[10px] h-5 px-1.5 font-semibold cursor-default select-none line-through"
+      >
+        +{earnedXp} XP
+      </Badge>
+    );
+  }
+
+  if (earnedXp >= 225) {
+    return (
+      <Badge
+        title={tooltipParts.join("\n")}
+        className="bg-gradient-to-r from-amber-500 via-yellow-500 to-amber-600 border-amber-400 text-black text-[10px] h-5 px-1.5 font-black uppercase tracking-wider animate-pulse shadow-[0_0_8px_rgba(245,158,11,0.5)] cursor-default select-none"
+      >
+        <Sparkles className="mr-0.5 h-2.5 w-2.5 fill-black" />
+        +{earnedXp} XP
+      </Badge>
+    );
+  }
+
+  if (earnedXp >= 125) {
+    return (
+      <Badge
+        title={tooltipParts.join("\n")}
+        className="bg-gradient-to-r from-violet-600 via-fuchsia-600 to-pink-600 border-violet-500 text-white text-[10px] h-5 px-1.5 font-extrabold uppercase tracking-wide shadow-[0_0_8px_rgba(124,58,237,0.5)] cursor-default select-none"
+      >
+        <Sparkles className="mr-0.5 h-2.5 w-2.5 fill-white" />
+        +{earnedXp} XP
+      </Badge>
+    );
+  }
+
+  return (
+    <Badge
+      variant="outline"
+      title={tooltipParts.join("\n")}
+      className="border-emerald-500/30 bg-emerald-950/10 text-emerald-400 text-[10px] h-5 px-1.5 font-semibold cursor-default select-none"
+    >
+      <Sparkles className="mr-0.5 h-2.5 w-2.5 fill-emerald-400" />
+      +{earnedXp} XP
+    </Badge>
+  );
+}
+
+function ReaderCount({ count, loading }: { count: number; loading: boolean }) {
+  if (loading) {
+    return <span className="inline-block h-4 w-10 animate-pulse rounded bg-secondary/60" />;
+  }
+  return (
+    <Badge
+      variant="outline"
+      title={`${count.toLocaleString()} reader${count === 1 ? "" : "s"}`}
+      className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground"
+    >
+      <Eye className="h-3 w-3" />
+      {formatReaderCount(count)}
+    </Badge>
+  );
+}
+
+function formatReaderCount(value: number): string {
+  if (!Number.isFinite(value) || value <= 0) return "0";
+  if (value < 1_000) return value.toString();
+  if (value < 1_000_000) return `${(value / 1_000).toFixed(value < 10_000 ? 1 : 0)}k`;
+  return `${(value / 1_000_000).toFixed(1)}M`;
+}
+
 function formatChapterAge(value: string): string {
   const date = new Date(value);
   const diffMs = Date.now() - date.getTime();
@@ -448,3 +594,5 @@ function formatChapterAge(value: string): string {
   if (diffMs < year) return `${Math.floor(diffMs / month)}mo ago`;
   return `${Math.floor(diffMs / year)}y ago`;
 }
+
+

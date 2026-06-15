@@ -13,14 +13,14 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
-import { 
-  User, 
-  Mail, 
-  Trophy, 
+import {
+  User,
+  Mail,
+  Trophy,
   Flame,
-  MessageSquare, 
-  BookOpen, 
-  Star, 
+  MessageSquare,
+  BookOpen,
+  Star,
   Calendar,
   Settings,
   Shield,
@@ -45,6 +45,7 @@ import { ProfileWidgets } from "@/components/profile/ProfileWidgets";
 import { AccentColorPicker } from "@/components/profile/AccentColorPicker";
 
 import { SocialLinksEditor, SocialLinksDisplay, type SocialLinksData } from "@/components/profile/SocialLinks";
+import { xpSourceLabel } from "@/lib/xp";
 
 
 /* ─── Keyframes (injected once) ─── */
@@ -508,10 +509,87 @@ export default function ProfilePage() {
         .from("reading_history")
         .select("updated_at")
         .eq("user_id", u.user.id);
-      
+
       if (error) throw error;
       return data || [];
     }
+  });
+
+  // XP history ledger — newest first, capped to a few hundred rows.
+  const xpHistory = useQuery({
+    queryKey: ["xp-history", "me"],
+    queryFn: async () => {
+      const { data: u } = await supabase.auth.getUser();
+      if (!u.user) return [];
+      const { data, error } = await supabase
+        .from("xp_transactions")
+        .select("id,amount,source,reference_id,reference_type,description,created_at")
+        .eq("user_id", u.user.id)
+        .order("created_at", { ascending: false })
+        .limit(200);
+      if (error) throw error;
+      return data ?? [];
+    },
+    staleTime: 30 * 1000,
+  });
+
+  // Resolve series links for ledger rows that reference one.
+  const xpSeriesIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const row of xpHistory.data ?? []) {
+      if (row.reference_type === "series" && row.reference_id) ids.add(row.reference_id);
+    }
+    return Array.from(ids);
+  }, [xpHistory.data]);
+
+  const xpSeriesLookup = useQuery({
+    queryKey: ["xp-history", "series-lookup", xpSeriesIds.join(",")],
+    queryFn: async () => {
+      if (xpSeriesIds.length === 0) return new Map<string, { slug: string; title: string }>();
+      const { data, error } = await supabase
+        .from("series")
+        .select("id,slug,title")
+        .in("id", xpSeriesIds);
+      if (error) throw error;
+      return new Map((data ?? []).map((row) => [row.id, { slug: row.slug, title: row.title }]));
+    },
+    enabled: xpSeriesIds.length > 0,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  // Resolve chapter links (slug + chapter_number + parent series slug).
+  const xpChapterIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const row of xpHistory.data ?? []) {
+      if (row.reference_type === "chapter" && row.reference_id) ids.add(row.reference_id);
+    }
+    return Array.from(ids);
+  }, [xpHistory.data]);
+
+  const xpChapterLookup = useQuery({
+    queryKey: ["xp-history", "chapter-lookup", xpChapterIds.join(",")],
+    queryFn: async () => {
+      if (xpChapterIds.length === 0)
+        return new Map<string, { slug: string; chapter_number: number; series_slug: string; series_title: string }>();
+      const { data, error } = await supabase
+        .from("chapters")
+        .select("id,slug,chapter_number,series:series_id(slug,title)")
+        .in("id", xpChapterIds);
+      if (error) throw error;
+      return new Map(
+        (data ?? []).map((row: any) => [
+          row.id,
+          {
+            slug: row.slug,
+            chapter_number: row.chapter_number,
+            series_slug: row.series?.slug ?? "",
+            series_title: row.series?.title ?? "",
+          },
+        ]),
+      );
+    },
+    enabled: xpChapterIds.length > 0,
+    staleTime: 5 * 60 * 1000,
   });
 
   const streaks = useMemo(() => {
@@ -1264,7 +1342,7 @@ export default function ProfilePage() {
                     <span 
                       className="absolute bottom-0 left-0 right-0 h-[1.5px] pointer-events-none"
                       style={{ 
-                        background: `linear-gradient(90deg, transparent, ${titleColor}50, ${titleColor}, ${titleColor}50, transparent)`,
+                        backgroundImage: `linear-gradient(90deg, transparent, ${titleColor}50, ${titleColor}, ${titleColor}50, transparent)`,
                         backgroundSize: '200% 100%',
                         animation: 'titleUnderlineSweep 3s linear infinite',
                       }}
@@ -1274,7 +1352,7 @@ export default function ProfilePage() {
                     <span 
                       className="absolute inset-0 pointer-events-none opacity-0 group-hover/title:opacity-100 transition-opacity"
                       style={{ 
-                        background: `linear-gradient(105deg, transparent 40%, ${titleColor}12 50%, transparent 60%)`,
+                        backgroundImage: `linear-gradient(105deg, transparent 40%, ${titleColor}12 50%, transparent 60%)`,
                         backgroundSize: '250% 100%',
                         animation: 'titleShimmerSweep 2s ease-in-out infinite',
                       }}
@@ -1410,7 +1488,7 @@ export default function ProfilePage() {
         style={{ animation: "profileFadeInUp 0.6s ease-out 0.2s both" }}
       >
         <Tabs defaultValue="edit" className="w-full">
-          <TabsList className="grid h-11 w-full grid-cols-5 gap-1 p-1">
+          <TabsList className="grid h-11 w-full grid-cols-6 gap-1 p-1">
             <TabsTrigger value="edit" className="h-9 min-w-0 gap-2 px-0 sm:px-3">
               <Settings className="h-4 w-4" />
               <span className="hidden sm:inline">Edit</span>
@@ -1426,6 +1504,10 @@ export default function ProfilePage() {
             <TabsTrigger value="stats" className="h-9 min-w-0 gap-2 px-0 sm:px-3">
               <TrendingUp className="h-4 w-4" />
               <span className="hidden sm:inline">Stats</span>
+            </TabsTrigger>
+            <TabsTrigger value="xp" className="h-9 min-w-0 gap-2 px-0 sm:px-3">
+              <Sparkles className="h-4 w-4" />
+              <span className="hidden sm:inline">XP</span>
             </TabsTrigger>
             <TabsTrigger value="privacy" className="h-9 min-w-0 gap-2 px-0 sm:px-3">
               <Shield className="h-4 w-4" />
@@ -1572,7 +1654,7 @@ export default function ProfilePage() {
                             <div 
                               className="absolute inset-0 opacity-0 group-hover/card:opacity-100 transition-opacity duration-500 pointer-events-none"
                               style={{ 
-                                background: `linear-gradient(90deg, transparent, ${frame.color}08, transparent)`,
+                                backgroundImage: `linear-gradient(90deg, transparent, ${frame.color}08, transparent)`,
                                 backgroundSize: '200% 100%',
                                 animation: 'frameCardShimmer 2s linear infinite',
                               }}
@@ -1990,6 +2072,116 @@ export default function ProfilePage() {
                 </div>
               </Card>
             </div>
+          </TabsContent>
+
+          {/* ─── XP History Tab ─── */}
+          <TabsContent value="xp">
+            <Card className="p-4 sm:p-6">
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <div>
+                  <h3 className="flex items-center gap-2 text-lg font-semibold">
+                    <Sparkles className="h-5 w-5" style={{ color: accentColor }} />
+                    XP History
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
+                    Every XP grant, newest first.
+                  </p>
+                </div>
+                <Badge variant="outline" className="text-xs">
+                  {xpHistory.data?.length ?? 0} entries
+                </Badge>
+              </div>
+
+              {xpHistory.isLoading ? (
+                <div className="space-y-2">
+                  {[1, 2, 3, 4].map((i) => (
+                    <div key={i} className="h-14 animate-pulse rounded-lg bg-secondary/60" />
+                  ))}
+                </div>
+              ) : xpHistory.data && xpHistory.data.length > 0 ? (
+                <div className="divide-y divide-border/40 overflow-hidden rounded-lg border border-border/40 bg-card">
+                  {xpHistory.data.map((row) => {
+                    const series =
+                      row.reference_type === "series" && row.reference_id
+                        ? xpSeriesLookup.data?.get(row.reference_id)
+                        : null;
+                    const chapter =
+                      row.reference_type === "chapter" && row.reference_id
+                        ? xpChapterLookup.data?.get(row.reference_id)
+                        : null;
+
+                    return (
+                      <div
+                        key={row.id}
+                        className="flex items-start justify-between gap-3 px-4 py-3 transition hover:bg-secondary/30"
+                      >
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="text-sm font-semibold">
+                              {xpSourceLabel(row.source)}
+                            </span>
+                            {chapter && (
+                              <Link
+                                to="/title/$slug/$chapterSlug"
+                                params={{ slug: chapter.series_slug, chapterSlug: chapter.slug }}
+                                className="text-xs font-medium hover:underline"
+                                style={{ color: accentColor }}
+                              >
+                                {chapter.series_title} · Ch. {chapter.chapter_number}
+                              </Link>
+                            )}
+                            {series && (
+                              <Link
+                                to="/title/$slug"
+                                params={{ slug: series.slug }}
+                                className="text-xs font-medium hover:underline"
+                                style={{ color: accentColor }}
+                              >
+                                {series.title}
+                              </Link>
+                            )}
+                          </div>
+                          {row.description && (
+                            <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
+                              {row.description}
+                            </p>
+                          )}
+                          <div className="mt-1 flex items-center gap-1 text-[11px] text-muted-foreground">
+                            <Calendar className="h-3 w-3" />
+                            {new Date(row.created_at).toLocaleString(undefined, {
+                              year: "numeric",
+                              month: "short",
+                              day: "numeric",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
+                          </div>
+                        </div>
+                        <Badge
+                          className={`shrink-0 text-xs font-semibold ${
+                            row.amount >= 0
+                              ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-400"
+                              : "border-red-500/40 bg-red-500/10 text-red-400"
+                          }`}
+                          variant="outline"
+                        >
+                          {row.amount >= 0 ? "+" : ""}
+                          {row.amount} XP
+                        </Badge>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="rounded-lg border border-dashed border-border/40 p-8 text-center">
+                  <Sparkles className="mx-auto h-12 w-12 text-muted-foreground/50" />
+                  <p className="mt-2 text-sm text-muted-foreground">No XP earned yet</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Read a chapter, follow a series, or finish a title to start your ledger.
+                  </p>
+                </div>
+              )}
+            </Card>
           </TabsContent>
 
           {/* ─── Privacy Settings Tab ─── */}

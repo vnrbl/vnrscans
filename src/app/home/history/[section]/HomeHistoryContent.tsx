@@ -228,6 +228,7 @@ async function fetchFollowedChapters(userId: string, period: Period): Promise<Ch
       .in("series_id", seriesIds)
       .eq("status", "published")
       .order("created_at", { ascending: false })
+      .order("chapter_number", { ascending: false })
       .range(from, to);
 
     if (cutoff) query = query.gte("created_at", cutoff);
@@ -295,6 +296,7 @@ async function fetchLatestUpdates(period: Period): Promise<ChapterItem[]> {
       .select("id,slug,title,chapter_number,created_at,series:series_id(slug,title,cover_url)")
       .eq("status", "published")
       .order("created_at", { ascending: false })
+      .order("chapter_number", { ascending: false })
       .range(from, to);
 
     if (cutoff) query = query.gte("created_at", cutoff);
