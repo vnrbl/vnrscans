@@ -8,6 +8,7 @@ const withAnalyzer = withBundleAnalyzer({
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  serverExternalPackages: ["@sparticuz/chromium", "puppeteer-core", "puppeteer"],
   images: {
     remotePatterns: [
       {
