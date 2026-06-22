@@ -39,51 +39,50 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   });
 
   useEffect(() => {
-    // Sign out and clear state if the account has been banned by an admin.
-    // Returns true if the user was banned (and thus signed out).
-    async function enforceBan(session: Session | null): Promise<boolean> {
-      if (!session?.user) return false;
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("is_banned")
-        .eq("user_id", session.user.id)
-        .maybeSingle();
+    // Check if the account has been banned by an admin in the background.
+    // If banned, it signs the user out and clears state.
+    async function checkBan(session: Session) {
+      try {
+        console.log("useAuth: checking if user is banned:", session.user.id);
+        const { data: profile, error } = await supabase
+          .from("profiles")
+          .select("is_banned")
+          .eq("user_id", session.user.id)
+          .maybeSingle();
 
-      if (profile?.is_banned) {
-        await supabase.auth.signOut();
-        setState({ session: null, user: null, loading: false });
-        toast.error("Your account has been suspended. Contact support if you believe this is a mistake.");
-        return true;
+        if (error) {
+          console.error("useAuth: checkBan profiles query error:", error);
+          return;
+        }
+
+        if (profile?.is_banned) {
+          console.warn("useAuth: user is banned, signing out...");
+          await supabase.auth.signOut();
+          setState({ session: null, user: null, loading: false });
+          toast.error("Your account has been suspended. Contact support if you believe this is a mistake.");
+        }
+      } catch (err) {
+        console.error("useAuth: checkBan exception occurred:", err);
       }
-      return false;
     }
 
-    // Hydrate initial session
-    supabase.auth.getSession().then(async ({ data }) => {
-      if (await enforceBan(data.session)) return;
-      setState({
-        session: data.session,
-        user: data.session?.user ?? null,
-        loading: false,
-      });
-    }).catch((err) => {
-      console.error("useAuth getSession error:", err);
-      setState((prev) => ({
-        ...prev,
-        loading: false,
-      }));
-    });
-
-    // Single global listener
+    // Single global listener handles initial session hydration as well (via INITIAL_SESSION)
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      if (await enforceBan(session)) return;
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log("useAuth: onAuthStateChange fired event:", event, "session present:", !!session);
+      
+      // Update state synchronously to prevent race conditions and blockages
       setState({
         session,
         user: session?.user ?? null,
         loading: false,
       });
+
+      // Run ban check in the background without blocking the UI state transition
+      if (session?.user) {
+        checkBan(session);
+      }
     });
 
     return () => subscription.unsubscribe();
