@@ -1,6 +1,7 @@
 import { Globe, ExternalLink } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { safeUrlOrNull } from "@/lib/safe-url";
 
 /* ─── Platform SVG icons ─── */
 
@@ -141,11 +142,15 @@ export function SocialLinksDisplay({ values, accentColor = "#8B5CF6" }: DisplayP
   if (activeLinks.length === 0) return null;
 
   const getUrl = (platform: (typeof PLATFORMS)[number], value: string) => {
-    // If it's already a URL, return as-is
-    if (value.startsWith("http://") || value.startsWith("https://")) return value;
-    // For Discord, don't linkify usernames
-    if (platform.key === "social_discord") return null;
-    return value;
+    // SECURITY: only linkify absolute http(s) URLs. A bare value such as
+    // `javascript:alert(1)` must never reach an <a href> — it would execute as
+    // stored XSS for anyone viewing the profile. Fall back to a non-link icon
+    // when the value is not a safe absolute URL.
+    const safe = safeUrlOrNull(value);
+    if (!safe) return null;
+    // For Discord, usernames/handles aren't links — only linkify real URLs.
+    if (platform.key === "social_discord" && !/^https?:\/\//i.test(safe)) return null;
+    return safe;
   };
 
   return (

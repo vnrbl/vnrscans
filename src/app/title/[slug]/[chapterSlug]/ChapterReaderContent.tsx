@@ -51,6 +51,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
+import { safeUrlOrNull } from "@/lib/safe-url";
 
 function Link({ to, params, search, children, ...props }: any) {
   let href = to || "";
@@ -2557,15 +2558,21 @@ function ChapterComments({ chapterId, seriesId }: { chapterId: string; seriesId:
             {spoilerHidden ? comment.content : renderCommentMarkdown(comment.content)}
           </div>
 
-          {comment.attachment_url && !spoilerHidden && (
+          {comment.attachment_url && !spoilerHidden && (() => {
+            // Only render as a clickable link when the URL has a safe scheme.
+            // This prevents stored XSS via javascript: URIs injected into
+            // attachment_url.
+            const safeAttachmentUrl = safeUrlOrNull(comment.attachment_url);
+            if (!safeAttachmentUrl) return null;
+            return (
             <a
-              href={comment.attachment_url}
+              href={safeAttachmentUrl}
               target="_blank"
               rel="noreferrer"
               className="mt-3 block max-w-sm overflow-hidden rounded-lg border border-border/50 bg-background"
             >
               <img
-                src={comment.attachment_url}
+                src={safeAttachmentUrl}
                 alt={
                   comment.attachment_alt ??
                   (comment.attachment_type === "gif" ? "Comment GIF" : "Comment image")
@@ -2574,7 +2581,8 @@ function ChapterComments({ chapterId, seriesId }: { chapterId: string; seriesId:
                 loading="lazy"
               />
             </a>
-          )}
+            );
+          })()}
 
           {spoilerHidden && (
             <Button

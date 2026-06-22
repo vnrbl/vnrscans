@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Link } from "@/lib/router-compat";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { safeUrlOrNull } from "@/lib/safe-url";
 import { Badge } from "@/components/ui/badge";
 import {
   Bell,
@@ -290,7 +291,7 @@ export default function NotificationsPage() {
                         <div className="flex items-start justify-between gap-2">
                           <div className="min-w-0">
                             <p className={`text-sm ${!n.is_read ? "font-semibold" : "font-medium"}`}>
-                              {n.link_url ? (
+                              {n.link_url && safeUrlOrNull(n.link_url) ? (
                                 <Link
                                   to={n.link_url as any}
                                   className="hover:underline"

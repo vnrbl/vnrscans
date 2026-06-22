@@ -6,6 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { safeUrlOrNull } from "@/lib/safe-url";
 
 type Notification = {
   id: string;
@@ -182,7 +183,7 @@ export function NotificationList({ notifications, isLoading, onMarkAllRead, onCl
               </div>
             );
 
-            return notification.link_url ? (
+            return notification.link_url && safeUrlOrNull(notification.link_url) ? (
               <Link key={notification.id} to={notification.link_url as any}>
                 {content}
               </Link>
