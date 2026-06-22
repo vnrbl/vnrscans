@@ -4,15 +4,19 @@
   "sideEffects": false,
   "type": "module",
   "scripts": {
-    "dev": "edk run -- next dev",
-    "build": "edk run -- next build && node scripts/copy-chromium-assets.js && edk run -- node scripts/generate-sitemap.js",
-    "start": "edk run -- next start",
-    "analyze": "edk run -- cross-env ANALYZE=true next build",
+    "dev": "next dev",
+    "dev:edk": "edk run -- next dev",
+    "build": "next build && node scripts/copy-chromium-assets.js && node scripts/generate-sitemap.js",
+    "build:edk": "edk run -- next build && node scripts/copy-chromium-assets.js && edk run -- node scripts/generate-sitemap.js",
+    "start": "next start",
+    "analyze": "cross-env ANALYZE=true next build",
     "lint": "eslint .",
     "format": "prettier --write .",
     "postinstall": "npx puppeteer browsers install chrome",
-    "scrape": "edk run -- npx tsx scripts/scrape-series.ts",
-    "auto-import": "edk run -- npx tsx scripts/auto-import-sources.ts"
+    "scrape": "npx tsx scripts/scrape-series.ts",
+    "scrape:edk": "edk run -- npx tsx scripts/scrape-series.ts",
+    "auto-import": "npx tsx scripts/auto-import-sources.ts",
+    "auto-import:edk": "edk run -- npx tsx scripts/auto-import-sources.ts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
