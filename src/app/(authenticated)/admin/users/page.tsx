@@ -14,10 +14,12 @@ import {
   Download,
   Flame,
   ChevronDown,
+  KeyRound,
+  Copy,
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { $deleteUser, $listUserEmails } from "@/lib/api/admin.actions";
+import { $deleteUser, $listUserEmails, $generateResetPasswordLink } from "@/lib/api/admin.actions";
 import { logAdminAction } from "@/lib/adminLog";
 import { Button } from "@/components/ui/button";
 import {
@@ -83,6 +85,10 @@ export default function AdminUsers() {
   const [editingUser, setEditingUser] = useState<ProfileRow | null>(null);
   const [deletingUser, setDeletingUser] = useState<ProfileRow | null>(null);
   const [banningUser, setBanningUser] = useState<ProfileRow | null>(null);
+  const [resettingUser, setResettingUser] = useState<ProfileRow | null>(null);
+  const [generatedLink, setGeneratedLink] = useState<string | null>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [isSending, setIsSending] = useState(false);
   const [banReason, setBanReason] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
@@ -242,6 +248,67 @@ export default function AdminUsers() {
     },
     onError: (e: Error) => toast.error(e.message),
   });
+
+  const handleSendResetEmail = async () => {
+    if (!resettingUser) return;
+    setIsSending(true);
+    try {
+      const userEmail = emailFor(resettingUser.user_id);
+      if (!userEmail) {
+        toast.error("User email not found");
+        return;
+      }
+      const { error } = await supabase.auth.resetPasswordForEmail(userEmail, {
+        redirectTo: `${window.location.origin}/auth/reset-password`,
+      });
+      if (error) {
+        toast.error(error.message);
+      } else {
+        toast.success(`Password reset email sent to ${userEmail}`);
+        setResettingUser(null);
+      }
+    } catch (err: any) {
+      toast.error(err.message || "An error occurred");
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  const handleGenerateResetLink = async () => {
+    if (!resettingUser) return;
+    setIsGenerating(true);
+    setGeneratedLink(null);
+    try {
+      const userEmail = emailFor(resettingUser.user_id);
+      if (!userEmail) {
+        toast.error("User email not found");
+        return;
+      }
+      const session = (await supabase.auth.getSession()).data.session;
+      const token = session?.access_token;
+      if (!token) {
+        toast.error("Not authenticated");
+        return;
+      }
+      const res = await $generateResetPasswordLink({
+        data: {
+          targetEmail: userEmail,
+          redirectTo: `${window.location.origin}/auth/reset-password`,
+          accessToken: token,
+        },
+      });
+      if (!res.success) {
+        toast.error(res.error || "Failed to generate link");
+      } else {
+        setGeneratedLink(res.actionLink ?? null);
+        toast.success("Password reset link generated successfully");
+      }
+    } catch (err: any) {
+      toast.error(err.message || "An error occurred");
+    } finally {
+      setIsGenerating(false);
+    }
+  };
 
   /* ---------------------------------------------------------------- */
   /*  Filtering                                                        */
@@ -509,6 +576,19 @@ export default function AdminUsers() {
                   variant="ghost"
                   size="icon"
                   onClick={() => {
+                    setResettingUser(u);
+                    setGeneratedLink(null);
+                  }}
+                  title="Reset Password"
+                  className="text-indigo-400 hover:bg-indigo-400/10 hover:text-indigo-400"
+                >
+                  <KeyRound className="h-4 w-4" />
+                </Button>
+
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => {
                     setEditingUser(u);
                     setForm({
                       username: u.username ?? "",
@@ -595,6 +675,89 @@ export default function AdminUsers() {
               onClick={() => banningUser && setBan.mutate({ user: banningUser, banned: true, reason: banReason })}
             >
               {setBan.isPending ? "Banning..." : "Ban user"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Reset password dialog */}
+      <Dialog open={!!resettingUser} onOpenChange={(v) => { if (!v) { setResettingUser(null); setGeneratedLink(null); } }}>
+        <DialogContent className="max-w-md border border-border/40 bg-card text-card-foreground">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-white">
+              <KeyRound className="h-5 w-5 text-indigo-400" />
+              Reset Password: {resettingUser?.username}
+            </DialogTitle>
+            <DialogDescription className="text-muted-foreground">
+              Choose how you would like to reset the password for {resettingUser ? (emailFor(resettingUser.user_id) || resettingUser.username) : ""}.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            {/* Option 1: Send email */}
+            <div className="rounded border border-border/40 p-4 space-y-3 bg-secondary/10">
+              <div>
+                <h4 className="text-sm font-semibold text-white">Option 1: Send Reset Email</h4>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Supabase will send an automated password reset link directly to the user&apos;s email address.
+                </p>
+              </div>
+              <Button
+                className="w-full text-xs font-semibold uppercase tracking-wider cursor-pointer"
+                variant="outline"
+                disabled={isSending || isGenerating}
+                onClick={handleSendResetEmail}
+              >
+                {isSending ? "Sending..." : "Send Reset Email"}
+              </Button>
+            </div>
+
+            {/* Option 2: Generate link */}
+            <div className="rounded border border-border/40 p-4 space-y-3 bg-secondary/10">
+              <div>
+                <h4 className="text-sm font-semibold text-white">Option 2: Generate Manual Link</h4>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Create a manual password recovery link. Useful if email delivery is slow or disabled.
+                </p>
+              </div>
+              <Button
+                className="w-full text-xs font-semibold uppercase tracking-wider cursor-pointer"
+                variant="outline"
+                disabled={isSending || isGenerating}
+                onClick={handleGenerateResetLink}
+              >
+                {isGenerating ? "Generating..." : "Generate Link"}
+              </Button>
+
+              {generatedLink && (
+                <div className="mt-3 space-y-2">
+                  <Label className="text-[10px] uppercase tracking-wider font-semibold text-neutral-300">Recovery Link</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      readOnly
+                      value={generatedLink}
+                      className="text-xs h-9 bg-neutral-950 font-mono text-white border-neutral-800"
+                    />
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      className="shrink-0 h-9 cursor-pointer"
+                      onClick={() => {
+                        navigator.clipboard.writeText(generatedLink);
+                        toast.success("Link copied to clipboard!");
+                      }}
+                    >
+                      <Copy className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button className="cursor-pointer" variant="ghost" onClick={() => { setResettingUser(null); setGeneratedLink(null); }}>
+              Close
             </Button>
           </DialogFooter>
         </DialogContent>

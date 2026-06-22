@@ -117,3 +117,42 @@ export async function $deleteUser(args: {
 
   return { success: true };
 }
+
+export async function $generateResetPasswordLink(args: {
+  data: {
+    targetEmail: string;
+    redirectTo: string;
+    accessToken: string;
+  };
+}) {
+  const { data } = args;
+  const validated = z
+    .object({
+      targetEmail: z.string().email(),
+      redirectTo: z.string().min(1),
+      accessToken: z.string().min(1),
+    })
+    .parse(data);
+
+  // 1. Verify caller is admin
+  await verifyAdmin(validated.accessToken);
+
+  // 2. Generate the recovery link via admin API
+  const supabaseAdmin = getAdminSupabase();
+  const { data: linkData, error } = await supabaseAdmin.auth.admin.generateLink({
+    type: "recovery",
+    email: validated.targetEmail,
+    options: {
+      redirectTo: validated.redirectTo,
+    },
+  });
+
+  if (error) {
+    return { success: false, error: error.message };
+  }
+
+  return {
+    success: true,
+    actionLink: linkData.properties.action_link,
+  };
+}

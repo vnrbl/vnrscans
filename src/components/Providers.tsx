@@ -48,8 +48,18 @@ export function Providers({ children }: { children: ReactNode }) {
 function AppShell({ children }: { children: ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
-  const bare = isReaderLayoutPath(pathname) || pathname === "/auth";
+  const bare = isReaderLayoutPath(pathname) || pathname.startsWith("/auth");
   const lastAuthUserId = useRef<string | null | undefined>(undefined);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const code = params.get("code");
+      if (code && (pathname === "/" || pathname === "/auth" || pathname === "")) {
+        router.push(`/auth/reset-password?code=${code}`);
+      }
+    }
+  }, [pathname, router]);
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {

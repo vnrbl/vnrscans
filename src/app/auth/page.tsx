@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { BookOpen, Mail, Lock, User, ArrowRight, Sparkles, Eye, EyeOff } from "lucide-react";
+import { BookOpen, Mail, Lock, User, ArrowRight, ArrowLeft, Sparkles, Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 import { supabase, REMEMBER_ME_KEY } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -11,13 +11,13 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useRouter } from "next/navigation";
-
 export default function AuthPage() {
   const { user } = useAuth();
   const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
   const [showSignUpPassword, setShowSignUpPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
 
   useEffect(() => {
     if (user) router.push("/home");
@@ -56,6 +56,23 @@ export default function AuthPage() {
     setLoading(false);
     if (error) toast.error(error.message);
     else toast.success("Check your email to verify your account");
+  };
+
+  const onForgotPassword = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setLoading(true);
+    const fd = new FormData(e.currentTarget);
+    const email = String(fd.get("email"));
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/auth/reset-password`,
+    });
+    setLoading(false);
+    if (error) {
+      toast.error(error.message);
+    } else {
+      toast.success("Password reset link sent to your email!");
+      setShowForgotPassword(false);
+    }
   };
 
   return (
@@ -142,70 +159,117 @@ export default function AuthPage() {
 
             {/* Sign In form */}
             <TabsContent value="signin" className="mt-6">
-              <form onSubmit={onSignIn} className="space-y-5">
-                <div className="space-y-2">
-                  <Label className="text-xs font-bold uppercase tracking-[0.04em] text-neutral-300">Email</Label>
-                  <div className="relative">
-                    <Mail className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-500" />
-                    <Input
-                      name="email"
-                      type="email"
-                      required
-                      placeholder="you@example.com"
-                      id="signin-email"
-                      className="h-12 rounded border border-neutral-800 bg-neutral-950 pl-11 text-sm text-white placeholder:text-neutral-600 focus-visible:ring-1 focus-visible:ring-neutral-500 transition-all"
-                    />
+              {showForgotPassword ? (
+                <form onSubmit={onForgotPassword} className="space-y-5">
+                  <div className="space-y-2">
+                    <Label className="text-xs font-bold uppercase tracking-[0.04em] text-neutral-300">Email</Label>
+                    <div className="relative">
+                      <Mail className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-500" />
+                      <Input
+                        name="email"
+                        type="email"
+                        required
+                        placeholder="you@example.com"
+                        id="forgot-email"
+                        className="h-12 rounded border border-neutral-800 bg-neutral-950 pl-11 text-sm text-white placeholder:text-neutral-600 focus-visible:ring-1 focus-visible:ring-neutral-500 transition-all"
+                      />
+                    </div>
                   </div>
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-xs font-bold uppercase tracking-[0.04em] text-neutral-300">Password</Label>
-                  <div className="relative">
-                    <Lock className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-500" />
-                    <Input
-                      name="password"
-                      type={showPassword ? "text" : "password"}
-                      required
-                      minLength={6}
-                      placeholder="••••••••"
-                      id="signin-password"
-                      className="h-12 rounded border border-neutral-800 bg-neutral-950 pl-11 pr-11 text-sm text-white placeholder:text-neutral-600 focus-visible:ring-1 focus-visible:ring-neutral-500 transition-all"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3.5 top-1/2 -translate-y-1/2 p-0.5 rounded transition-colors text-neutral-500 hover:text-white"
-                      tabIndex={-1}
-                    >
-                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </button>
-                  </div>
-                </div>
 
-                <div className="flex items-center gap-2">
-                  <Checkbox
-                    id="remember-me"
-                    checked={rememberMe}
-                    onCheckedChange={(v) => setRememberMe(v === true)}
-                    className="border-neutral-700 data-[state=checked]:bg-white data-[state=checked]:text-black data-[state=checked]:border-white"
-                  />
-                  <Label
-                    htmlFor="remember-me"
-                    className="cursor-pointer text-xs font-medium text-neutral-300 select-none"
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    id="forgot-submit-btn"
+                    className="group relative h-12 w-full rounded bg-white hover:bg-neutral-200 text-black text-xs font-bold uppercase tracking-[0.08em] transition-all flex items-center justify-center gap-2 cursor-pointer"
                   >
-                    Remember me for 2 weeks
-                  </Label>
-                </div>
+                    Send recovery link
+                    <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5 stroke-[2]" />
+                  </button>
 
-                <button
-                  type="submit"
-                  disabled={loading}
-                  id="signin-submit-btn"
-                  className="group relative h-12 w-full rounded bg-white hover:bg-neutral-200 text-black text-xs font-bold uppercase tracking-[0.08em] transition-all flex items-center justify-center gap-2 cursor-pointer"
-                >
-                  Sign in
-                  <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5 stroke-[2]" />
-                </button>
-              </form>
+                  <button
+                    type="button"
+                    onClick={() => setShowForgotPassword(false)}
+                    className="flex items-center justify-center gap-2 w-full text-xs text-neutral-450 hover:text-white transition-colors py-1 cursor-pointer font-light"
+                  >
+                    <ArrowLeft className="h-3.5 w-3.5" />
+                    Back to sign in
+                  </button>
+                </form>
+              ) : (
+                <form onSubmit={onSignIn} className="space-y-5">
+                  <div className="space-y-2">
+                    <Label className="text-xs font-bold uppercase tracking-[0.04em] text-neutral-300">Email</Label>
+                    <div className="relative">
+                      <Mail className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-500" />
+                      <Input
+                        name="email"
+                        type="email"
+                        required
+                        placeholder="you@example.com"
+                        id="signin-email"
+                        className="h-12 rounded border border-neutral-800 bg-neutral-950 pl-11 text-sm text-white placeholder:text-neutral-600 focus-visible:ring-1 focus-visible:ring-neutral-500 transition-all"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs font-bold uppercase tracking-[0.04em] text-neutral-300">Password</Label>
+                      <button
+                        type="button"
+                        onClick={() => setShowForgotPassword(true)}
+                        className="text-[10px] uppercase tracking-wider text-neutral-450 hover:text-white transition-colors cursor-pointer font-semibold"
+                      >
+                        Forgot password?
+                      </button>
+                    </div>
+                    <div className="relative">
+                      <Lock className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-500" />
+                      <Input
+                        name="password"
+                        type={showPassword ? "text" : "password"}
+                        required
+                        minLength={6}
+                        placeholder="••••••••"
+                        id="signin-password"
+                        className="h-12 rounded border border-neutral-800 bg-neutral-950 pl-11 pr-11 text-sm text-white placeholder:text-neutral-600 focus-visible:ring-1 focus-visible:ring-neutral-500 transition-all"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3.5 top-1/2 -translate-y-1/2 p-0.5 rounded transition-colors text-neutral-500 hover:text-white"
+                        tabIndex={-1}
+                      >
+                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      id="remember-me"
+                      checked={rememberMe}
+                      onCheckedChange={(v) => setRememberMe(v === true)}
+                      className="border-neutral-700 data-[state=checked]:bg-white data-[state=checked]:text-black data-[state=checked]:border-white"
+                    />
+                    <Label
+                      htmlFor="remember-me"
+                      className="cursor-pointer text-xs font-medium text-neutral-300 select-none"
+                    >
+                      Remember me for 2 weeks
+                    </Label>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    id="signin-submit-btn"
+                    className="group relative h-12 w-full rounded bg-white hover:bg-neutral-200 text-black text-xs font-bold uppercase tracking-[0.08em] transition-all flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    Sign in
+                    <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5 stroke-[2]" />
+                  </button>
+                </form>
+              )}
             </TabsContent>
 
             {/* Sign Up form */}
