@@ -1438,9 +1438,7 @@ function preferImagesMatchingExampleUrl(images: string[], exampleUrl?: string | 
 }
 
 function shouldUseSharedReaderBrowser(url: string, exampleUrl?: string | null): boolean {
-  return (
-    isQimanhwaLikeUrl(url)
-  );
+  return true;
 }
 
 function filterReaderImagesForSource(
