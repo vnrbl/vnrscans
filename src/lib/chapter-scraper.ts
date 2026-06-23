@@ -153,61 +153,7 @@ async function scrapeWithPuppeteer(url: string, isChapterPage: boolean = false):
     const page = await browser.newPage();
     
     // Enable request interception to block ads, stylesheets, and post-load hijack redirects
-    await page.setRequestInterception(true);
-    let initialLoadFinished = false;
-    let targetHost = '';
-    try {
-      targetHost = new URL(url).hostname.replace('www.', '');
-    } catch {}
-
-    page.on('request', (request) => {
-      const resourceType = request.resourceType();
-      const requestUrl = request.url();
-
-      const isAdOrAnalytics =
-        requestUrl.includes('google-analytics') ||
-        requestUrl.includes('doubleclick') ||
-        requestUrl.includes('adsystem') ||
-        requestUrl.includes('adnxs') ||
-        requestUrl.includes('popads') ||
-        requestUrl.includes('popunder') ||
-        requestUrl.includes('adskeeper') ||
-        requestUrl.includes('mgid') ||
-        requestUrl.includes('exoclick') ||
-        requestUrl.includes('a-ads') ||
-        requestUrl.includes('juicyads');
-
-      if (
-        resourceType === 'stylesheet' ||
-        resourceType === 'font' ||
-        resourceType === 'media' ||
-        isAdOrAnalytics
-      ) {
-        request.abort();
-        return;
-      }
-
-      // Block post-load navigation hijacks to other domains
-      if (
-        initialLoadFinished &&
-        request.isNavigationRequest() &&
-        request.frame() === page.mainFrame()
-      ) {
-        try {
-          const reqHost = new URL(requestUrl).hostname.replace('www.', '');
-          if (targetHost && !reqHost.includes(targetHost) && !targetHost.includes(reqHost)) {
-            console.log(`[Scraper] Aborting post-load ad hijack redirect to: ${requestUrl}`);
-            request.abort();
-            return;
-          }
-        } catch {
-          request.abort();
-          return;
-        }
-      }
-
-      request.continue();
-    });
+    await setupRequestInterception(page, url);
 
     // Apply anti-detection measures to prevent Cloudflare Turnstile blocks
     await page.evaluateOnNewDocument(() => {
@@ -1100,6 +1046,7 @@ async function extractReaderImagesWithSharedBrowser(
       const page = await browser.newPage();
       try {
         await prepareScraperPage(page);
+        await setupRequestInterception(page, url);
         console.log(`[Scraper] Shared reader browser extracting: ${url}`);
         await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
         await new Promise((resolve) => setTimeout(resolve, 2500));
@@ -1137,6 +1084,69 @@ async function extractReaderImagesWithSharedBrowser(
   } finally {
     await browser.close();
   }
+}
+
+async function setupRequestInterception(page: any, url: string): Promise<void> {
+  await page.setRequestInterception(true);
+  let targetHost = '';
+  try {
+    targetHost = new URL(url).hostname.replace('www.', '');
+  } catch {}
+
+  page.on('request', (request: any) => {
+    const resourceType = request.resourceType();
+    const requestUrl = request.url();
+
+    const isAdOrAnalytics =
+      requestUrl.includes('google-analytics') ||
+      requestUrl.includes('doubleclick') ||
+      requestUrl.includes('adsystem') ||
+      requestUrl.includes('adnxs') ||
+      requestUrl.includes('popads') ||
+      requestUrl.includes('popunder') ||
+      requestUrl.includes('adskeeper') ||
+      requestUrl.includes('mgid') ||
+      requestUrl.includes('exoclick') ||
+      requestUrl.includes('a-ads') ||
+      requestUrl.includes('juicyads');
+
+    if (
+      resourceType === 'stylesheet' ||
+      resourceType === 'font' ||
+      resourceType === 'media' ||
+      isAdOrAnalytics
+    ) {
+      request.abort();
+      return;
+    }
+
+    if (request.isNavigationRequest() && request.frame() === page.mainFrame()) {
+      if (requestUrl === url) {
+        request.continue();
+        return;
+      }
+
+      try {
+        const reqHost = new URL(requestUrl).hostname.replace('www.', '');
+        const isRelated =
+          !targetHost ||
+          reqHost.includes(targetHost) ||
+          targetHost.includes(reqHost) ||
+          request.redirectChain().length > 0;
+
+        if (!isRelated) {
+          console.log(`[Scraper] Aborting hijack navigation to: ${requestUrl}`);
+          request.abort();
+          return;
+        }
+      } catch {
+        request.abort();
+        return;
+      }
+    }
+
+    request.continue();
+  });
 }
 
 async function prepareScraperPage(page: any): Promise<void> {
