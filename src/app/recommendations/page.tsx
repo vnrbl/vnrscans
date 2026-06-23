@@ -130,8 +130,6 @@ export default function RecommendationsPage() {
 
   return (
     <div className="min-h-screen bg-background relative overflow-hidden">
-      <title>Recommendations — vnrscans</title>
-      <meta name="description" content="Personalized series recommendations based on your reading history" />
       {/* Background glow */}
       <div className="absolute top-[-10%] right-[-10%] h-[400px] w-[400px] rounded-full bg-primary/5 blur-[80px] pointer-events-none" />
       <div className="absolute bottom-[-10%] left-[-10%] h-[450px] w-[450px] rounded-full bg-accent/5 blur-[100px] pointer-events-none" />

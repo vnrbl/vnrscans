@@ -43,3 +43,10 @@ dist-ssr
 .next/
 .astro/
 *.tsbuildinfo
+
+# Scratch / Agent files
+system.tmp
+tiny.dat
+nul
+my-agent/
+

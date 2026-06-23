@@ -45,7 +45,11 @@ export default function TitleDetailPageContent({
       if (!data) throw new Error("Series not found");
       return data;
     },
-    placeholderData: initialSeriesData,
+    initialData: initialSeriesData,
+    // Keep the server-provided data on screen even if a background
+    // refetch fails (RLS, network, etc.) — never regress to a
+    // "Series not found" screen for a real series.
+    retry: false,
     staleTime: 1000 * 60 * 5,
     gcTime: 1000 * 60 * 20,
   });

@@ -6,8 +6,8 @@
   "scripts": {
     "dev": "next dev",
     "dev:edk": "edk run -- next dev",
-    "build": "next build && node scripts/copy-chromium-assets.js && node scripts/generate-sitemap.js",
-    "build:edk": "edk run -- next build && node scripts/copy-chromium-assets.js && edk run -- node scripts/generate-sitemap.js",
+    "build": "next build && node scripts/copy-chromium-assets.js",
+    "build:edk": "edk run -- next build && node scripts/copy-chromium-assets.js",
     "start": "next start",
     "analyze": "cross-env ANALYZE=true next build",
     "lint": "eslint .",

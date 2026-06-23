@@ -1,3 +1,4 @@
+# All crawlers — allow public content, block low-value / private pages
 User-agent: *
 Allow: /
 Disallow: /admin
@@ -6,8 +7,16 @@ Disallow: /library
 Disallow: /notifications
 Disallow: /profile
 Disallow: /settings
+Disallow: /search
+Disallow: /user/
+Disallow: /api/
 
+# Allow AdSense & adsbot to crawl everything
 User-agent: Mediapartners-Google
 Allow: /
 
+User-agent: AdsBot-Google
+Allow: /
+
+# Sitemap index (dynamic — always reflects current DB state)
 Sitemap: https://www.vnrscans.com/sitemap.xml

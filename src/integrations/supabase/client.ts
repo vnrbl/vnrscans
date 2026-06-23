@@ -12,10 +12,19 @@ function createSwitchableStorage(): Storage | undefined {
       ? window.sessionStorage
       : window.localStorage;
 
+  const fallback = (): Storage =>
+    pick() === window.localStorage ? window.sessionStorage : window.localStorage;
+
   return {
-    getItem: (key) => pick().getItem(key),
-    setItem: (key, value) => pick().setItem(key, value),
-    removeItem: (key) => pick().removeItem(key),
+    getItem: (key) => pick().getItem(key) ?? fallback().getItem(key),
+    setItem: (key, value) => {
+      pick().setItem(key, value);
+      if (key !== REMEMBER_ME_KEY) fallback().removeItem(key);
+    },
+    removeItem: (key) => {
+      pick().removeItem(key);
+      fallback().removeItem(key);
+    },
     clear: () => pick().clear(),
     key: (index) => pick().key(index),
     get length() {

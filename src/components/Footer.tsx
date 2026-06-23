@@ -1,4 +1,5 @@
 import { Link } from "@/lib/router-compat";
+import NextLink from "next/link";
 import { ShieldCheck, Mail, ExternalLink, Globe } from "lucide-react";
 
 export function Footer() {
@@ -65,10 +66,10 @@ export function Footer() {
                 <Link to="/contact" className="hover:text-primary transition-colors">Inquiries & Contact</Link>
               </li>
               <li>
-                <a href="/privacy" className="hover:text-primary transition-colors">Privacy Policy</a>
+                <NextLink href="/privacy" className="hover:text-primary transition-colors">Privacy Policy</NextLink>
               </li>
               <li>
-                <a href="/terms" className="hover:text-primary transition-colors">Terms of Service</a>
+                <NextLink href="/terms" className="hover:text-primary transition-colors">Terms of Service</NextLink>
               </li>
               <li>
                 <a

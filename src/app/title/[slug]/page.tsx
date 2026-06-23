@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { notFound } from "next/navigation";
 import TitleDetailPageContent from "./TitleDetailPageContent";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -107,6 +108,13 @@ export default async function Page({ params }: PageProps) {
 
   // Reuses the same request-scoped data from generateMetadata (deduped)
   const initialSeriesData = await getSeriesData(slug);
+
+  // Return a real 404 (instead of HTTP 200 "Series not found") so that
+  // dead/mock URLs are removed from Google's index instead of crawling
+  // thin error pages that hurt sitewide quality signals.
+  if (!initialSeriesData) {
+    notFound();
+  }
 
   // Fetch chapters in parallel only if series exists
   let initialChaptersData: any[] = [];

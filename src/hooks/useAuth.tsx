@@ -39,6 +39,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   });
 
   useEffect(() => {
+    let mounted = true;
+
     // Check if the account has been banned by an admin in the background.
     // If banned, it signs the user out and clears state.
     async function checkBan(session: Session) {
@@ -66,6 +68,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     }
 
+    async function hydrateSession() {
+      const { data, error } = await supabase.auth.getSession();
+      if (!mounted) return;
+
+      if (error) {
+        console.error("useAuth: getSession error:", error);
+        setState({ session: null, user: null, loading: false });
+        return;
+      }
+
+      setState({
+        session: data.session,
+        user: data.session?.user ?? null,
+        loading: false,
+      });
+
+      if (data.session?.user) {
+        checkBan(data.session);
+      }
+    }
+
+    hydrateSession();
+
     // Single global listener handles initial session hydration as well (via INITIAL_SESSION)
     const {
       data: { subscription },
@@ -85,7 +110,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   return (

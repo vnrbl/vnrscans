@@ -1,14 +1,5 @@
-"use client";
-
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
-import { Badge } from "@/components/ui/badge";
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
+import Link from "next/link";
+import type { Metadata } from "next";
 import {
   BookOpen,
   Layers,
@@ -24,83 +15,131 @@ import {
   Eye,
   Heart,
 } from "lucide-react";
-import Link from "next/link";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
+import { Badge } from "@/components/ui/badge";
+import { supabase } from "@/integrations/supabase/client";
+import { HomeStats } from "./HomeStats";
 
-export default function Home() {
-  // Fetch stats from Supabase
-  const stats = useQuery({
-    queryKey: ["stats"],
-    queryFn: async () => {
-      const [seriesRes, chapterRes, userRes] = await Promise.all([
-        supabase.from("series").select("*", { count: "exact", head: true }),
-        supabase.from("chapters").select("*", { count: "exact", head: true }),
-        supabase.from("profiles").select("*", { count: "exact", head: true }),
-      ]);
-      return {
-        chapters: chapterRes.count || 0,
-        series: seriesRes.count || 0,
-        readers: userRes.count || 0,
-      };
-    },
-    staleTime: 1000 * 60 * 10,
-    gcTime: 1000 * 60 * 30,
-  });
+export const revalidate = 300; // ISR: refresh anonymous landing every 5 min
 
-  // Fetch popular series for showcase
-  const popularSeries = useQuery({
-    queryKey: ["showcase-series"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("series")
-        .select("id, slug, title, cover_url, description, type, status, view_count")
-        .limit(3);
-      if (error) throw error;
-      return data || [];
-    },
-    staleTime: 1000 * 60 * 10,
-    gcTime: 1000 * 60 * 30,
-  });
+export const metadata: Metadata = {
+  title: "vnrscans - Read Manga, Manhwa, Manhua & Novels Online Free",
+  description:
+    "Read the latest manga, manhwa, manhua, and web novels online for free on vnrscans. Fast updates, high-quality chapters, bookmarks, reading history, and a gamified reader experience.",
+  keywords: [
+    "read manga online",
+    "read manhwa online",
+    "read manhua online",
+    "free manga reader",
+    "latest manhwa chapters",
+    "vnrscans",
+    "web novels",
+    "manga updates",
+  ],
+  alternates: {
+    canonical: "/",
+  },
+  openGraph: {
+    title: "vnrscans - Read Manga, Manhwa, Manhua & Novels",
+    description:
+      "Read the latest manga, manhwa, manhua, and web novels online for free on vnrscans. Fast updates, high-quality chapters, and a premium reading experience.",
+    type: "website",
+    url: "https://www.vnrscans.com",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "vnrscans - Read Manga, Manhwa, Manhua & Novels",
+    description:
+      "Read the latest manga, manhwa, manhua, and web novels online for free on vnrscans.",
+  },
+};
 
-  // Mock series data as fallback if no series exist in DB yet
-  const mockSeries = [
-    {
-      id: "mock-1",
-      slug: "solo-leveling-ragnarok",
-      title: "Solo Leveling: Ragnarok",
-      description: "The official sequel to Solo Leveling. Earth's peace is shattered once again, and Sung Suho must rise to save humanity.",
-      cover_url: "https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?w=500&auto=format&fit=crop&q=80",
-      type: "manhwa",
-      status: "ongoing",
-      view_count: 84729,
-    },
-    {
-      id: "mock-2",
-      slug: "omniscient-readers-viewpoint",
-      title: "Omniscient Reader's Viewpoint",
-      description: "Only one reader knows the ending of the novel that has suddenly become reality. Can he survive the scenarios?",
-      cover_url: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=500&auto=format&fit=crop&q=80",
-      type: "manhwa",
-      status: "ongoing",
-      view_count: 95821,
-    },
-    {
-      id: "mock-3",
-      slug: "return-of-the-mount-hua-sect",
-      title: "Return of the Mount Hua Sect",
-      description: "Chung Myung, the 13th Disciple of the Mount Hua Sect, wakes up 100 years in the future to find his sect in ruins.",
-      cover_url: "https://images.unsplash.com/photo-1578632767115-351597cf2477?w=500&auto=format&fit=crop&q=80",
-      type: "manhwa",
-      status: "ongoing",
-      view_count: 73942,
-    },
-  ];
+type ShowcaseSeries = {
+  id: string;
+  slug: string;
+  title: string;
+  description: string | null;
+  cover_url: string | null;
+  type: string;
+  status: string;
+  view_count: number | null;
+};
 
-  const displaySeries = popularSeries.data && popularSeries.data.length > 0
-    ? popularSeries.data
-    : mockSeries;
+async function getShowcaseSeries(): Promise<ShowcaseSeries[]> {
+  try {
+    const { data, error } = await supabase
+      .from("series")
+      .select(
+        "id, slug, title, description, cover_url, type, status, view_count"
+      )
+      .eq("is_hidden", false)
+      .order("view_count", { ascending: false })
+      .limit(6);
+
+    if (error || !data || data.length === 0) return [];
+    return data;
+  } catch {
+    return [];
+  }
+}
+
+async function getStats() {
+  try {
+    const [seriesRes, chapterRes, userRes] = await Promise.all([
+      supabase.from("series").select("*", { count: "exact", head: true }).eq("is_hidden", false),
+      supabase.from("chapters").select("*", { count: "exact", head: true }).eq("status", "published"),
+      supabase.from("profiles").select("*", { count: "exact", head: true }),
+    ]);
+    return {
+      chapters: chapterRes.count || 0,
+      series: seriesRes.count || 0,
+      readers: userRes.count || 0,
+    };
+  } catch {
+    return { chapters: 0, series: 0, readers: 0 };
+  }
+}
+
+export default async function Home() {
+  const [series, stats] = await Promise.all([getShowcaseSeries(), getStats()]);
+
+  // WebSite + Organization structured data for richer search presence
+  const websiteLd = {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    name: "vnrscans",
+    url: "https://www.vnrscans.com",
+    potentialAction: {
+      "@type": "SearchAction",
+      target: "https://www.vnrscans.com/search?q={search_term_string}",
+      "query-input": "required name=search_term_string",
+    },
+  };
+  const orgLd = {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    name: "vnrscans",
+    url: "https://www.vnrscans.com",
+    logo: "https://www.vnrscans.com/favicon.svg",
+    sameAs: [],
+  };
 
   return (
     <div className="min-h-screen bg-background text-foreground overflow-x-hidden">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteLd) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(orgLd) }}
+      />
+
       {/* ─── Hero Section ─── */}
       <section className="relative border-b border-border/20 pb-16 pt-24 md:pb-28 md:pt-40">
         <div className="container mx-auto px-4 text-center sm:px-6 md:px-8 lg:px-12 xl:px-16">
@@ -111,9 +150,7 @@ export default function Home() {
           <h1 className="mx-auto max-w-5xl text-4xl font-bold leading-[0.95] tracking-[0.06em] text-white sm:text-6xl md:text-7xl lg:text-8xl">
             DISCOVER STORIES
             <br />
-            <span className="text-gradient">
-              DRAWN BY IMAGINATION
-            </span>
+            <span className="text-gradient">DRAWN BY IMAGINATION</span>
           </h1>
 
           <p className="mx-auto mt-8 max-w-2xl text-sm leading-relaxed text-muted-foreground sm:text-base md:text-lg tracking-[0.02em] font-light">
@@ -133,26 +170,30 @@ export default function Home() {
             </Link>
           </div>
 
-          {/* ─── Platform Stats ─── */}
+          {/* ─── Platform Stats (server-rendered for SEO) ─── */}
           <div className="mx-auto mt-24 grid max-w-4xl grid-cols-1 gap-6 sm:grid-cols-3">
             {[
               {
-                value: stats.data?.chapters.toLocaleString() || "12,840+",
+                value: stats.chapters.toLocaleString(),
                 label: "CHAPTERS INDEXED",
                 icon: BookOpen,
+                fallback: "12,840+",
               },
               {
-                value: stats.data?.series.toLocaleString() || "342",
+                value: stats.series.toLocaleString(),
                 label: "MANHWA SERIES",
                 icon: Layers,
+                fallback: "342",
               },
               {
-                value: stats.data?.readers.toLocaleString() || "18,490+",
+                value: stats.readers.toLocaleString(),
                 label: "GLOBAL READERS",
                 icon: Users,
+                fallback: "18,490+",
               },
             ].map((stat, i) => {
               const Icon = stat.icon;
+              const shown = stat.value !== "0" ? stat.value : stat.fallback;
               return (
                 <div
                   key={i}
@@ -161,9 +202,7 @@ export default function Home() {
                   <div className="mb-4 text-muted-foreground">
                     <Icon className="h-5 w-5 stroke-[1.5]" />
                   </div>
-                  <div className="text-3xl font-bold tracking-[0.02em] text-white">
-                    {stat.value}
-                  </div>
+                  <HomeStats value={shown} />
                   <div className="eyebrow mt-2 text-2xs tracking-[0.1em] text-muted-foreground">
                     {stat.label}
                   </div>
@@ -174,7 +213,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ─── Featured Showcase Section ─── */}
+      {/* ─── Featured Showcase Section (REAL series, real internal links) ─── */}
       <section className="py-24 border-b border-border/20">
         <div className="container mx-auto px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16">
           <div className="flex flex-col md:flex-row md:items-end justify-between mb-16">
@@ -183,7 +222,7 @@ export default function Home() {
                 <Compass className="inline h-4.5 w-4.5 mr-1.5 align-text-bottom stroke-[1.5]" /> Discover Content
               </div>
               <h2 className="text-3xl font-bold tracking-[0.04em] text-white uppercase leading-none">
-                Featured Series on vnrscans
+                {series.length > 0 ? "Popular Series on vnrscans" : "Featured Series on vnrscans"}
               </h2>
               <p className="mt-3 text-sm text-muted-foreground max-w-xl font-light tracking-[0.01em]">
                 Experience fluid chapter loading and HD art. Start reading some of our most highly-rated manhwa series.
@@ -196,64 +235,83 @@ export default function Home() {
             </Link>
           </div>
 
-          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {displaySeries.map((series) => (
-              <div
-                key={series.id}
-                className="card-spacex bg-surface-1 group flex flex-col h-full hover:border-hairline-strong transition-all duration-300"
-              >
-                {/* Cover Image Container */}
-                <div className="relative aspect-[16/10] overflow-hidden bg-neutral-900">
-                  <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent opacity-90 z-10 pointer-events-none" />
-                  <img
-                    src={series.cover_url || "https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?w=500"}
-                    alt={series.title}
-                    className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
-                    referrerPolicy="no-referrer"
-                  />
-                  <div className="absolute top-4 left-4 z-20 flex gap-2">
-                    <Badge variant="outline" className="capitalize text-3xs font-semibold bg-black/60 text-neutral-300 border-neutral-800 tracking-[0.05em] py-0.5 px-2">
-                      {series.type}
-                    </Badge>
-                    <Badge
-                      variant="outline"
-                      className={`capitalize text-3xs font-semibold py-0.5 px-2 tracking-[0.05em] ${
-                        series.status === "ongoing"
-                          ? "bg-emerald-950/20 border-emerald-900/40 text-emerald-400"
-                          : "bg-neutral-900/60 border-neutral-800/40 text-neutral-400"
-                      }`}
-                    >
-                      {series.status}
-                    </Badge>
-                  </div>
-                </div>
-
-                {/* Body Content */}
-                <div className="p-6 flex-1 flex flex-col justify-between">
-                  <div>
-                    <h3 className="text-lg font-bold tracking-[0.02em] text-white uppercase group-hover:text-neutral-200 transition-colors line-clamp-1">
-                      {series.title}
-                    </h3>
-                    <p className="mt-3 text-xs text-muted-foreground line-clamp-3 leading-relaxed font-light">
-                      {series.description || "No description provided."}
-                    </p>
+          {series.length > 0 ? (
+            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+              {series.map((item) => (
+                <Link
+                  key={item.id}
+                  href={`/title/${item.slug}`}
+                  className="card-spacex bg-surface-1 group flex flex-col h-full hover:border-hairline-strong transition-all duration-300"
+                >
+                  <div className="relative aspect-[16/10] overflow-hidden bg-neutral-900">
+                    <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent opacity-90 z-10 pointer-events-none" />
+                    {item.cover_url ? (
+                      <img
+                        src={item.cover_url}
+                        alt={`${item.title} cover`}
+                        className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
+                        referrerPolicy="no-referrer"
+                        loading="lazy"
+                      />
+                    ) : (
+                      <div className="grid h-full w-full place-items-center text-muted-foreground">
+                        <BookOpen className="h-8 w-8" />
+                      </div>
+                    )}
+                    <div className="absolute top-4 left-4 z-20 flex gap-2">
+                      <Badge variant="outline" className="capitalize text-3xs font-semibold bg-black/60 text-neutral-300 border-neutral-800 tracking-[0.05em] py-0.5 px-2">
+                        {item.type}
+                      </Badge>
+                      <Badge
+                        variant="outline"
+                        className={`capitalize text-3xs font-semibold py-0.5 px-2 tracking-[0.05em] ${
+                          item.status === "ongoing"
+                            ? "bg-emerald-950/20 border-emerald-900/40 text-emerald-400"
+                            : "bg-neutral-900/60 border-neutral-800/40 text-neutral-400"
+                        }`}
+                      >
+                        {item.status}
+                      </Badge>
+                    </div>
                   </div>
 
-                  <div className="mt-6 pt-4 border-t border-border/20 flex items-center justify-between text-3xs font-bold text-muted-foreground uppercase tracking-widest">
-                    <span className="flex items-center gap-1.5">
-                      <Eye className="h-3.5 w-3.5 text-neutral-400 stroke-[1.5]" />
-                      {series.view_count?.toLocaleString() || "0"} Views
-                    </span>
-                    <Link href={`/title/${series.slug || series.id}`}>
-                      <span className="flex items-center gap-1 text-white hover:underline cursor-pointer">
+                  <div className="p-6 flex-1 flex flex-col justify-between">
+                    <div>
+                      <h3 className="text-lg font-bold tracking-[0.02em] text-white uppercase group-hover:text-neutral-200 transition-colors line-clamp-1">
+                        {item.title}
+                      </h3>
+                      <p className="mt-3 text-xs text-muted-foreground line-clamp-3 leading-relaxed font-light">
+                        {item.description || `Read ${item.title} ${item.type} online in high quality on vnrscans.`}
+                      </p>
+                    </div>
+
+                    <div className="mt-6 pt-4 border-t border-border/20 flex items-center justify-between text-3xs font-bold text-muted-foreground uppercase tracking-widest">
+                      <span className="flex items-center gap-1.5">
+                        <Eye className="h-3.5 w-3.5 text-neutral-400 stroke-[1.5]" />
+                        {item.view_count?.toLocaleString() || "0"} Views
+                      </span>
+                      <span className="flex items-center gap-1 text-white">
                         Read Now <ArrowRight className="h-3 w-3" />
                       </span>
-                    </Link>
+                    </div>
                   </div>
-                </div>
-              </div>
-            ))}
-          </div>
+                </Link>
+              ))}
+            </div>
+          ) : (
+            <div className="card-spacex bg-surface-1 p-12 text-center">
+              <BookOpen className="mx-auto h-10 w-10 text-muted-foreground mb-4" />
+              <h3 className="text-lg font-bold text-white">New series are being added</h3>
+              <p className="mt-2 text-sm text-muted-foreground">
+                Our catalog is growing daily. Explore what&apos;s available now.
+              </p>
+              <Link href="/browse" className="inline-block mt-6">
+                <span className="btn-solid-pill cursor-pointer">
+                  Browse Library <ArrowRight className="ml-1 h-3.5 w-3.5" />
+                </span>
+              </Link>
+            </div>
+          )}
         </div>
       </section>
 
@@ -364,7 +422,6 @@ export default function Home() {
               </div>
             </div>
 
-            {/* Visual Trust Callout Block */}
             <div className="relative max-w-md mx-auto lg:max-w-none w-full">
               <div className="card-spacex bg-surface-1 p-8 hover:border-hairline-strong transition-all duration-300">
                 <Badge variant="outline" className="border-emerald-900/60 text-emerald-400 bg-emerald-950/10 mb-5 text-3xs font-bold uppercase tracking-widest py-0.5 px-2">
@@ -392,7 +449,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ─── FAQ Section ─── */}
+      {/* ─── FAQ Section (with structured-data-friendly markup) ─── */}
       <section className="py-24">
         <div className="container mx-auto max-w-4xl px-6">
           <div className="text-center mb-16">

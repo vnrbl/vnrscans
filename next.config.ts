@@ -9,6 +9,11 @@ const withAnalyzer = withBundleAnalyzer({
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   serverExternalPackages: ["@sparticuz/chromium", "puppeteer-core", "puppeteer"],
+  outputFileTracingIncludes: {
+    "/*": [
+      "./node_modules/@sparticuz/chromium/bin/**/*",
+    ],
+  },
   images: {
     remotePatterns: [
       {
@@ -76,6 +81,18 @@ const nextConfig: NextConfig = {
       "@radix-ui/react-icons",
       "recharts",
     ],
+  },
+  async rewrites() {
+    return [
+      {
+        source: "/sitemap-series-:page.xml",
+        destination: "/sitemap-series/:page",
+      },
+      {
+        source: "/sitemap-chapters-:page.xml",
+        destination: "/sitemap-chapters/:page",
+      },
+    ];
   },
 };
 

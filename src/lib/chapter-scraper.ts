@@ -1,6 +1,7 @@
 /**
  * Chapter URL scraper - extracts image URLs from manga/manhwa chapter pages
  */
+import chromium from '@sparticuz/chromium';
 
 export interface ChapterInfo {
   chapterNumber: number;
@@ -335,6 +336,8 @@ async function resolveChromeExecutable(
   puppeteer: typeof import('puppeteer').default,
 ): Promise<{ executablePath?: string; args: string[]; headless: boolean | 'shell' }> {
   const { existsSync } = await import('node:fs');
+  const { join } = await import('node:path');
+  const { cwd } = await import('node:process');
 
   const envPath =
     process.env.PUPPETEER_EXECUTABLE_PATH ||
@@ -371,22 +374,60 @@ async function resolveChromeExecutable(
     }
   }
 
-  try {
-    const chromium = (await import('@sparticuz/chromium')).default;
-    const executablePath = await chromium.executablePath();
+  const packagedChromiumErrors: string[] = [];
 
-    if (executablePath) {
-      return {
-        executablePath,
-        args: chromium.args,
-        headless: true,
-      };
+  try {
+    const packagedBinPaths = [
+      undefined,
+      join(cwd(), 'node_modules', '@sparticuz', 'chromium', 'bin'),
+      join(cwd(), 'bin'),
+      join(cwd(), '.next', 'server', 'bin'),
+      join(cwd(), '.next', 'server', 'node_modules', '@sparticuz', 'chromium', 'bin'),
+      '/var/task/bin',
+      '/var/task/node_modules/@sparticuz/chromium/bin',
+      '/var/task/.next/server/bin',
+      '/var/task/.next/server/node_modules/@sparticuz/chromium/bin',
+    ];
+
+    for (const packagedBinPath of packagedBinPaths) {
+      try {
+        const executablePath = await chromium.executablePath(packagedBinPath);
+
+        if (executablePath && existsSync(executablePath)) {
+          return {
+            executablePath,
+            args: chromium.args,
+            headless: 'shell',
+          };
+        }
+      } catch (error) {
+        packagedChromiumErrors.push(
+          `${packagedBinPath ?? 'default package bin'}: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+        console.warn(
+          '[Scraper] Packaged Chromium path unavailable:',
+          packagedBinPath ?? 'default package bin',
+          error,
+        );
+      }
     }
   } catch (error) {
+    packagedChromiumErrors.push(
+      `@sparticuz/chromium import: ${error instanceof Error ? error.message : String(error)}`,
+    );
     console.warn('[Scraper] Packaged Chromium fallback unavailable:', error);
   }
 
-  return { args: [], headless: true };
+  throw new Error(
+    [
+      'Packaged Chromium is not available in this server runtime.',
+      'The scraper cannot fall back to Puppeteer cache on Vercel because Chrome download is skipped during install.',
+      'Checked packaged Chromium locations:',
+      packagedChromiumErrors.length > 0 ? packagedChromiumErrors.join(' | ') : 'none',
+    ].join(' '),
+  );
 }
 
 async function safePuppeteerExecutablePath(
@@ -1208,14 +1249,18 @@ function filterReaderImagesForSource(
   const sourceImages = exampleMatches.length > 0 ? exampleMatches : uniqueImages;
 
   if (isQimanhwaLikeUrl(pageUrl) || isQimanhwaLikeUrl(exampleUrl || '')) {
-    return sourceImages.filter(isQimanhwaReaderPageImage);
+    return selectChapterImageCluster(sourceImages.filter(isQimanhwaReaderPageImage), pageUrl, exampleUrl);
   }
 
   if (isAsuraScansUrl(pageUrl) || isAsuraScansUrl(exampleUrl || '')) {
-    return sourceImages.filter(isAsuraReaderPageImage);
+    return selectChapterImageCluster(sourceImages.filter(isAsuraReaderPageImage), pageUrl, exampleUrl);
   }
 
-  return sourceImages.filter((url) => isLikelyChapterReaderImage(url, pageUrl, exampleUrl));
+  return selectChapterImageCluster(
+    sourceImages.filter((url) => isLikelyChapterReaderImage(url, pageUrl, exampleUrl)),
+    pageUrl,
+    exampleUrl,
+  );
 }
 
 function findImagesMatchingExampleUrl(images: string[], exampleUrl?: string | null): string[] {
@@ -1308,11 +1353,15 @@ function isLikelyChapterReaderImage(url: string, pageUrl: string = '', exampleUr
 
     if (!isReaderImageFile(filename)) return false;
     if (isNonChapterImageUrl(lowercaseUrl)) return false;
+    if (isLikelyUiAssetPath(parsed.pathname)) return false;
     if (isNumberedImageFilename(filename)) return true;
+    if (hasPageNumberInImageFilename(filename) && hasReaderPathHint(lowercaseUrl)) return true;
     if (sameExampleOrigin && hasReaderPathHint(lowercaseUrl)) return true;
     if (hasReaderPathHint(lowercaseUrl) && hasChapterNumberNearImagePath(parsed.pathname)) return true;
     if (lowercasePageUrl && sameHost(url, pageUrl) && hasReaderPathHint(lowercaseUrl)) return true;
+    if (lowercasePageUrl && sameHost(url, pageUrl) && hasUploadPathHint(lowercaseUrl)) return true;
     if (lowercaseExampleUrl && sameHost(url, exampleUrl || '') && hasReaderPathHint(lowercaseUrl)) return true;
+    if (lowercaseExampleUrl && sameHost(url, exampleUrl || '') && hasUploadPathHint(lowercaseUrl)) return true;
 
     return false;
   } catch {
@@ -1326,6 +1375,10 @@ function isReaderImageFile(filename: string): boolean {
 
 function isNumberedImageFilename(filename: string): boolean {
   return /^(?:page[_-]?)?\d{1,4}(?:[_-]\d{1,4})?\.(?:jpe?g|png|webp)$/i.test(filename);
+}
+
+function hasPageNumberInImageFilename(filename: string): boolean {
+  return /(?:^|[-_])(?:page[-_]?)?\d{1,4}(?:[-_]\d{1,6})?\.(?:jpe?g|png|webp)$/i.test(filename);
 }
 
 function hasReaderPathHint(lowercaseUrl: string): boolean {
@@ -1352,12 +1405,131 @@ function isNonChapterImageUrl(lowercaseUrl: string): boolean {
     lowercaseUrl.includes('icon') ||
     lowercaseUrl.includes('avatar') ||
     lowercaseUrl.includes('banner') ||
+    lowercaseUrl.includes('brand') ||
+    lowercaseUrl.includes('button') ||
+    lowercaseUrl.includes('captcha') ||
+    lowercaseUrl.includes('comment') ||
     lowercaseUrl.includes('placeholder') ||
+    lowercaseUrl.includes('preview') ||
+    lowercaseUrl.includes('promo') ||
+    lowercaseUrl.includes('recommend') ||
+    lowercaseUrl.includes('related') ||
+    lowercaseUrl.includes('sprite') ||
     lowercaseUrl.includes('thumb') ||
+    lowercaseUrl.includes('thumbnail') ||
     lowercaseUrl.includes('cover') ||
+    lowercaseUrl.includes('/ads/') ||
+    lowercaseUrl.includes('/advert') ||
+    lowercaseUrl.includes('/banners/') ||
+    lowercaseUrl.includes('/covers/') ||
+    lowercaseUrl.includes('/icons/') ||
+    lowercaseUrl.includes('/logos/') ||
     lowercaseUrl.includes('/profiles/') ||
     lowercaseUrl.includes('/profile/')
   );
+}
+
+function hasUploadPathHint(lowercaseUrl: string): boolean {
+  return (
+    lowercaseUrl.includes('/wp-content/uploads/') ||
+    lowercaseUrl.includes('/uploads/') ||
+    lowercaseUrl.includes('/upload/')
+  );
+}
+
+function isLikelyUiAssetPath(pathname: string): boolean {
+  const parts = pathname.toLowerCase().split('/').filter(Boolean);
+  return parts.some((part) =>
+    /^(?:ads?|avatars?|banners?|brand|covers?|icons?|logos?|previews?|profiles?|recommendations?|related|sprites?|thumbs?|thumbnails?)$/.test(part),
+  );
+}
+
+function selectChapterImageCluster(
+  images: string[],
+  pageUrl: string = '',
+  exampleUrl?: string | null,
+): string[] {
+  const uniqueImages = Array.from(new Set(images)).filter((url) =>
+    isLikelyChapterReaderImage(url, pageUrl, exampleUrl) ||
+    isQimanhwaReaderPageImage(url) ||
+    isAsuraReaderPageImage(url),
+  );
+
+  if (uniqueImages.length <= 2) return uniqueImages;
+
+  const groups = new Map<string, string[]>();
+  for (const image of uniqueImages) {
+    const key = getReaderImageClusterKey(image);
+    if (!key) continue;
+    const group = groups.get(key) ?? [];
+    group.push(image);
+    groups.set(key, group);
+  }
+
+  const rankedGroups = Array.from(groups.entries())
+    .map(([key, group]) => ({
+      key,
+      group,
+      score: scoreReaderImageCluster(group, key, exampleUrl),
+    }))
+    .sort((a, b) => b.score - a.score || b.group.length - a.group.length);
+
+  const best = rankedGroups[0];
+  if (!best || best.group.length < 2) return uniqueImages;
+
+  return best.group.sort(compareReaderImageOrder);
+}
+
+function getReaderImageClusterKey(url: string): string | null {
+  try {
+    const parsed = new URL(url);
+    const parts = parsed.pathname.split('/').filter(Boolean);
+    const filename = parts.pop() ?? '';
+    const filenameStem = filename.replace(/\.(?:jpe?g|png|webp)(?:[?#].*)?$/i, '');
+    const normalizedStem = filenameStem
+      .replace(/\d{1,8}/g, '#')
+      .replace(/#+/g, '#')
+      .replace(/^#$/, 'page-#');
+    return `${parsed.origin}/${parts.join('/')}/${normalizedStem}`;
+  } catch {
+    return null;
+  }
+}
+
+function scoreReaderImageCluster(group: string[], key: string, exampleUrl?: string | null): number {
+  let score = group.length * 10;
+  const lowerKey = key.toLowerCase();
+  if (hasReaderPathHint(lowerKey)) score += 20;
+  if (group.some((url) => isNumberedImageFilename(new URL(url).pathname.split('/').pop() ?? ''))) score += 12;
+  if (group.some((url) => hasPageNumberInImageFilename(new URL(url).pathname.split('/').pop() ?? ''))) score += 8;
+
+  if (exampleUrl) {
+    const exampleKey = getReaderImageClusterKey(exampleUrl);
+    if (exampleKey && exampleKey === key) score += 40;
+    if (sameHost(group[0] ?? '', exampleUrl)) score += 12;
+  }
+
+  if (group.some((url) => isNonChapterImageUrl(url.toLowerCase()))) score -= 50;
+  return score;
+}
+
+function compareReaderImageOrder(first: string, second: string): number {
+  const firstNumber = extractReaderImageOrderNumber(first);
+  const secondNumber = extractReaderImageOrderNumber(second);
+  if (firstNumber !== null && secondNumber !== null && firstNumber !== secondNumber) {
+    return firstNumber - secondNumber;
+  }
+  return first.localeCompare(second);
+}
+
+function extractReaderImageOrderNumber(url: string): number | null {
+  try {
+    const filename = new URL(url).pathname.split('/').pop() ?? '';
+    const match = filename.match(/(?:page[-_]?)?(\d{1,4})(?:[-_]\d{1,6})?\.(?:jpe?g|png|webp)$/i);
+    return match?.[1] ? Number(match[1]) : null;
+  } catch {
+    return null;
+  }
 }
 
 function sameHost(firstUrl: string, secondUrl: string): boolean {
