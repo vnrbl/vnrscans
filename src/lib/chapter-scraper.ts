@@ -1555,6 +1555,24 @@ function isLikelyChapterReaderImage(url: string, pageUrl: string = '', exampleUr
         }
       })();
 
+    // Custom check for Elftoon
+    const isElftoon =
+      lowercaseUrl.includes('elftoon.com') ||
+      lowercaseUrl.includes('elftoon.xyz') ||
+      lowercasePageUrl.includes('elftoon.com') ||
+      lowercasePageUrl.includes('elftoon.xyz') ||
+      lowercaseExampleUrl.includes('elftoon.com') ||
+      lowercaseExampleUrl.includes('elftoon.xyz');
+
+    if (isElftoon) {
+      const isUploads = lowercaseUrl.includes('/wp-content/uploads/');
+      const hasNumberPrefix = /^\d+/.test(filename);
+      const isImage = isReaderImageFile(filename);
+      if (isUploads && hasNumberPrefix && isImage) {
+        return true;
+      }
+    }
+
     if (!isReaderImageFile(filename)) return false;
     if (isNonChapterImageUrl(lowercaseUrl)) return false;
     if (isLikelyUiAssetPath(parsed.pathname)) return false;

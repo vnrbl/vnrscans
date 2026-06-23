@@ -156,8 +156,20 @@ export async function $runCloudScrape(args: {
     ),
   );
 
+  // Find the highest chapter number for this scanlation group to avoid scanning older chapters
+  const maxChapterNumber = (existingRows ?? []).reduce((max, row) => {
+    if (row.scanlation_group === scanlationGroup) {
+      return Math.max(max, Number(row.chapter_number));
+    }
+    return max;
+  }, 0);
+
   let exactDuplicateCount = 0;
   const missing = discovered.filter((chapter) => {
+    // If we already have chapters, do not scan or import any chapter <= max chapter number
+    if (existingRows && existingRows.length > 0 && chapter.chapterNumber <= maxChapterNumber) {
+      return false;
+    }
     const isExactDuplicate = existingKeys.has(chapterScanKey(chapter.chapterNumber, scanlationGroup));
     if (isExactDuplicate) exactDuplicateCount++;
     return !isExactDuplicate;
@@ -360,8 +372,22 @@ export async function $syncImportSource(args: {
       ),
     );
 
+    // Find the highest chapter number for this scanlation group to avoid scanning older chapters
+    const maxChapterNumber = (existingRows ?? []).reduce((max, row) => {
+      if (row.scanlation_group === scanlationGroup) {
+        return Math.max(max, Number(row.chapter_number));
+      }
+      return max;
+    }, 0);
+
     const missing = discovered
-      .filter((chapter) => !existingKeys.has(chapterScanKey(chapter.chapterNumber, scanlationGroup)))
+      .filter((chapter) => {
+        // If we already have chapters, do not scan or import any chapter <= max chapter number
+        if (existingRows && existingRows.length > 0 && chapter.chapterNumber <= maxChapterNumber) {
+          return false;
+        }
+        return !existingKeys.has(chapterScanKey(chapter.chapterNumber, scanlationGroup));
+      })
       .sort((a, b) => a.chapterNumber - b.chapterNumber)
       .slice(0, maxChapters);
 
