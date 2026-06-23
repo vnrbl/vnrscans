@@ -267,6 +267,31 @@ async function collectLiveReaderImageUrls(page: any): Promise<string[]> {
   try {
     const urls = await page.evaluate(`
       (() => {
+        try {
+          const scriptEl = document.getElementById('ng-state');
+          if (scriptEl && scriptEl.textContent) {
+            const state = JSON.parse(scriptEl.textContent);
+            const urls = [];
+            const search = (obj) => {
+              if (!obj || typeof obj !== 'object') return;
+              if (Array.isArray(obj.images)) {
+                for (const img of obj.images) {
+                  if (img && typeof img === 'object' && typeof img.url === 'string') {
+                    urls.push(img.url);
+                  }
+                }
+              }
+              for (const key of Object.keys(obj)) {
+                search(obj[key]);
+              }
+            };
+            search(state);
+            if (urls.length > 0) return urls;
+          }
+        } catch (e) {
+          console.warn('Failed to parse ng-state in browser:', e);
+        }
+
         const imageEntries = Array.from(document.images).map((img, index) => {
           const rect = img.getBoundingClientRect();
           const className = String(img.className || '').toLowerCase();
@@ -1090,7 +1115,9 @@ async function setupRequestInterception(page: any, url: string): Promise<void> {
   let targetHost = '';
   try {
     targetHost = new URL(url).hostname.replace('www.', '');
-  } catch {}
+  } catch {
+    // Ignore invalid URL
+  }
 
   page.on('request', (request: any) => {
     const resourceType = request.resourceType();
@@ -1158,7 +1185,87 @@ async function prepareScraperPage(page: any): Promise<void> {
   await page.setViewport({ width: 1280, height: 800 });
 }
 
+function extractImagesFromNgState(html: string): string[] {
+  try {
+    const match = html.match(/<script\b[^>]*?id=["']ng-state["'][^>]*?>([\s\S]*?)<\/script>/i);
+    if (!match) return [];
+    
+    let rawJson = match[1].trim();
+    if (!rawJson) return [];
+    
+    rawJson = rawJson
+      .replace(/&quot;/g, '"')
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&apos;/g, "'");
+
+    const state = JSON.parse(rawJson);
+    const urls: string[] = [];
+    
+    const search = (obj: any) => {
+      if (!obj || typeof obj !== 'object') return;
+      
+      if (Array.isArray(obj.images)) {
+        for (const img of obj.images) {
+          if (img && typeof img === 'object' && typeof img.url === 'string') {
+            urls.push(img.url);
+          }
+        }
+      }
+      
+      for (const key of Object.keys(obj)) {
+        search(obj[key]);
+      }
+    };
+    
+    search(state);
+    return urls;
+  } catch (error) {
+    console.warn('[Scraper] Failed to parse ng-state JSON:', error);
+    return [];
+  }
+}
+
 export function extractImageUrls(html: string, baseUrl: string): string[] {
+  // First try to extract from Angular's transferState JSON if present (common for Qi Manga / Qi Scans)
+  const ngStateUrls = extractImagesFromNgState(html);
+  if (ngStateUrls.length > 0) {
+    const images = ngStateUrls.map(url => {
+      if (!url.startsWith('http')) {
+        try {
+          const base = new URL(baseUrl);
+          if (url.startsWith('//')) {
+            return `https:${url}`;
+          } else {
+            return new URL(url, base.href).href;
+          }
+        } catch {
+          return null;
+        }
+      }
+      return url;
+    }).filter((url): url is string => !!url);
+
+    const uniqueNgImages = [...new Set(images)];
+    const validNgImages = uniqueNgImages.filter(url => {
+      const lowercaseBaseUrl = baseUrl.toLowerCase();
+      const lowercaseUrl = url.toLowerCase();
+      
+      const isQimanhwa =
+        isQimanhwaLikeUrl(baseUrl) ||
+        isQimanhwaLikeUrl(url);
+      if (isQimanhwa) {
+        return isQimanhwaReaderPageImage(url);
+      }
+      return true;
+    });
+
+    if (validNgImages.length > 0) {
+      return validNgImages;
+    }
+  }
+
   const images: string[] = [];
   const imageRegexPatterns = [
     // Common manga reader image patterns
@@ -1279,9 +1386,8 @@ export function extractImageUrls(html: string, baseUrl: string): string[] {
       }
 
       const isQimanhwa =
-        lowercaseBaseUrl.includes('qimanhwa.com') ||
-        lowercaseUrl.includes('qimanhwa.com') ||
-        lowercaseUrl.includes('qiscans.org');
+        isQimanhwaLikeUrl(baseUrl) ||
+        isQimanhwaLikeUrl(url);
       if (isQimanhwa) {
         return isQimanhwaReaderPageImage(url);
       }
@@ -1617,7 +1723,11 @@ function isQimanhwaReaderPageImage(url: string): boolean {
       lowercaseUrl.includes('/file/qiscans/upload/rezo/series/') ||
       lowercaseUrl.includes('/rezo/series/') ||
       lowercaseUrl.includes('/file/qiscans/upload/upload/series/') ||
-      lowercaseUrl.includes('/upload/upload/series/');
+      lowercaseUrl.includes('/upload/upload/series/') ||
+      lowercaseUrl.includes('/file/qiscans/upload/series/') ||
+      lowercaseUrl.includes('/upload/series/') ||
+      lowercaseUrl.includes('/file/qimanga/upload/series/') ||
+      lowercaseUrl.includes('/qimanga/rezo/series/');
 
     return isNumberedPage && isReaderPath;
   } catch {
@@ -1643,10 +1753,18 @@ function isQimanhwaLikeUrl(url: string): boolean {
   try {
     const parsed = new URL(url);
     const hostname = parsed.hostname.toLowerCase();
-    return hostname.includes('qimanhwa.com') || hostname.includes('qiscans.org');
+    return (
+      hostname.includes('qimanhwa.com') ||
+      hostname.includes('qiscans.org') ||
+      hostname.includes('qimanga.com')
+    );
   } catch {
     const lowercaseUrl = url.toLowerCase();
-    return lowercaseUrl.includes('qimanhwa.com') || lowercaseUrl.includes('qiscans.org');
+    return (
+      lowercaseUrl.includes('qimanhwa.com') ||
+      lowercaseUrl.includes('qiscans.org') ||
+      lowercaseUrl.includes('qimanga.com')
+    );
   }
 }
 
