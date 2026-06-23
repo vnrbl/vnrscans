@@ -172,9 +172,18 @@ async function scrapeWithPuppeteer(url: string, isChapterPage: boolean = false):
     await new Promise(r => setTimeout(r, 4000));
 
     if (isChapterPage) {
-      // Scroll down if it's a chapter page to trigger lazy loading of images
-      console.log('[Scraper] Triggering lazy-load image scrolling...');
-      await scrollChapterPageForLazyImages(page);
+      // Try to collect images immediately before scrolling
+      const immediateUrls = await collectLiveReaderImageUrls(page);
+      const immediateImages = filterReaderImagesForSource(immediateUrls, url);
+      const isQimanhwa = isQimanhwaLikeUrl(url);
+      const shouldSkipScroll = (isQimanhwa && immediateImages.length > 0) || immediateImages.length >= 10;
+
+      if (shouldSkipScroll) {
+        console.log(`[Scraper] Collected ${immediateImages.length} images immediately. Skipping scroll.`);
+      } else {
+        console.log('[Scraper] Triggering lazy-load image scrolling...');
+        await scrollChapterPageForLazyImages(page);
+      }
     } else {
       // Some series pages render chapter rows client-side and only after scrolling.
       await page.waitForFunction(
@@ -182,23 +191,31 @@ async function scrapeWithPuppeteer(url: string, isChapterPage: boolean = false):
         { timeout: 15000 },
       ).catch(() => {});
 
-      let previousChapterCount = 0;
-      let stablePasses = 0;
+      const chapterCountInitial = await page.evaluate(() => {
+        return (document.body.innerText.match(/chapter\s*\d+/gi) || []).length;
+      });
 
-      for (let i = 0; i < 10 && stablePasses < 2; i++) {
-        const chapterCount = await page.evaluate(() => {
-          window.scrollTo(0, document.body.scrollHeight);
-          return (document.body.innerText.match(/chapter\s*\d+/gi) || []).length;
-        });
+      // Only run scroll stability checks for Vortex pages or pages that have no chapters loaded yet
+      if (isVortexLikeUrl(url) || chapterCountInitial === 0) {
+        console.log('[Scraper] Triggering series page scrolling for dynamic chapters...');
+        let previousChapterCount = chapterCountInitial;
+        let stablePasses = 0;
 
-        if (chapterCount === previousChapterCount) {
-          stablePasses++;
-        } else {
-          stablePasses = 0;
-          previousChapterCount = chapterCount;
+        for (let i = 0; i < 10 && stablePasses < 2; i++) {
+          const chapterCount = await page.evaluate(() => {
+            window.scrollTo(0, document.body.scrollHeight);
+            return (document.body.innerText.match(/chapter\s*\d+/gi) || []).length;
+          });
+
+          if (chapterCount === previousChapterCount) {
+            stablePasses++;
+          } else {
+            stablePasses = 0;
+            previousChapterCount = chapterCount;
+          }
+
+          await new Promise(r => setTimeout(r, 400));
         }
-
-        await new Promise(r => setTimeout(r, 1000));
       }
     }
 
@@ -223,13 +240,23 @@ async function scrapeWithPuppeteer(url: string, isChapterPage: boolean = false):
 }
 
 async function scrollChapterPageForLazyImages(page: any): Promise<void> {
-  let lastHeight = 0;
-  let lastReaderImageCount = 0;
   let stablePasses = 0;
+  let lastImageCount = 0;
 
   for (let pass = 0; pass < 3 && stablePasses < 2; pass++) {
-    const { height, readerImageCount } = await page.evaluate(() => {
-      const readerImageCount = Array.from(document.images).filter((img) => {
+    let currentHeight = await page.evaluate(() => document.body.scrollHeight);
+    
+    for (let y = 0; y <= currentHeight; y += 1500) {
+      await page.evaluate((scrollY: number) => window.scrollTo(0, scrollY), y);
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      currentHeight = await page.evaluate(() => document.body.scrollHeight);
+    }
+
+    await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+    await new Promise((resolve) => setTimeout(resolve, 200));
+
+    const currentImageCount = await page.evaluate(() => {
+      return Array.from(document.images).filter((img) => {
         const className = String(img.className || '').toLowerCase();
         const alt = String(img.alt || '').toLowerCase();
         return (
@@ -240,26 +267,14 @@ async function scrollChapterPageForLazyImages(page: any): Promise<void> {
           (img.naturalWidth >= 500 && img.naturalHeight >= 800)
         );
       }).length;
-
-      return { height: document.body.scrollHeight, readerImageCount };
     });
 
-    if (height === lastHeight && readerImageCount === lastReaderImageCount && readerImageCount > 0) {
+    if (currentImageCount === lastImageCount && currentImageCount > 0) {
       stablePasses++;
     } else {
       stablePasses = 0;
-      lastHeight = height;
-      lastReaderImageCount = readerImageCount;
+      lastImageCount = currentImageCount;
     }
-
-    const scrollTarget = Math.max(height, 30000);
-    for (let y = 0; y <= scrollTarget; y += 1200) {
-      await page.evaluate((scrollY: number) => window.scrollTo(0, scrollY), y);
-      await new Promise((resolve) => setTimeout(resolve, 80));
-    }
-
-    await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
-    await new Promise((resolve) => setTimeout(resolve, 500));
   }
 }
 
@@ -1074,26 +1089,42 @@ async function extractReaderImagesWithSharedBrowser(
         console.log(`[Scraper] Shared reader browser extracting: ${url}`);
         await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
         await new Promise((resolve) => setTimeout(resolve, 2500));
-        await scrollChapterPageForLazyImages(page);
 
-        const images = filterReaderImagesForSource(
+        // Try immediate extraction first
+        const immediateImages = filterReaderImagesForSource(
           preferImagesMatchingExampleUrl(await collectLiveReaderImageUrls(page), options.imageUrlExample),
           url,
           options.imageUrlExample,
         );
-        if (images.length === 0) {
-          const html = await page.content();
-          const htmlImages = filterReaderImagesForSource(
-            preferImagesMatchingExampleUrl(extractImageUrls(html, url), options.imageUrlExample),
+
+        const isQimanhwa = isQimanhwaLikeUrl(url);
+        const shouldSkipScroll = (isQimanhwa && immediateImages.length > 0) || immediateImages.length >= 10;
+
+        if (shouldSkipScroll) {
+          console.log(`[Scraper] Found ${immediateImages.length} images immediately. Skipping scroll.`);
+          results.set(url, immediateImages);
+        } else {
+          await scrollChapterPageForLazyImages(page);
+
+          const images = filterReaderImagesForSource(
+            preferImagesMatchingExampleUrl(await collectLiveReaderImageUrls(page), options.imageUrlExample),
             url,
             options.imageUrlExample,
           );
-          if (htmlImages.length === 0) {
-            throw new Error('No images found on the chapter page.');
+          if (images.length === 0) {
+            const html = await page.content();
+            const htmlImages = filterReaderImagesForSource(
+              preferImagesMatchingExampleUrl(extractImageUrls(html, url), options.imageUrlExample),
+              url,
+              options.imageUrlExample,
+            );
+            if (htmlImages.length === 0) {
+              throw new Error('No images found on the chapter page.');
+            }
+            results.set(url, htmlImages);
+          } else {
+            results.set(url, images);
           }
-          results.set(url, htmlImages);
-        } else {
-          results.set(url, images);
         }
       } finally {
         await page.close().catch(() => {});
