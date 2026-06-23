@@ -167,7 +167,6 @@ async function scrapeWithPuppeteer(url: string, isChapterPage: boolean = false):
 
     console.log(`[Scraper] Navigating page to ${url}...`);
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
-    initialLoadFinished = true;
 
     // Wait for automatic challenge resolution/redirects
     await new Promise(r => setTimeout(r, 4000));
