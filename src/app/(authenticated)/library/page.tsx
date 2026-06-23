@@ -16,7 +16,7 @@ export default function LibraryPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("user_library")
-        .select("*,series:series(id,slug,title,cover_url,type,rating_average,status,view_count)")
+        .select("*,series:series_id(id,slug,title,cover_url,type,rating_average,status,view_count)")
         .order("updated_at", { ascending: false });
       if (error) throw error;
       return data ?? [];
