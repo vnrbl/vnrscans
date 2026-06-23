@@ -152,6 +152,63 @@ async function scrapeWithPuppeteer(url: string, isChapterPage: boolean = false):
   try {
     const page = await browser.newPage();
     
+    // Enable request interception to block ads, stylesheets, and post-load hijack redirects
+    await page.setRequestInterception(true);
+    let initialLoadFinished = false;
+    let targetHost = '';
+    try {
+      targetHost = new URL(url).hostname.replace('www.', '');
+    } catch {}
+
+    page.on('request', (request) => {
+      const resourceType = request.resourceType();
+      const requestUrl = request.url();
+
+      const isAdOrAnalytics =
+        requestUrl.includes('google-analytics') ||
+        requestUrl.includes('doubleclick') ||
+        requestUrl.includes('adsystem') ||
+        requestUrl.includes('adnxs') ||
+        requestUrl.includes('popads') ||
+        requestUrl.includes('popunder') ||
+        requestUrl.includes('adskeeper') ||
+        requestUrl.includes('mgid') ||
+        requestUrl.includes('exoclick') ||
+        requestUrl.includes('a-ads') ||
+        requestUrl.includes('juicyads');
+
+      if (
+        resourceType === 'stylesheet' ||
+        resourceType === 'font' ||
+        resourceType === 'media' ||
+        isAdOrAnalytics
+      ) {
+        request.abort();
+        return;
+      }
+
+      // Block post-load navigation hijacks to other domains
+      if (
+        initialLoadFinished &&
+        request.isNavigationRequest() &&
+        request.frame() === page.mainFrame()
+      ) {
+        try {
+          const reqHost = new URL(requestUrl).hostname.replace('www.', '');
+          if (targetHost && !reqHost.includes(targetHost) && !targetHost.includes(reqHost)) {
+            console.log(`[Scraper] Aborting post-load ad hijack redirect to: ${requestUrl}`);
+            request.abort();
+            return;
+          }
+        } catch {
+          request.abort();
+          return;
+        }
+      }
+
+      request.continue();
+    });
+
     // Apply anti-detection measures to prevent Cloudflare Turnstile blocks
     await page.evaluateOnNewDocument(() => {
       Object.defineProperty(navigator, 'webdriver', {
@@ -164,6 +221,7 @@ async function scrapeWithPuppeteer(url: string, isChapterPage: boolean = false):
 
     console.log(`[Scraper] Navigating page to ${url}...`);
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
+    initialLoadFinished = true;
 
     // Wait for automatic challenge resolution/redirects
     await new Promise(r => setTimeout(r, 4000));
