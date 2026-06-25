@@ -156,23 +156,21 @@ export async function $runCloudScrape(args: {
     ),
   );
 
-  // Find the highest chapter number for this scanlation group to avoid scanning older chapters
-  const maxChapterNumber = (existingRows ?? []).reduce((max, row) => {
-    if (row.scanlation_group === scanlationGroup) {
-      return Math.max(max, Number(row.chapter_number));
-    }
-    return max;
-  }, 0);
+  // IMPORTANT: We previously skipped any chapter whose number was <= the max
+  // already imported for this scanlation group. That was too aggressive — it
+  // silently dropped legitimate decimal chapters (12.5, 13.1), re-translations,
+  // and any chapter a site republished under an existing number. Exact
+  // duplicates are already handled by existingKeys below, so the <= max guard
+  // only caused new chapters to be missed. It has been removed.
 
   let exactDuplicateCount = 0;
   const missing = discovered.filter((chapter) => {
-    // If we already have chapters, do not scan or import any chapter <= max chapter number
-    if (existingRows && existingRows.length > 0 && chapter.chapterNumber <= maxChapterNumber) {
+    const isExactDuplicate = existingKeys.has(chapterScanKey(chapter.chapterNumber, scanlationGroup));
+    if (isExactDuplicate) {
+      exactDuplicateCount++;
       return false;
     }
-    const isExactDuplicate = existingKeys.has(chapterScanKey(chapter.chapterNumber, scanlationGroup));
-    if (isExactDuplicate) exactDuplicateCount++;
-    return !isExactDuplicate;
+    return true;
   });
 
   const details: Array<{ chapter: number; status: string; message?: string; pages?: number }> = [];
@@ -372,22 +370,11 @@ export async function $syncImportSource(args: {
       ),
     );
 
-    // Find the highest chapter number for this scanlation group to avoid scanning older chapters
-    const maxChapterNumber = (existingRows ?? []).reduce((max, row) => {
-      if (row.scanlation_group === scanlationGroup) {
-        return Math.max(max, Number(row.chapter_number));
-      }
-      return max;
-    }, 0);
-
+    // Note: the old "<= maxChapterNumber" guard was removed because it dropped
+    // legitimate decimal/re-published chapters. Exact duplicates are already
+    // covered by existingKeys. Sort newest-last so we import chronologically.
     const missing = discovered
-      .filter((chapter) => {
-        // If we already have chapters, do not scan or import any chapter <= max chapter number
-        if (existingRows && existingRows.length > 0 && chapter.chapterNumber <= maxChapterNumber) {
-          return false;
-        }
-        return !existingKeys.has(chapterScanKey(chapter.chapterNumber, scanlationGroup));
-      })
+      .filter((chapter) => !existingKeys.has(chapterScanKey(chapter.chapterNumber, scanlationGroup)))
       .sort((a, b) => a.chapterNumber - b.chapterNumber)
       .slice(0, maxChapters);
 
@@ -396,6 +383,19 @@ export async function $syncImportSource(args: {
       missing.map((chapter) => chapter.url),
       { concurrency: 4, imageUrlExample },
     );
+
+    // First pass: collect all chapter data + images, filtering out failures
+    const chapterRows: Array<{
+      series_id: any;
+      chapter_number: number;
+      title: string | null;
+      slug: string;
+      chapter_type: string;
+      status: string;
+      uploaded_by: string | null;
+      scanlation_group: string;
+    }> = [];
+    const chapterImages = new Map<string, string[]>();
 
     for (const chapter of missing) {
       try {
@@ -414,35 +414,17 @@ export async function $syncImportSource(args: {
           scanlationGroup,
         });
 
-        const { data: chapterRecord, error: chapterError } = await admin
-          .from("chapters")
-          .insert({
-            series_id: source.series_id,
-            chapter_number: chapter.chapterNumber,
-            title: chapter.title || null,
-            slug: targetSlug,
-            chapter_type: "image",
-            status: source.auto_publish ? "published" : "draft",
-            uploaded_by: source.source_site || sourcePreset.sourceSite,
-            scanlation_group: scanlationGroup,
-          })
-          .select("id")
-          .single();
-
-        if (chapterError) throw chapterError;
-
-        const pages = images.map((imageUrl, index) => ({
-          chapter_id: chapterRecord.id,
-          page_number: index + 1,
-          image_url: imageUrl,
-        }));
-
-        const { error: pagesError } = await admin.from("chapter_pages").insert(pages);
-        if (pagesError) throw pagesError;
-
-        imported++;
-        details.push({ chapter: chapter.chapterNumber, status: "imported" });
-        existingKeys.add(chapterScanKey(chapter.chapterNumber, scanlationGroup));
+        chapterRows.push({
+          series_id: source.series_id,
+          chapter_number: chapter.chapterNumber,
+          title: chapter.title || null,
+          slug: targetSlug,
+          chapter_type: "image",
+          status: source.auto_publish ? "published" : "draft",
+          uploaded_by: source.source_site || sourcePreset.sourceSite,
+          scanlation_group: scanlationGroup,
+        });
+        chapterImages.set(chapterScanKey(chapter.chapterNumber, scanlationGroup), images);
       } catch (chapterError) {
         failed++;
         details.push({
@@ -450,6 +432,57 @@ export async function $syncImportSource(args: {
           status: "failed",
           message: chapterError instanceof Error ? chapterError.message : "Unknown error",
         });
+      }
+    }
+
+    // Bulk insert all chapters at once
+    if (chapterRows.length > 0) {
+      const { data: insertedChapters, error: chapterInsertError } = await admin
+        .from("chapters")
+        .insert(chapterRows)
+        .select("id,chapter_number,scanlation_group");
+
+      if (chapterInsertError) {
+        // Bulk insert failed — fall back to counting all prepared rows as failed
+        for (const row of chapterRows) {
+          failed++;
+          details.push({
+            chapter: row.chapter_number,
+            status: "failed",
+            message: chapterInsertError.message,
+          });
+        }
+      } else {
+        // Bulk insert all pages at once
+        const pageRows = (insertedChapters ?? []).flatMap((chapter: any) => {
+          const key = chapterScanKey(Number(chapter.chapter_number), chapter.scanlation_group);
+          const images = chapterImages.get(key) ?? [];
+          return images.map((imageUrl, index) => ({
+            chapter_id: chapter.id,
+            page_number: index + 1,
+            image_url: imageUrl,
+          }));
+        });
+
+        const { error: pagesError } = await admin.from("chapter_pages").insert(pageRows);
+        if (pagesError) {
+          for (const chapter of insertedChapters ?? []) {
+            failed++;
+            details.push({
+              chapter: Number(chapter.chapter_number),
+              status: "failed",
+              message: pagesError.message,
+            });
+          }
+        } else {
+          imported = insertedChapters?.length ?? 0;
+          for (const chapter of insertedChapters ?? []) {
+            const key = chapterScanKey(Number(chapter.chapter_number), chapter.scanlation_group);
+            const images = chapterImages.get(key) ?? [];
+            details.push({ chapter: Number(chapter.chapter_number), status: "imported" });
+            existingKeys.add(key);
+          }
+        }
       }
     }
 

@@ -49,6 +49,18 @@ const SOURCE_PRESETS: Array<{
     imageUrlExample:
       "https://storage.vortexscans.org/upload/series/reincarnators-stream/68d990a7-23ab-4fd2-ad8e-f545f4610d18/page-0001_01_1777744448739-752500.jpg",
   },
+  {
+    hostIncludes: "elftoon.com",
+    sourceSite: "Elftoon",
+    scanlationGroup: "Elftoon",
+    imageUrlExample: "https://elftoon.com/wp-content/uploads/2024/01/001.webp",
+  },
+  {
+    hostIncludes: "elftoon.xyz",
+    sourceSite: "Elftoon",
+    scanlationGroup: "Elftoon",
+    imageUrlExample: "https://elftoon.xyz/wp-content/uploads/2024/01/001.webp",
+  },
 ];
 
 export function detectImportSource(url: string): ImportSourcePreset {

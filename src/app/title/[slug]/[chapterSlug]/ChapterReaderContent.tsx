@@ -2241,6 +2241,9 @@ function ChapterComments({ chapterId, seriesId }: { chapterId: string; seriesId:
       setReplyAttachmentAlt(null);
       qc.invalidateQueries({ queryKey: ["chapter-comments", chapterId] });
       qc.invalidateQueries({ queryKey: ["admin", "comments"] });
+      qc.invalidateQueries({ queryKey: ["profile"] });
+      qc.invalidateQueries({ queryKey: ["xp-history"] });
+      qc.invalidateQueries({ queryKey: ["user-stats"] });
     },
     onError: (error: Error) => toast.error(error.message),
   });
@@ -2254,6 +2257,9 @@ function ChapterComments({ chapterId, seriesId }: { chapterId: string; seriesId:
       toast.success("Comment deleted");
       qc.invalidateQueries({ queryKey: ["chapter-comments", chapterId] });
       qc.invalidateQueries({ queryKey: ["admin", "comments"] });
+      qc.invalidateQueries({ queryKey: ["profile"] });
+      qc.invalidateQueries({ queryKey: ["xp-history"] });
+      qc.invalidateQueries({ queryKey: ["user-stats"] });
     },
     onError: (error: Error) => toast.error(error.message),
   });

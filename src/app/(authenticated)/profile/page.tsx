@@ -391,7 +391,7 @@ export default function ProfilePage() {
       if (error) throw error;
       return { ...data, email: u.user.email } as any;
     },
-    staleTime: 2 * 60 * 1000,
+    staleTime: 0,
   });
 
   // Fetch equipped badge/title
@@ -418,7 +418,7 @@ export default function ProfilePage() {
       }
       return data as any;
     },
-    staleTime: 2 * 60 * 1000,
+    staleTime: 0,
   });
 
   // Fetch user comment history
@@ -439,7 +439,7 @@ export default function ProfilePage() {
       }
       return data || [];
     },
-    staleTime: 2 * 60 * 1000,
+    staleTime: 0,
   });
 
   // Fetch series info for comment history
@@ -480,7 +480,7 @@ export default function ProfilePage() {
         ratings: ratingsCount.count || 0,
       };
     },
-    staleTime: 5 * 60 * 1000,
+    staleTime: 0,
   });
 
   // Fetch user roles
@@ -496,7 +496,7 @@ export default function ProfilePage() {
       if (error) return [];
       return (data || []).map((r) => r.role);
     },
-    staleTime: 10 * 60 * 1000,
+    staleTime: 0,
   });
 
   // Fetch reading history timestamps to compute streak
@@ -595,9 +595,16 @@ export default function ProfilePage() {
   const streaks = useMemo(() => {
     if (!historyQuery.data) return { current: 0, longest: 0 };
     
+    const toLocalYYYYMMDD = (d: Date) => {
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, "0");
+      const day = String(d.getDate()).padStart(2, "0");
+      return `${year}-${month}-${day}`;
+    };
+
     // Extract unique dates of activity
     const dates = Array.from(new Set(
-      historyQuery.data.map(item => new Date(item.updated_at).toISOString().split("T")[0])
+      historyQuery.data.map(item => toLocalYYYYMMDD(new Date(item.updated_at)))
     )).sort();
 
     if (dates.length === 0) return { current: 0, longest: 0 };
@@ -606,10 +613,10 @@ export default function ProfilePage() {
     let longest = 0;
     let tempStreak = 0;
 
-    const todayStr = new Date().toISOString().split("T")[0];
+    const todayStr = toLocalYYYYMMDD(new Date());
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
-    const yesterdayStr = yesterday.toISOString().split("T")[0];
+    const yesterdayStr = toLocalYYYYMMDD(yesterday);
 
     // Compute longest streak
     for (let i = 0; i < dates.length; i++) {
@@ -633,12 +640,12 @@ export default function ProfilePage() {
     const hasActivityTodayOrYesterday = dates.includes(todayStr) || dates.includes(yesterdayStr);
     if (hasActivityTodayOrYesterday) {
       const searchDate = dates.includes(todayStr) ? new Date() : yesterday;
-      let searchStr = searchDate.toISOString().split("T")[0];
+      let searchStr = toLocalYYYYMMDD(searchDate);
       
       while (dates.includes(searchStr)) {
         current++;
         searchDate.setDate(searchDate.getDate() - 1);
-        searchStr = searchDate.toISOString().split("T")[0];
+        searchStr = toLocalYYYYMMDD(searchDate);
       }
     }
 

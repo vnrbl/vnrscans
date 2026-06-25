@@ -3,6 +3,36 @@
  */
 import chromium from '@sparticuz/chromium';
 
+/**
+ * Retry an async operation with exponential backoff and jitter.
+ * Retries on any thrown error, up to `maxRetries` attempts.
+ */
+async function retryAsync<T>(
+  fn: () => Promise<T>,
+  label: string,
+  maxRetries: number = 2,
+  baseDelayMs: number = 3000,
+): Promise<T> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      lastError = err;
+      if (attempt < maxRetries) {
+        const jitter = Math.random() * 1000;
+        const delay = baseDelayMs * Math.pow(2, attempt) + jitter;
+        console.warn(
+          `[Scraper] ${label} failed (attempt ${attempt + 1}/${maxRetries + 1}), retrying in ${Math.round(delay)}ms...`,
+          err instanceof Error ? err.message : err,
+        );
+        await new Promise((resolve) => setTimeout(resolve, delay));
+      }
+    }
+  }
+  throw lastError;
+}
+
 export interface ChapterInfo {
   chapterNumber: number;
   title?: string;
@@ -77,7 +107,7 @@ export async function extractChaptersFromSeriesUrl(seriesUrl: string): Promise<C
 
 async function fetchReadablePage(url: string): Promise<string | null> {
   try {
-    const readerUrl = `https://r.jina.ai/http://r.jina.ai/http://${url}`;
+    const readerUrl = `https://r.jina.ai/http://${url}`;
     const response = await fetch(readerUrl, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -1029,7 +1059,10 @@ export async function extractImagesFromChapterUrls(
 
   const directSettled = await Promise.allSettled(
     directUrls.map(async (url) => {
-      const images = await extractImagesFromChapterUrl(url, options);
+      const images = await retryAsync(
+        () => extractImagesFromChapterUrl(url, options),
+        `Direct extraction for ${url}`,
+      );
       results.set(url, images);
     }),
   );
@@ -1082,53 +1115,58 @@ async function extractReaderImagesWithSharedBrowser(
   const worker = async () => {
     while (nextIndex < urls.length) {
       const url = urls[nextIndex++];
-      const page = await browser.newPage();
-      try {
-        await prepareScraperPage(page);
-        await setupRequestInterception(page, url);
-        console.log(`[Scraper] Shared reader browser extracting: ${url}`);
-        await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
-        await new Promise((resolve) => setTimeout(resolve, 2500));
+      await retryAsync(
+        async () => {
+          const page = await browser.newPage();
+          try {
+            await prepareScraperPage(page);
+            await setupRequestInterception(page, url);
+            console.log(`[Scraper] Shared reader browser extracting: ${url}`);
+            await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
+            await new Promise((resolve) => setTimeout(resolve, 2500));
 
-        // Try immediate extraction first
-        const immediateImages = filterReaderImagesForSource(
-          preferImagesMatchingExampleUrl(await collectLiveReaderImageUrls(page), options.imageUrlExample),
-          url,
-          options.imageUrlExample,
-        );
-
-        const isQimanhwa = isQimanhwaLikeUrl(url);
-        const shouldSkipScroll = (isQimanhwa && immediateImages.length > 0) || immediateImages.length >= 10;
-
-        if (shouldSkipScroll) {
-          console.log(`[Scraper] Found ${immediateImages.length} images immediately. Skipping scroll.`);
-          results.set(url, immediateImages);
-        } else {
-          await scrollChapterPageForLazyImages(page);
-
-          const images = filterReaderImagesForSource(
-            preferImagesMatchingExampleUrl(await collectLiveReaderImageUrls(page), options.imageUrlExample),
-            url,
-            options.imageUrlExample,
-          );
-          if (images.length === 0) {
-            const html = await page.content();
-            const htmlImages = filterReaderImagesForSource(
-              preferImagesMatchingExampleUrl(extractImageUrls(html, url), options.imageUrlExample),
+            // Try immediate extraction first
+            const immediateImages = filterReaderImagesForSource(
+              preferImagesMatchingExampleUrl(await collectLiveReaderImageUrls(page), options.imageUrlExample),
               url,
               options.imageUrlExample,
             );
-            if (htmlImages.length === 0) {
-              throw new Error('No images found on the chapter page.');
+
+            const isQimanhwa = isQimanhwaLikeUrl(url);
+            const shouldSkipScroll = (isQimanhwa && immediateImages.length > 0) || immediateImages.length >= 10;
+
+            if (shouldSkipScroll) {
+              console.log(`[Scraper] Found ${immediateImages.length} images immediately. Skipping scroll.`);
+              results.set(url, immediateImages);
+            } else {
+              await scrollChapterPageForLazyImages(page);
+
+              const images = filterReaderImagesForSource(
+                preferImagesMatchingExampleUrl(await collectLiveReaderImageUrls(page), options.imageUrlExample),
+                url,
+                options.imageUrlExample,
+              );
+              if (images.length === 0) {
+                const html = await page.content();
+                const htmlImages = filterReaderImagesForSource(
+                  preferImagesMatchingExampleUrl(extractImageUrls(html, url), options.imageUrlExample),
+                  url,
+                  options.imageUrlExample,
+                );
+                if (htmlImages.length === 0) {
+                  throw new Error('No images found on the chapter page.');
+                }
+                results.set(url, htmlImages);
+              } else {
+                results.set(url, images);
+              }
             }
-            results.set(url, htmlImages);
-          } else {
-            results.set(url, images);
+          } finally {
+            await page.close().catch(() => {});
           }
-        }
-      } finally {
-        await page.close().catch(() => {});
-      }
+        },
+        `Shared browser extraction for ${url}`,
+      );
     }
   };
 

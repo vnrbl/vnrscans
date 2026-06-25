@@ -121,11 +121,7 @@ export const SeriesHeader = React.memo(function SeriesHeader({
 
       {genres.length > 0 && (
         <MetaSection label="Genres">
-          {genres.map((genre) => (
-            <MetaPill key={genre.id} href="/browse" search={{ genre: genre.slug }}>
-              {genre.name}
-            </MetaPill>
-          ))}
+          <LimitedGenrePills genres={genres} />
         </MetaSection>
       )}
 
@@ -207,6 +203,66 @@ function MetaPill({
   }
 
   return <span className={pillClass}>{children}</span>;
+}
+
+function LimitedGenrePills({
+  genres,
+}: {
+  genres: Array<{ id: string; name: string; slug: string }>;
+}) {
+  const [showAll, setShowAll] = React.useState(false);
+  const mobileGenres = showAll ? genres : genres.slice(0, 10);
+  const desktopGenres = showAll ? genres : genres.slice(0, 20);
+
+  return (
+    <>
+      <span className="contents md:hidden">
+        {mobileGenres.map((genre) => (
+          <MetaPill key={genre.id} href="/browse" search={{ genre: genre.slug }}>
+            {genre.name}
+          </MetaPill>
+        ))}
+      </span>
+
+      <span className="hidden md:contents">
+        {desktopGenres.map((genre) => (
+          <MetaPill key={genre.id} href="/browse" search={{ genre: genre.slug }}>
+            {genre.name}
+          </MetaPill>
+        ))}
+      </span>
+
+      {!showAll && genres.length > 10 && (
+        <button
+          type="button"
+          onClick={() => setShowAll(true)}
+          className="inline-flex rounded-md border border-primary/30 bg-primary/10 px-3 py-1.5 text-sm font-medium text-primary transition hover:bg-primary hover:text-primary-foreground md:hidden"
+        >
+          Show all +{genres.length - 10}
+        </button>
+      )}
+
+      {!showAll && genres.length > 20 && (
+        <button
+          type="button"
+          onClick={() => setShowAll(true)}
+          className="hidden rounded-md border border-primary/30 bg-primary/10 px-3 py-1.5 text-sm font-medium text-primary transition hover:bg-primary hover:text-primary-foreground md:inline-flex"
+        >
+          Show all +{genres.length - 20}
+        </button>
+      )}
+
+      {showAll && genres.length > 10 && (
+        <button
+          type="button"
+          onClick={() => setShowAll(false)}
+          className="inline-flex rounded-md border border-border/60 bg-secondary/50 px-3 py-1.5 text-sm font-medium text-muted-foreground transition hover:bg-secondary hover:text-foreground"
+        >
+          Show less
+        </button>
+      )}
+    </>
+  );
 }
 
 function LimitedTagPills({

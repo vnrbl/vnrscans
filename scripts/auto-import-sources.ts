@@ -74,6 +74,9 @@ async function syncSource(source: any) {
       ),
     );
 
+    // Note: the old "<= maxChapterNumber" guard was removed because it dropped
+    // legitimate decimal/re-published chapters. Exact duplicates are already
+    // covered by existingKeys.
     const missing = discovered
       .filter((chapter) => !existingKeys.has(chapterScanKey(chapter.chapterNumber, scanlationGroup)))
       .sort((a, b) => a.chapterNumber - b.chapterNumber)
