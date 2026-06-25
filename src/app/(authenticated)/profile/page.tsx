@@ -451,12 +451,29 @@ export default function ProfilePage() {
       if (commentSeriesIds.length === 0) return new Map();
       const { data, error } = await supabase
         .from("series")
-        .select("id,title,slug")
+        .select("id,title,slug,cover_url")
         .in("id", commentSeriesIds);
       if (error) return new Map();
       return new Map((data ?? []).map((s: any) => [s.id, s]));
     },
     enabled: commentSeriesIds.length > 0,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  // Fetch chapter info for comment history
+  const commentChapterIds = Array.from(new Set((commentHistory.data ?? []).map((c: any) => c.chapter_id).filter(Boolean))) as string[];
+  const commentChaptersInfo = useQuery({
+    queryKey: ["profile", "comment-chapters", commentChapterIds.join(",")],
+    queryFn: async () => {
+      if (commentChapterIds.length === 0) return new Map();
+      const { data, error } = await supabase
+        .from("chapters")
+        .select("id,chapter_number,title,slug")
+        .in("id", commentChapterIds);
+      if (error) return new Map();
+      return new Map((data ?? []).map((c: any) => [c.id, c]));
+    },
+    enabled: commentChapterIds.length > 0,
     staleTime: 5 * 60 * 1000,
   });
 
@@ -1954,6 +1971,7 @@ export default function ProfilePage() {
                 <div className="space-y-3">
                   {commentHistory.data.map((comment: any) => {
                     const seriesInfo = commentSeriesInfo.data?.get(comment.series_id);
+                    const chapterInfo = commentChaptersInfo.data?.get(comment.chapter_id);
                     return (
                       <div
                         key={comment.id}
@@ -1962,7 +1980,17 @@ export default function ProfilePage() {
                           background: `linear-gradient(135deg, ${accentColor}03, transparent)`,
                         }}
                       >
-                        <div className="flex items-start justify-between gap-3">
+                        <div className="flex gap-4 items-start">
+                          {seriesInfo?.cover_url && (
+                            <div className="relative h-16 w-11 overflow-hidden rounded border border-border/30 bg-secondary shrink-0 shadow-sm">
+                              <img
+                                src={seriesInfo.cover_url}
+                                alt={seriesInfo.title}
+                                className="h-full w-full object-cover animate-[profileFadeInUp_0.3s_ease-out]"
+                                referrerPolicy="no-referrer"
+                              />
+                            </div>
+                          )}
                           <div className="flex-1 min-w-0">
                             {/* Comment content */}
                             <p className="text-sm leading-relaxed text-foreground">
@@ -2004,6 +2032,19 @@ export default function ProfilePage() {
                                     style={{ color: accentColor }}
                                   >
                                     {seriesInfo.title}
+                                  </Link>
+                                </>
+                              )}
+                              {chapterInfo && (
+                                <>
+                                  <span className="text-border">•</span>
+                                  <Link
+                                    to="/title/$slug/$chapterSlug"
+                                    params={{ slug: seriesInfo?.slug || "", chapterSlug: chapterInfo.slug }}
+                                    className="font-medium transition-colors hover:underline"
+                                    style={{ color: accentColor }}
+                                  >
+                                    Ch. {chapterInfo.chapter_number}
                                   </Link>
                                 </>
                               )}
