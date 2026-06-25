@@ -46,6 +46,7 @@ import { AccentColorPicker } from "@/components/profile/AccentColorPicker";
 
 import { SocialLinksEditor, SocialLinksDisplay, type SocialLinksData } from "@/components/profile/SocialLinks";
 import { xpSourceLabel } from "@/lib/xp";
+import { stripBbCode } from "@/lib/bbcode";
 
 
 /* ─── Keyframes (injected once) ─── */
@@ -1901,8 +1902,8 @@ export default function ProfilePage() {
                 {/* Social Links Section */}
                 <SocialLinksEditor
                   values={socialLinks}
-                  onChange={(key, value) =>
-                    setSocialLinks((prev) => ({ ...prev, [key]: value }))
+                  onChange={(key: string, value: string) =>
+                    setSocialLinks((prev: any) => ({ ...prev, [key]: value }))
                   }
                 />
 
@@ -1970,7 +1971,10 @@ export default function ProfilePage() {
                               ) : comment.is_hidden ? (
                                 <span className="italic text-muted-foreground">🚫 Hidden by moderator</span>
                               ) : (
-                                comment.content?.length > 200 ? comment.content.slice(0, 200) + "..." : comment.content
+                                (() => {
+                                  const clean = stripBbCode(comment.content || "");
+                                  return clean.length > 200 ? clean.slice(0, 200) + "..." : clean;
+                                })()
                               )}
                             </p>
 

@@ -135,6 +135,9 @@ export const SeriesActions = React.memo(function SeriesActions({
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["rating", slug] });
       qc.invalidateQueries({ queryKey: ["series", "detail", slug] });
+      qc.invalidateQueries({ queryKey: ["profile"] });
+      qc.invalidateQueries({ queryKey: ["xp-history"] });
+      qc.invalidateQueries({ queryKey: ["user-stats"] });
       toast.success("Rating saved");
     },
     onError: (e: Error) => toast.error(e.message),

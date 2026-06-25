@@ -38,6 +38,7 @@ import {
   X,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { renderCommentMarkdown, COMMENT_TEXT_COLORS } from "@/lib/bbcode";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
@@ -2007,62 +2008,7 @@ type CommentDraft = {
   attachmentAlt: string | null;
 };
 
-const COMMENT_TEXT_COLORS: Record<string, string> = {
-  red: "#ef4444",
-  orange: "#f97316",
-  yellow: "#eab308",
-  green: "#22c55e",
-  blue: "#3b82f6",
-  purple: "#a855f7",
-  pink: "#ec4899",
-};
-
-function renderCommentMarkdown(text: string): ReactNode[] {
-  return text.split("\n").flatMap((line, lineIndex, lines) => {
-    const nodes = renderInlineMarkdown(line, `${lineIndex}`);
-    if (lineIndex < lines.length - 1) nodes.push(<br key={`br-${lineIndex}`} />);
-    return nodes;
-  });
-}
-
-function renderInlineMarkdown(text: string, keyPrefix: string): ReactNode[] {
-  const pattern =
-    /\[color=(red|orange|yellow|green|blue|purple|pink)\]([\s\S]*?)\[\/color\]|\*\*([^*]+)\*\*|~~([^~]+)~~|`([^`]+)`|\*([^*]+)\*/gi;
-  const nodes: ReactNode[] = [];
-  let lastIndex = 0;
-  let match: RegExpExecArray | null;
-
-  while ((match = pattern.exec(text)) !== null) {
-    if (match.index > lastIndex) nodes.push(text.slice(lastIndex, match.index));
-
-    const key = `${keyPrefix}-${match.index}`;
-    if (match[1]) {
-      const color = match[1].toLowerCase();
-      nodes.push(
-        <span key={key} style={{ color: COMMENT_TEXT_COLORS[color] }}>
-          {renderInlineMarkdown(match[2], key)}
-        </span>,
-      );
-    } else if (match[3]) {
-      nodes.push(<strong key={key}>{renderInlineMarkdown(match[3], key)}</strong>);
-    } else if (match[4]) {
-      nodes.push(<s key={key}>{renderInlineMarkdown(match[4], key)}</s>);
-    } else if (match[5]) {
-      nodes.push(
-        <code key={key} className="rounded bg-secondary px-1 py-0.5 text-[0.9em]">
-          {match[5]}
-        </code>,
-      );
-    } else if (match[6]) {
-      nodes.push(<em key={key}>{renderInlineMarkdown(match[6], key)}</em>);
-    }
-
-    lastIndex = pattern.lastIndex;
-  }
-
-  if (lastIndex < text.length) nodes.push(text.slice(lastIndex));
-  return nodes;
-}
+// Comment parsing and markdown rendering imported from @/lib/bbcode
 
 function ChapterComments({ chapterId, seriesId }: { chapterId: string; seriesId: string }) {
   const { user } = useAuth();
