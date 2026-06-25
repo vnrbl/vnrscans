@@ -8,7 +8,7 @@ const withAnalyzer = withBundleAnalyzer({
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
-  serverExternalPackages: ["@sparticuz/chromium", "puppeteer-core", "puppeteer"],
+  serverExternalPackages: ["@sparticuz/chromium", "puppeteer-core", "puppeteer", "@supabase/supabase-js", "@supabase/ssr"],
   outputFileTracingIncludes: {
     "/*": [
       "./node_modules/@sparticuz/chromium/bin/**/*",

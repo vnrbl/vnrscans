@@ -155,6 +155,12 @@ CREATE TABLE IF NOT EXISTS public.achievements (
   updated_at timestamptz NOT NULL DEFAULT now()
 );
 
+ALTER TABLE public.achievements 
+  ADD COLUMN IF NOT EXISTS is_active boolean NOT NULL DEFAULT true;
+
+ALTER TABLE public.achievements 
+  ADD COLUMN IF NOT EXISTS is_secret boolean NOT NULL DEFAULT false;
+
 CREATE TABLE IF NOT EXISTS public.xp_events (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   name text NOT NULL,

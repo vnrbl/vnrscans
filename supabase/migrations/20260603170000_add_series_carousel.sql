@@ -57,12 +57,14 @@ CREATE TRIGGER trigger_update_carousel_timestamp
 ALTER TABLE public.carousel_items ENABLE ROW LEVEL SECURITY;
 
 -- Public can view active carousel items
+DROP POLICY IF EXISTS "Active carousel items are public" ON public.carousel_items;
 CREATE POLICY "Active carousel items are public" 
   ON public.carousel_items
   FOR SELECT 
   USING (is_active = true);
 
 -- Admins can manage all carousel items
+DROP POLICY IF EXISTS "Admins manage carousel items" ON public.carousel_items;
 CREATE POLICY "Admins manage carousel items" 
   ON public.carousel_items
   FOR ALL 

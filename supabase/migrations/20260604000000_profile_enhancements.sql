@@ -200,28 +200,38 @@ WHERE NOT EXISTS (SELECT 1 FROM public.profile_badges LIMIT 1);
 
 -- Reading Goals
 ALTER TABLE public.reading_goals ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Users view own goals" ON public.reading_goals;
 CREATE POLICY "Users view own goals" ON public.reading_goals FOR SELECT USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users manage own goals" ON public.reading_goals;
 CREATE POLICY "Users manage own goals" ON public.reading_goals FOR ALL USING (auth.uid() = user_id);
 
 -- Profile Badges (public read)
 ALTER TABLE public.profile_badges ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Badges are public" ON public.profile_badges;
 CREATE POLICY "Badges are public" ON public.profile_badges FOR SELECT USING (is_active = true);
+DROP POLICY IF EXISTS "Admins manage badges" ON public.profile_badges;
 CREATE POLICY "Admins manage badges" ON public.profile_badges FOR ALL USING (
   EXISTS (SELECT 1 FROM public.user_roles WHERE user_id = auth.uid() AND role = 'admin')
 );
 
 -- User Badges
 ALTER TABLE public.user_badges ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Users view own badges" ON public.user_badges;
 CREATE POLICY "Users view own badges" ON public.user_badges FOR SELECT USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users manage own badges" ON public.user_badges;
 CREATE POLICY "Users manage own badges" ON public.user_badges FOR ALL USING (auth.uid() = user_id);
 
 -- Collections
 ALTER TABLE public.reading_collections ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Users view own collections" ON public.reading_collections;
 CREATE POLICY "Users view own collections" ON public.reading_collections FOR SELECT USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Public collections viewable" ON public.reading_collections;
 CREATE POLICY "Public collections viewable" ON public.reading_collections FOR SELECT USING (is_public = true);
+DROP POLICY IF EXISTS "Users manage own collections" ON public.reading_collections;
 CREATE POLICY "Users manage own collections" ON public.reading_collections FOR ALL USING (auth.uid() = user_id);
 
 ALTER TABLE public.collection_items ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Collection items inherit visibility" ON public.collection_items;
 CREATE POLICY "Collection items inherit visibility" ON public.collection_items FOR SELECT USING (
   EXISTS (
     SELECT 1 FROM public.reading_collections 
@@ -229,6 +239,7 @@ CREATE POLICY "Collection items inherit visibility" ON public.collection_items F
     AND (user_id = auth.uid() OR is_public = true)
   )
 );
+DROP POLICY IF EXISTS "Users manage own collection items" ON public.collection_items;
 CREATE POLICY "Users manage own collection items" ON public.collection_items FOR ALL USING (
   EXISTS (
     SELECT 1 FROM public.reading_collections 
@@ -238,18 +249,25 @@ CREATE POLICY "Users manage own collection items" ON public.collection_items FOR
 
 -- Notifications
 ALTER TABLE public.user_notifications ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Users view own notifications" ON public.user_notifications;
 CREATE POLICY "Users view own notifications" ON public.user_notifications FOR SELECT USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users update own notifications" ON public.user_notifications;
 CREATE POLICY "Users update own notifications" ON public.user_notifications FOR UPDATE USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "System creates notifications" ON public.user_notifications;
 CREATE POLICY "System creates notifications" ON public.user_notifications FOR INSERT WITH CHECK (true);
 
 -- Profile Widgets
 ALTER TABLE public.profile_widgets ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Widgets publicly viewable" ON public.profile_widgets;
 CREATE POLICY "Widgets publicly viewable" ON public.profile_widgets FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Users manage own widgets" ON public.profile_widgets;
 CREATE POLICY "Users manage own widgets" ON public.profile_widgets FOR ALL USING (auth.uid() = user_id);
 
 -- Milestones
 ALTER TABLE public.user_milestones ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Users view own milestones" ON public.user_milestones;
 CREATE POLICY "Users view own milestones" ON public.user_milestones FOR SELECT USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "System creates milestones" ON public.user_milestones;
 CREATE POLICY "System creates milestones" ON public.user_milestones FOR INSERT WITH CHECK (true);
 
 -- ============================================
