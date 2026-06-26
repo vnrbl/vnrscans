@@ -1,3 +1,4 @@
+/* eslint-disable no-useless-escape */
 /**
  * Chapter URL scraper - extracts image URLs from manga/manhwa chapter pages
  */
@@ -352,6 +353,7 @@ async function collectLiveReaderImageUrls(page: any): Promise<string[]> {
             img.getAttribute('data-original'),
             ...Array.from(img.attributes)
               .map(attr => attr.value)
+              // eslint-disable-next-line no-useless-escape
               .filter(val => typeof val === 'string' && (val.startsWith('http') || val.startsWith('//') || val.includes('/') || val.includes('.')) && /\.(?:jpe?g|png|webp)(?:$|[?#])/i.test(val))
           ].filter(Boolean);
           const src = String(values[0] || '');
