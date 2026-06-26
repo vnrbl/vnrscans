@@ -276,14 +276,17 @@ async function scrollChapterPageForLazyImages(page: any): Promise<void> {
   for (let pass = 0; pass < 3 && stablePasses < 2; pass++) {
     let currentHeight = await page.evaluate(() => document.body.scrollHeight);
     
-    for (let y = 0; y <= currentHeight; y += 1500) {
+    // Use smaller scroll steps (800px instead of 1500px) and longer delay (120ms instead of 50ms)
+    // to give Chrome enough time to trigger lazy-load event handlers.
+    for (let y = 0; y <= currentHeight; y += 800) {
       await page.evaluate((scrollY: number) => window.scrollTo(0, scrollY), y);
-      await new Promise((resolve) => setTimeout(resolve, 50));
+      await new Promise((resolve) => setTimeout(resolve, 120));
       currentHeight = await page.evaluate(() => document.body.scrollHeight);
     }
 
     await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
-    await new Promise((resolve) => setTimeout(resolve, 200));
+    // Wait longer at the bottom of the page (1500ms instead of 200ms) to allow pending network connections to settle
+    await new Promise((resolve) => setTimeout(resolve, 1500));
 
     const currentImageCount = await page.evaluate(() => {
       return Array.from(document.images).filter((img) => {
@@ -346,7 +349,10 @@ async function collectLiveReaderImageUrls(page: any): Promise<string[]> {
             img.src,
             img.getAttribute('data-src'),
             img.getAttribute('data-lazy-src'),
-            img.getAttribute('data-original')
+            img.getAttribute('data-original'),
+            ...Array.from(img.attributes)
+              .map(attr => attr.value)
+              .filter(val => typeof val === 'string' && (val.startsWith('http') || val.startsWith('//') || val.includes('/') || val.includes('.')) && /\.(?:jpe?g|png|webp)(?:$|[?#])/i.test(val))
           ].filter(Boolean);
           const src = String(values[0] || '');
           const lowercaseSrc = src.toLowerCase();
@@ -1434,14 +1440,19 @@ export function extractImageUrls(html: string, baseUrl: string): string[] {
       const lowercaseBaseUrl = baseUrl.toLowerCase();
       const lowercaseUrl = url.toLowerCase();
       
-      // If scraping from asurascans.com, only allow reader page image URL families.
-      const isAsura = lowercaseBaseUrl.includes('asurascans.com') || lowercaseUrl.includes('asurascans.com');
-      if (
-        isAsura &&
-        !lowercaseUrl.includes('asura-images/chapters/') &&
-        !lowercaseUrl.includes('asura-images/chapters-restored/')
-      ) {
-        return false;
+      // If scraping from Asura, only allow reader page image URL families.
+      const isAsura = lowercaseBaseUrl.includes('asura') || lowercaseUrl.includes('asura');
+      if (isAsura) {
+        const isKnownAsuraImage = 
+          lowercaseUrl.includes('asura-images/chapters/') ||
+          lowercaseUrl.includes('asura-images/chapters-restored/') ||
+          lowercaseUrl.includes('storage/media/') ||
+          lowercaseUrl.includes('wp-content/uploads/') ||
+          isNumberedImageFilename(new URL(url).pathname.split('/').pop() ?? '');
+          
+        if (!isKnownAsuraImage) {
+          return false;
+        }
       }
 
       // If scraping from elftoon.com / elftoon.xyz, only allow URLs of the pattern: /wp-content/uploads/
@@ -1826,9 +1837,12 @@ function isAsuraReaderPageImage(url: string): boolean {
     const filename = new URL(url).pathname.split('/').pop() ?? '';
     const isReaderPath =
       lowercaseUrl.includes('asura-images/chapters/') ||
-      lowercaseUrl.includes('asura-images/chapters-restored/');
+      lowercaseUrl.includes('asura-images/chapters-restored/') ||
+      lowercaseUrl.includes('storage/media/') ||
+      lowercaseUrl.includes('wp-content/uploads/') ||
+      (lowercaseUrl.includes('asura') && lowercaseUrl.includes('/chapters/'));
     const isImageFile = /\.(?:jpe?g|png|webp)(?:$|[?#])/i.test(filename);
-    return isReaderPath && isImageFile;
+    return (isReaderPath || isNumberedImageFilename(filename)) && isImageFile;
   } catch {
     return false;
   }
@@ -1855,9 +1869,9 @@ function isQimanhwaLikeUrl(url: string): boolean {
 
 function isAsuraScansUrl(url: string): boolean {
   try {
-    return new URL(url).hostname.toLowerCase().includes('asurascans.com');
+    return new URL(url).hostname.toLowerCase().includes('asura');
   } catch {
-    return url.toLowerCase().includes('asurascans.com');
+    return url.toLowerCase().includes('asura');
   }
 }
 

@@ -3,7 +3,7 @@
 // the server is authoritative; these are only for "how much will I earn" hints.
 
 export const XP_AMOUNTS = {
-  chapter_complete: 1000,
+  chapter_complete: 50,
   caught_up: 100,
   series_complete: 1000,
   follow_series: 15,

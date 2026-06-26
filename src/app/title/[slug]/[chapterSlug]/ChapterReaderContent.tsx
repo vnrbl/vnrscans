@@ -1989,6 +1989,10 @@ type CommentProfile = {
   user_id: string;
   username: string;
   avatar_url: string | null;
+  avatar_frame?: string | null;
+  accent_color?: string | null;
+  user_level?: number | null;
+  is_vip?: boolean | null;
 };
 
 const COMMENT_REACTIONS = [
@@ -2010,9 +2014,202 @@ type CommentDraft = {
 
 // Comment parsing and markdown rendering imported from @/lib/bbcode
 
+function CommentAvatarFrame({
+  avatarUrl,
+  avatarFrame,
+  accentColor,
+  username,
+  size = 36,
+}: {
+  avatarUrl?: string | null;
+  avatarFrame: string | null;
+  accentColor: string | null;
+  username?: string | null;
+  size?: number;
+}) {
+  const borderWidth = avatarFrame === "creator" ? 3 : 2; // px
+  const innerSize = size - borderWidth * 2;
+
+  const getFrameGradient = () => {
+    switch (avatarFrame) {
+      case "neon": return "conic-gradient(from 0deg, #A855F7, #06B6D4, #EC4899, #A855F7)";
+      case "gold": return "conic-gradient(from 0deg, #a67c00, #ffd700, #ffeb99, #ffd700, #a67c00)";
+      case "cyber": return "conic-gradient(from 0deg, #0ea5e9, transparent 30%, #c084fc, transparent 60%, #0ea5e9)";
+      case "fire": return "conic-gradient(from 0deg, #b91c1c, #f97316, #ef4444, #b91c1c)";
+      case "sakura": return "conic-gradient(from 0deg, #FDA4AF, #F472B6, #E879F9, #FDA4AF)";
+      case "shadow": return "conic-gradient(from 0deg, #4f46e5, #06b6d4, #1e1b4b, #4f46e5)";
+      case "qi": return "conic-gradient(from 0deg, #059669, #10B981, #FBBF24, #059669)";
+      case "asura": return "conic-gradient(from 0deg, #ef4444, #7f1d1d, #ef4444)";
+      case "system": return "conic-gradient(from 0deg, #06B6D4, transparent 30%, #06B6D4 50%, transparent 70%, #06B6D4)";
+      case "abyss": return "conic-gradient(from 0deg, #D946EF, #4A044E, #3B0764, #D946EF)";
+      case "glitch": return "conic-gradient(from 0deg, #ef4444, #06b6d4, #ef4444)";
+      case "divine": return "conic-gradient(from 0deg, #FCD34D, #FFFFFF, #FFFBEB, #FCD34D)";
+      case "creator": return `conic-gradient(from 0deg, ${accentColor}, transparent, ${accentColor}80, transparent, ${accentColor})`;
+      default: return accentColor || "#8B5CF6";
+    }
+  };
+
+  const getFrameGlow = () => {
+    switch (avatarFrame) {
+      case "neon": return "0 0 8px rgba(168,85,247,0.5), 0 0 16px rgba(6,182,212,0.3)";
+      case "gold": return "0 0 8px rgba(255,215,0,0.5), 0 0 14px rgba(255,215,0,0.25)";
+      case "cyber": return "0 0 8px rgba(6,182,212,0.5), 0 0 14px rgba(192,132,252,0.25)";
+      case "fire": return "0 0 10px rgba(239,68,68,0.6), 0 0 16px rgba(249,115,22,0.3)";
+      case "sakura": return "0 0 8px rgba(244,114,182,0.5), 0 0 14px rgba(233,121,249,0.25)";
+      case "shadow": return "0 0 10px rgba(99,102,241,0.6), 0 0 16px rgba(6,182,212,0.2)";
+      case "qi": return "0 0 8px rgba(16,185,129,0.5), 0 0 14px rgba(251,191,36,0.25)";
+      case "asura": return "0 0 10px rgba(239,68,68,0.7), 0 0 18px rgba(127,29,29,0.4)";
+      case "system": return "0 0 8px rgba(6,182,212,0.6), 0 0 14px rgba(6,182,212,0.3)";
+      case "abyss": return "0 0 10px rgba(217,70,239,0.6), 0 0 16px rgba(139,92,246,0.3)";
+      case "glitch": return "0 0 8px rgba(239,68,68,0.5), 0 0 14px rgba(6,182,212,0.3)";
+      case "divine": return "0 0 10px rgba(252,211,77,0.6), 0 0 16px rgba(255,255,255,0.3)";
+      case "creator": return `0 0 10px ${accentColor}, 0 0 16px ${accentColor}50`;
+      default: return `0 0 6px ${(accentColor || "#8B5CF6")}40`;
+    }
+  };
+
+  const isAnimated = avatarFrame && avatarFrame !== "none";
+  const animSpeed = avatarFrame === "fire" ? "1.5s" : avatarFrame === "neon" ? "2s" : avatarFrame === "abyss" ? "4.5s" : avatarFrame === "glitch" ? "1.2s" : "3s";
+
+  return (
+    <div
+      className="relative rounded-full flex items-center justify-center flex-shrink-0"
+      style={{ 
+        width: size, 
+        height: size,
+        boxShadow: isAnimated ? getFrameGlow() : undefined,
+      }}
+    >
+      {/* Rotating frame border */}
+      {isAnimated && (
+        <div 
+          className="absolute inset-0 rounded-full" 
+          style={{ 
+            background: getFrameGradient(),
+            animation: `navRotCW ${animSpeed} linear infinite`,
+          }} 
+        />
+      )}
+      {/* Static frame border for "none" */}
+      {!isAnimated && (
+        <div 
+          className="absolute inset-0 rounded-full border border-border/80" 
+          style={{ background: accentColor || "transparent" }} 
+        />
+      )}
+      {/* Inner background mask */}
+      <div 
+        className="absolute rounded-full bg-card" 
+        style={{ 
+          inset: isAnimated ? borderWidth : 0,
+        }} 
+      />
+
+      {/* Avatar image or initial */}
+      <div 
+        className="relative rounded-full overflow-hidden flex items-center justify-center bg-card z-10"
+        style={{ 
+          width: isAnimated ? innerSize : size, 
+          height: isAnimated ? innerSize : size,
+          animation: isAnimated ? `navPulse 4s ease-in-out infinite` : undefined,
+        }}
+      >
+        {avatarUrl ? (
+          <img
+            src={avatarUrl}
+            alt={username || "Profile"}
+            width={innerSize}
+            height={innerSize}
+            className="h-full w-full object-cover rounded-full"
+            decoding="async"
+          />
+        ) : (
+          <div 
+            className="h-full w-full flex items-center justify-center rounded-full text-[10px] font-bold"
+            style={{ 
+              background: `linear-gradient(135deg, ${(accentColor || "#8B5CF6")}30, ${(accentColor || "#8B5CF6")}10)`,
+              color: accentColor || "#8B5CF6",
+            }}
+          >
+            {username?.charAt(0)?.toUpperCase() || "U"}
+          </div>
+        )}
+      </div>
+
+      {/* Cyber brackets overlay */}
+      {avatarFrame === "cyber" && (
+        <div className="absolute inset-[-1px] pointer-events-none z-20 animate-[navGlitch_6s_infinite]">
+          <div className="absolute top-0 left-0 h-1 w-1 border-t border-l border-cyan-400 rounded-tl-sm" style={{ boxShadow: '0 0 2px cyan' }} />
+          <div className="absolute top-0 right-0 h-1 w-1 border-t border-r border-cyan-400 rounded-tr-sm" style={{ boxShadow: '0 0 2px cyan' }} />
+          <div className="absolute bottom-0 left-0 h-1 w-1 border-b border-l border-cyan-400 rounded-bl-sm" style={{ boxShadow: '0 0 2px cyan' }} />
+          <div className="absolute bottom-0 right-0 h-1 w-1 border-b border-r border-cyan-400 rounded-br-sm" style={{ boxShadow: '0 0 2px cyan' }} />
+        </div>
+      )}
+
+      {/* Glitch temporal overlay */}
+      {avatarFrame === "glitch" && (
+        <div className="absolute inset-[-1px] pointer-events-none z-20 animate-[navGlitch_4s_infinite]">
+          <div className="absolute top-0 left-0 w-full h-[1px] bg-red-500 shadow-[0_0_2px_red]" />
+          <div className="absolute bottom-0 left-0 w-full h-[1px] bg-cyan-400 shadow-[0_0_2px_cyan]" />
+        </div>
+      )}
+
+      {/* Divine stars tiny */}
+      {avatarFrame === "divine" && (
+        <div className="absolute -top-1 left-1/2 -translate-x-1/2 text-yellow-300 z-20 animate-pulse" style={{ fontSize: '6px' }}>
+          ✨
+        </div>
+      )}
+
+      {/* System S-RANK mini badge */}
+      {avatarFrame === "system" && (
+        <div className="absolute -top-0.5 -right-0.5 z-30 bg-slate-950 border border-cyan-400 text-cyan-400 text-[4px] font-black px-0.5 rounded leading-tight" style={{ boxShadow: '0 0 3px rgba(6,182,212,0.7)' }}>
+          S
+        </div>
+      )}
+
+      {/* Fire ember dot */}
+      {avatarFrame === "fire" && (
+        <div className="absolute -top-0.5 left-1/2 -translate-x-1/2 w-0.5 h-0.5 rounded-full bg-orange-500 z-20 animate-pulse" style={{ boxShadow: '0 0 3px #ef4444' }} />
+      )}
+
+      {/* Gold crown tiny */}
+      {avatarFrame === "gold" && (
+        <div className="absolute -top-1 left-1/2 -translate-x-1/2 text-amber-400 z-20" style={{ fontSize: '7px', filter: 'drop-shadow(0 1px 1px rgba(0,0,0,0.5))' }}>
+          👑
+        </div>
+      )}
+
+      {/* Creator crown tiny */}
+      {avatarFrame === "creator" && (
+        <div className="absolute -top-1.2 left-1/2 -translate-x-1/2 text-amber-400 z-20" style={{ fontSize: '7px', filter: 'drop-shadow(0 1px 1px rgba(0,0,0,0.5))', color: accentColor || undefined }}>
+          👑
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ChapterComments({ chapterId, seriesId }: { chapterId: string; seriesId: string }) {
   const { user } = useAuth();
   const qc = useQueryClient();
+  const navigate = useNavigate();
+
+  const currentUserProfile = useQuery({
+    queryKey: ["current-user-profile", user?.id],
+    queryFn: async () => {
+      if (!user?.id) return null;
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("avatar_url,avatar_frame,accent_color,username")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      if (error) return null;
+      return data;
+    },
+    enabled: !!user?.id,
+    staleTime: 5 * 60 * 1000,
+  });
   const [content, setContent] = useState("");
   const [isSpoiler, setIsSpoiler] = useState(false);
   const [attachmentType, setAttachmentType] = useState<"image" | "gif" | null>(null);
@@ -2055,7 +2252,7 @@ function ChapterComments({ chapterId, seriesId }: { chapterId: string; seriesId:
       if (userIds.length === 0) return new Map<string, CommentProfile>();
       const { data, error } = await supabase
         .from("profiles")
-        .select("user_id,username,avatar_url")
+        .select("user_id,username,avatar_url,avatar_frame,accent_color,user_level,is_vip")
         .in("user_id", userIds);
       if (error) throw error;
       return new Map((data ?? []).map((profile) => [profile.user_id, profile as CommentProfile]));
@@ -2092,6 +2289,27 @@ function ChapterComments({ chapterId, seriesId }: { chapterId: string; seriesId:
     enabled: (commentsQ.data?.length ?? 0) > 0,
     staleTime: 1000 * 30,
   });
+
+  // Auto scroll to target comment from URL hash
+  useEffect(() => {
+    if (!commentsQ.isLoading && commentsQ.data && typeof window !== "undefined") {
+      const hash = window.location.hash;
+      if (hash && hash.startsWith("#comment-")) {
+        const id = hash.replace("#comment-", "");
+        const timer = setTimeout(() => {
+          const element = document.getElementById(`comment-${id}`);
+          if (element) {
+            element.scrollIntoView({ behavior: "smooth", block: "center" });
+            element.classList.add("ring-2", "ring-primary", "ring-offset-2", "transition-all", "duration-1000");
+            setTimeout(() => {
+              element.classList.remove("ring-2", "ring-primary", "ring-offset-2");
+            }, 3000);
+          }
+        }, 300);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [commentsQ.isLoading, commentsQ.data]);
 
   const comments = commentsQ.data ?? [];
   const repliesByParent = new Map<string, ChapterComment[]>();
@@ -2424,7 +2642,7 @@ function ChapterComments({ chapterId, seriesId }: { chapterId: string; seriesId:
     </div>
   );
 
-  const renderComment = (comment: ChapterComment, isReply = false) => {
+  const renderComment = (comment: ChapterComment, isReply = false, isLastReply = false) => {
     const profile = profilesQ.data?.get(comment.user_id);
     const reactionCounts = reactionsQ.data?.counts.get(comment.id) ?? {};
     const isOwnComment = user?.id === comment.user_id;
@@ -2433,39 +2651,70 @@ function ChapterComments({ chapterId, seriesId }: { chapterId: string; seriesId:
     return (
       <article
         key={comment.id}
-        className={`${isReply ? "ml-8 border-l border-border/50 pl-4" : ""}`}
+        id={`comment-${comment.id}`}
+        className={`${isReply ? "ml-6 pl-5 relative" : ""}`}
       >
-        <div className="rounded-lg border border-border/50 bg-card p-4">
+        {isReply && (
+          <>
+            {/* Curved Connector Elbow */}
+            <div className="absolute left-0 top-0 w-5 h-[34px] border-l-2 border-b-2 border-border/25 rounded-bl-xl pointer-events-none" />
+            {/* Vertical thread continuation */}
+            {!isLastReply && (
+              <div className="absolute left-0 top-[34px] bottom-0 w-[2px] bg-border/25 pointer-events-none" />
+            )}
+          </>
+        )}
+        <div 
+          className="rounded-xl border border-border/50 bg-card p-4 transition-all duration-300 hover:shadow-md"
+          style={{
+            borderLeft: profile?.accent_color ? `3px solid ${profile.accent_color}` : undefined
+          }}
+        >
           <div className="flex items-start justify-between gap-3">
             <div className="flex min-w-0 items-center gap-3">
-              <div className="grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-full bg-primary/15 text-xs font-bold text-primary">
-                {profile?.avatar_url ? (
-                  <img
-                    src={profile.avatar_url}
-                    alt={profile.username}
-                    className="h-full w-full object-cover"
-                  />
-                ) : (
-                  (profile?.username ?? "U").slice(0, 2).toUpperCase()
-                )}
+              <div className="shrink-0">
+                <CommentAvatarFrame
+                  avatarUrl={profile?.avatar_url}
+                  avatarFrame={profile?.avatar_frame || 'none'}
+                  accentColor={profile?.accent_color || '#8B5CF6'}
+                  username={profile?.username}
+                  size={36}
+                />
               </div>
               <div className="min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="truncate text-sm font-semibold">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span 
+                    className="truncate text-sm font-semibold hover:underline cursor-pointer transition-colors"
+                    style={{ color: profile?.accent_color || undefined }}
+                    onClick={() => navigate({ to: "/user/$username", params: { username: profile?.username || "" } })}
+                  >
                     {profile?.username ?? "Reader"}
                   </span>
+                  
+                  {profile?.user_level && (
+                    <span className="rounded-full bg-secondary/80 px-1.5 py-0.5 text-[9px] font-bold text-muted-foreground border border-border/20">
+                      Lvl {profile.user_level}
+                    </span>
+                  )}
+                  
+                  {profile?.is_vip && (
+                    <span className="rounded bg-gradient-to-r from-amber-500 to-yellow-400 text-black font-black text-[8px] tracking-wider px-1.5 py-0.5 uppercase shadow-sm">
+                      VIP
+                    </span>
+                  )}
+                  
                   {comment.is_pinned && (
-                    <span className="rounded bg-primary/15 px-1.5 py-0.5 text-[10px] font-bold text-primary">
+                    <span className="rounded bg-primary/15 px-1.5 py-0.5 text-[9px] font-bold text-primary border border-primary/20">
                       PINNED
                     </span>
                   )}
                   {comment.is_spoiler && (
-                    <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-bold text-amber-500">
+                    <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[9px] font-bold text-amber-500 border border-amber-500/20">
                       SPOILER
                     </span>
                   )}
                 </div>
-                <div className="text-xs text-muted-foreground">
+                <div className="text-[10px] text-muted-foreground mt-0.5">
                   {formatTimeAgo(comment.created_at)}
                 </div>
               </div>
@@ -2475,8 +2724,9 @@ function ChapterComments({ chapterId, seriesId }: { chapterId: string; seriesId:
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-8 w-8"
+                  className="h-8 w-8 rounded-full text-muted-foreground hover:bg-primary/10 hover:text-primary transition-colors"
                   onClick={() => toggleSpoiler(comment.id)}
+                  title={spoilerHidden ? "Show spoiler" : "Hide spoiler"}
                 >
                   {spoilerHidden ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
                 </Button>
@@ -2484,9 +2734,10 @@ function ChapterComments({ chapterId, seriesId }: { chapterId: string; seriesId:
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-8 w-8"
+                className="h-8 w-8 rounded-full text-muted-foreground hover:bg-amber-500/10 hover:text-amber-500 transition-colors"
                 onClick={() => reportComment.mutate(comment.id)}
                 disabled={!user || reportComment.isPending}
+                title="Report comment"
               >
                 <Flag className="h-4 w-4" />
               </Button>
@@ -2494,11 +2745,12 @@ function ChapterComments({ chapterId, seriesId }: { chapterId: string; seriesId:
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-8 w-8"
+                  className="h-8 w-8 rounded-full text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
                   onClick={() => deleteComment.mutate(comment.id)}
                   disabled={deleteComment.isPending}
+                  title="Delete comment"
                 >
-                  <Trash2 className="h-4 w-4 text-destructive" />
+                  <Trash2 className="h-4 w-4" />
                 </Button>
               )}
             </div>
@@ -2561,15 +2813,15 @@ function ChapterComments({ chapterId, seriesId }: { chapterId: string; seriesId:
                       reactionType: reaction.type,
                     })
                   }
-                  className={`flex h-7 items-center gap-1 rounded-full border px-2 text-xs transition-colors ${
+                  className={`flex h-7 items-center gap-1.5 rounded-full border px-2.5 text-xs font-medium transition-all duration-200 hover:scale-105 active:scale-95 ${
                     active
-                      ? "border-primary bg-primary/15 text-primary"
-                      : "border-border/60 hover:border-primary/60 hover:bg-primary/10"
+                      ? "border-primary/60 bg-primary/10 text-primary shadow-[0_0_10px_rgba(139,92,246,0.15)]"
+                      : "border-border/50 bg-background/30 hover:border-border hover:bg-muted/40 hover:text-foreground text-muted-foreground"
                   }`}
                   title={reaction.label}
                 >
-                  <Icon className="h-3.5 w-3.5" />
-                  {count > 0 && <span>{count}</span>}
+                  <Icon className={`h-3.5 w-3.5 transition-transform duration-200 ${active ? "scale-110" : "hover:scale-110"}`} />
+                  {count > 0 && <span className="font-semibold">{count}</span>}
                 </button>
               );
             })}
@@ -2578,7 +2830,7 @@ function ChapterComments({ chapterId, seriesId }: { chapterId: string; seriesId:
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-7 gap-1 px-2 text-xs"
+                className="h-7 gap-1 px-2.5 text-xs rounded-full hover:bg-muted/50 transition-colors"
                 onClick={() => setReplyTo(replyTo === comment.id ? null : comment.id)}
               >
                 <Reply className="h-3.5 w-3.5" />
@@ -2588,20 +2840,34 @@ function ChapterComments({ chapterId, seriesId }: { chapterId: string; seriesId:
           </div>
 
           {replyTo === comment.id && (
-            <div className="mt-4 space-y-2">
-              <Textarea
-                ref={replyContentRef}
-                value={replyContent}
-                onChange={(event) => setReplyContent(event.target.value)}
-                placeholder="Write a reply..."
-                className="min-h-20 resize-none"
-              />
+            <div className="mt-4 rounded-xl border border-border/50 bg-card/60 p-3 transition-all duration-300 focus-within:border-primary/60 focus-within:ring-1 focus-within:ring-primary/40 focus-within:shadow-[0_0_12px_rgba(139,92,246,0.15)]">
+              <div className="flex gap-3 items-start">
+                <div className="shrink-0 mt-1">
+                  <CommentAvatarFrame
+                    avatarUrl={currentUserProfile.data?.avatar_url}
+                    avatarFrame={currentUserProfile.data?.avatar_frame || 'none'}
+                    accentColor={currentUserProfile.data?.accent_color || '#8B5CF6'}
+                    username={currentUserProfile.data?.username || user?.email}
+                    size={28}
+                  />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <Textarea
+                    ref={replyContentRef}
+                    value={replyContent}
+                    onChange={(event) => setReplyContent(event.target.value)}
+                    placeholder="Write a reply..."
+                    className="min-h-16 resize-none border-0 bg-transparent p-0 focus-visible:ring-0 focus-visible:ring-offset-0 text-sm leading-relaxed"
+                  />
+                </div>
+              </div>
+
               {replyAttachmentUrl && (
-                <div className="flex max-w-md gap-3 rounded-lg border border-border/50 bg-background p-2">
+                <div className="mt-2 flex max-w-md gap-3 rounded-lg border border-border/50 bg-background/70 p-2">
                   <img
                     src={replyAttachmentUrl}
                     alt={replyAttachmentAlt ?? "Reply attachment preview"}
-                    className="h-16 w-20 rounded-md object-cover"
+                    className="h-14 w-16 rounded-md object-cover"
                   />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-primary">
@@ -2618,27 +2884,28 @@ function ChapterComments({ chapterId, seriesId }: { chapterId: string; seriesId:
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="mt-1 h-7 px-2 text-xs"
+                      className="mt-1 h-6 px-2 text-xs"
                       onClick={clearReplyAttachment}
                     >
-                      <X className="mr-1 h-3.5 w-3.5" />
+                      <X className="mr-1 h-3 w-3" />
                       Remove
                     </Button>
                   </div>
                 </div>
               )}
-              <div className="grid gap-2 rounded-lg border border-border/40 bg-background/60 p-2 md:grid-cols-[auto_1fr]">
-                <div className="flex flex-wrap gap-2">
+
+              <div className="mt-3 pt-3 border-t border-border/30 flex flex-wrap items-center justify-between gap-3">
+                <div className="flex flex-wrap items-center gap-2">
                   <Button
                     asChild
                     variant="outline"
                     size="sm"
-                    className="h-8 gap-2"
+                    className="h-7 gap-2 bg-background/50 hover:bg-background transition-colors text-[10px] cursor-pointer"
                     disabled={!user || replyUploadingAttachment}
                   >
-                    <label>
-                      <ImageIcon className="h-4 w-4" />
-                      {replyUploadingAttachment ? "Uploading" : "Image"}
+                    <label className="cursor-pointer">
+                      <ImageIcon className="h-3.5 w-3.5" />
+                      {replyUploadingAttachment ? "Uploading" : "Attach Image"}
                       <input
                         type="file"
                         accept="image/png,image/jpeg,image/webp,image/gif"
@@ -2651,49 +2918,52 @@ function ChapterComments({ chapterId, seriesId }: { chapterId: string; seriesId:
                       />
                     </label>
                   </Button>
-                </div>
-                <MarkdownToolbar
-                  textarea={replyContentRef.current}
-                  value={replyContent}
-                  setValue={setReplyContent}
-                  disabled={!user}
-                />
-              </div>
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <label className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <input
-                    type="checkbox"
-                    checked={replySpoiler}
-                    onChange={(event) => setReplySpoiler(event.target.checked)}
+                  
+                  <MarkdownToolbar
+                    textarea={replyContentRef.current}
+                    value={replyContent}
+                    setValue={setReplyContent}
+                    disabled={!user}
                   />
-                  Mark as spoiler
-                </label>
-                <div className="flex gap-2">
-                  <Button variant="ghost" size="sm" onClick={() => setReplyTo(null)}>
-                    Cancel
-                  </Button>
-                  <Button
-                    size="sm"
-                    className="gap-2"
-                    disabled={
-                      createComment.isPending ||
-                      replyUploadingAttachment ||
-                      (replyContent.trim().length < 2 && !replyAttachmentUrl)
-                    }
-                    onClick={() =>
-                      createComment.mutate({
-                        body: replyContent,
-                        parentId: comment.id,
-                        spoiler: replySpoiler,
-                        attachmentType: replyAttachmentType,
-                        attachmentUrl: replyAttachmentUrl,
-                        attachmentAlt: replyAttachmentAlt,
-                      })
-                    }
-                  >
-                    <Send className="h-4 w-4" />
-                    Reply
-                  </Button>
+                </div>
+                
+                <div className="flex items-center gap-3">
+                  <label className="flex items-center gap-2 text-xs text-muted-foreground select-none cursor-pointer hover:text-foreground transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={replySpoiler}
+                      onChange={(event) => setReplySpoiler(event.target.checked)}
+                      className="rounded border-border bg-background text-primary focus:ring-primary"
+                    />
+                    Mark as spoiler
+                  </label>
+                  <div className="flex gap-2">
+                    <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setReplyTo(null)}>
+                      Cancel
+                    </Button>
+                    <Button
+                      size="sm"
+                      className="h-7 gap-2 px-3 text-xs cursor-pointer"
+                      disabled={
+                        createComment.isPending ||
+                        replyUploadingAttachment ||
+                        (replyContent.trim().length < 2 && !replyAttachmentUrl)
+                      }
+                      onClick={() =>
+                        createComment.mutate({
+                          body: replyContent,
+                          parentId: comment.id,
+                          spoiler: replySpoiler,
+                          attachmentType: replyAttachmentType,
+                          attachmentUrl: replyAttachmentUrl,
+                          attachmentAlt: replyAttachmentAlt,
+                        })
+                      }
+                    >
+                      <Send className="h-3.5 w-3.5" />
+                      Reply
+                    </Button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -2704,7 +2974,7 @@ function ChapterComments({ chapterId, seriesId }: { chapterId: string; seriesId:
           <div className="mt-3 space-y-3">
             {(repliesByParent.get(comment.id) ?? [])
               .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
-              .map((reply) => renderComment(reply, true))}
+              .map((reply, index, arr) => renderComment(reply, true, index === arr.length - 1))}
           </div>
         )}
       </article>
@@ -2712,17 +2982,17 @@ function ChapterComments({ chapterId, seriesId }: { chapterId: string; seriesId:
   };
 
   return (
-    <section className="rounded-lg border border-border/50 bg-background/60 p-4 sm:p-5">
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+    <section className="rounded-2xl border border-border/40 bg-background/35 backdrop-blur-md p-5 sm:p-6 shadow-xl relative overflow-hidden">
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3 relative z-10">
         <div>
-          <h3 className="flex items-center gap-2 text-lg font-semibold">
-            <MessageSquare className="h-5 w-5" />
+          <h3 className="flex items-center gap-2 text-lg font-bold tracking-tight">
+            <MessageSquare className="h-5 w-5 text-primary" />
             Comments
           </h3>
-          <p className="text-sm text-muted-foreground">Discuss this chapter with other readers.</p>
+          <p className="text-xs text-muted-foreground mt-0.5">Discuss this chapter with other readers.</p>
         </div>
         <Select value={sort} onValueChange={(value: any) => setSort(value)}>
-          <SelectTrigger className="h-9 w-[130px]">
+          <SelectTrigger className="h-9 w-[130px] bg-background/50 border-border/50">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -2733,22 +3003,38 @@ function ChapterComments({ chapterId, seriesId }: { chapterId: string; seriesId:
         </Select>
       </div>
 
-      <div className="mb-5 space-y-3 rounded-lg border border-border/50 bg-card p-3">
-        <Textarea
-          ref={contentRef}
-          value={content}
-          onChange={(event) => setContent(event.target.value)}
-          placeholder={user ? "Share your thoughts..." : "Sign in to comment"}
-          disabled={!user}
-          className="min-h-24 resize-none"
-        />
+      <div className="mb-6 rounded-xl border border-border/50 bg-card/60 p-4 transition-all duration-300 focus-within:border-primary/60 focus-within:ring-1 focus-within:ring-primary/40 focus-within:shadow-[0_0_12px_rgba(139,92,246,0.15)] relative z-10">
+        <div className="flex gap-4 items-start">
+          {/* Active User Avatar with Frame */}
+          <div className="shrink-0 mt-1">
+            <CommentAvatarFrame
+              avatarUrl={currentUserProfile.data?.avatar_url}
+              avatarFrame={currentUserProfile.data?.avatar_frame || 'none'}
+              accentColor={currentUserProfile.data?.accent_color || '#8B5CF6'}
+              username={currentUserProfile.data?.username || user?.email}
+              size={36}
+            />
+          </div>
+          
+          <div className="flex-1 min-w-0">
+            <Textarea
+              ref={contentRef}
+              value={content}
+              onChange={(event) => setContent(event.target.value)}
+              placeholder={user ? "Share your thoughts..." : "Sign in to comment"}
+              disabled={!user}
+              className="min-h-20 resize-none border-0 bg-transparent p-0 focus-visible:ring-0 focus-visible:ring-offset-0 text-sm leading-relaxed"
+            />
+          </div>
+        </div>
 
+        {/* Attachment preview area */}
         {attachmentUrl && (
-          <div className="flex max-w-md gap-3 rounded-lg border border-border/50 bg-background p-2">
+          <div className="mt-3 flex max-w-md gap-3 rounded-lg border border-border/50 bg-background/70 p-2">
             <img
               src={attachmentUrl}
               alt={attachmentAlt ?? "Comment attachment preview"}
-              className="h-20 w-24 rounded-md object-cover"
+              className="h-16 w-20 rounded-md object-cover"
             />
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-primary">
@@ -2765,28 +3051,28 @@ function ChapterComments({ chapterId, seriesId }: { chapterId: string; seriesId:
               <Button
                 variant="ghost"
                 size="sm"
-                className="mt-2 h-7 px-2 text-xs"
+                className="mt-1.5 h-6 px-2 text-xs"
                 onClick={clearAttachment}
               >
-                <X className="mr-1 h-3.5 w-3.5" />
+                <X className="mr-1 h-3 w-3" />
                 Remove
               </Button>
             </div>
           </div>
         )}
 
-        <div className="grid gap-3 rounded-lg border border-border/40 bg-background/60 p-3 md:grid-cols-[auto_1fr]">
-          <div className="flex flex-wrap gap-2">
+        <div className="mt-4 pt-3 border-t border-border/30 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-2">
             <Button
               asChild
               variant="outline"
               size="sm"
-              className="h-9 gap-2"
+              className="h-8 gap-2 bg-background/50 hover:bg-background transition-colors text-xs cursor-pointer"
               disabled={!user || uploadingAttachment}
             >
-              <label>
-                <ImageIcon className="h-4 w-4" />
-                {uploadingAttachment ? "Uploading" : "Image"}
+              <label className="cursor-pointer">
+                <ImageIcon className="h-3.5 w-3.5" />
+                {uploadingAttachment ? "Uploading" : "Attach Image"}
                 <input
                   type="file"
                   accept="image/png,image/jpeg,image/webp,image/gif"
@@ -2799,48 +3085,49 @@ function ChapterComments({ chapterId, seriesId }: { chapterId: string; seriesId:
                 />
               </label>
             </Button>
-          </div>
-
-          <MarkdownToolbar
-            textarea={contentRef.current}
-            value={content}
-            setValue={setContent}
-            disabled={!user}
-          />
-        </div>
-
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <label className="flex items-center gap-2 text-xs text-muted-foreground">
-            <input
-              type="checkbox"
-              checked={isSpoiler}
-              onChange={(event) => setIsSpoiler(event.target.checked)}
+            
+            <MarkdownToolbar
+              textarea={contentRef.current}
+              value={content}
+              setValue={setContent}
               disabled={!user}
             />
-            Mark as spoiler
-          </label>
-          <Button
-            className="gap-2"
-            disabled={
-              !user ||
-              createComment.isPending ||
-              uploadingAttachment ||
-              (content.trim().length < 2 && !attachmentUrl)
-            }
-            onClick={() =>
-              createComment.mutate({
-                body: content,
-                parentId: null,
-                spoiler: isSpoiler,
-                attachmentType,
-                attachmentUrl,
-                attachmentAlt,
-              })
-            }
-          >
-            <Send className="h-4 w-4" />
-            Post Comment
-          </Button>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <label className="flex items-center gap-2 text-xs text-muted-foreground select-none cursor-pointer hover:text-foreground transition-colors">
+              <input
+                type="checkbox"
+                checked={isSpoiler}
+                onChange={(event) => setIsSpoiler(event.target.checked)}
+                className="rounded border-border bg-background text-primary focus:ring-primary"
+                disabled={!user}
+              />
+              Mark as spoiler
+            </label>
+            <Button
+              className="h-8 gap-2 px-4 text-xs font-semibold shadow-md shadow-primary/10 hover:brightness-110 active:scale-[0.98] transition-all cursor-pointer"
+              disabled={
+                !user ||
+                createComment.isPending ||
+                uploadingAttachment ||
+                (content.trim().length < 2 && !attachmentUrl)
+              }
+              onClick={() =>
+                createComment.mutate({
+                  body: content,
+                  parentId: null,
+                  spoiler: isSpoiler,
+                  attachmentType,
+                  attachmentUrl,
+                  attachmentAlt,
+                })
+              }
+            >
+              <Send className="h-3.5 w-3.5" />
+              Post Comment
+            </Button>
+          </div>
         </div>
       </div>
 

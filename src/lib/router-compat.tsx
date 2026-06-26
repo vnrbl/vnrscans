@@ -4,7 +4,7 @@ import NextLink from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import React from "react";
 
-export function Link({ to, params, search, children, activeProps, activeOptions, className, ...props }: any) {
+export function Link({ to, params, search, hash, children, activeProps, activeOptions, className, ...props }: any) {
   let href = to || "";
   if (params) {
     for (const [key, val] of Object.entries(params)) {
@@ -16,6 +16,9 @@ export function Link({ to, params, search, children, activeProps, activeOptions,
     if (searchStr) {
       href = `${href}?${searchStr}`;
     }
+  }
+  if (hash) {
+    href = `${href}#${hash}`;
   }
 
   const pathname = usePathname();
@@ -57,6 +60,9 @@ export function useNavigate() {
       for (const [key, val] of Object.entries(opts.params)) {
         target = target.replace(`$${key}`, val);
       }
+      if (opts.hash) {
+        target = `${target}#${opts.hash}`;
+      }
       router.push(target);
     } else if (opts.to) {
       let target = opts.to;
@@ -65,6 +71,9 @@ export function useNavigate() {
         if (searchStr) {
           target = `${target}?${searchStr}`;
         }
+      }
+      if (opts.hash) {
+        target = `${target}#${opts.hash}`;
       }
       router.push(target);
     }

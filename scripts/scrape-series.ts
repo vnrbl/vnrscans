@@ -77,9 +77,9 @@ const isQimanhwaUrl = (url: string): boolean => {
 const isAsuraUrl = (url: string): boolean => {
   try {
     const hostname = new URL(url.trim()).hostname.toLowerCase();
-    return hostname.includes('asurascans.com');
+    return hostname.includes('asura');
   } catch {
-    return url.toLowerCase().includes('asurascans.com');
+    return url.toLowerCase().includes('asura');
   }
 };
 
@@ -182,13 +182,16 @@ async function scrollChapterPageForLazyImages(page: any): Promise<void> {
     }
 
     const scrollTarget = Math.max(height, 30000);
-    for (let y = 0; y <= scrollTarget; y += 1200) {
+    // Scroll in smaller steps (800px instead of 1200px) and wait longer (120ms instead of 80ms)
+    // to prevent skipping lazy-loaded images or jumping past trigger boundaries too fast.
+    for (let y = 0; y <= scrollTarget; y += 800) {
       await page.evaluate((scrollY: number) => window.scrollTo(0, scrollY), y);
-      await new Promise((resolve) => setTimeout(resolve, 80));
+      await new Promise((resolve) => setTimeout(resolve, 120));
     }
 
     await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
-    await new Promise((resolve) => setTimeout(resolve, 500));
+    // Wait longer at the bottom of the page (2000ms instead of 500ms) to allow slow network assets to finish fetching
+    await new Promise((resolve) => setTimeout(resolve, 2000));
   }
 }
 
@@ -205,6 +208,9 @@ async function collectLiveReaderImageUrls(page: any): Promise<string[]> {
           img.getAttribute('data-src'),
           img.getAttribute('data-lazy-src'),
           img.getAttribute('data-original'),
+          ...Array.from(img.attributes)
+            .map(attr => attr.value)
+            .filter(val => typeof val === 'string' && (val.startsWith('http') || val.startsWith('//') || val.includes('/') || val.includes('.')) && /\.(?:jpe?g|png|webp)(?:$|[?#])/i.test(val))
         ].filter(Boolean) as string[];
         const src = String(values[0] || '');
         const lowercaseSrc = src.toLowerCase();

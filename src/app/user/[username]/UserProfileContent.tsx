@@ -1,6 +1,6 @@
 "use client";
 
-import { Link } from "@/lib/router-compat";
+import { Link, useNavigate } from "@/lib/router-compat";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -29,6 +29,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { SocialLinksDisplay } from "@/components/profile/SocialLinks";
 import { BadgeIcon, enhanceBadge } from "@/lib/profileBadges";
+import { stripBbCode } from "@/lib/bbcode";
 
 type PublicProfileStats = {
   chapters_read: number;
@@ -311,6 +312,7 @@ const getFrameSmokeColor = (frame: string, accent: string) => {
 
 export default function UserProfileContent({ username }: { username: string }) {
   const qc = useQueryClient();
+  const navigate = useNavigate();
 
   // Fetch public profile by username
   const profile = useQuery({
@@ -492,10 +494,9 @@ export default function UserProfileContent({ username }: { username: string }) {
     queryFn: async () => {
       if (!profile.data?.user_id) return [];
       const { data, error } = await (supabase.from("comments") as any)
-        .select("id,content,created_at,chapter_id,series_id,is_spoiler,is_hidden,attachment_type,attachment_url")
+        .select("id,content,created_at,chapter_id,series_id,parent_id,is_spoiler,is_hidden,attachment_type,attachment_url")
         .eq("user_id", profile.data.user_id)
         .eq("is_hidden", false)
-        .is("parent_id", null)
         .order("created_at", { ascending: false })
         .limit(20);
       if (error) {
@@ -516,12 +517,71 @@ export default function UserProfileContent({ username }: { username: string }) {
       if (commentSeriesIds.length === 0) return new Map();
       const { data, error } = await supabase
         .from("series")
-        .select("id,title,slug")
+        .select("id,title,slug,cover_url")
         .in("id", commentSeriesIds);
       if (error) return new Map();
       return new Map((data ?? []).map((s: any) => [s.id, s]));
     },
     enabled: commentSeriesIds.length > 0,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  // Fetch chapter info for comment history
+  const commentChapterIds = Array.from(new Set((commentHistory.data ?? []).map((c: any) => c.chapter_id).filter(Boolean))) as string[];
+  const commentChaptersInfo = useQuery({
+    queryKey: ["public-profile-comment-chapters", commentChapterIds.join(",")],
+    queryFn: async () => {
+      if (commentChapterIds.length === 0) return new Map();
+      const { data, error } = await supabase
+        .from("chapters")
+        .select("id,chapter_number,title,slug")
+        .in("id", commentChapterIds);
+      if (error) return new Map();
+      return new Map((data ?? []).map((c: any) => [c.id, c]));
+    },
+    enabled: commentChapterIds.length > 0,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  // Fetch parent comments for comment history
+  const parentCommentIds = Array.from(new Set((commentHistory.data ?? []).map((c: any) => c.parent_id).filter(Boolean))) as string[];
+  const parentCommentsInfo = useQuery({
+    queryKey: ["public-profile-parent-comments", parentCommentIds.join(",")],
+    queryFn: async () => {
+      if (parentCommentIds.length === 0) return new Map();
+      const { data, error } = await (supabase.from("comments") as any)
+        .select("id,content,user_id,is_spoiler,is_hidden")
+        .in("id", parentCommentIds);
+      if (error) {
+        console.error("Error fetching parent comments:", error);
+        return new Map();
+      }
+
+      const parentUserIds = Array.from(new Set((data ?? []).map((c: any) => c.user_id).filter(Boolean))) as string[];
+      let profilesMap = new Map();
+      if (parentUserIds.length > 0) {
+        const { data: profilesData, error: profilesError } = await supabase
+          .from("profiles")
+          .select("user_id,username")
+          .in("user_id", parentUserIds);
+        if (!profilesError && profilesData) {
+          profilesMap = new Map(profilesData.map((p: any) => [p.user_id, p.username]));
+        }
+      }
+
+      const resultMap = new Map();
+      for (const c of (data ?? [])) {
+        resultMap.set(c.id, {
+          id: c.id,
+          content: c.content,
+          is_spoiler: c.is_spoiler,
+          is_hidden: c.is_hidden,
+          username: profilesMap.get(c.user_id) || "Reader",
+        });
+      }
+      return resultMap;
+    },
+    enabled: parentCommentIds.length > 0,
     staleTime: 5 * 60 * 1000,
   });
 
@@ -1279,28 +1339,85 @@ export default function UserProfileContent({ username }: { username: string }) {
             <div className="space-y-3">
               {commentHistory.data.map((comment: any) => {
                 const seriesInfo = commentSeriesInfo.data?.get(comment.series_id);
+                const chapterInfo = commentChaptersInfo.data?.get(comment.chapter_id);
                 return (
                   <div
                     key={comment.id}
-                    className="group rounded-lg border border-border/40 bg-card p-4 transition-all duration-200 hover:border-border hover:shadow-sm"
+                    className="group rounded-lg border border-border/40 bg-card p-4 transition-all duration-200 hover:border-border hover:shadow-sm cursor-pointer"
                     style={{
                       background: `linear-gradient(135deg, ${accentColor}03, transparent)`,
                     }}
+                    onClick={(e) => {
+                      const target = e.target as HTMLElement;
+                      if (target.closest("a, button")) return;
+                      if (seriesInfo?.slug) {
+                        if (chapterInfo?.slug) {
+                          navigate({
+                            to: "/title/$slug/$chapterSlug",
+                            params: { slug: seriesInfo.slug, chapterSlug: chapterInfo.slug },
+                            hash: `comment-${comment.id}`,
+                          });
+                        } else {
+                          navigate({
+                            to: "/title/$slug",
+                            params: { slug: seriesInfo.slug },
+                            hash: `comment-${comment.id}`,
+                          });
+                        }
+                      }
+                    }}
                   >
-                    <div className="flex items-start justify-between gap-3">
+                    <div className="flex gap-4 items-start">
+                      {seriesInfo?.cover_url && (
+                        <div className="relative h-16 w-11 overflow-hidden rounded border border-border/30 bg-secondary shrink-0 shadow-sm">
+                          <img
+                            src={seriesInfo.cover_url}
+                            alt={seriesInfo.title}
+                            className="h-full w-full object-cover animate-[profileFadeInUp_0.3s_ease-out]"
+                            referrerPolicy="no-referrer"
+                          />
+                        </div>
+                      )}
                       <div className="flex-1 min-w-0">
+                        {/* Reply Context */}
+                        {comment.parent_id && (() => {
+                          const parentComment = parentCommentsInfo.data?.get(comment.parent_id);
+                          return (
+                            <div 
+                              className="mb-2 border-l-2 pl-3 py-1 bg-muted/40 rounded-r text-xs text-muted-foreground transition-all duration-200 hover:bg-muted/60"
+                              style={{ borderLeftColor: accentColor }}
+                            >
+                              <span className="font-semibold text-foreground/80">
+                                Replying to @{parentComment?.username || "Reader"}:
+                              </span>{" "}
+                              <span className="italic line-clamp-1 text-left">
+                                {parentComment?.is_spoiler ? (
+                                  "⚠️ Spoiler comment"
+                                ) : parentComment?.is_hidden ? (
+                                  "🚫 Hidden by moderator"
+                                ) : (
+                                  stripBbCode(parentComment?.content || "")
+                                )}
+                              </span>
+                            </div>
+                          );
+                        })()}
+
                         {/* Comment content */}
                         <p className="text-sm leading-relaxed text-foreground text-left">
                           {comment.is_spoiler ? (
                             <span className="italic text-muted-foreground">⚠️ Spoiler comment</span>
                           ) : (
-                            comment.content?.length > 200 ? comment.content.slice(0, 200) + "..." : comment.content
+                            (() => {
+                              const clean = stripBbCode(comment.content || "");
+                              return clean.length > 200 ? clean.slice(0, 200) + "..." : clean;
+                            })()
                           )}
                         </p>
 
                         {/* Attachment indicator */}
                         {comment.attachment_url && (
-                          <div className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground">
+                          <div className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground text-left">
                             <span>📎</span>
                             <span>{comment.attachment_type === "gif" ? "GIF" : "Image"} attached</span>
                           </div>
@@ -1324,6 +1441,19 @@ export default function UserProfileContent({ username }: { username: string }) {
                                 style={{ color: accentColor }}
                               >
                                 {seriesInfo.title}
+                              </Link>
+                            </>
+                          )}
+                          {chapterInfo && (
+                            <>
+                              <span className="text-border">•</span>
+                              <Link
+                                to="/title/$slug/$chapterSlug"
+                                params={{ slug: seriesInfo?.slug || "", chapterSlug: chapterInfo.slug }}
+                                className="font-medium transition-colors hover:underline"
+                                style={{ color: accentColor }}
+                              >
+                                Ch. {chapterInfo.chapter_number}
                               </Link>
                             </>
                           )}
