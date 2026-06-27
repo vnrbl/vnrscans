@@ -302,7 +302,7 @@ const TitleSidePanel = React.memo(function TitleSidePanel({
   return (
     <aside className="space-y-6 min-w-0">
       {/* Feature 1: Release Schedule & Countdown Timer */}
-      <ReleaseCountdownWidget seriesStatus={seriesStatus} />
+      <ReleaseCountdownWidget seriesId={seriesId} seriesStatus={seriesStatus} />
 
       {/* Feature 2: Personal Reading Progress & XP Tracker */}
       <ReadingProgressWidget seriesId={seriesId} totalChapters={totalChapters} />
