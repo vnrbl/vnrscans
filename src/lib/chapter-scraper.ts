@@ -199,9 +199,18 @@ async function scrapeWithPuppeteer(url: string, isChapterPage: boolean = false):
     console.log(`[Scraper] Navigating page to ${url}...`);
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
 
-    // Wait for challenge redirects and progressively rendered reader images.
-    // Asura needs roughly four seconds to add its full page list to the DOM.
-    await new Promise(r => setTimeout(r, 4000));
+    // Adaptively poll for content / images instead of fixed 4000ms delay
+    const startWait = Date.now();
+    while (Date.now() - startWait < (isChapterPage ? 2000 : 1500)) {
+      if (isChapterPage) {
+        const imgs = await collectLiveReaderImageUrls(page);
+        if (imgs.length >= 5) break;
+      } else {
+        const text = await page.evaluate(() => document.body.innerText || '');
+        if (/chapter\s*\d+/i.test(text)) break;
+      }
+      await new Promise(r => setTimeout(r, 150));
+    }
 
     if (isChapterPage) {
       // Try to collect images immediately before scrolling
@@ -275,54 +284,26 @@ async function scrapeWithPuppeteer(url: string, isChapterPage: boolean = false):
 }
 
 async function scrollChapterPageForLazyImages(page: any): Promise<void> {
-  let stablePasses = 0;
-  let lastImageCount = 0;
+  console.log('[Scraper] Fast scrolling chapter page for lazy images...');
+  await page.evaluate(async () => {
+    await new Promise<void>((resolve) => {
+      let totalHeight = 0;
+      const distance = 1600;
+      const timer = setInterval(() => {
+        const scrollHeight = document.body.scrollHeight;
+        window.scrollBy(0, distance);
+        totalHeight += distance;
 
-  console.log('[Scraper] scrollChapterPageForLazyImages: Starting scroll passes...');
-  // Use more passes (5 instead of 3) to handle very long chapters (50,000+ px tall)
-  for (let pass = 0; pass < 5 && stablePasses < 2; pass++) {
-    let currentHeight = await page.evaluate(() => document.body.scrollHeight);
-    console.log(`[Scraper] scrollPass ${pass + 1}/5: Initial height = ${currentHeight}`);
-    
-    // Use 1200px scroll steps for faster coverage on long manhwa chapters.
-    // 100ms delay gives Chrome enough time to trigger lazy-load event handlers.
-    for (let y = 0; y <= currentHeight; y += 1200) {
-      console.log(`  [Scraper] scroll: y = ${y} / ${currentHeight}`);
-      await page.evaluate((scrollY: number) => window.scrollTo(0, scrollY), y);
-      await new Promise((resolve) => setTimeout(resolve, 100));
-      currentHeight = await page.evaluate(() => document.body.scrollHeight);
-    }
-
-    console.log(`  [Scraper] scroll: Reached end of scroll steps. Current height = ${currentHeight}. Scrolling to absolute bottom...`);
-    await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
-    // Wait at the bottom to allow pending network connections to settle
-    await new Promise((resolve) => setTimeout(resolve, 800));
-
-    const currentImageCount = await page.evaluate(() => {
-      return Array.from(document.images).filter((img) => {
-        const className = String(img.className || '').toLowerCase();
-        const alt = String(img.alt || '').toLowerCase();
-        return (
-          className.includes('r-page-img') ||
-          className.includes('reader') ||
-          className.includes('chapter') ||
-          alt.startsWith('page ') ||
-          (img.naturalWidth >= 500 && img.naturalHeight >= 800)
-        );
-      }).length;
+        if (totalHeight >= scrollHeight) {
+          clearInterval(timer);
+          window.scrollTo(0, scrollHeight);
+          resolve();
+        }
+      }, 30);
     });
-
-    console.log(`  [Scraper] scrollPass ${pass + 1} results: currentImageCount = ${currentImageCount}, lastImageCount = ${lastImageCount}, stablePasses = ${stablePasses}`);
-
-    if (currentImageCount === lastImageCount && currentImageCount > 0) {
-      stablePasses++;
-      console.log(`  [Scraper] scrollPass ${pass + 1}: Image count stable (${currentImageCount}). stablePasses = ${stablePasses}`);
-    } else {
-      stablePasses = 0;
-      lastImageCount = currentImageCount;
-      console.log(`  [Scraper] scrollPass ${pass + 1}: Image count changed/zero. Resetting stablePasses. lastImageCount = ${lastImageCount}`);
-    }
-  }
+  });
+  // Brief pause for lazy connections to settle
+  await new Promise((resolve) => setTimeout(resolve, 300));
 }
 
 async function collectLiveReaderImageUrls(page: any): Promise<string[]> {
@@ -1165,16 +1146,19 @@ async function extractReaderImagesWithSharedBrowser(
             await setupRequestInterception(page, url);
             console.log(`[Scraper] Shared reader browser extracting: ${url}`);
             await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
-            // Asura progressively renders its full reader list for a few
-            // seconds; capture it before deciding whether scrolling is needed.
-            await new Promise((resolve) => setTimeout(resolve, isAsuraScansUrl(url) ? 4000 : 2500));
-
-            // Try immediate extraction first
-            const immediateImages = filterReaderImagesForSource(
-              preferImagesMatchingExampleUrl(await collectLiveReaderImageUrls(page), options.imageUrlExample),
-              url,
-              options.imageUrlExample,
-            );
+            // Adaptively poll for reader images instead of a long fixed delay
+            const maxWaitMs = isAsuraScansUrl(url) ? 2000 : 1000;
+            const pollStart = Date.now();
+            let immediateImages: string[] = [];
+            while (Date.now() - pollStart < maxWaitMs) {
+              immediateImages = filterReaderImagesForSource(
+                preferImagesMatchingExampleUrl(await collectLiveReaderImageUrls(page), options.imageUrlExample),
+                url,
+                options.imageUrlExample,
+              );
+              if (immediateImages.length >= 5) break;
+              await new Promise((r) => setTimeout(r, 150));
+            }
 
             const isQimanhwa = isQimanhwaLikeUrl(url);
             const isAsura = isAsuraScansUrl(url);
