@@ -11,12 +11,23 @@ Disallow: /search
 Disallow: /user/
 Disallow: /api/
 
-# Allow AdSense & adsbot to crawl everything
+# AdSense & AdsBot crawlers — focus on textual content & overviews, block image-heavy chapter streams during inspection
 User-agent: Mediapartners-Google
 Allow: /
+Allow: /browse
+Allow: /recommendations
+Allow: /about
+Allow: /contact
+Allow: /privacy
+Allow: /terms
+Allow: /dmca
+Disallow: /*/*-*/* # Block individual chapter reader paths (e.g. /title/slug/chapter-1) to avoid thin content flags
 
 User-agent: AdsBot-Google
 Allow: /
+Allow: /browse
+Allow: /recommendations
+Disallow: /*/*-*/*
 
 # Sitemap index (dynamic — always reflects current DB state)
 Sitemap: https://www.vnrscans.com/sitemap.xml

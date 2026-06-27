@@ -1,6 +1,6 @@
 import { Link, useNavigate } from "@/lib/router-compat";
 import { useState, useEffect, lazy, Suspense } from "react";
-import { Menu, X, Search, BookOpen, User as UserIcon, LogOut, ShieldCheck, Library, Home, Sparkles, Trophy, Dice1, Dice2, Dice3, Dice4, Dice5, Dice6, Loader2, Users } from "lucide-react";
+import { Menu, X, Search, BookOpen, User as UserIcon, LogOut, ShieldCheck, Library, Home, Sparkles, Trophy, Dice1, Dice2, Dice3, Dice4, Dice5, Dice6, Loader2, Users, Newspaper } from "lucide-react";
 import type { DiceSeries } from "@/components/DiceRollOverlay";
 
 const DiceRollOverlay = lazy(() => import("@/components/DiceRollOverlay").then(m => ({ default: m.DiceRollOverlay })));
@@ -20,6 +20,12 @@ import {
   Dialog,
   DialogContent,
 } from "@/components/ui/dialog";
+import {
+  Sheet,
+  SheetContent,
+  SheetTrigger,
+  SheetClose,
+} from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
 const NotificationBell = lazy(() => import("@/components/notifications/NotificationBell").then(m => ({ default: m.NotificationBell })));
 import {
@@ -43,6 +49,7 @@ const readingTypeOrder = ["manga", "manhwa", "manhua", "novel"];
 
 export function Navbar() {
   const [open, setOpen] = useState(false);
+  const [menuDrawerOpen, setMenuDrawerOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeSearchTab, setActiveSearchTab] = useState<SearchTab>("comics");
@@ -86,6 +93,7 @@ export function Navbar() {
     { to: "/browse", label: "Browse", icon: BookOpen },
     { to: "/rankings", label: "Rankings", icon: Trophy },
     { to: "/recommendations", label: "For You", icon: Sparkles },
+    { to: "/news", label: "News & Reviews", icon: Newspaper },
   ];
 
   const hotSeries = useQuery({
@@ -253,190 +261,193 @@ export function Navbar() {
   };
 
   return (
-    <header className="sticky top-0 z-40 border-b border-border/50 bg-background/95 backdrop-blur-md supports-[backdrop-filter]:bg-background/60">
-      <div className="container mx-auto flex h-16 items-center px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16 relative">
-        {/* Logo */}
-        <div className="flex-1 flex items-center justify-start">
-          <Link to="/home" className="flex shrink-0 items-center gap-2 transition-transform hover:scale-105">
-            <img src="/favicon.svg" alt="vnrscans logo" width={40} height={40} className="h-10 w-10 rounded-lg object-contain" />
-          </Link>
-        </div>
-
-        <nav className="hidden xl:flex items-center justify-center gap-1 absolute left-1/2 -translate-x-1/2">
-          {links.map((l) => (
-            <Link
-              key={l.to}
-              to={l.to}
-              className="flex items-center gap-2 px-3 py-1.5 text-xs font-bold uppercase tracking-[0.08em] text-muted-foreground transition-all hover:text-white"
-              activeProps={{ className: "text-white" }}
-              activeOptions={{ exact: l.to === "/" }}
-            >
-              <l.icon className="h-4 w-4 stroke-[1.5]" />
-              {l.label}
-            </Link>
-          ))}
-        </nav>
-
-        {/* Actions */}
-        <div className="flex-1 flex items-center justify-end gap-2">
-          {/* Search Button (desktop) */}
-          <button
-            onClick={() => setSearchOpen(true)}
-            title="Search (Ctrl+K)"
-            className="hidden sm:flex items-center gap-2 w-[180px] md:w-[220px] xl:w-[260px] h-9 rounded-lg border border-border/60 bg-secondary/50 px-3 text-sm text-muted-foreground transition-all hover:border-border hover:bg-secondary hover:text-foreground focus:outline-none"
-          >
-            <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
-            <span className="flex-1 truncate text-left font-sans font-normal tracking-normal text-muted-foreground">
-              Search titles, authors...
-            </span>
-            <kbd className="hidden lg:inline-flex items-center rounded border border-border/60 bg-background/60 px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground">
-              Ctrl K
-            </kbd>
-          </button>
-
-          {/* Random Button (desktop) */}
-          {(() => {
-            const DiceIcon = [Dice1, Dice2, Dice3, Dice4, Dice5, Dice6][navDiceFace - 1];
-            return (
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={handleRandom}
-                disabled={isRolling}
-                className="hidden sm:flex"
-                title="Random Series"
-              >
-                <DiceIcon className={`h-5 w-5 transition-all ${isRolling ? "text-primary scale-110" : ""}`} />
-              </Button>
-            );
-          })()}
-
-          {/* Search Dialog */}
-          <Dialog open={searchOpen} onOpenChange={setSearchOpen}>
-            <DialogContent className="top-[12vh] max-h-[78vh] w-[calc(100vw-1.5rem)] max-w-[620px] translate-y-0 overflow-hidden rounded border-neutral-800 bg-neutral-950 p-0 shadow-2xl sm:top-[14vh] [&>button]:hidden">
-              <div className="border-b border-neutral-900 p-3">
-                <div className="flex items-center gap-3">
-                  <div className="flex min-w-0 flex-1 items-center gap-2 rounded border border-neutral-800 bg-neutral-950 px-3 focus-within:border-neutral-500 transition-colors">
-                    <Search className="h-4 w-4 flex-shrink-0 text-muted-foreground stroke-[1.5]" />
-                    <input
-                      value={searchQuery}
-                      onChange={(event) => setSearchQuery(event.target.value)}
-                      autoFocus
-                      placeholder="Search manga by title, author or synopsis..."
-                      className="h-10 min-w-0 flex-1 bg-transparent font-sans text-sm font-normal tracking-normal text-white outline-none placeholder:text-neutral-500 placeholder:opacity-100"
-                    />
-                    {searching && <Loader2 className="h-4 w-4 animate-spin text-neutral-400" />}
+    <>
+      <header className="sticky top-0 z-40 border-b border-border/50 bg-background/95 backdrop-blur-md supports-[backdrop-filter]:bg-background/60">
+        <div className="container mx-auto flex h-16 items-center px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16 relative justify-between">
+          {/* Left Side: YouTube-Style Menu Toggle + Logo */}
+          <div className="flex items-center gap-3">
+            <Sheet open={menuDrawerOpen} onOpenChange={setMenuDrawerOpen}>
+              <SheetTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-9 w-9 text-foreground hover:bg-secondary/60 transition-colors"
+                  title="Menu"
+                >
+                  <Menu className="h-5 w-5" />
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="left" className="w-[240px] sm:w-[260px] bg-[#0f0f0f] border-r border-border/40 p-3 flex flex-col justify-between shadow-2xl [&>button]:text-white">
+                <div className="space-y-3">
+                  {/* Drawer Top Header (Logo & Title like YouTube) */}
+                  <div className="flex items-center gap-3 px-3 py-2">
+                    <img src="/favicon.svg" alt="vnrscans logo" width={32} height={32} className="h-8 w-8 rounded-lg object-contain" />
+                    <span className="font-black text-sm tracking-wider text-white uppercase">VNR SCANS</span>
                   </div>
-                  <kbd className="hidden rounded border border-border bg-[#2b2b31] px-2 py-1 text-[10px] font-semibold text-muted-foreground sm:inline-flex">
-                    ESC
-                  </kbd>
-                  <button
-                    type="button"
-                    onClick={() => setSearchOpen(false)}
-                    className="grid h-8 w-8 place-items-center rounded border border-neutral-800 text-neutral-400 transition hover:bg-neutral-900 hover:text-white"
-                    aria-label="Close search"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
+
+                  <div className="h-px bg-neutral-800/80 my-1" />
+
+                  {/* Main Navigation Links List (YouTube Style) */}
+                  <div className="space-y-1">
+                    {links.map((l) => (
+                      <Link
+                        key={l.to}
+                        to={l.to}
+                        onClick={() => setMenuDrawerOpen(false)}
+                        className="flex items-center gap-4 w-full px-3 py-2.5 rounded-xl text-sm font-medium text-neutral-300 hover:text-white hover:bg-neutral-800/80 transition-colors"
+                        activeProps={{ className: "text-white bg-neutral-800 font-bold" }}
+                      >
+                        <l.icon className="h-5 w-5 stroke-[1.8] text-neutral-400" />
+                        <span>{l.label}</span>
+                      </Link>
+                    ))}
+                  </div>
+
+                  <div className="h-px bg-neutral-800/80 my-1" />
+
+                  {/* Library & More Section */}
+                  <div className="space-y-1">
+                    <p className="px-3 text-[11px] font-semibold text-neutral-500 uppercase tracking-wider mb-1 mt-2">Explore</p>
+                    {user && (
+                      <Link
+                        to="/library"
+                        onClick={() => setMenuDrawerOpen(false)}
+                        className="flex items-center gap-4 w-full px-3 py-2.5 rounded-xl text-sm font-medium text-neutral-300 hover:text-white hover:bg-neutral-800/80 transition-colors"
+                        activeProps={{ className: "text-white bg-neutral-800 font-bold" }}
+                      >
+                        <Library className="h-5 w-5 stroke-[1.8] text-neutral-400" />
+                        <span>Bookmarks & Library</span>
+                      </Link>
+                    )}
+
+                    {showPanel && (
+                      <Link
+                        to="/admin"
+                        onClick={() => setMenuDrawerOpen(false)}
+                        className="flex items-center gap-4 w-full px-3 py-2.5 rounded-xl text-sm font-medium text-primary hover:bg-primary/10 transition-colors"
+                      >
+                        <ShieldCheck className="h-5 w-5 stroke-[1.8]" />
+                        <span>{panelLabel}</span>
+                      </Link>
+                    )}
+                  </div>
                 </div>
-              </div>
 
-              <div className="border-b border-neutral-900 p-3">
-                <div className="grid h-9 grid-cols-3 gap-2 rounded border border-neutral-800 bg-neutral-950 p-1">
-                  <SearchTabButton
-                    active={activeSearchTab === "comics"}
-                    icon={<BookOpen className="h-3.5 w-3.5" />}
-                    label="Comics"
-                    onClick={() => setActiveSearchTab("comics")}
-                  />
-                  <SearchTabButton
-                    active={activeSearchTab === "users"}
-                    icon={<UserIcon className="h-3.5 w-3.5" />}
-                    label="Users"
-                    onClick={() => setActiveSearchTab("users")}
-                  />
-                  <SearchTabButton
-                    active={activeSearchTab === "groups"}
-                    icon={<Users className="h-3.5 w-3.5" />}
-                    label="Groups"
-                    onClick={() => setActiveSearchTab("groups")}
-                  />
+                {/* Bottom Action Button (No Profile Info as requested) */}
+                <div className="p-2 border-t border-neutral-800/80">
+                  {!user ? (
+                    <Button
+                      className="w-full bg-red-600 hover:bg-red-700 text-white font-bold h-9 rounded-full text-xs"
+                      onClick={() => {
+                        setMenuDrawerOpen(false);
+                        navigate({ to: "/auth" });
+                      }}
+                    >
+                      Sign In
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="ghost"
+                      className="w-full text-xs font-medium text-neutral-400 hover:text-white hover:bg-neutral-800 h-9 justify-start px-3 rounded-xl"
+                      onClick={() => {
+                        setMenuDrawerOpen(false);
+                        signOut();
+                      }}
+                    >
+                      <LogOut className="mr-3 h-4 w-4" /> Sign Out
+                    </Button>
+                  )}
                 </div>
-              </div>
+              </SheetContent>
+            </Sheet>
 
-              <div className="max-h-[54vh] overflow-y-auto px-3 py-4">
-                {activeSearchTab === "comics" && (
-                  <SeriesSearchPanel
-                    query={searchQuery}
-                    loading={searching || hotSeries.isLoading}
-                    items={searchQuery.trim().length >= 2 ? seriesResults : hotSeries.data ?? []}
-                    onSelect={handleSearchSelect}
-                  />
-                )}
-                {activeSearchTab === "users" && (
-                  <UserSearchPanel
-                    query={searchQuery}
-                    loading={searching}
-                    items={userResults}
-                    onSelect={handleUserSelect}
-                  />
-                )}
-                {activeSearchTab === "groups" && (
-                  <GroupSearchPanel
-                    query={searchQuery}
-                    loading={searching}
-                    items={groupResults}
-                    onSelect={handleGroupSelect}
-                  />
-                )}
-              </div>
-            </DialogContent>
-          </Dialog>
+            <Link to="/home" className="flex shrink-0 items-center gap-2 transition-transform hover:scale-105">
+              <img src="/favicon.svg" alt="vnrscans logo" width={36} height={36} className="h-9 w-9 rounded-lg object-contain" />
+            </Link>
+          </div>
 
-          {/* User Menu */}
-          {user ? (
-            <>
-              {/* Library Quick Access (Desktop) */}
+          {/* Centralized Search Bar (desktop) */}
+          <div className="hidden sm:flex items-center justify-center absolute left-1/2 -translate-x-1/2 z-10 pointer-events-auto">
+            <button
+              onClick={() => setSearchOpen(true)}
+              title="Search (Ctrl+K)"
+              className="flex items-center gap-2 w-[200px] md:w-[260px] lg:w-[320px] h-9 rounded-lg border border-border/60 bg-secondary/50 px-3 text-sm text-muted-foreground transition-all hover:border-border hover:bg-secondary hover:text-foreground focus:outline-none"
+            >
+              <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
+              <span className="flex-1 truncate text-left font-sans font-normal tracking-normal text-muted-foreground">
+                Search titles, authors...
+              </span>
+              <kbd className="hidden lg:inline-flex items-center rounded border border-border/60 bg-background/60 px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground">
+                Ctrl K
+              </kbd>
+            </button>
+          </div>
+
+          {/* Right Actions */}
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            {/* Random Button (desktop) */}
+            {(() => {
+              const DiceIcon = [Dice1, Dice2, Dice3, Dice4, Dice5, Dice6][navDiceFace - 1];
+              return (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleRandom}
+                  disabled={isRolling}
+                  className="hidden sm:flex gap-1.5 text-xs font-bold uppercase tracking-wider text-muted-foreground hover:text-foreground h-9 px-2.5"
+                  title="Random Series"
+                >
+                  <DiceIcon className={`h-4 w-4 transition-all ${isRolling ? "text-primary scale-110" : ""}`} />
+                  <span>Random</span>
+                </Button>
+              );
+            })()}
+
+            {/* Library Quick Access (Desktop) */}
+            {user && (
               <Button
                 variant="ghost"
-                size="icon"
+                size="sm"
                 onClick={() => navigate({ to: "/library" })}
-                className="hidden lg:flex"
+                className="hidden lg:flex gap-1.5 text-xs font-bold uppercase tracking-wider text-muted-foreground hover:text-foreground h-9 px-2.5"
                 title="My Library"
               >
-                <Library className="h-5 w-5" />
+                <Library className="h-4 w-4" />
+                <span>Library</span>
               </Button>
+            )}
 
-              {/* Mobile Search Icon (left of notifications) */}
-              <button
-                className="flex sm:hidden items-center justify-center h-9 w-9 rounded-lg text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors"
-                onClick={() => setSearchOpen(true)}
-                aria-label="Search"
-              >
-                <Search className="h-5 w-5" />
-              </button>
+            {/* Mobile Search Button (Top Header) */}
+            <button
+              className="flex sm:hidden items-center justify-center h-9 w-9 rounded-lg text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors"
+              onClick={() => setSearchOpen(true)}
+              aria-label="Search"
+            >
+              <Search className="h-5 w-5" />
+            </button>
 
-              {/* Mobile Dice Roll Icon */}
-              {(() => {
-                const DiceIcon = [Dice1, Dice2, Dice3, Dice4, Dice5, Dice6][navDiceFace - 1];
-                return (
-                  <button
-                    className="flex sm:hidden items-center justify-center h-9 w-9 rounded-lg text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors disabled:opacity-50"
-                    onClick={handleRandom}
-                    disabled={isRolling}
-                    aria-label="Roll Random"
-                  >
-                    <DiceIcon className={`h-5 w-5 transition-all ${isRolling ? "text-primary scale-110" : ""}`} />
-                  </button>
-                );
-              })()}
+            {/* Mobile Random Roll Icon */}
+            {(() => {
+              const DiceIcon = [Dice1, Dice2, Dice3, Dice4, Dice5, Dice6][navDiceFace - 1];
+              return (
+                <button
+                  className="flex sm:hidden items-center justify-center h-9 w-9 rounded-lg text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors disabled:opacity-50"
+                  onClick={handleRandom}
+                  disabled={isRolling}
+                  aria-label="Roll Random"
+                >
+                  <DiceIcon className={`h-5 w-5 transition-all ${isRolling ? "text-primary scale-110" : ""}`} />
+                </button>
+              );
+            })()}
 
-              {/* Notifications Bell */}
-              <Suspense fallback={null}>
-                <NotificationBell />
-              </Suspense>
+            {/* Notifications Bell */}
+            <Suspense fallback={null}>
+              <NotificationBell />
+            </Suspense>
 
-              {/* User Dropdown with Stats */}
+            {/* User Profile Avatar & Dropdown Menu */}
+            {user ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="icon" className="rounded-full p-0 transition-all hover:bg-transparent hover:scale-105 focus-visible:ring-0 focus-visible:ring-offset-0">
@@ -496,52 +507,157 @@ export function Navbar() {
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
-            </>
-          ) : (
-            <Link to="/auth">
-              <Button size="sm">Sign In</Button>
-            </Link>
-          )}
-
-          {/* Mobile Menu Toggle */}
-          <button className="xl:hidden" onClick={() => setOpen((o) => !o)} aria-label="Menu">
-            {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-          </button>
+            ) : (
+              <Button size="sm" onClick={() => navigate({ to: "/auth" })} className="hidden sm:inline-flex">
+                Sign In
+              </Button>
+            )}
+          </div>
         </div>
-      </div>
 
-      {/* Mobile Menu */}
-      {open && (
-        <div className="border-t border-border/50 xl:hidden">
-          <nav className="container mx-auto flex flex-col items-center px-4 py-2">
-            {links.map((l) => (
-              <Link
-                key={l.to}
-                to={l.to}
-                onClick={() => setOpen(false)}
-                className="flex items-center justify-center gap-2 w-full max-w-[200px] px-3 py-2.5 text-xs font-bold uppercase tracking-[0.08em] text-muted-foreground hover:text-white transition-all"
-                activeProps={{ className: "text-white" }}
-              >
-                <l.icon className="h-4 w-4 stroke-[1.5]" />
-                {l.label}
-              </Link>
-            ))}
-          </nav>
-        </div>
-      )}
+        {/* Search Dialog */}
+        <Dialog open={searchOpen} onOpenChange={setSearchOpen}>
+          <DialogContent className="top-[12vh] max-h-[78vh] w-[calc(100vw-1.5rem)] max-w-[620px] translate-y-0 overflow-hidden rounded border-neutral-800 bg-neutral-950 p-0 shadow-2xl sm:top-[14vh] [&>button]:hidden">
+            <div className="border-b border-neutral-900 p-3">
+              <div className="flex items-center gap-3">
+                <div className="flex min-w-0 flex-1 items-center gap-2 rounded border border-neutral-800 bg-neutral-950 px-3 focus-within:border-neutral-500 transition-colors">
+                  <Search className="h-4 w-4 flex-shrink-0 text-muted-foreground stroke-[1.5]" />
+                  <input
+                    value={searchQuery}
+                    onChange={(event) => setSearchQuery(event.target.value)}
+                    autoFocus
+                    placeholder="Search manga by title, author or synopsis..."
+                    className="h-10 min-w-0 flex-1 bg-transparent font-sans text-sm font-normal tracking-normal text-white outline-none placeholder:text-neutral-500 placeholder:opacity-100"
+                  />
+                  {searching && <Loader2 className="h-4 w-4 animate-spin text-neutral-400" />}
+                </div>
+                <kbd className="hidden rounded border border-border bg-[#2b2b31] px-2 py-1 text-[10px] font-semibold text-muted-foreground sm:inline-flex">
+                  ESC
+                </kbd>
+                <button
+                  type="button"
+                  onClick={() => setSearchOpen(false)}
+                  className="grid h-8 w-8 place-items-center rounded border border-neutral-800 text-neutral-400 transition hover:bg-neutral-900 hover:text-white"
+                  aria-label="Close search"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
 
-      {/* Dice Roll Overlay */}
-      <Suspense fallback={null}>
-        <DiceRollOverlay
-          open={diceOpen}
-          diceResult={diceResult}
-          series={diceSeries}
-          onClose={handleDiceClose}
-          onNavigate={handleDiceNavigate}
-          onRollAgain={() => { handleDiceClose(); setTimeout(handleRandom, 50); }}
-        />
-      </Suspense>
-    </header>
+            <div className="border-b border-neutral-900 p-3">
+              <div className="grid h-9 grid-cols-3 gap-2 rounded border border-neutral-800 bg-neutral-950 p-1">
+                <SearchTabButton
+                  active={activeSearchTab === "comics"}
+                  icon={<BookOpen className="h-3.5 w-3.5" />}
+                  label="Comics"
+                  onClick={() => setActiveSearchTab("comics")}
+                />
+                <SearchTabButton
+                  active={activeSearchTab === "users"}
+                  icon={<UserIcon className="h-3.5 w-3.5" />}
+                  label="Users"
+                  onClick={() => setActiveSearchTab("users")}
+                />
+                <SearchTabButton
+                  active={activeSearchTab === "groups"}
+                  icon={<Users className="h-3.5 w-3.5" />}
+                  label="Groups"
+                  onClick={() => setActiveSearchTab("groups")}
+                />
+              </div>
+            </div>
+
+            <div className="max-h-[54vh] overflow-y-auto px-3 py-4">
+              {activeSearchTab === "comics" && (
+                <SeriesSearchPanel
+                  query={searchQuery}
+                  loading={searching || hotSeries.isLoading}
+                  items={searchQuery.trim().length >= 2 ? seriesResults : hotSeries.data ?? []}
+                  onSelect={handleSearchSelect}
+                />
+              )}
+              {activeSearchTab === "users" && (
+                <UserSearchPanel
+                  query={searchQuery}
+                  loading={searching}
+                  items={userResults}
+                  onSelect={handleUserSelect}
+                />
+              )}
+              {activeSearchTab === "groups" && (
+                <GroupSearchPanel
+                  query={searchQuery}
+                  loading={searching}
+                  items={groupResults}
+                  onSelect={handleGroupSelect}
+                />
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Dice Roll Overlay */}
+        <Suspense fallback={null}>
+          <DiceRollOverlay
+            open={diceOpen}
+            diceResult={diceResult}
+            series={diceSeries}
+            onClose={handleDiceClose}
+            onNavigate={handleDiceNavigate}
+            onRollAgain={() => { handleDiceClose(); setTimeout(handleRandom, 50); }}
+          />
+        </Suspense>
+      </header>
+
+      {/* Mobile Bottom Navigation Bar */}
+      <nav className="fixed bottom-0 left-0 right-0 z-50 flex sm:hidden h-14 items-center justify-around border-t border-border/60 bg-[#111115]/95 backdrop-blur-lg px-2 shadow-2xl">
+        <Link
+          to="/home"
+          className="flex flex-col items-center justify-center gap-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground hover:text-primary transition-colors py-1 flex-1"
+          activeProps={{ className: "text-primary font-black" }}
+        >
+          <Home className="h-5 w-5 stroke-[1.8]" />
+          <span>Home</span>
+        </Link>
+
+        <Link
+          to="/browse"
+          className="flex flex-col items-center justify-center gap-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground hover:text-primary transition-colors py-1 flex-1"
+          activeProps={{ className: "text-primary font-black" }}
+        >
+          <BookOpen className="h-5 w-5 stroke-[1.8]" />
+          <span>Browse</span>
+        </Link>
+
+        <Link
+          to="/library"
+          className="flex flex-col items-center justify-center gap-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground hover:text-primary transition-colors py-1 flex-1"
+          activeProps={{ className: "text-primary font-black" }}
+        >
+          <Library className="h-5 w-5 stroke-[1.8]" />
+          <span>Library</span>
+        </Link>
+
+        <Link
+          to="/news"
+          className="flex flex-col items-center justify-center gap-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground hover:text-primary transition-colors py-1 flex-1"
+          activeProps={{ className: "text-primary font-black" }}
+        >
+          <Newspaper className="h-5 w-5 stroke-[1.8]" />
+          <span>News</span>
+        </Link>
+
+        <Link
+          to={user ? "/profile" : "/auth"}
+          className="flex flex-col items-center justify-center gap-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground hover:text-primary transition-colors py-1 flex-1"
+          activeProps={{ className: "text-primary font-black" }}
+        >
+          <UserIcon className="h-5 w-5 stroke-[1.8]" />
+          <span>{user ? "Profile" : "Sign In"}</span>
+        </Link>
+      </nav>
+    </>
   );
 }
 

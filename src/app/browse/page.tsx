@@ -41,10 +41,36 @@ async function fetchInitialData(): Promise<BrowseInitialData> {
   if (tagsRes.error) throw tagsRes.error;
   if (defaultManhwaRes.error) throw defaultManhwaRes.error;
 
+  const fetchedSeries = defaultManhwaRes.data ?? [];
+  let seriesWithRealCounts = fetchedSeries;
+
+  if (fetchedSeries.length > 0) {
+    const { data: chapters } = await supabase
+      .from("chapters")
+      .select("series_id,chapter_number")
+      .in("series_id", fetchedSeries.map((s: any) => s.id))
+      .eq("status", "published");
+
+    const uniqueChaptersBySeries = new Map<string, Set<number>>();
+    (chapters ?? []).forEach((chapter: any) => {
+      const existing = uniqueChaptersBySeries.get(chapter.series_id) ?? new Set<number>();
+      existing.add(Math.floor(chapter.chapter_number));
+      uniqueChaptersBySeries.set(chapter.series_id, existing);
+    });
+
+    seriesWithRealCounts = fetchedSeries.map((s: any) => {
+      const actualCount = uniqueChaptersBySeries.get(s.id)?.size ?? 0;
+      return {
+        ...s,
+        chapter_count: actualCount > 0 ? actualCount : (s.chapter_count ?? 0),
+      };
+    });
+  }
+
   return {
     genres: genresRes.data ?? [],
     tags: tagsRes.data ?? [],
-    defaultManhwa: defaultManhwaRes.data ?? [],
+    defaultManhwa: seriesWithRealCounts,
   };
 }
 

@@ -49,11 +49,6 @@ export function SeriesCard({ s, rank }: { s: Series; rank?: number }) {
         <h3 className="line-clamp-1 text-xs font-bold leading-none text-white uppercase tracking-[0.02em] group-hover:text-neutral-200 transition-colors">
           {s.title}
         </h3>
-        {s.chapter_count && s.chapter_count > 0 && (
-          <p className="mt-2 text-3xs font-semibold text-neutral-550 uppercase tracking-widest">
-            {s.chapter_count} chapters
-          </p>
-        )}
       </div>
     </Link>
   );
