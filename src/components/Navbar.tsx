@@ -363,6 +363,9 @@ export function Navbar() {
 
             <Link to="/home" className="flex shrink-0 items-center gap-2 transition-transform hover:scale-105">
               <img src="/favicon.svg" alt="vnrscans logo" width={36} height={36} className="h-9 w-9 rounded-lg object-contain" />
+              <span className="font-black text-sm sm:text-base tracking-wider text-white uppercase font-sans leading-none">
+                VNR SCANS
+              </span>
             </Link>
           </div>
 
