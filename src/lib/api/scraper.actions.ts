@@ -190,7 +190,7 @@ export async function $runCloudScrape(args: {
   const isAsura = validated.url.toLowerCase().includes('asura');
   const extractedImages = await extractImagesFromChapterUrls(
     missing.map((chapter) => chapter.url),
-    { concurrency: isAsura ? 6 : 4, imageUrlExample },
+    { concurrency: isAsura ? 2 : 4, imageUrlExample },
   );
 
   const chapterRows: Array<{
@@ -383,7 +383,7 @@ export async function $syncImportSource(args: {
     const isAsuraSource = source.source_url.toLowerCase().includes('asura');
     const batchExtractedImages = await extractImagesFromChapterUrls(
       missing.map((chapter) => chapter.url),
-      { concurrency: isAsuraSource ? 6 : 4, imageUrlExample },
+      { concurrency: isAsuraSource ? 2 : 4, imageUrlExample },
     );
 
     // First pass: collect all chapter data + images, filtering out failures

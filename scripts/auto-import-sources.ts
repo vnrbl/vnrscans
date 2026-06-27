@@ -86,7 +86,7 @@ async function syncSource(source: any) {
     const isAsuraSource = source.source_url.toLowerCase().includes('asura');
     const batchExtractedImages = await extractImagesFromChapterUrls(
       missing.map((chapter) => chapter.url),
-      { concurrency: isAsuraSource ? 6 : 4, imageUrlExample: source.image_url_example },
+      { concurrency: isAsuraSource ? 2 : 4, imageUrlExample: source.image_url_example },
     );
 
     for (const chapter of missing) {

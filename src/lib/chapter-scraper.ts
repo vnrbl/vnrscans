@@ -199,10 +199,9 @@ async function scrapeWithPuppeteer(url: string, isChapterPage: boolean = false):
     console.log(`[Scraper] Navigating page to ${url}...`);
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
 
-    // Wait for automatic challenge resolution/redirects
-    // Asura Scans doesn't use Cloudflare challenges, so we can reduce the wait
-    const isAsuraUrl = isAsuraScansUrl(url);
-    await new Promise(r => setTimeout(r, isAsuraUrl ? 1500 : 4000));
+    // Wait for challenge redirects and progressively rendered reader images.
+    // Asura needs roughly four seconds to add its full page list to the DOM.
+    await new Promise(r => setTimeout(r, 4000));
 
     if (isChapterPage) {
       // Try to collect images immediately before scrolling
@@ -210,7 +209,9 @@ async function scrapeWithPuppeteer(url: string, isChapterPage: boolean = false):
       const immediateImages = filterReaderImagesForSource(immediateUrls, url);
       const isQimanhwa = isQimanhwaLikeUrl(url);
       const isAsura = isAsuraScansUrl(url);
-      const shouldSkipScroll = !isAsura && ((isQimanhwa && immediateImages.length > 0) || immediateImages.length >= 10);
+      const shouldSkipScroll =
+        (isAsura && immediateImages.length > 0) ||
+        (!isAsura && ((isQimanhwa && immediateImages.length > 0) || immediateImages.length >= 10));
 
       if (shouldSkipScroll) {
         console.log(`[Scraper] Collected ${immediateImages.length} images immediately. Skipping scroll.`);
@@ -389,10 +390,6 @@ async function collectLiveReaderImageUrls(page: any): Promise<string[]> {
             !lowercaseSrc.includes('/series/featured/') &&
             /^page[-_]\\d{1,4}/i.test(filename);
 
-          // Asura Scans branding banners are landscape (width >= height, ~1200x800).
-          // Real chapter pages are always tall portrait strips (e.g. 900x16000).
-          const isAsuraBrandingBanner = isAsuraPage && nw > 0 && nh > 0 && nw >= nh;
-
           const isAsuraReaderImage = values.some((val) => {
             const lVal = String(val).toLowerCase();
             return (
@@ -410,7 +407,6 @@ async function collectLiveReaderImageUrls(page: any): Promise<string[]> {
             nh,
             values,
             isVortexReaderImage,
-            isAsuraBrandingBanner,
             isGenericReaderImage:
               className.includes('r-page-img') ||
               className.includes('reader') ||
@@ -430,7 +426,7 @@ async function collectLiveReaderImageUrls(page: any): Promise<string[]> {
         const candidates = vortexReaderImages.length > 0
           ? vortexReaderImages
           : imageEntries
-              .filter((entry) => entry.isGenericReaderImage && !entry.isAsuraBrandingBanner)
+              .filter((entry) => entry.isGenericReaderImage)
               .sort((a, b) => a.top - b.top || a.index - b.index)
               .flatMap((entry) => entry.values);
 
@@ -1169,8 +1165,9 @@ async function extractReaderImagesWithSharedBrowser(
             await setupRequestInterception(page, url);
             console.log(`[Scraper] Shared reader browser extracting: ${url}`);
             await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
-            // Asura loads faster (no Cloudflare challenge), use shorter wait
-            await new Promise((resolve) => setTimeout(resolve, isAsuraScansUrl(url) ? 1200 : 2500));
+            // Asura progressively renders its full reader list for a few
+            // seconds; capture it before deciding whether scrolling is needed.
+            await new Promise((resolve) => setTimeout(resolve, isAsuraScansUrl(url) ? 4000 : 2500));
 
             // Try immediate extraction first
             const immediateImages = filterReaderImagesForSource(
@@ -1181,7 +1178,9 @@ async function extractReaderImagesWithSharedBrowser(
 
             const isQimanhwa = isQimanhwaLikeUrl(url);
             const isAsura = isAsuraScansUrl(url);
-            const shouldSkipScroll = !isAsura && ((isQimanhwa && immediateImages.length > 0) || immediateImages.length >= 10);
+            const shouldSkipScroll =
+              (isAsura && immediateImages.length > 0) ||
+              (!isAsura && ((isQimanhwa && immediateImages.length > 0) || immediateImages.length >= 10));
 
             if (shouldSkipScroll) {
               console.log(`[Scraper] Found ${immediateImages.length} images immediately. Skipping scroll.`);
@@ -1547,7 +1546,10 @@ function filterReaderImagesForSource(
   }
 
   if (isAsuraScansUrl(pageUrl) || isAsuraScansUrl(exampleUrl || '')) {
-    return selectChapterImageCluster(sourceImages.filter(isAsuraReaderPageImage), pageUrl, exampleUrl);
+    // Asura uses random hexadecimal filenames. Generic cluster scoring treats
+    // those filenames as unrelated families and can collapse a full chapter
+    // to only one or two images. The DOM/source list is already reader-ordered.
+    return sourceImages.filter(isAsuraReaderPageImage);
   }
 
   return selectChapterImageCluster(

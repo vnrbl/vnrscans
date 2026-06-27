@@ -1255,7 +1255,7 @@ export default function ChapterManager({ seriesId, onBack }: { seriesId: string;
 
       const isAsuraBulkImport =
         isAsuraUrl(seriesUrl) || selectedList.some((chapter) => isAsuraUrl(chapter.url));
-      const BATCH_SIZE = isAsuraBulkImport ? 12 : 5;
+      const BATCH_SIZE = isAsuraBulkImport ? 2 : 5;
       type ExtractionResult =
         | { chapter: ChapterInfo; images: string[] }
         | { chapter: ChapterInfo; error: string };
