@@ -200,14 +200,17 @@ async function scrapeWithPuppeteer(url: string, isChapterPage: boolean = false):
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
 
     // Wait for automatic challenge resolution/redirects
-    await new Promise(r => setTimeout(r, 4000));
+    // Asura Scans doesn't use Cloudflare challenges, so we can reduce the wait
+    const isAsuraUrl = isAsuraScansUrl(url);
+    await new Promise(r => setTimeout(r, isAsuraUrl ? 1500 : 4000));
 
     if (isChapterPage) {
       // Try to collect images immediately before scrolling
       const immediateUrls = await collectLiveReaderImageUrls(page);
       const immediateImages = filterReaderImagesForSource(immediateUrls, url);
       const isQimanhwa = isQimanhwaLikeUrl(url);
-      const shouldSkipScroll = (isQimanhwa && immediateImages.length > 0) || immediateImages.length >= 10;
+      const isAsura = isAsuraScansUrl(url);
+      const shouldSkipScroll = !isAsura && ((isQimanhwa && immediateImages.length > 0) || immediateImages.length >= 10);
 
       if (shouldSkipScroll) {
         console.log(`[Scraper] Collected ${immediateImages.length} images immediately. Skipping scroll.`);
@@ -274,20 +277,25 @@ async function scrollChapterPageForLazyImages(page: any): Promise<void> {
   let stablePasses = 0;
   let lastImageCount = 0;
 
-  for (let pass = 0; pass < 3 && stablePasses < 2; pass++) {
+  console.log('[Scraper] scrollChapterPageForLazyImages: Starting scroll passes...');
+  // Use more passes (5 instead of 3) to handle very long chapters (50,000+ px tall)
+  for (let pass = 0; pass < 5 && stablePasses < 2; pass++) {
     let currentHeight = await page.evaluate(() => document.body.scrollHeight);
+    console.log(`[Scraper] scrollPass ${pass + 1}/5: Initial height = ${currentHeight}`);
     
-    // Use smaller scroll steps (800px instead of 1500px) and longer delay (120ms instead of 50ms)
-    // to give Chrome enough time to trigger lazy-load event handlers.
-    for (let y = 0; y <= currentHeight; y += 800) {
+    // Use 1200px scroll steps for faster coverage on long manhwa chapters.
+    // 100ms delay gives Chrome enough time to trigger lazy-load event handlers.
+    for (let y = 0; y <= currentHeight; y += 1200) {
+      console.log(`  [Scraper] scroll: y = ${y} / ${currentHeight}`);
       await page.evaluate((scrollY: number) => window.scrollTo(0, scrollY), y);
-      await new Promise((resolve) => setTimeout(resolve, 120));
+      await new Promise((resolve) => setTimeout(resolve, 100));
       currentHeight = await page.evaluate(() => document.body.scrollHeight);
     }
 
+    console.log(`  [Scraper] scroll: Reached end of scroll steps. Current height = ${currentHeight}. Scrolling to absolute bottom...`);
     await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
-    // Wait longer at the bottom of the page (1500ms instead of 200ms) to allow pending network connections to settle
-    await new Promise((resolve) => setTimeout(resolve, 1500));
+    // Wait at the bottom to allow pending network connections to settle
+    await new Promise((resolve) => setTimeout(resolve, 800));
 
     const currentImageCount = await page.evaluate(() => {
       return Array.from(document.images).filter((img) => {
@@ -303,11 +311,15 @@ async function scrollChapterPageForLazyImages(page: any): Promise<void> {
       }).length;
     });
 
+    console.log(`  [Scraper] scrollPass ${pass + 1} results: currentImageCount = ${currentImageCount}, lastImageCount = ${lastImageCount}, stablePasses = ${stablePasses}`);
+
     if (currentImageCount === lastImageCount && currentImageCount > 0) {
       stablePasses++;
+      console.log(`  [Scraper] scrollPass ${pass + 1}: Image count stable (${currentImageCount}). stablePasses = ${stablePasses}`);
     } else {
       stablePasses = 0;
       lastImageCount = currentImageCount;
+      console.log(`  [Scraper] scrollPass ${pass + 1}: Image count changed/zero. Resetting stablePasses. lastImageCount = ${lastImageCount}`);
     }
   }
 }
@@ -317,34 +329,41 @@ async function collectLiveReaderImageUrls(page: any): Promise<string[]> {
     const urls = await page.evaluate(`
       (() => {
         try {
-          const scriptEl = document.getElementById('ng-state');
-          if (scriptEl && scriptEl.textContent) {
-            const state = JSON.parse(scriptEl.textContent);
-            const urls = [];
-            const search = (obj) => {
-              if (!obj || typeof obj !== 'object') return;
-              if (Array.isArray(obj.images)) {
-                for (const img of obj.images) {
-                  if (img && typeof img === 'object' && typeof img.url === 'string') {
-                    urls.push(img.url);
+          const isAsuraPage = location.hostname.toLowerCase().includes('asura');
+          if (!isAsuraPage) {
+            const scriptEl = document.getElementById('ng-state');
+            if (scriptEl && scriptEl.textContent) {
+              const state = JSON.parse(scriptEl.textContent);
+              const urls = [];
+              const search = (obj) => {
+                if (!obj || typeof obj !== 'object') return;
+                if (Array.isArray(obj.images)) {
+                  for (const img of obj.images) {
+                    if (img && typeof img === 'object' && typeof img.url === 'string') {
+                      urls.push(img.url);
+                    }
                   }
                 }
-              }
-              for (const key of Object.keys(obj)) {
-                search(obj[key]);
-              }
-            };
-            search(state);
-            if (urls.length > 0) return urls;
+                for (const key of Object.keys(obj)) {
+                  search(obj[key]);
+                }
+              };
+              search(state);
+              if (urls.length > 0) return urls;
+            }
           }
         } catch (e) {
           console.warn('Failed to parse ng-state in browser:', e);
         }
 
+        const isAsuraPage = location.hostname.toLowerCase().includes('asura');
+
         const imageEntries = Array.from(document.images).map((img, index) => {
           const rect = img.getBoundingClientRect();
           const className = String(img.className || '').toLowerCase();
           const alt = String(img.alt || '').toLowerCase();
+          const nw = img.naturalWidth || 0;
+          const nh = img.naturalHeight || 0;
           const values = [
             img.currentSrc,
             img.src,
@@ -370,19 +389,36 @@ async function collectLiveReaderImageUrls(page: any): Promise<string[]> {
             !lowercaseSrc.includes('/series/featured/') &&
             /^page[-_]\\d{1,4}/i.test(filename);
 
+          // Asura Scans branding banners are landscape (width >= height, ~1200x800).
+          // Real chapter pages are always tall portrait strips (e.g. 900x16000).
+          const isAsuraBrandingBanner = isAsuraPage && nw > 0 && nh > 0 && nw >= nh;
+
+          const isAsuraReaderImage = values.some((val) => {
+            const lVal = String(val).toLowerCase();
+            return (
+              lVal.includes('asura-images/chapters/') ||
+              lVal.includes('asura-images/chapters-restored/') ||
+              (lVal.includes('asura') && lVal.includes('/chapters/'))
+            );
+          });
+
           return {
             index,
             top: rect.top + window.scrollY,
-            width: rect.width || img.width || img.naturalWidth || 0,
+            width: rect.width || img.width || nw || 0,
+            nw,
+            nh,
             values,
             isVortexReaderImage,
+            isAsuraBrandingBanner,
             isGenericReaderImage:
               className.includes('r-page-img') ||
               className.includes('reader') ||
               className.includes('chapter') ||
               alt.startsWith('page ') ||
               (alt.includes('chapter') && alt.includes('page')) ||
-              (img.naturalWidth >= 500 && img.naturalHeight >= 800)
+              (nw >= 500 && nh >= 800) ||
+              isAsuraReaderImage
           };
         });
 
@@ -394,7 +430,7 @@ async function collectLiveReaderImageUrls(page: any): Promise<string[]> {
         const candidates = vortexReaderImages.length > 0
           ? vortexReaderImages
           : imageEntries
-              .filter((entry) => entry.isGenericReaderImage)
+              .filter((entry) => entry.isGenericReaderImage && !entry.isAsuraBrandingBanner)
               .sort((a, b) => a.top - b.top || a.index - b.index)
               .flatMap((entry) => entry.values);
 
@@ -1004,22 +1040,24 @@ export async function extractImagesFromChapterUrl(
         } else {
           const usesClientRenderedReader =
             isQimanhwaLikeUrl(chapterUrl) ||
+            isAsuraScansUrl(chapterUrl) ||
             isVortexLikeUrl(chapterUrl) ||
             isVortexLikeUrl(imageUrlExample);
-          const exampleModeImages = extractImageUrls(html, chapterUrl);
-          const exampleMatches = findImagesMatchingExampleUrl(exampleModeImages, imageUrlExample);
-          const sourceImages = filterReaderImagesForSource(exampleModeImages, chapterUrl, imageUrlExample);
-          if (exampleMatches.length > 0 && !usesClientRenderedReader) {
-            return exampleMatches;
-          }
-
-          if (sourceImages.length > 0) {
-            return sourceImages;
-          }
 
           if (usesClientRenderedReader) {
             // These readers often render chapter pages client-side; direct HTML can miss reader images.
             usePuppeteerFallback = true;
+          } else {
+            const exampleModeImages = extractImageUrls(html, chapterUrl);
+            const exampleMatches = findImagesMatchingExampleUrl(exampleModeImages, imageUrlExample);
+            const sourceImages = filterReaderImagesForSource(exampleModeImages, chapterUrl, imageUrlExample);
+            if (exampleMatches.length > 0) {
+              return exampleMatches;
+            }
+
+            if (sourceImages.length > 0) {
+              return sourceImages;
+            }
           }
         }
       }
@@ -1131,7 +1169,8 @@ async function extractReaderImagesWithSharedBrowser(
             await setupRequestInterception(page, url);
             console.log(`[Scraper] Shared reader browser extracting: ${url}`);
             await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
-            await new Promise((resolve) => setTimeout(resolve, 2500));
+            // Asura loads faster (no Cloudflare challenge), use shorter wait
+            await new Promise((resolve) => setTimeout(resolve, isAsuraScansUrl(url) ? 1200 : 2500));
 
             // Try immediate extraction first
             const immediateImages = filterReaderImagesForSource(
@@ -1141,7 +1180,8 @@ async function extractReaderImagesWithSharedBrowser(
             );
 
             const isQimanhwa = isQimanhwaLikeUrl(url);
-            const shouldSkipScroll = (isQimanhwa && immediateImages.length > 0) || immediateImages.length >= 10;
+            const isAsura = isAsuraScansUrl(url);
+            const shouldSkipScroll = !isAsura && ((isQimanhwa && immediateImages.length > 0) || immediateImages.length >= 10);
 
             if (shouldSkipScroll) {
               console.log(`[Scraper] Found ${immediateImages.length} images immediately. Skipping scroll.`);
@@ -1213,8 +1253,9 @@ async function setupRequestInterception(page: any, url: string): Promise<void> {
       requestUrl.includes('a-ads') ||
       requestUrl.includes('juicyads');
 
+    const isAsura = isAsuraScansUrl(url);
     if (
-      resourceType === 'stylesheet' ||
+      (resourceType === 'stylesheet' && !isAsura) ||
       resourceType === 'font' ||
       resourceType === 'media' ||
       isAdOrAnalytics

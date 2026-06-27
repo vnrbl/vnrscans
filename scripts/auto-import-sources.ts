@@ -83,9 +83,10 @@ async function syncSource(source: any) {
       .slice(0, maxChaptersPerSource);
 
     skipped = discovered.length - missing.length;
+    const isAsuraSource = source.source_url.toLowerCase().includes('asura');
     const batchExtractedImages = await extractImagesFromChapterUrls(
       missing.map((chapter) => chapter.url),
-      { concurrency: 4, imageUrlExample: source.image_url_example },
+      { concurrency: isAsuraSource ? 6 : 4, imageUrlExample: source.image_url_example },
     );
 
     for (const chapter of missing) {
