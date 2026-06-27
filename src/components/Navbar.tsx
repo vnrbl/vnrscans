@@ -412,11 +412,15 @@ export function Navbar() {
                 variant="ghost"
                 size="sm"
                 onClick={() => navigate({ to: "/library" })}
-                className="hidden lg:flex gap-1.5 text-xs font-bold uppercase tracking-wider text-muted-foreground hover:text-foreground h-9 px-2.5"
+                className="hidden lg:flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-muted-foreground hover:text-foreground h-9 px-2.5 relative"
                 title="My Library"
               >
-                <Library className="h-4 w-4" />
+                <Library className="h-4 w-4 text-emerald-400" />
                 <span>Library</span>
+                <span className="flex h-2 w-2 relative ml-0.5">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                </span>
               </Button>
             )}
 

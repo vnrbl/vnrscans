@@ -1848,11 +1848,11 @@ function ChapterReactions({ chapterId, seriesId }: { chapterId: string; seriesId
 
   // Reaction emojis with their types
   const reactions = [
-    { type: "heart", icon: Heart, label: "Love" },
-    { type: "thumbs_up", icon: ThumbsUp, label: "Like" },
-    { type: "laugh", icon: Laugh, label: "Funny" },
-    { type: "star", icon: Star, label: "Amazing" },
-    { type: "smile", icon: Smile, label: "Enjoyed" },
+    { type: "goat", emoji: "👑", label: "GOAT" },
+    { type: "hype", emoji: "🔥", label: "Hype" },
+    { type: "twist", emoji: "😱", label: "Plot Twist" },
+    { type: "fraud", emoji: "🤡", label: "Fraud" },
+    { type: "peak", emoji: "😭", label: "Peak Fiction" },
   ];
 
   // Fetch reaction counts
@@ -1936,10 +1936,11 @@ function ChapterReactions({ chapterId, seriesId }: { chapterId: string; seriesId
     <div className="mt-12 mb-8 border-t border-border pt-8">
       {/* Reactions */}
       <div className="mb-8">
-        <h3 className="text-lg font-semibold mb-4">How did you like this chapter?</h3>
+        <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+          <span>🏆 Chapter Hype & Reactions</span>
+        </h3>
         <div className="flex flex-wrap gap-3">
           {reactions.map((reaction) => {
-            const Icon = reaction.icon;
             const count = reactionsQ.data?.[reaction.type] || 0;
             const hasReacted = userReactionsQ.data?.includes(reaction.type);
 
@@ -1948,15 +1949,16 @@ function ChapterReactions({ chapterId, seriesId }: { chapterId: string; seriesId
                 key={reaction.type}
                 onClick={() => toggleReaction.mutate(reaction.type)}
                 disabled={toggleReaction.isPending}
-                className={`flex items-center gap-2 px-4 py-2 rounded-full border transition-all ${
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl border transition-all duration-300 transform active:scale-95 cursor-pointer ${
                   hasReacted
-                    ? "bg-primary/20 border-primary text-primary"
-                    : "border-border hover:bg-primary/10 hover:border-primary/50"
+                    ? "bg-primary/20 border-primary text-primary font-bold shadow-md scale-105"
+                    : "bg-card/60 border-border/60 hover:bg-primary/10 hover:border-primary/50 text-foreground"
                 }`}
                 title={reaction.label}
               >
-                <Icon className={`h-5 w-5 ${hasReacted ? "fill-current" : ""}`} />
-                {count > 0 && <span className="text-sm font-medium">{count}</span>}
+                <span className="text-lg">{reaction.emoji}</span>
+                <span className="text-xs font-bold uppercase tracking-wide">{reaction.label}</span>
+                <span className="text-xs font-mono font-bold bg-secondary/80 px-1.5 py-0.5 rounded-md text-muted-foreground">{count}</span>
               </button>
             );
           })}

@@ -16,7 +16,8 @@ import {
   CheckCircle2, 
   Sparkles,
   Award,
-  Users
+  Users,
+  Share2
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -28,6 +29,29 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useDragScroll, DRAG_SCROLL_CONTAINER_CLASS } from "@/hooks/useDragScroll";
 import { TITLE_CARD_WIDTH, TITLE_COVER_CLASS } from "@/components/titleCardStyles";
 import Link from "next/link";
+
+function SideWidgets({
+  seriesId,
+  seriesStatus,
+  totalChapters,
+}: {
+  seriesId: string;
+  seriesStatus?: string | null;
+  totalChapters: number;
+}) {
+  return (
+    <aside className="space-y-6 min-w-0">
+      {/* Feature 1: Share Series Feature */}
+      <ShareWidget />
+
+      {/* Feature 2: Personal Reading Progress & XP Tracker */}
+      <ReadingProgressWidget seriesId={seriesId} totalChapters={totalChapters} />
+
+      {/* Feature 3: Series Top Readers & Supporters */}
+      <SeriesLeaderboardWidget seriesId={seriesId} />
+    </aside>
+  );
+}
 
 import { SeriesHeader } from "./SeriesHeader";
 import { SeriesActions } from "./SeriesActions";
@@ -301,8 +325,8 @@ const TitleSidePanel = React.memo(function TitleSidePanel({
 }) {
   return (
     <aside className="space-y-6 min-w-0">
-      {/* Feature 1: Release Schedule & Countdown Timer */}
-      <ReleaseCountdownWidget seriesId={seriesId} seriesStatus={seriesStatus} />
+      {/* Feature 1: Share Series Feature */}
+      <ShareWidget />
 
       {/* Feature 2: Personal Reading Progress & XP Tracker */}
       <ReadingProgressWidget seriesId={seriesId} totalChapters={totalChapters} />
@@ -314,105 +338,45 @@ const TitleSidePanel = React.memo(function TitleSidePanel({
 });
 
 /* ------------------------------------------------------------------ */
-/*  Feature 1: Release Schedule & Countdown Widget                    */
+/*  Feature 1: Share Series Widget                                    */
 /* ------------------------------------------------------------------ */
 
-function ReleaseCountdownWidget({ seriesId, seriesStatus }: { seriesId: string; seriesStatus?: string | null }) {
-  const [notified, setNotified] = React.useState(false);
-  const isOngoing = seriesStatus === "ongoing";
-
-  const latestChapterQ = useQuery({
-    queryKey: ["latest-chapter-release", seriesId],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from("chapters")
-        .select("created_at, scheduled_at, chapter_number")
-        .eq("series_id", seriesId)
-        .order("chapter_number", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      return data;
-    },
-    staleTime: 1000 * 60 * 10,
-  });
-
-  const expectedDateText = React.useMemo(() => {
-    if (!isOngoing) return "Series Completed";
-    const ch = latestChapterQ.data;
-    if (ch?.scheduled_at) {
-      const date = new Date(ch.scheduled_at);
-      return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-    }
-    if (ch?.created_at) {
-      const lastDate = new Date(ch.created_at);
-      const nextDate = new Date(lastDate.getTime() + 7 * 24 * 60 * 60 * 1000);
-      const now = new Date();
-      if (nextDate < now) {
-        nextDate.setDate(now.getDate() + 3);
+function ShareWidget() {
+  const handleShare = () => {
+    if (typeof window !== "undefined") {
+      const url = window.location.href;
+      if (navigator.share) {
+        navigator.share({
+          title: document.title,
+          url: url,
+        }).catch(() => {});
+      } else {
+        navigator.clipboard.writeText(url).then(() => {
+          toast.success("Link copied to clipboard!");
+        });
       }
-      return nextDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-    }
-    const defaultNext = new Date();
-    defaultNext.setDate(defaultNext.getDate() + 4);
-    return defaultNext.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-  }, [latestChapterQ.data, isOngoing]);
-
-  const handleNotifyToggle = () => {
-    setNotified(!notified);
-    if (!notified) {
-      toast.success("Release notifications enabled for this series!");
-    } else {
-      toast.info("Release notifications muted.");
     }
   };
 
   return (
     <div className="rounded-xl border border-border/60 bg-card/60 p-4 shadow-sm backdrop-blur-sm">
-      <div className="flex items-center justify-between gap-2 mb-3">
-        <div className="flex items-center gap-2">
-          <div className="p-2 rounded-lg bg-primary/10 text-primary">
-            <Clock className="h-4 w-4" />
-          </div>
-          <div>
-            <h3 className="text-sm font-bold leading-tight">Release Schedule</h3>
-            <p className="text-[11px] text-muted-foreground">
-              {isOngoing ? "Weekly Updates" : "Status: " + (seriesStatus || "Completed")}
-            </p>
-          </div>
+      <div className="flex items-center gap-3">
+        <div className="p-2.5 rounded-xl bg-primary/10 text-primary shrink-0">
+          <Share2 className="h-5 w-5" />
         </div>
-        {isOngoing && (
-          <Badge variant="secondary" className="bg-emerald-500/15 text-emerald-400 border-emerald-500/30 text-[10px] uppercase tracking-wider font-semibold animate-pulse">
-            Ongoing
-          </Badge>
-        )}
+        <div className="flex-1 min-w-0">
+          <h3 className="text-sm font-bold leading-tight">Share Series</h3>
+          <p className="text-[11px] text-muted-foreground truncate">Share with friends & community</p>
+        </div>
       </div>
-
-      <div className="rounded-lg bg-muted/40 p-3 text-center border border-border/40">
-        {isOngoing ? (
-          <div>
-            <span className="text-[11px] text-muted-foreground uppercase tracking-wider font-semibold">Expected Date</span>
-            <div className="mt-1 font-mono text-base font-black tracking-tight text-primary flex items-center justify-center gap-1.5">
-              <Zap className="h-4 w-4 fill-primary text-primary" />
-              <span>{expectedDateText}</span>
-            </div>
-            <p className="mt-1 text-[10px] text-muted-foreground">Est. Frequency: Weekly</p>
-          </div>
-        ) : (
-          <div className="flex items-center justify-center gap-2 py-1 text-xs font-semibold text-muted-foreground">
-            <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-            <span>All chapters available to read</span>
-          </div>
-        )}
-      </div>
-
       <Button
-        variant={notified ? "secondary" : "outline"}
+        variant="secondary"
         size="sm"
-        className="w-full mt-3 gap-2 text-xs font-semibold h-9"
-        onClick={handleNotifyToggle}
+        onClick={handleShare}
+        className="w-full mt-3 gap-2 font-semibold text-xs h-9 rounded-lg hover:bg-primary hover:text-primary-foreground transition-colors cursor-pointer"
       >
-        <Bell className={`h-3.5 w-3.5 ${notified ? "fill-primary text-primary" : ""}`} />
-        {notified ? "Notifications Enabled" : "Notify Me On Release"}
+        <Share2 className="h-3.5 w-3.5" />
+        Share Link
       </Button>
     </div>
   );
