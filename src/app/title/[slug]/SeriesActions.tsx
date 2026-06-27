@@ -3,7 +3,7 @@
 import React from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { BookOpen, UserPlus, UserCheck, Star, Bookmark } from "lucide-react";
+import { BookOpen, UserPlus, UserCheck, Star, Bookmark, Bell, BellRing, BellOff } from "lucide-react";
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -231,14 +231,53 @@ export const SeriesActions = React.memo(function SeriesActions({
         )}
 
         {user && isFollowing.data && (
-          <Button
-            variant="outline"
-            className="h-10 w-full border-border/60"
-            onClick={() => toggleFollow.mutate()}
-          >
-            <UserCheck className="mr-2 h-4 w-4" />
-            Following
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              className="h-10 flex-1 border-border/60"
+              onClick={() => toggleFollow.mutate()}
+            >
+              <UserCheck className="mr-2 h-4 w-4" />
+              Following
+            </Button>
+            
+            <Select
+              defaultValue="all"
+              onValueChange={(val) => {
+                if (val === "all") {
+                  toast.success("Notifications: All! You will get alerts when new chapters drop.");
+                } else if (val === "personalized") {
+                  toast.info("Notifications: Personalized updates enabled.");
+                } else {
+                  toast.info("Release notifications turned off.");
+                }
+              }}
+            >
+              <SelectTrigger className="h-10 w-12 px-0 justify-center border-border/60 bg-secondary/50" title="Release Notifications">
+                <BellRing className="h-4 w-4 text-primary animate-pulse" />
+              </SelectTrigger>
+              <SelectContent align="end">
+                <SelectItem value="all">
+                  <div className="flex items-center gap-2">
+                    <BellRing className="h-4 w-4 text-primary" />
+                    <span>All Notifications</span>
+                  </div>
+                </SelectItem>
+                <SelectItem value="personalized">
+                  <div className="flex items-center gap-2">
+                    <Bell className="h-4 w-4 text-muted-foreground" />
+                    <span>Personalized</span>
+                  </div>
+                </SelectItem>
+                <SelectItem value="none">
+                  <div className="flex items-center gap-2">
+                    <BellOff className="h-4 w-4 text-muted-foreground" />
+                    <span>None</span>
+                  </div>
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         )}
       </div>
 

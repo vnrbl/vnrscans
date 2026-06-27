@@ -1846,13 +1846,13 @@ function ChapterReactions({ chapterId, seriesId }: { chapterId: string; seriesId
   const { user } = useAuth();
   const qc = useQueryClient();
 
-  // Reaction emojis with their types
+  // Reaction emojis mapped to database check constraint values
   const reactions = [
-    { type: "goat", emoji: "👑", label: "GOAT" },
-    { type: "hype", emoji: "🔥", label: "Hype" },
-    { type: "twist", emoji: "😱", label: "Plot Twist" },
-    { type: "fraud", emoji: "🤡", label: "Fraud" },
-    { type: "peak", emoji: "😭", label: "Peak Fiction" },
+    { type: "star", emoji: "👑", label: "GOAT" },
+    { type: "thumbs_up", emoji: "🔥", label: "Hype" },
+    { type: "laugh", emoji: "😱", label: "Plot Twist" },
+    { type: "smile", emoji: "🤡", label: "Fraud" },
+    { type: "heart", emoji: "😭", label: "Peak Fiction" },
   ];
 
   // Fetch reaction counts
@@ -1995,6 +1995,7 @@ type CommentProfile = {
   accent_color?: string | null;
   user_level?: number | null;
   is_vip?: boolean | null;
+  earned_tag?: string | null;
 };
 
 const COMMENT_REACTIONS = [
@@ -2252,12 +2253,59 @@ function ChapterComments({ chapterId, seriesId }: { chapterId: string; seriesId:
     queryKey: ["comment-profiles", userIds.join(",")],
     queryFn: async () => {
       if (userIds.length === 0) return new Map<string, CommentProfile>();
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("user_id,username,avatar_url,avatar_frame,accent_color,user_level,is_vip")
-        .in("user_id", userIds);
-      if (error) throw error;
-      return new Map((data ?? []).map((profile) => [profile.user_id, profile as CommentProfile]));
+
+      const [profilesRes, rolesRes, badgesRes] = await Promise.all([
+        supabase
+          .from("profiles")
+          .select("user_id,username,avatar_url,avatar_frame,accent_color,user_level,is_vip")
+          .in("user_id", userIds),
+        supabase
+          .from("user_roles")
+          .select("user_id,role")
+          .in("user_id", userIds),
+        supabase
+          .from("user_badges")
+          .select("user_id,is_equipped,badge:badge_id(name,color)")
+          .in("user_id", userIds)
+          .eq("is_equipped", true),
+      ]);
+
+      if (profilesRes.error) throw profilesRes.error;
+
+      const rolesMap = new Map<string, string[]>();
+      (rolesRes.data ?? []).forEach((r: any) => {
+        const existing = rolesMap.get(r.user_id) ?? [];
+        existing.push(r.role);
+        rolesMap.set(r.user_id, existing);
+      });
+
+      const equippedBadgeMap = new Map<string, string>();
+      (badgesRes.data ?? []).forEach((b: any) => {
+        if (b.badge?.name) {
+          equippedBadgeMap.set(b.user_id, b.badge.name);
+        }
+      });
+
+      const profileMap = new Map<string, CommentProfile>();
+      (profilesRes.data ?? []).forEach((profile) => {
+        const uRoles = rolesMap.get(profile.user_id) ?? [];
+        let tag: string | null = null;
+
+        if (uRoles.includes("creator")) {
+          tag = "Creator";
+        } else if (uRoles.includes("admin")) {
+          tag = "Admin";
+        } else if (equippedBadgeMap.has(profile.user_id)) {
+          tag = equippedBadgeMap.get(profile.user_id)!;
+        }
+
+        profileMap.set(profile.user_id, {
+          ...profile,
+          earned_tag: tag,
+        } as CommentProfile);
+      });
+
+      return profileMap;
     },
     enabled: userIds.length > 0,
     staleTime: 1000 * 60 * 5,
@@ -2693,6 +2741,18 @@ function ChapterComments({ chapterId, seriesId }: { chapterId: string; seriesId:
                     {profile?.username ?? "Reader"}
                   </span>
                   
+                  {profile?.earned_tag && (
+                    <span 
+                      className="rounded bg-gradient-to-r from-amber-500/20 to-yellow-500/20 text-amber-400 border border-amber-500/40 font-black text-[9px] tracking-wider px-1.5 py-0.5 uppercase shadow-sm"
+                      style={{
+                        borderColor: profile.accent_color ? `${profile.accent_color}60` : undefined,
+                        color: profile.accent_color || undefined,
+                      }}
+                    >
+                      {profile.earned_tag}
+                    </span>
+                  )}
+
                   {profile?.user_level && (
                     <span className="rounded-full bg-secondary/80 px-1.5 py-0.5 text-[9px] font-bold text-muted-foreground border border-border/20">
                       Lvl {profile.user_level}
