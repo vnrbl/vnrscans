@@ -37,6 +37,32 @@ export const SeriesHeader = React.memo(function SeriesHeader({
   followersCount,
   uniqueChapterCount,
 }: SeriesHeaderProps) {
+  const CORE_GENRES_SET = React.useMemo(
+    () =>
+      new Set([
+        "action", "adventure", "boys love", "comedy", "crime", "cyberpunk", "drama", 
+        "ecchi", "erotica", "fantasy", "girls love", "harem", "historical", "horror", 
+        "isekai", "josei", "martial arts", "mecha", "medical", "mystery", "psychological", 
+        "reincarnation", "romance", "sci-fi", "seinen", "shoujo", "shounen", "slice of life", 
+        "sports", "supernatural", "thriller", "wuxia", "xianxia", "xuanhuan", "yaoi", "yuri",
+        "monsters", "magic", "cultivation", "webtoon", "manhwa", "manhua", "manga"
+      ]),
+    []
+  );
+
+  const { coreGenres, tropeTags } = React.useMemo(() => {
+    const allMap = new Map<string, any>();
+    [...genres, ...tags].forEach((item) => {
+      if (item && (item.slug || item.id)) {
+        allMap.set(item.slug || item.id, item);
+      }
+    });
+    const all = Array.from(allMap.values());
+    const core = all.filter((item) => CORE_GENRES_SET.has(item.name.toLowerCase().trim()));
+    const tropes = all.filter((item) => !CORE_GENRES_SET.has(item.name.toLowerCase().trim()));
+    return { coreGenres: core, tropeTags: tropes };
+  }, [genres, tags, CORE_GENRES_SET]);
+
   return (
     <main className="min-w-0 flex-1 text-center sm:text-left">
       <nav className="mb-3 flex flex-wrap items-center justify-center gap-1.5 text-xs uppercase tracking-wider text-muted-foreground font-semibold sm:justify-start">
@@ -119,15 +145,15 @@ export const SeriesHeader = React.memo(function SeriesHeader({
         </div>
       )}
 
-      {genres.length > 0 && (
+      {coreGenres.length > 0 && (
         <MetaSection label="Genres">
-          <LimitedGenrePills genres={genres} />
+          <LimitedGenrePills genres={coreGenres} />
         </MetaSection>
       )}
 
-      {tags.length > 0 && (
+      {tropeTags.length > 0 && (
         <MetaSection label="Tags">
-          <LimitedTagPills tags={tags} />
+          <LimitedTagPills tags={tropeTags} />
         </MetaSection>
       )}
 
@@ -268,7 +294,7 @@ function LimitedGenrePills({
 function LimitedTagPills({
   tags,
 }: {
-  tags: Array<{ id: string; name: string; slug: string; color: string; icon: string }>;
+  tags: Array<{ id?: string; name: string; slug: string; color?: string; icon?: string }>;
 }) {
   const [showAll, setShowAll] = React.useState(false);
   const mobileTags = showAll ? tags : tags.slice(0, 10);
@@ -278,7 +304,7 @@ function LimitedTagPills({
     <>
       <span className="contents md:hidden">
         {mobileTags.map((tag) => (
-          <MetaPill key={tag.id} href="/browse" search={{ tag: tag.slug }}>
+          <MetaPill key={tag.id || tag.slug} href="/browse" search={{ genre: tag.slug }}>
             {tag.icon && <span className="mr-1">{tag.icon}</span>}
             {tag.name}
           </MetaPill>
@@ -287,7 +313,7 @@ function LimitedTagPills({
 
       <span className="hidden md:contents">
         {desktopTags.map((tag) => (
-          <MetaPill key={tag.id} href="/browse" search={{ tag: tag.slug }}>
+          <MetaPill key={tag.id || tag.slug} href="/browse" search={{ genre: tag.slug }}>
             {tag.icon && <span className="mr-1">{tag.icon}</span>}
             {tag.name}
           </MetaPill>

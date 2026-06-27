@@ -24,10 +24,17 @@ export default function LibraryPage() {
   });
 
   const filterByStatus = (status: string) => {
-    return (library.data ?? [])
+    const items = (library.data ?? [])
       .filter((item: any) => item.reading_status === status)
       .map((item: any) => item.series)
       .filter(Boolean);
+
+    const seen = new Set<string>();
+    return items.filter((series: any) => {
+      if (!series.id || seen.has(series.id)) return false;
+      seen.add(series.id);
+      return true;
+    });
   };
 
   return (

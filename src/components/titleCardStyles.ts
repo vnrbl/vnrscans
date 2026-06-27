@@ -1,3 +1,3 @@
-/** Fixed cover height keeps cards wider without growing taller than the previous layout. */
-export const TITLE_CARD_WIDTH = "w-[150px] shrink-0 sm:w-[180px] md:w-[220px]";
-export const TITLE_COVER_CLASS = "relative h-[225px] overflow-hidden bg-secondary sm:h-[280px] md:h-[320px]";
+/** Cover height matching Reading History cards for sleek, proportional presentation. */
+export const TITLE_CARD_WIDTH = "w-[140px] shrink-0 sm:w-[160px] md:w-[180px]";
+export const TITLE_COVER_CLASS = "relative h-[200px] overflow-hidden bg-secondary sm:h-[230px] md:h-[250px]";
