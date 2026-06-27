@@ -657,34 +657,6 @@ export function Navbar() {
           <span>{user ? "Profile" : "Sign In"}</span>
         </Link>
       </nav>
-
-      {/* YouTube Left Side Mini Menu Panel (Desktop Mini Sidebar like YouTube) */}
-      <aside className="hidden md:flex flex-col fixed left-0 top-16 bottom-0 w-18 z-30 bg-[#0f0f0f] border-r border-neutral-800/80 py-3 items-center gap-4 transition-all">
-        {links.map((l) => (
-          <Link
-            key={l.to}
-            to={l.to}
-            className="flex flex-col items-center justify-center gap-1.5 w-16 py-3 rounded-xl text-[10px] font-medium text-neutral-400 hover:text-white hover:bg-neutral-800/80 transition-colors"
-            activeProps={{ className: "text-white font-bold bg-neutral-800" }}
-            title={l.label}
-          >
-            <l.icon className="h-5 w-5 stroke-[1.8]" />
-            <span className="truncate max-w-[60px] text-center leading-none">{l.label}</span>
-          </Link>
-        ))}
-
-        {user && (
-          <Link
-            to="/library"
-            className="flex flex-col items-center justify-center gap-1.5 w-16 py-3 rounded-xl text-[10px] font-medium text-neutral-400 hover:text-white hover:bg-neutral-800/80 transition-colors"
-            activeProps={{ className: "text-white font-bold bg-neutral-800" }}
-            title="Bookmarks & Library"
-          >
-            <Library className="h-5 w-5 stroke-[1.8]" />
-            <span className="truncate max-w-[60px] text-center leading-none">Library</span>
-          </Link>
-        )}
-      </aside>
     </>
   );
 }
