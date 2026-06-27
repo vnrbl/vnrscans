@@ -51,12 +51,12 @@ export async function $extractChaptersFromUrl(args: {
     accessToken: string;
   };
 }) {
-  const { data } = args;
-  const validated = z
-    .object({ url: z.string().url(), accessToken: z.string().min(1) })
-    .parse(data);
-  await verifyAdmin(validated.accessToken);
   try {
+    const { data } = args;
+    const validated = z
+      .object({ url: z.string().url(), accessToken: z.string().min(1) })
+      .parse(data);
+    await verifyAdmin(validated.accessToken);
     const chapters = await extractChaptersFromSeriesUrl(validated.url);
     return { success: true, chapters };
   } catch (error) {
@@ -74,16 +74,16 @@ export async function $extractImagesFromUrl(args: {
     accessToken: string;
   };
 }) {
-  const { data } = args;
-  const validated = z
-    .object({
-      url: z.string().url(),
-      imageUrlExample: z.string().url().optional().or(z.literal("")),
-      accessToken: z.string().min(1),
-    })
-    .parse(data);
-  await verifyAdmin(validated.accessToken);
   try {
+    const { data } = args;
+    const validated = z
+      .object({
+        url: z.string().url(),
+        imageUrlExample: z.string().url().optional().or(z.literal("")),
+        accessToken: z.string().min(1),
+      })
+      .parse(data);
+    await verifyAdmin(validated.accessToken);
     const images = await extractImagesFromChapterUrl(validated.url, {
       imageUrlExample: validated.imageUrlExample || null,
     });
@@ -106,6 +106,7 @@ export async function $runCloudScrape(args: {
     uploader?: string | null;
   };
 }) {
+  try {
   const { data } = args;
   const validated = z
     .object({
@@ -148,7 +149,17 @@ export async function $runCloudScrape(args: {
     .select("chapter_number,scanlation_group")
     .eq("series_id", validated.seriesId);
 
-  if (existingError) throw existingError;
+  if (existingError) {
+    return {
+      success: false,
+      error: `Failed to query existing chapters: ${existingError.message}`,
+      chaptersFound: 0,
+      imported: 0,
+      skipped: 0,
+      failed: 0,
+      details: [],
+    };
+  }
 
   const existingKeys = new Set(
     (existingRows ?? []).map((chapter: any) =>
@@ -311,6 +322,19 @@ export async function $runCloudScrape(args: {
     failed,
     details,
   };
+  } catch (error) {
+    console.error("[CloudScrape] Unhandled error:", error);
+    const message = error instanceof Error ? error.message : "Cloud scrape failed";
+    return {
+      success: false,
+      error: message,
+      chaptersFound: 0,
+      imported: 0,
+      skipped: 0,
+      failed: 0,
+      details: [],
+    };
+  }
 }
 
 export async function $syncImportSource(args: {
@@ -320,6 +344,7 @@ export async function $syncImportSource(args: {
     maxChapters?: number;
   };
 }) {
+  try {
   const { data } = args;
   const validated = z
     .object({
@@ -539,6 +564,11 @@ export async function $syncImportSource(args: {
       .update({ last_checked_at: startedAt, last_error: message })
       .eq("id", source.id);
 
+    return { success: false, error: message };
+  }
+  } catch (outerError) {
+    console.error("[SyncImportSource] Unhandled error:", outerError);
+    const message = outerError instanceof Error ? outerError.message : "Sync failed";
     return { success: false, error: message };
   }
 }
