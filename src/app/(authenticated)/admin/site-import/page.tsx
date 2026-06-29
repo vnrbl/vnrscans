@@ -138,7 +138,7 @@ export default function SiteImportPage() {
         throw new Error(result.error || "Catalog scan failed");
       setSnapshot(result.snapshot);
       setSelectedIds(new Set());
-      toast.success(`Found ${result.snapshot.items.length} series from Asura Scans.`);
+      toast.success(`Found ${result.snapshot.items.length} series from ${result.snapshot.job.source_site}.`);
       void refreshRecentJobs();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Catalog scan failed");
@@ -284,16 +284,37 @@ export default function SiteImportPage() {
         <CardHeader>
           <CardTitle className="text-base">Discover catalog</CardTitle>
           <CardDescription>
-            Asura Scans is supported in this first release. Catalog discovery does not download
-            chapter images.
+            Select a preset catalog source or enter a catalog URL. Catalog discovery does not
+            download chapter images.
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs font-medium text-muted-foreground">Presets:</span>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setSiteUrl("https://asurascans.com/browse")}
+              className={siteUrl.includes("asura") ? "border-primary text-primary" : ""}
+            >
+              Asura Scans
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setSiteUrl("https://qiscans.org/series")}
+              className={siteUrl.includes("qi") ? "border-primary text-primary" : ""}
+            >
+              Qi Scans
+            </Button>
+          </div>
           <div className="flex flex-col gap-3 sm:flex-row">
             <Input
               value={siteUrl}
               onChange={(event) => setSiteUrl(event.target.value)}
-              placeholder="https://asurascans.com/browse"
+              placeholder="https://qiscans.org/series or https://asurascans.com/browse"
               className="font-mono"
             />
             <Button onClick={discoverCatalog} disabled={discovering || !siteUrl.trim()}>

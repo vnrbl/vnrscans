@@ -23,6 +23,12 @@ const SOURCE_PRESETS: Array<{
     imageUrlExample: "https://media.qimanhwa.com/file/qiscans/upload/upload/series/example/chapter/page_001.webp",
   },
   {
+    hostIncludes: "qimanga.com",
+    sourceSite: "Qi Scans",
+    scanlationGroup: "Qi Scans",
+    imageUrlExample: "https://media.qimanhwa.com/file/qiscans/upload/upload/series/example/chapter/page_001.webp",
+  },
+  {
     hostIncludes: "asurascans.com",
     sourceSite: "Asura Scans",
     scanlationGroup: "Asura Scans",

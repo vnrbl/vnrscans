@@ -10,9 +10,10 @@ import {
 import { buildChapterSlug } from "../chapter-utils";
 import { detectImportSource } from "../import-source-utils";
 import { discoverAsuraCatalog, isSupportedAsuraCatalogUrl } from "../site-import/asura";
+import { discoverQiScansCatalog, isSupportedQiScansCatalogUrl } from "../site-import/qiscans";
 import type { SiteSeriesMetadata } from "../site-import/types";
 
-const IMPORT_BATCH_SIZE = 2;
+const IMPORT_BATCH_SIZE = 8;
 
 export type SiteImportJobStatus =
   | "scanning"
@@ -120,11 +121,15 @@ export async function $discoverSiteCatalog(args: {
       .object({ siteUrl: z.string().url(), accessToken: z.string().min(1) })
       .parse(args.data);
     const user = await verifyAdmin(validated.accessToken);
-    if (!isSupportedAsuraCatalogUrl(validated.siteUrl)) {
-      throw new Error("This first version supports asurascans.com only.");
+    const isAsura = isSupportedAsuraCatalogUrl(validated.siteUrl);
+    const isQiScans = isSupportedQiScansCatalogUrl(validated.siteUrl);
+    if (!isAsura && !isQiScans) {
+      throw new Error("Currently supported sites: Asura Scans and Qi Scans.");
     }
 
-    const discovery = await discoverAsuraCatalog(validated.siteUrl);
+    const discovery = isAsura
+      ? await discoverAsuraCatalog(validated.siteUrl)
+      : await discoverQiScansCatalog(validated.siteUrl);
     const admin = getAdminSupabase();
     const { data: job, error: jobError } = await admin
       .from("site_import_jobs")
@@ -521,7 +526,7 @@ export async function $processNextSiteImportItem(args: {
       const batch = missing.slice(0, IMPORT_BATCH_SIZE);
       const batchImages = await extractImagesFromChapterUrls(
         batch.map((chapter) => chapter.url),
-        { concurrency: 2, imageUrlExample: sourcePreset.imageUrlExample },
+        { concurrency: 6, imageUrlExample: sourcePreset.imageUrlExample },
       );
       let imported = 0;
       const failures: string[] = [];
@@ -547,7 +552,7 @@ export async function $processNextSiteImportItem(args: {
               }),
               chapter_type: "image",
               status: item.auto_publish ? "published" : "draft",
-              uploaded_by: "Asura Scans",
+              uploaded_by: sourcePreset.sourceSite || "Site Import",
               scanlation_group: scanlationGroup,
             })
             .select("id")

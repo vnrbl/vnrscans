@@ -1015,6 +1015,17 @@ export async function extractImagesFromChapterUrl(
         if (isProtectedPage(html)) {
           usePuppeteerFallback = true;
         } else {
+          const exampleModeImages = extractImageUrls(html, chapterUrl);
+          const exampleMatches = findImagesMatchingExampleUrl(exampleModeImages, imageUrlExample);
+          const sourceImages = filterReaderImagesForSource(exampleModeImages, chapterUrl, imageUrlExample);
+          if (exampleMatches.length > 0) {
+            return exampleMatches;
+          }
+
+          if (sourceImages.length > 0) {
+            return sourceImages;
+          }
+
           const usesClientRenderedReader =
             isQimanhwaLikeUrl(chapterUrl) ||
             isAsuraScansUrl(chapterUrl) ||
@@ -1022,19 +1033,7 @@ export async function extractImagesFromChapterUrl(
             isVortexLikeUrl(imageUrlExample);
 
           if (usesClientRenderedReader) {
-            // These readers often render chapter pages client-side; direct HTML can miss reader images.
             usePuppeteerFallback = true;
-          } else {
-            const exampleModeImages = extractImageUrls(html, chapterUrl);
-            const exampleMatches = findImagesMatchingExampleUrl(exampleModeImages, imageUrlExample);
-            const sourceImages = filterReaderImagesForSource(exampleModeImages, chapterUrl, imageUrlExample);
-            if (exampleMatches.length > 0) {
-              return exampleMatches;
-            }
-
-            if (sourceImages.length > 0) {
-              return sourceImages;
-            }
           }
         }
       }
@@ -1076,32 +1075,32 @@ export async function extractImagesFromChapterUrls(
   options: { concurrency?: number; imageUrlExample?: string | null } = {},
 ): Promise<Map<string, string[]>> {
   const uniqueUrls = Array.from(new Set(chapterUrls));
-  const browserUrls = uniqueUrls.filter((url) => shouldUseSharedReaderBrowser(url, options.imageUrlExample));
-  const directUrls = uniqueUrls.filter((url) => !shouldUseSharedReaderBrowser(url, options.imageUrlExample));
   const results = new Map<string, string[]>();
+  const failedUrls: string[] = [];
 
   const directSettled = await Promise.allSettled(
-    directUrls.map(async (url) => {
-      const images = await retryAsync(
-        () => extractImagesFromChapterUrl(url, options),
-        `Direct extraction for ${url}`,
-      );
-      results.set(url, images);
+    uniqueUrls.map(async (url) => {
+      try {
+        const images = await retryAsync(
+          () => extractImagesFromChapterUrl(url, options),
+          `Direct extraction for ${url}`,
+        );
+        if (images && images.length > 0) {
+          results.set(url, images);
+        } else {
+          failedUrls.push(url);
+        }
+      } catch {
+        failedUrls.push(url);
+      }
     }),
   );
-  directSettled.forEach((result, index) => {
-    if (result.status === 'rejected') {
-      console.warn(
-        `[Scraper] Direct extraction failed for ${directUrls[index]}:`,
-        result.reason instanceof Error ? result.reason.message : result.reason,
-      );
-    }
-  });
 
+  const browserUrls = failedUrls.filter((url) => shouldUseSharedReaderBrowser(url, options.imageUrlExample));
   if (browserUrls.length === 0) return results;
 
   const browserResults = await extractReaderImagesWithSharedBrowser(browserUrls, {
-    concurrency: options.concurrency ?? 2,
+    concurrency: options.concurrency ?? 4,
     imageUrlExample: options.imageUrlExample,
   });
   browserResults.forEach((images, url) => results.set(url, images));
@@ -1851,6 +1850,8 @@ function isQimanhwaReaderPageImage(url: string): boolean {
       lowercaseUrl.includes('/upload/upload/series/') ||
       lowercaseUrl.includes('/file/qiscans/upload/series/') ||
       lowercaseUrl.includes('/upload/series/') ||
+      lowercaseUrl.includes('/uploads/series/') ||
+      lowercaseUrl.includes('quantumscans') ||
       lowercaseUrl.includes('/file/qimanga/upload/series/') ||
       lowercaseUrl.includes('/qimanga/rezo/series/');
 
