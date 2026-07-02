@@ -68,7 +68,7 @@ export const ChapterList = React.memo(function ChapterList({
 
       const { data, error } = await query;
       if (error) throw error;
-      return (data ?? []).filter((c) => !c.scheduled_at || new Date(c.scheduled_at) <= new Date());
+      return (data ?? []).filter((c) => c.chapter_number !== 0 && (!c.scheduled_at || new Date(c.scheduled_at) <= new Date()));
     },
     placeholderData: selectedGroup === "all" && sortOrder === "desc" ? initialChaptersData : undefined,
     staleTime: 1000 * 60 * 2,

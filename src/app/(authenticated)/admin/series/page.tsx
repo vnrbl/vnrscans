@@ -20,6 +20,7 @@ import {
   Search,
   RefreshCw,
   Power,
+  Loader2,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { logAdminAction } from "@/lib/adminLog";
@@ -394,6 +395,59 @@ async function syncSeriesTaxonomy(seriesId: string, form: SeriesForm) {
   }
 }
 
+async function syncSeriesCoverHistory(seriesId: string, coverUrl: string | null) {
+  if (!coverUrl) return;
+  let { data: chapter, error: chError } = await supabase
+    .from("chapters")
+    .select("id")
+    .eq("series_id", seriesId)
+    .eq("chapter_number", 0)
+    .maybeSingle();
+  if (chError) throw chError;
+  if (!chapter) {
+    const { data: newCh, error } = await supabase
+      .from("chapters")
+      .insert({
+        series_id: seriesId,
+        chapter_number: 0,
+        title: "Covers",
+        slug: "covers",
+        chapter_type: "image",
+        status: "published",
+        uploaded_by: "System"
+      })
+      .select("id")
+      .single();
+    if (error) throw error;
+    chapter = newCh;
+  }
+  const { data: existingPages, error: pError } = await supabase
+    .from("chapter_pages")
+    .select("id")
+    .eq("chapter_id", chapter.id)
+    .eq("image_url", coverUrl)
+    .maybeSingle();
+  if (pError) throw pError;
+  if (!existingPages) {
+    const { data: pages, error: countError } = await supabase
+      .from("chapter_pages")
+      .select("page_number")
+      .eq("chapter_id", chapter.id)
+      .order("page_number", { ascending: false })
+      .limit(1);
+    if (countError) throw countError;
+    const nextNum = pages && pages.length > 0 ? pages[0].page_number + 1 : 1;
+    const { error: insertError } = await supabase
+      .from("chapter_pages")
+      .insert({
+        chapter_id: chapter.id,
+        page_number: nextNum,
+        image_url: coverUrl
+      });
+    if (insertError) throw insertError;
+  }
+}
+
 export default function AdminSeries() {
   const qc = useQueryClient();
   const { user } = useAuth();
@@ -462,6 +516,36 @@ export default function AdminSeries() {
 
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<SeriesForm>(emptySeriesForm);
+  const [uploadingCover, setUploadingCover] = useState(false);
+
+  const handleUploadImage = async (file: File) => {
+    if (!user) throw new Error("Must be logged in to upload files");
+    const extension = file.name.split(".").pop()?.toLowerCase().replace(/[^a-z0-9]/g, "") || "jpg";
+    const path = `${user.id}/${crypto.randomUUID()}.${extension}`;
+    const { error } = await supabase.storage.from("comment-media").upload(path, file, {
+      contentType: file.type,
+      upsert: false,
+    });
+    if (error) throw error;
+    const { data } = supabase.storage.from("comment-media").getPublicUrl(path);
+    return data.publicUrl;
+  };
+
+  const onCoverFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingCover(true);
+    const toastId = toast.loading("Uploading cover image...");
+    try {
+      const url = await handleUploadImage(file);
+      setForm((prev) => ({ ...prev, cover_url: url }));
+      toast.success("Cover image uploaded successfully!", { id: toastId });
+    } catch (err: any) {
+      toast.error(`Upload failed: ${err.message}`, { id: toastId });
+    } finally {
+      setUploadingCover(false);
+    }
+  };
 
   const genres = useQuery({
     queryKey: ["admin", "genres", "options"],
@@ -497,16 +581,24 @@ export default function AdminSeries() {
         .single();
       if (error) throw error;
       await syncSeriesTaxonomy(data.id, form);
+      await syncSeriesCoverHistory(data.id, form.cover_url || null);
       await logAdminAction("create", "series", data.id, { title: form.title });
+      return data;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      const isNovel = form.type === "novel";
       toast.success("Series created");
       setOpen(false);
       setForm(emptySeriesForm);
+      qc.invalidateQueries({ queryKey: ["series"] });
       qc.invalidateQueries({ queryKey: ["admin", "series"] });
       qc.invalidateQueries({ queryKey: ["admin", "genres"] });
       qc.invalidateQueries({ queryKey: ["admin", "tags"] });
       setCurrentPage(1); // Reset to first page
+      
+      if (isNovel && data?.id) {
+        navigate({ to: "/admin/novels", search: { seriesId: data.id } });
+      }
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -520,12 +612,14 @@ export default function AdminSeries() {
         .eq("id", editingSeries.id);
       if (error) throw error;
       await syncSeriesTaxonomy(editingSeries.id, form);
+      await syncSeriesCoverHistory(editingSeries.id, form.cover_url || null);
       await logAdminAction("update", "series", editingSeries.id, { title: form.title });
     },
     onSuccess: () => {
       toast.success("Series updated");
       setEditingSeries(null);
       setForm(emptySeriesForm);
+      qc.invalidateQueries({ queryKey: ["series"] });
       qc.invalidateQueries({ queryKey: ["admin", "series"] });
       qc.invalidateQueries({ queryKey: ["admin", "genres"] });
       qc.invalidateQueries({ queryKey: ["admin", "tags"] });
@@ -595,6 +689,8 @@ export default function AdminSeries() {
               setForm={setForm}
               genres={genres.data ?? []}
               tags={tags.data ?? []}
+              uploadingCover={uploadingCover}
+              onCoverFileChange={onCoverFileChange}
             />
             <DialogFooter>
               <Button onClick={() => create.mutate()} disabled={!form.title || create.isPending}>
@@ -877,6 +973,8 @@ export default function AdminSeries() {
             setForm={setForm}
             genres={genres.data ?? []}
             tags={tags.data ?? []}
+            uploadingCover={uploadingCover}
+            onCoverFileChange={onCoverFileChange}
           />
           <DialogFooter>
             <Button
@@ -901,11 +999,15 @@ function SeriesFormFields({
   setForm,
   genres,
   tags,
+  uploadingCover,
+  onCoverFileChange,
 }: {
   form: SeriesForm;
   setForm: (form: SeriesForm) => void;
   genres: GenreOption[];
   tags: TagOption[];
+  uploadingCover?: boolean;
+  onCoverFileChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
 }) {
   const selectedTagNames = useMemo(() => {
     const selectedExistingTags = tags
@@ -1154,11 +1256,33 @@ function SeriesFormFields({
       </div>
       <div>
         <Label>Cover URL</Label>
-        <Input
-          value={form.cover_url}
-          onChange={(e) => setForm({ ...form, cover_url: e.target.value })}
-          placeholder="https://example.com/cover.jpg"
-        />
+        <div className="flex gap-2 mt-1">
+          <Input
+            value={form.cover_url}
+            onChange={(e) => setForm({ ...form, cover_url: e.target.value })}
+            placeholder="https://example.com/cover.jpg"
+            className="flex-1"
+          />
+          <div className="relative shrink-0">
+            <input
+              type="file"
+              accept="image/*"
+              id="manga-cover-file-input"
+              onChange={onCoverFileChange}
+              className="hidden"
+              disabled={uploadingCover}
+            />
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => document.getElementById("manga-cover-file-input")?.click()}
+              disabled={uploadingCover}
+              className="h-10"
+            >
+              {uploadingCover ? <Loader2 className="h-4 w-4 animate-spin" /> : "Upload"}
+            </Button>
+          </div>
+        </div>
       </div>
       <div>
         <Label>Alternative Titles</Label>

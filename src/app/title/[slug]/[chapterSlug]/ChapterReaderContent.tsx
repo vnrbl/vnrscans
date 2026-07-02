@@ -157,7 +157,7 @@ export default function Reader({ slug, chapterSlug }: { slug: string; chapterSlu
       if (error) throw error;
       return data ?? [];
     },
-    enabled: !!chapterQ.data && chapterQ.data.chapter_type === "image",
+    enabled: !!chapterQ.data,
     staleTime: 1000 * 60 * 30,
     gcTime: 1000 * 60 * 60,
   });
@@ -664,6 +664,7 @@ export default function Reader({ slug, chapterSlug }: { slug: string; chapterSlu
               seriesSlug={seriesSlug}
               seriesTitle={c.series?.title ?? ""}
               chapterNumber={c.chapter_number}
+              illustrations={pagesQ.data?.map((p: any) => p.image_url) ?? []}
             />
           ) : (
             <ImageView
@@ -1215,6 +1216,7 @@ function NovelView({
   seriesSlug,
   seriesTitle,
   chapterNumber,
+  illustrations = [],
 }: {
   content: string;
   chapterId: string;
@@ -1226,6 +1228,7 @@ function NovelView({
   seriesSlug: string;
   seriesTitle: string;
   chapterNumber: number;
+  illustrations?: string[];
 }) {
   // Scroll position restoration for novels
   useEffect(() => {
@@ -1276,13 +1279,32 @@ function NovelView({
     };
   }, [chapterId, content]);
 
+  const isHtml = /<[a-z][\s\S]*>/i.test(content);
+
   return (
-    <div className="mx-auto max-w-2xl px-4 py-10">
+    <div className="mx-auto max-w-4xl px-4 sm:px-6 md:px-8 py-10">
+      <style dangerouslySetInnerHTML={{ __html: `
+        .novel-body-text p {
+          margin-bottom: 2rem !important;
+          line-height: 1.95 !important;
+          letter-spacing: -0.012em !important;
+          word-spacing: -0.02em !important;
+          text-align: justify !important;
+          text-justify: inter-word !important;
+        }
+        .novel-body-text {
+          line-height: 1.95 !important;
+          letter-spacing: -0.012em !important;
+          word-spacing: -0.02em !important;
+          text-align: justify !important;
+          text-justify: inter-word !important;
+        }
+      `}} />
       <article
         className="text-foreground"
         style={{
           fontSize: "var(--novel-font-size, 18px)",
-          lineHeight: "var(--novel-line-height, 1.7)",
+          lineHeight: "var(--novel-line-height, 1.9)",
         }}
       >
         <header className="mb-8 border-b border-border pb-6">
@@ -1293,11 +1315,35 @@ function NovelView({
             Read the full chapter online at vnrscans.
           </p>
         </header>
-        {content.split(/\n{2,}/).map((p, i) => (
-          <p key={i} className="mb-4 whitespace-pre-wrap">
-            {p}
-          </p>
-        ))}
+
+        {illustrations && illustrations.length > 0 && (
+          <div className="mb-8 space-y-4">
+            {illustrations.map((url, idx) => (
+              <div key={idx} className="relative w-full max-h-[600px] overflow-hidden rounded-lg border border-border/40 bg-card/10 shadow-lg">
+                <img
+                  src={url}
+                  alt={`Illustration ${idx + 1}`}
+                  className="w-full h-auto max-h-[600px] object-contain mx-auto"
+                />
+              </div>
+            ))}
+          </div>
+        )}
+        
+        {isHtml ? (
+          <div 
+            className="novel-body-text whitespace-pre-wrap"
+            dangerouslySetInnerHTML={{ __html: content }}
+          />
+        ) : (
+          <div className="novel-body-text">
+            {content.split(/\n{2,}/).map((p, i) => (
+              <p key={i} className="whitespace-pre-wrap">
+                {p}
+              </p>
+            ))}
+          </div>
+        )}
       </article>
 
       {/* Chapter Navigation Buttons - Above Reactions */}

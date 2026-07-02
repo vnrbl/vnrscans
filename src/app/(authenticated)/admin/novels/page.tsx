@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo, Suspense } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -49,11 +49,12 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
   DialogFooter,
 } from "@/components/ui/dialog";
 import { buildChapterSlug } from "@/lib/chapter-utils";
 import { logAdminAction } from "@/lib/adminLog";
+import { useNavigate } from "@/lib/router-compat";
+import { useSearchParams } from "next/navigation";
 
 type ChapterRow = {
   id: string;
@@ -75,20 +76,79 @@ function slugify(s: string) {
     .replace(/^-|-$/g, "");
 }
 
-export default function NovelsWriterPage() {
+async function syncSeriesCoverHistory(seriesId: string, coverUrl: string | null) {
+  if (!coverUrl) return;
+  let { data: chapter, error: chError } = await supabase
+    .from("chapters")
+    .select("id")
+    .eq("series_id", seriesId)
+    .eq("chapter_number", 0)
+    .maybeSingle();
+  if (chError) throw chError;
+  if (!chapter) {
+    const { data: newCh, error } = await supabase
+      .from("chapters")
+      .insert({
+        series_id: seriesId,
+        chapter_number: 0,
+        title: "Covers",
+        slug: "covers",
+        chapter_type: "image",
+        status: "published",
+        uploaded_by: "System"
+      })
+      .select("id")
+      .single();
+    if (error) throw error;
+    chapter = newCh;
+  }
+  const { data: existingPages, error: pError } = await supabase
+    .from("chapter_pages")
+    .select("id")
+    .eq("chapter_id", chapter.id)
+    .eq("image_url", coverUrl)
+    .maybeSingle();
+  if (pError) throw pError;
+  if (!existingPages) {
+    const { data: pages, error: countError } = await supabase
+      .from("chapter_pages")
+      .select("page_number")
+      .eq("chapter_id", chapter.id)
+      .order("page_number", { ascending: false })
+      .limit(1);
+    if (countError) throw countError;
+    const nextNum = pages && pages.length > 0 ? pages[0].page_number + 1 : 1;
+    const { error: insertError } = await supabase
+      .from("chapter_pages")
+      .insert({
+        chapter_id: chapter.id,
+        page_number: nextNum,
+        image_url: coverUrl
+      });
+    if (insertError) throw insertError;
+  }
+}
+
+function NovelsWriterContent() {
   const qc = useQueryClient();
   const { user } = useAuth();
+  const navigate = useNavigate();
+  const searchParams = useSearchParams();
   
+  // Read initial/updated seriesId from URL parameters
+  const urlSeriesId = searchParams.get("seriesId") || "";
+
   // Workspace States
-  const [selectedSeriesId, setSelectedSeriesId] = useState<string>("");
+  const [selectedSeriesId, setSelectedSeriesId] = useState<string>(urlSeriesId);
   const [activeChapter, setActiveChapter] = useState<ChapterRow | null>(null);
   const [focusMode, setFocusMode] = useState(false);
   const [lastSaved, setLastSaved] = useState<string>("");
   
-  // Create Series Dialog State
+  // Create / Edit Series Dialog State
   const [createSeriesOpen, setCreateSeriesOpen] = useState(false);
+  const [isEditingSeries, setIsEditingSeries] = useState(false);
   
-  // New Series Form States
+  // New / Edited Series Form States
   const [newTitle, setNewTitle] = useState("");
   const [newCoverUrl, setNewCoverUrl] = useState("");
   const [newDescription, setNewDescription] = useState("");
@@ -107,8 +167,67 @@ export default function NovelsWriterPage() {
   const [status, setStatus] = useState<"draft" | "published" | "scheduled">("draft");
   const [scheduledAt, setScheduledAt] = useState("");
   const [novelContent, setNovelContent] = useState("");
+  const [imageUrls, setImageUrls] = useState("");
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [uploadingCover, setUploadingCover] = useState(false);
+  const [uploadingIllustrations, setUploadingIllustrations] = useState(false);
+
+  const handleUploadImage = async (file: File) => {
+    if (!user) throw new Error("Must be logged in to upload files");
+    const extension = file.name.split(".").pop()?.toLowerCase().replace(/[^a-z0-9]/g, "") || "jpg";
+    const path = `${user.id}/${crypto.randomUUID()}.${extension}`;
+    const { error } = await supabase.storage.from("comment-media").upload(path, file, {
+      contentType: file.type,
+      upsert: false,
+    });
+    if (error) throw error;
+    const { data } = supabase.storage.from("comment-media").getPublicUrl(path);
+    return data.publicUrl;
+  };
+
+  const onCoverFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingCover(true);
+    const toastId = toast.loading("Uploading cover image...");
+    try {
+      const url = await handleUploadImage(file);
+      setNewCoverUrl(url);
+      toast.success("Cover image uploaded successfully!", { id: toastId });
+    } catch (err: any) {
+      toast.error(`Upload failed: ${err.message}`, { id: toastId });
+    } finally {
+      setUploadingCover(false);
+    }
+  };
+
+  const onIllustrationFilesChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+    
+    setUploadingIllustrations(true);
+    const toastId = toast.loading(`Uploading ${files.length} illustration(s)...`);
+    try {
+      const urls = await Promise.all(files.map(file => handleUploadImage(file)));
+      const currentUrls = imageUrls.split("\n").map(u => u.trim()).filter(Boolean);
+      const combined = [...currentUrls, ...urls].join("\n");
+      setImageUrls(combined);
+      toast.success("Illustrations uploaded successfully!", { id: toastId });
+    } catch (err: any) {
+      toast.error(`Upload failed: ${err.message}`, { id: toastId });
+    } finally {
+      setUploadingIllustrations(false);
+    }
+  };
+
+  // Sync selected series ID if URL query param changes
+  useEffect(() => {
+    if (urlSeriesId && urlSeriesId !== selectedSeriesId) {
+      setSelectedSeriesId(urlSeriesId);
+      setActiveChapter(null);
+    }
+  }, [urlSeriesId]);
 
   // Fetch uploader profile
   const userProfile = useQuery({
@@ -126,13 +245,13 @@ export default function NovelsWriterPage() {
     enabled: !!user,
   });
 
-  // Fetch all novel series
+  // Fetch all novel series with taxonomy relations pre-loaded
   const novelSeriesQuery = useQuery({
     queryKey: ["admin", "novels-series-list"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("series")
-        .select("id,title,slug,cover_url")
+        .select("*, series_genres(genre_id), series_tags(tag_id)")
         .eq("type", "novel")
         .eq("is_hidden", false)
         .order("title");
@@ -183,12 +302,39 @@ export default function NovelsWriterPage() {
     enabled: !!selectedSeriesId,
   });
 
-  // Initialize selected series if none set
+  // Query pages (illustrations) for active chapter
+  const chapterPagesQuery = useQuery({
+    queryKey: ["admin", "novel-chapter-pages", activeChapter?.id],
+    queryFn: async () => {
+      if (!activeChapter?.id) return [];
+      const { data, error } = await supabase
+        .from("chapter_pages")
+        .select("image_url")
+        .eq("chapter_id", activeChapter.id)
+        .order("page_number");
+      if (error) throw error;
+      return data ?? [];
+    },
+    enabled: !!activeChapter?.id,
+  });
+
+  // Sync imageUrls state with active chapter's pages
   useEffect(() => {
-    if (novelSeriesQuery.data && novelSeriesQuery.data.length > 0 && !selectedSeriesId) {
-      setSelectedSeriesId(novelSeriesQuery.data[0].id);
+    if (chapterPagesQuery.data && activeChapter?.id) {
+      setImageUrls(chapterPagesQuery.data.map((p: any) => p.image_url).join("\n"));
+    } else {
+      setImageUrls("");
     }
-  }, [novelSeriesQuery.data, selectedSeriesId]);
+  }, [chapterPagesQuery.data, activeChapter?.id]);
+
+  // Initialize selected series if none set and no query param exists
+  useEffect(() => {
+    if (novelSeriesQuery.data && novelSeriesQuery.data.length > 0 && !selectedSeriesId && !urlSeriesId) {
+      const firstId = novelSeriesQuery.data[0].id;
+      setSelectedSeriesId(firstId);
+      navigate({ to: "/admin/novels", search: { seriesId: firstId } });
+    }
+  }, [novelSeriesQuery.data, selectedSeriesId, urlSeriesId]);
 
   // Load active chapter details into form
   const loadChapter = (chapter: ChapterRow) => {
@@ -221,10 +367,11 @@ export default function NovelsWriterPage() {
     setStatus("draft");
     setScheduledAt("");
     setNovelContent("");
+    setImageUrls("");
     setLastSaved("");
   };
 
-  // Reset Create Series Form
+  // Reset Create/Edit Series Form
   const resetNewSeriesForm = () => {
     setNewTitle("");
     setNewCoverUrl("");
@@ -286,15 +433,79 @@ export default function NovelsWriterPage() {
       }
 
       await logAdminAction("create", "series", newSeries.id, { title: newTitle.trim() });
+      await syncSeriesCoverHistory(newSeries.id, newCoverUrl.trim() || null);
       return newSeries.id;
     },
     onSuccess: (newId) => {
       toast.success("Novel series created successfully!");
       setCreateSeriesOpen(false);
       resetNewSeriesForm();
+      qc.invalidateQueries({ queryKey: ["series"] });
       qc.invalidateQueries({ queryKey: ["admin", "novels-series-list"] });
+      
+      // Update state and redirect to the novels page with the query parameter
       setSelectedSeriesId(newId);
+      navigate({ to: "/admin/novels", search: { seriesId: newId } });
       startNewChapter();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  // Edit Novel Series Mutation
+  const editSeriesMutation = useMutation({
+    mutationFn: async () => {
+      if (!selectedSeriesId) throw new Error("No series selected");
+      if (!newTitle.trim()) throw new Error("Title is required");
+
+      const seriesPayload = {
+        title: newTitle.trim(),
+        slug: slugify(newTitle.trim()),
+        cover_url: newCoverUrl.trim() || null,
+        description: newDescription.trim() || null,
+        author: newAuthor.trim() || null,
+        artist: newArtist.trim() || null,
+        alternative_titles: newAltTitles.trim() || null,
+        status: newStatus,
+        content_rating: newContentRating,
+        release_year: newReleaseYear ? parseInt(newReleaseYear, 10) : null,
+        updated_at: new Date().toISOString()
+      };
+
+      // 1. Update series details
+      const { error: seriesError } = await supabase
+        .from("series")
+        .update(seriesPayload)
+        .eq("id", selectedSeriesId);
+
+      if (seriesError) throw seriesError;
+
+      // 2. Sync genres relationships
+      await supabase.from("series_genres").delete().eq("series_id", selectedSeriesId);
+      if (newGenreIds.length > 0) {
+        const { error: genresError } = await supabase
+          .from("series_genres")
+          .insert(newGenreIds.map(genre_id => ({ series_id: selectedSeriesId, genre_id })));
+        if (genresError) throw genresError;
+      }
+
+      // 3. Sync tags relationships
+      await supabase.from("series_tags").delete().eq("series_id", selectedSeriesId);
+      if (newTagIds.length > 0) {
+        const { error: tagsError } = await supabase
+          .from("series_tags")
+          .insert(newTagIds.map(tag_id => ({ series_id: selectedSeriesId, tag_id })));
+        if (tagsError) throw tagsError;
+      }
+
+      await logAdminAction("update", "series", selectedSeriesId, { title: newTitle.trim() });
+      await syncSeriesCoverHistory(selectedSeriesId, newCoverUrl.trim() || null);
+    },
+    onSuccess: () => {
+      toast.success("Novel series details updated successfully!");
+      setCreateSeriesOpen(false);
+      resetNewSeriesForm();
+      qc.invalidateQueries({ queryKey: ["series"] });
+      qc.invalidateQueries({ queryKey: ["admin", "novels-series-list"] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -412,6 +623,8 @@ export default function NovelsWriterPage() {
         uploaded_by: authorName,
       };
 
+      let finalChapterId = "";
+
       if (activeChapter) {
         // Update Chapter
         const { error } = await supabase
@@ -423,6 +636,8 @@ export default function NovelsWriterPage() {
           .eq("id", activeChapter.id);
 
         if (error) throw error;
+        finalChapterId = activeChapter.id;
+        
         await logAdminAction("update", "chapter", activeChapter.id, {
           series_id: selectedSeriesId,
           chapter_number: chapterNum,
@@ -437,11 +652,30 @@ export default function NovelsWriterPage() {
           .single();
 
         if (error) throw error;
+        finalChapterId = newChapter.id;
+
         await logAdminAction("create", "chapter", newChapter.id, {
           series_id: selectedSeriesId,
           chapter_number: chapterNum,
           type: "novel"
         });
+      }
+
+      // Sync chapter_pages (illustrations/cover pictures for this chapter)
+      await supabase
+        .from("chapter_pages")
+        .delete()
+        .eq("chapter_id", finalChapterId);
+
+      const urls = imageUrls.split("\n").map(u => u.trim()).filter(Boolean);
+      if (urls.length > 0) {
+        const pages = urls.map((url, idx) => ({
+          chapter_id: finalChapterId,
+          page_number: idx + 1,
+          image_url: url,
+        }));
+        const { error: pagesError } = await supabase.from("chapter_pages").insert(pages);
+        if (pagesError) throw pagesError;
       }
 
       // Clear local storage draft
@@ -451,6 +685,8 @@ export default function NovelsWriterPage() {
     onSuccess: (_, publishStatus) => {
       toast.success(activeChapter ? "Chapter updated successfully!" : "New chapter published!");
       qc.invalidateQueries({ queryKey: ["admin", "novels-chapters", selectedSeriesId] });
+      qc.invalidateQueries({ queryKey: ["series-chapter-covers", selectedSeriesId] });
+      qc.invalidateQueries({ queryKey: ["admin", "novel-chapter-pages", activeChapter?.id] });
       setLastSaved("");
       
       // Reload active chapter query
@@ -481,9 +717,17 @@ export default function NovelsWriterPage() {
       toast.success("Chapter deleted");
       startNewChapter();
       qc.invalidateQueries({ queryKey: ["admin", "novels-chapters", selectedSeriesId] });
+      qc.invalidateQueries({ queryKey: ["series-chapter-covers", selectedSeriesId] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
+
+  // Handles manual change of selected novel dropdown (syncs to URL params)
+  const handleSelectSeries = (seriesId: string) => {
+    setSelectedSeriesId(seriesId);
+    navigate({ to: "/admin/novels", search: { seriesId } });
+    startNewChapter();
+  };
 
   return (
     <div className="min-h-screen bg-background relative overflow-hidden flex flex-col">
@@ -503,18 +747,55 @@ export default function NovelsWriterPage() {
           </div>
           
           <div className="flex items-center gap-2.5">
-            {/* Create Novel Series Button Trigger */}
+            {/* Create Novel Series Trigger Button */}
+            <Button
+              onClick={() => {
+                setIsEditingSeries(false);
+                resetNewSeriesForm();
+                setCreateSeriesOpen(true);
+              }}
+              className="bg-emerald-600 hover:bg-emerald-700 h-9 font-semibold text-white"
+            >
+              <Plus className="mr-1.5 h-4 w-4" /> Create Novel
+            </Button>
+
+            {/* Edit Novel Series Trigger Button */}
+            {selectedSeriesId && (
+              <Button
+                onClick={() => {
+                  const series = novelSeriesQuery.data?.find(s => s.id === selectedSeriesId);
+                  if (series) {
+                    setIsEditingSeries(true);
+                    setNewTitle(series.title);
+                    setNewCoverUrl(series.cover_url || "");
+                    setNewDescription(series.description || "");
+                    setNewAuthor(series.author || "");
+                    setNewArtist(series.artist || "");
+                    setNewAltTitles(series.alternative_titles || "");
+                    setNewStatus(series.status as any);
+                    setNewContentRating(series.content_rating as any);
+                    setNewReleaseYear(series.release_year ? String(series.release_year) : "");
+                    setNewGenreIds(series.series_genres?.map((g: any) => g.genre_id) || []);
+                    setNewTagIds(series.series_tags?.map((t: any) => t.tag_id) || []);
+                    setCreateSeriesOpen(true);
+                  }
+                }}
+                variant="outline"
+                className="border-border/60 hover:bg-secondary h-9 font-semibold"
+              >
+                <Settings className="mr-1.5 h-4 w-4 text-muted-foreground" /> Edit Novel
+              </Button>
+            )}
+
+            {/* Create / Edit Series Dialog */}
             <Dialog open={createSeriesOpen} onOpenChange={(v) => { setCreateSeriesOpen(v); if(!v) resetNewSeriesForm(); }}>
-              <DialogTrigger asChild>
-                <Button className="bg-emerald-600 hover:bg-emerald-700 h-9 font-semibold text-white">
-                  <Plus className="mr-1.5 h-4 w-4" /> Create Novel
-                </Button>
-              </DialogTrigger>
               <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
-                  <DialogTitle>Create New Novel Series</DialogTitle>
+                  <DialogTitle>{isEditingSeries ? "Edit Novel Details" : "Create New Novel Series"}</DialogTitle>
                   <DialogDescription>
-                    Add a new web novel configuration to the site. This sets up the series title, metadata, genres, and tags.
+                    {isEditingSeries
+                      ? "Update metadata, details, genres, or cover images for the active web novel series."
+                      : "Add a new web novel configuration to the site. This sets up the series title, metadata, genres, and tags."}
                   </DialogDescription>
                 </DialogHeader>
                 
@@ -554,13 +835,34 @@ export default function NovelsWriterPage() {
                       </div>
                       <div>
                         <Label htmlFor="coverUrl">Cover Image URL</Label>
-                        <Input
-                          id="coverUrl"
-                          placeholder="https://..."
-                          value={newCoverUrl}
-                          onChange={(e) => setNewCoverUrl(e.target.value)}
-                          className="mt-1"
-                        />
+                        <div className="flex gap-2 mt-1">
+                          <Input
+                            id="coverUrl"
+                            placeholder="https://..."
+                            value={newCoverUrl}
+                            onChange={(e) => setNewCoverUrl(e.target.value)}
+                            className="flex-1"
+                          />
+                          <div className="relative shrink-0">
+                            <input
+                              type="file"
+                              accept="image/*"
+                              id="novel-cover-file-input"
+                              onChange={onCoverFileChange}
+                              className="hidden"
+                              disabled={uploadingCover}
+                            />
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={() => document.getElementById("novel-cover-file-input")?.click()}
+                              disabled={uploadingCover}
+                              className="h-10"
+                            >
+                              {uploadingCover ? <Loader2 className="h-4 w-4 animate-spin" /> : "Upload"}
+                            </Button>
+                          </div>
+                        </div>
                       </div>
                       <div>
                         <Label htmlFor="altTitles">Alternative Titles (comma/line separated)</Label>
@@ -675,17 +977,26 @@ export default function NovelsWriterPage() {
                 <DialogFooter className="mt-4 border-t border-border/10 pt-3">
                   <Button variant="outline" onClick={() => setCreateSeriesOpen(false)}>Cancel</Button>
                   <Button
-                    onClick={() => createSeriesMutation.mutate()}
-                    disabled={!newTitle.trim() || !newAuthor.trim() || !newDescription.trim() || createSeriesMutation.isPending}
+                    onClick={() => isEditingSeries ? editSeriesMutation.mutate() : createSeriesMutation.mutate()}
+                    disabled={
+                      !newTitle.trim() ||
+                      !newAuthor.trim() ||
+                      !newDescription.trim() ||
+                      (isEditingSeries ? editSeriesMutation.isPending : createSeriesMutation.isPending)
+                    }
                     className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold min-w-[120px]"
                   >
-                    {createSeriesMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Create Novel"}
+                    {isEditingSeries ? (
+                      editSeriesMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save Changes"
+                    ) : (
+                      createSeriesMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Create Novel"
+                    )}
                   </Button>
                 </DialogFooter>
               </DialogContent>
             </Dialog>
 
-            <Select value={selectedSeriesId} onValueChange={(v) => { setSelectedSeriesId(v); startNewChapter(); }}>
+            <Select value={selectedSeriesId} onValueChange={handleSelectSeries}>
               <SelectTrigger className="w-[200px] bg-card/60 backdrop-blur border-border/60">
                 <SelectValue placeholder="Select novel series..." />
               </SelectTrigger>
@@ -844,6 +1155,45 @@ export default function NovelsWriterPage() {
                   </div>
                 </div>
 
+                {/* Cover Pictures / Chapter Illustrations Upload field */}
+                <div>
+                  <div className="flex items-center justify-between">
+                    <Label>Chapter Illustrations / Cover Pictures (one URL per line) (optional)</Label>
+                    <div className="relative">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        id="illustration-files-input"
+                        multiple
+                        onChange={onIllustrationFilesChange}
+                        className="hidden"
+                        disabled={uploadingIllustrations}
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => document.getElementById("illustration-files-input")?.click()}
+                        disabled={uploadingIllustrations}
+                        className="h-7 text-xs text-primary hover:text-primary/80 font-bold flex items-center gap-1"
+                      >
+                        {uploadingIllustrations ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Plus className="h-3 w-3 mr-1" />}
+                        Upload Images
+                      </Button>
+                    </div>
+                  </div>
+                  <Textarea
+                    rows={2}
+                    placeholder="https://example.com/chapter-illustration-1.jpg&#10;https://example.com/chapter-illustration-2.jpg"
+                    value={imageUrls}
+                    onChange={(e) => setImageUrls(e.target.value)}
+                    className="font-mono text-xs mt-1.5 bg-card/30 border-border/45"
+                  />
+                  <p className="mt-1 text-[10px] text-muted-foreground">
+                    Add cover illustrations for this specific chapter. These will show inside the chapter reader and in the main series details cover slideshow.
+                  </p>
+                </div>
+
                 {/* Formatted Tags Editor Toolbar */}
                 <div className="flex flex-wrap items-center gap-1.5 p-1.5 rounded-lg border border-border/40 bg-card/60 backdrop-blur-sm mt-2">
                   <Button
@@ -971,5 +1321,17 @@ export default function NovelsWriterPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function NovelsWriterPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex h-[50vh] items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    }>
+      <NovelsWriterContent />
+    </Suspense>
   );
 }

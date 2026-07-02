@@ -184,7 +184,7 @@ export default function NovelsClient({ initialNovels }: NovelsClientProps) {
             {/* Featured Novel (Hero Section) */}
             {featuredNovel && !searchQuery.trim() && (
               <div className="mb-14">
-                <Card className="overflow-hidden border-border/60 bg-card/60 backdrop-blur-md transition-all duration-300 hover:border-primary/50 hover:shadow-2xl">
+                <Card className="overflow-hidden border-border/60 bg-card/60 backdrop-blur-md transition-all duration-500 hover:border-primary/50 hover:shadow-2xl group hover:-translate-y-1">
                   <div className="grid md:grid-cols-12 gap-0 items-center">
                     <div className="md:col-span-7 relative h-64 sm:h-80 md:h-[420px] overflow-hidden">
                       <OptimizedImage
@@ -293,7 +293,7 @@ export default function NovelsClient({ initialNovels }: NovelsClientProps) {
                 {(searchQuery.trim() ? filteredNovels : remainingNovels).map((novel) => (
                   <Card
                     key={novel.id}
-                    className="flex flex-col justify-between overflow-hidden border-border/60 bg-card/60 backdrop-blur-sm transition-all duration-300 hover:border-primary/50 hover:shadow-xl w-full group"
+                    className="flex flex-col justify-between overflow-hidden border-border/60 bg-card/60 backdrop-blur-sm transition-all duration-300 hover:border-primary/50 hover:shadow-xl w-full group hover:-translate-y-1.5 hover:bg-card"
                   >
                     <div>
                       {/* Cover & General Badges */}
@@ -311,7 +311,7 @@ export default function NovelsClient({ initialNovels }: NovelsClientProps) {
                           {novel.rating_average ? Number(novel.rating_average).toFixed(1) : "0.0"}
                         </div>
                       </div>
-
+ 
                       <CardContent className="p-5 pb-3">
                         <Link
                           to="/title/$slug"
@@ -320,19 +320,19 @@ export default function NovelsClient({ initialNovels }: NovelsClientProps) {
                         >
                           {novel.title}
                         </Link>
-
+ 
                         {novel.author && (
                           <p className="text-[11px] text-muted-foreground mt-1 mb-2">
                             By {novel.author}
                           </p>
                         )}
-
+ 
                         <p className="mt-2 text-xs text-muted-foreground line-clamp-2 leading-relaxed">
                           {novel.description || `Read ${novel.title} online on vnrscans.`}
                         </p>
                       </CardContent>
                     </div>
-
+ 
                     {/* Chapter features section inside the grid card */}
                     <div className="p-5 pt-3 mt-auto border-t border-border/30">
                       <div className="space-y-2">
@@ -380,7 +380,7 @@ export default function NovelsClient({ initialNovels }: NovelsClientProps) {
                           params={{ slug: novel.slug }}
                           className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-primary hover:text-primary/80 transition-colors"
                         >
-                          View Series <ChevronRight className="h-3 w-3" />
+                          View Series <ChevronRight className="h-3 w-3 transition-transform duration-300 group-hover:translate-x-1" />
                         </Link>
                       </div>
                     </div>

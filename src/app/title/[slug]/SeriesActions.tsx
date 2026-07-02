@@ -3,7 +3,7 @@
 import React from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { BookOpen, UserPlus, UserCheck, Star, Bookmark, Bell, BellRing, BellOff } from "lucide-react";
+import { ArrowLeft, BookOpen, UserPlus, UserCheck, Star, Bookmark, Bell, BellRing, BellOff, ChevronLeft, ChevronRight } from "lucide-react";
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -16,6 +16,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { XP_AMOUNTS } from "@/lib/xp";
 
 /* ------------------------------------------------------------------ */
@@ -44,6 +50,42 @@ export const SeriesActions = React.memo(function SeriesActions({
 }: SeriesActionsProps) {
   const { user } = useAuth();
   const qc = useQueryClient();
+  const [activeCoverIdx, setActiveCoverIdx] = React.useState(0);
+  const [isGalleryOpen, setIsGalleryOpen] = React.useState(false);
+  const [galleryIdx, setGalleryIdx] = React.useState(0);
+  const [activeView, setActiveView] = React.useState<"grid" | "lightbox">("grid");
+
+  // Fetch all images uploaded for chapters of this series to use as supplementary cover pictures/illustrations
+  const chapterCoversQuery = useQuery({
+    queryKey: ["series", "chapter-covers", seriesId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("chapters")
+        .select("id, chapter_pages(image_url)")
+        .eq("series_id", seriesId);
+      if (error) throw error;
+      
+      const urls: string[] = [];
+      (data || []).forEach((ch: any) => {
+        (ch.chapter_pages || []).forEach((cp: any) => {
+          if (cp.image_url) urls.push(cp.image_url);
+        });
+      });
+      return urls.reverse();
+    },
+    staleTime: 1000 * 60 * 5,
+  });
+
+  const allCovers = React.useMemo(() => {
+    const list: string[] = [];
+    if (coverUrl) list.push(coverUrl);
+    (chapterCoversQuery.data || []).forEach((img: string) => {
+      if (!list.includes(img)) {
+        list.push(img);
+      }
+    });
+    return list;
+  }, [coverUrl, chapterCoversQuery.data]);
 
   const isFollowing = useQuery({
     queryKey: ["following", slug, user?.id],
@@ -166,19 +208,83 @@ export const SeriesActions = React.memo(function SeriesActions({
 
   return (
     <aside className="mx-auto w-full max-w-[180px] shrink-0 sm:mx-0 sm:max-w-[220px]">
-      <div className="overflow-hidden rounded-xl border border-border/40 bg-secondary shadow-2xl transition-all duration-300 hover:border-primary/30">
-        {coverUrl ? (
-          <div className="relative aspect-[2/3] w-full">
+      <div 
+        onClick={() => {
+          if (allCovers.length > 0) {
+            setActiveView("grid");
+            setIsGalleryOpen(true);
+          }
+        }}
+        className="overflow-hidden rounded-xl border border-border/40 bg-secondary shadow-2xl transition-all duration-300 hover:border-primary/30 relative group cursor-pointer"
+      >
+        {allCovers.length > 0 ? (
+          <div className="relative aspect-[2/3] w-full bg-black/60 overflow-hidden flex items-center justify-center">
+            {/* Blurred Backdrop */}
+            <img
+              src={allCovers[activeCoverIdx]}
+              alt=""
+              className="absolute inset-0 h-full w-full object-cover blur-md opacity-25 scale-105 pointer-events-none"
+            />
+            {/* Main Image */}
             <Image
-              src={coverUrl}
+              src={allCovers[activeCoverIdx]}
               alt={title}
               fill
               priority
               unoptimized
               sizes="(max-width: 640px) 180px, 220px"
-              className="object-cover"
+              className="relative z-10 object-contain transition-transform duration-500 hover:scale-102"
               referrerPolicy="no-referrer"
             />
+
+            {allCovers.length > 1 && (
+              <>
+                {/* Left Arrow */}
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setActiveCoverIdx(prev => (prev - 1 + allCovers.length) % allCovers.length);
+                  }}
+                  className="absolute left-2.5 top-1/2 -translate-y-1/2 p-2 rounded-full bg-black/75 backdrop-blur border border-white/10 text-white hover:bg-black/90 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-all duration-300 z-10 hover:scale-105 shadow-md shadow-black/30"
+                  aria-label="Previous cover"
+                >
+                  <ChevronLeft className="h-3.5 w-3.5" />
+                </button>
+                {/* Right Arrow */}
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setActiveCoverIdx(prev => (prev + 1) % allCovers.length);
+                  }}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 p-2 rounded-full bg-black/75 backdrop-blur border border-white/10 text-white hover:bg-black/90 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-all duration-300 z-10 hover:scale-105 shadow-md shadow-black/30"
+                  aria-label="Next cover"
+                >
+                  <ChevronRight className="h-3.5 w-3.5" />
+                </button>
+                {/* Dots Indicator inside a pill container */}
+                <div className="absolute bottom-2.5 left-1/2 -translate-x-1/2 flex items-center justify-center gap-1.5 z-10 px-2.5 py-1.5 rounded-full bg-black/45 backdrop-blur-sm border border-white/5">
+                  {allCovers.map((_, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setActiveCoverIdx(idx);
+                      }}
+                      className={`h-1 rounded-full transition-all duration-300 ${
+                        activeCoverIdx === idx ? "bg-primary w-3.5" : "bg-white/60 w-1"
+                      }`}
+                      aria-label={`Go to cover ${idx + 1}`}
+                    />
+                  ))}
+                </div>
+              </>
+            )}
           </div>
         ) : (
           <div className="flex aspect-[2/3] items-center justify-center text-muted-foreground">
@@ -295,6 +401,121 @@ export const SeriesActions = React.memo(function SeriesActions({
             </button>
           ))}
         </div>
+      )}
+
+      {allCovers.length > 0 && (
+        <Dialog open={isGalleryOpen} onOpenChange={setIsGalleryOpen}>
+          <DialogContent className="max-w-3xl border border-border/30 bg-[#0e0e11]/95 p-6 backdrop-blur-md text-foreground">
+            <DialogHeader className="pb-3 border-b border-border/10">
+              <DialogTitle className="text-lg font-bold flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  {activeView === "lightbox" && (
+                    <button
+                      type="button"
+                      onClick={() => setActiveView("grid")}
+                      className="p-1 rounded-md hover:bg-white/10 text-muted-foreground hover:text-foreground transition-colors mr-1"
+                      title="Back to Gallery Grid"
+                    >
+                      <ArrowLeft className="h-5 w-5" />
+                    </button>
+                  )}
+                  <span>Covers & Illustrations Gallery</span>
+                </div>
+                <span className="text-xs text-muted-foreground font-mono font-normal">
+                  {activeView === "lightbox" ? `${galleryIdx + 1} of ${allCovers.length}` : `${allCovers.length} images`}
+                </span>
+              </DialogTitle>
+            </DialogHeader>
+
+            {activeView === "grid" ? (
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mt-4 overflow-y-auto max-h-[70vh] p-1 scrollbar-thin scrollbar-thumb-primary/30">
+                {allCovers.map((url, idx) => (
+                  <div
+                    key={idx}
+                    onClick={() => {
+                      setGalleryIdx(idx);
+                      setActiveView("lightbox");
+                    }}
+                    className="relative aspect-[2/3] rounded-lg overflow-hidden border border-border/20 cursor-pointer transition-all duration-300 hover:border-primary/50 hover:scale-102 hover:shadow-xl hover:shadow-primary/5 group"
+                  >
+                    <img
+                      src={url}
+                      alt={`Cover ${idx + 1}`}
+                      className="object-cover h-full w-full transition-transform duration-300 group-hover:scale-105"
+                    />
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
+                      <span className="text-white text-xs font-semibold px-2.5 py-1 rounded bg-black/70 backdrop-blur-sm border border-white/10">
+                        View Image
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <>
+                <div className="relative aspect-[3/4] max-h-[60vh] w-full flex items-center justify-center bg-black/90 rounded-lg overflow-hidden mt-4 border border-border/10">
+                  {/* Blurred background image for immersive depth */}
+                  <img
+                    src={allCovers[galleryIdx]}
+                    alt=""
+                    className="absolute inset-0 h-full w-full object-cover blur-2xl opacity-40 scale-105 pointer-events-none"
+                  />
+                  {/* Main cover in full aspect ratio fit */}
+                  <img
+                    src={allCovers[galleryIdx]}
+                    alt={`${title} Cover ${galleryIdx + 1}`}
+                    className="relative z-10 max-h-[60vh] max-w-full object-contain shadow-2xl"
+                  />
+
+                  {allCovers.length > 1 && (
+                    <>
+                      {/* Left Arrow */}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setGalleryIdx((prev) => (prev - 1 + allCovers.length) % allCovers.length);
+                        }}
+                        className="absolute left-4 top-1/2 -translate-y-1/2 p-2.5 rounded-full bg-black/70 hover:bg-black/90 border border-white/10 text-white transition-all hover:scale-105 z-20"
+                      >
+                        <ChevronLeft className="h-5 w-5" />
+                      </button>
+                      {/* Right Arrow */}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setGalleryIdx((prev) => (prev + 1) % allCovers.length);
+                        }}
+                        className="absolute right-4 top-1/2 -translate-y-1/2 p-2.5 rounded-full bg-black/70 hover:bg-black/90 border border-white/10 text-white transition-all hover:scale-105 z-20"
+                      >
+                        <ChevronRight className="h-5 w-5" />
+                      </button>
+                    </>
+                  )}
+                </div>
+
+                {/* Thumbnail grid */}
+                {allCovers.length > 1 && (
+                  <div className="mt-4 flex gap-2 overflow-x-auto py-1 scrollbar-thin scrollbar-thumb-primary/45">
+                    {allCovers.map((url, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => setGalleryIdx(idx)}
+                        className={`relative aspect-[2/3] w-14 shrink-0 rounded overflow-hidden border-2 transition-all ${
+                          galleryIdx === idx ? "border-primary scale-95" : "border-transparent opacity-60 hover:opacity-100"
+                        }`}
+                      >
+                        <img src={url} alt="" className="object-cover h-full w-full" />
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+          </DialogContent>
+        </Dialog>
       )}
     </aside>
   );
