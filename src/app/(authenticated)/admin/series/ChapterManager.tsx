@@ -434,7 +434,7 @@ export default function ChapterManager({ seriesId, onBack }: { seriesId: string;
       try {
         const { data, error } = await supabase
           .from("chapters")
-          .select("id,slug,chapter_number,title,chapter_type,created_at,status,scheduled_at,uploaded_by,scanlation_group")
+          .select("id,slug,chapter_number,title,chapter_type,created_at,status,scheduled_at,uploaded_by,scanlation_group,novel_content")
           .eq("series_id", seriesId)
           .order("chapter_number", { ascending: false });
         if (error) {
@@ -562,6 +562,7 @@ export default function ChapterManager({ seriesId, onBack }: { seriesId: string;
     scheduled_at: "",
     uploaded_by: "",
     scanlation_group: "",
+    novel_content: "",
   });
   const [extracting, setExtracting] = useState(false);
   const [bulkUploadOpen, setBulkUploadOpen] = useState(false);
@@ -607,6 +608,7 @@ export default function ChapterManager({ seriesId, onBack }: { seriesId: string;
       scheduled_at: "",
       uploaded_by: "",
       scanlation_group: "",
+      novel_content: "",
     });
     setGroupSelect(SCANLATION_GROUP_NONE);
     setGroupNewName("");
@@ -793,6 +795,8 @@ export default function ChapterManager({ seriesId, onBack }: { seriesId: string;
         );
       }
 
+      const isNovel = series.data?.type === "novel";
+
       const { data: chapter, error: chapterError } = await supabase
         .from("chapters")
         .insert({
@@ -803,7 +807,8 @@ export default function ChapterManager({ seriesId, onBack }: { seriesId: string;
             title: null,
             scanlationGroup: scanlation_group,
           }),
-          chapter_type: "image",
+          chapter_type: isNovel ? "novel" : "image",
+          novel_content: isNovel ? form.novel_content || null : null,
           status: form.status as any,
           scheduled_at:
             form.status === "scheduled" && form.scheduled_at
@@ -817,22 +822,25 @@ export default function ChapterManager({ seriesId, onBack }: { seriesId: string;
 
       if (chapterError) throw chapterError;
 
-      const urls = form.image_urls.split("\n").filter((u) => u.trim());
-      if (urls.length === 0) throw new Error("At least one image URL is required");
+      if (!isNovel) {
+        const urls = form.image_urls.split("\n").filter((u) => u.trim());
+        if (urls.length === 0) throw new Error("At least one image URL is required");
 
-      const pages = urls.map((url, idx) => ({
-        chapter_id: chapter.id,
-        page_number: idx + 1,
-        image_url: url.trim(),
-      }));
+        const pages = urls.map((url, idx) => ({
+          chapter_id: chapter.id,
+          page_number: idx + 1,
+          image_url: url.trim(),
+        }));
 
-      const { error: pagesError } = await supabase.from("chapter_pages").insert(pages);
-      if (pagesError) throw pagesError;
+        const { error: pagesError } = await supabase.from("chapter_pages").insert(pages);
+        if (pagesError) throw pagesError;
+      }
+
       await logAdminAction("create", "chapter", chapter.id, {
         series_id: seriesId,
         chapter_number: chapterNum,
         scanlation_group,
-        pages: urls.length,
+        pages: isNovel ? 0 : form.image_urls.split("\n").filter((u) => u.trim()).length,
       });
     },
     onSuccess: () => {
@@ -846,15 +854,22 @@ export default function ChapterManager({ seriesId, onBack }: { seriesId: string;
   });
 
   const openChapterEdit = async (chapter: any) => {
-    const { data, error } = await supabase
-      .from("chapter_pages")
-      .select("image_url")
-      .eq("chapter_id", chapter.id)
-      .order("page_number");
-    if (error) {
-      toast.error(error.message);
-      return;
+    const isNovel = series.data?.type === "novel";
+    let imageUrlsVal = "";
+
+    if (!isNovel) {
+      const { data, error } = await supabase
+        .from("chapter_pages")
+        .select("image_url")
+        .eq("chapter_id", chapter.id)
+        .order("page_number");
+      if (error) {
+        toast.error(error.message);
+        return;
+      }
+      imageUrlsVal = (data ?? []).map((p) => p.image_url).join("\n");
     }
+
     setEditingChapter(chapter);
     const { selectValue, newGroupName } = scanlationGroupToSelectValue(
       chapter.scanlation_group,
@@ -865,7 +880,7 @@ export default function ChapterManager({ seriesId, onBack }: { seriesId: string;
     setForm({
       chapter_number: String(chapter.chapter_number ?? ""),
       title: chapter.title ?? "",
-      image_urls: (data ?? []).map((p) => p.image_url).join("\n"),
+      image_urls: imageUrlsVal,
       chapter_url: "",
       status: chapter.status ?? "published",
       scheduled_at: chapter.scheduled_at
@@ -873,6 +888,7 @@ export default function ChapterManager({ seriesId, onBack }: { seriesId: string;
         : "",
       uploaded_by: chapter.uploaded_by ?? "",
       scanlation_group: chapter.scanlation_group ?? "",
+      novel_content: chapter.novel_content ?? "",
     });
   };
 
@@ -1399,6 +1415,8 @@ export default function ChapterManager({ seriesId, onBack }: { seriesId: string;
       const chapterNum = isNaN(parsedNum) ? 0 : parsedNum;
 
       const scanlation_group = getScanlationGroupForUpload();
+      const isNovel = series.data?.type === "novel";
+
       const { error: chapterError } = await supabase
         .from("chapters")
         .update({
@@ -1408,6 +1426,8 @@ export default function ChapterManager({ seriesId, onBack }: { seriesId: string;
             title: null,
             scanlationGroup: scanlation_group,
           }),
+          chapter_type: isNovel ? "novel" : "image",
+          novel_content: isNovel ? form.novel_content || null : null,
           status: form.status as any,
           scheduled_at:
             form.status === "scheduled" && form.scheduled_at
@@ -1420,26 +1440,35 @@ export default function ChapterManager({ seriesId, onBack }: { seriesId: string;
         .eq("id", editingChapter.id);
       if (chapterError) throw chapterError;
 
-      const urls = form.image_urls
-        .split("\n")
-        .map((u) => u.trim())
-        .filter(Boolean);
-      if (urls.length === 0) throw new Error("At least one image URL is required");
+      if (!isNovel) {
+        const urls = form.image_urls
+          .split("\n")
+          .map((u) => u.trim())
+          .filter(Boolean);
+        if (urls.length === 0) throw new Error("At least one image URL is required");
 
-      const { error: deleteError } = await supabase
-        .from("chapter_pages")
-        .delete()
-        .eq("chapter_id", editingChapter.id);
-      if (deleteError) throw deleteError;
+        const { error: deleteError } = await supabase
+          .from("chapter_pages")
+          .delete()
+          .eq("chapter_id", editingChapter.id);
+        if (deleteError) throw deleteError;
 
-      const { error: pagesError } = await supabase.from("chapter_pages").insert(
-        urls.map((url, idx) => ({
-          chapter_id: editingChapter.id,
-          page_number: idx + 1,
-          image_url: url,
-        })),
-      );
-      if (pagesError) throw pagesError;
+        const { error: pagesError } = await supabase.from("chapter_pages").insert(
+          urls.map((url, idx) => ({
+            chapter_id: editingChapter.id,
+            page_number: idx + 1,
+            image_url: url,
+          })),
+        );
+        if (pagesError) throw pagesError;
+      } else {
+        // If it's a novel, make sure we clean up any chapter pages if it was previously an image chapter
+        await supabase
+          .from("chapter_pages")
+          .delete()
+          .eq("chapter_id", editingChapter.id);
+      }
+
       await logAdminAction("update", "chapter", editingChapter.id, {
         series_id: seriesId,
         chapter_number: chapterNum,
@@ -2037,68 +2066,90 @@ export default function ChapterManager({ seriesId, onBack }: { seriesId: string;
                   />
                 </div>
 
-                {/* Chapter URL Extraction */}
-                <div className="rounded-lg border border-violet-500/30 bg-violet-500/5 p-4 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <Label className="text-violet-600 font-semibold">
-                      Option 1: Extract from Chapter URL
-                    </Label>
-                    <Download className="h-4 w-4 text-violet-600" />
-                  </div>
-                  <div className="flex gap-2">
-                    <Input
-                      placeholder="https://example.com/manga/title/chapter-1"
-                      value={form.chapter_url}
-                      onChange={(e) => setForm({ ...form, chapter_url: e.target.value })}
-                      className="flex-1"
-                    />
-                    <Button
-                      type="button"
-                      onClick={extractFromUrl}
-                      disabled={!form.chapter_url.trim() || extracting}
-                      variant="outline"
-                      className="border-violet-600 text-violet-600 hover:bg-violet-600 hover:text-white"
-                    >
-                      {extracting ? "Extracting..." : "Extract"}
-                    </Button>
-                  </div>
+                {series.data?.type === "novel" ? (
                   <div>
-                    <Label>Image URL Example (optional)</Label>
-                    <Input
-                      placeholder="https://storage.vortexscans.org/upload/series/..."
-                      value={imageUrlTypeExample}
-                      onChange={(e) => setImageUrlTypeExample(e.target.value)}
+                    <Label>Novel Content (HTML supported) *</Label>
+                    <Textarea
+                      rows={15}
+                      placeholder="<p>Write or paste your novel chapter here...</p>"
+                      value={form.novel_content}
+                      onChange={(e) => setForm({ ...form, novel_content: e.target.value })}
+                      className="font-mono text-sm mt-1.5"
                     />
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Optional: enter one sample image URL from the source you prefer.
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Write or paste your novel chapter text here. HTML tags like &lt;p&gt; and &lt;strong&gt; are supported.
                     </p>
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    Paste a chapter URL from any manga/manhwa site and we'll automatically extract
-                    all images.
-                  </p>
-                </div>
+                ) : (
+                  <>
+                    {/* Chapter URL Extraction */}
+                    <div className="rounded-lg border border-violet-500/30 bg-violet-500/5 p-4 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-violet-600 font-semibold">
+                          Option 1: Extract from Chapter URL
+                        </Label>
+                        <Download className="h-4 w-4 text-violet-600" />
+                      </div>
+                      <div className="flex gap-2">
+                        <Input
+                          placeholder="https://example.com/manga/title/chapter-1"
+                          value={form.chapter_url}
+                          onChange={(e) => setForm({ ...form, chapter_url: e.target.value })}
+                          className="flex-1"
+                        />
+                        <Button
+                          type="button"
+                          onClick={extractFromUrl}
+                          disabled={!form.chapter_url.trim() || extracting}
+                          variant="outline"
+                          className="border-violet-600 text-violet-600 hover:bg-violet-600 hover:text-white"
+                        >
+                          {extracting ? "Extracting..." : "Extract"}
+                        </Button>
+                      </div>
+                      <div>
+                        <Label>Image URL Example (optional)</Label>
+                        <Input
+                          placeholder="https://storage.vortexscans.org/upload/series/..."
+                          value={imageUrlTypeExample}
+                          onChange={(e) => setImageUrlTypeExample(e.target.value)}
+                        />
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Optional: enter one sample image URL from the source you prefer.
+                        </p>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Paste a chapter URL from any manga/manhwa site and we'll automatically extract
+                        all images.
+                      </p>
+                    </div>
 
-                {/* Manual URL Input */}
-                <div>
-                  <Label>Option 2: Manual Image URLs (one per line) *</Label>
-                  <Textarea
-                    rows={10}
-                    placeholder="https://example.com/page1.jpg&#10;https://example.com/page2.jpg&#10;https://example.com/page3.jpg"
-                    value={form.image_urls}
-                    onChange={(e) => setForm({ ...form, image_urls: e.target.value })}
-                    className="font-mono text-sm"
-                  />
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Or paste image URLs directly, one URL per line. Supports direct image links from
-                    any website.
-                  </p>
-                </div>
+                    {/* Manual URL Input */}
+                    <div>
+                      <Label>Option 2: Manual Image URLs (one per line) *</Label>
+                      <Textarea
+                        rows={10}
+                        placeholder="https://example.com/page1.jpg&#10;https://example.com/page2.jpg&#10;https://example.com/page3.jpg"
+                        value={form.image_urls}
+                        onChange={(e) => setForm({ ...form, image_urls: e.target.value })}
+                        className="font-mono text-sm"
+                      />
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Or paste image URLs directly, one URL per line. Supports direct image links from
+                        any website.
+                      </p>
+                    </div>
+                  </>
+                )}
               </div>
               <DialogFooter>
                 <Button
                   onClick={() => create.mutate()}
-                  disabled={!form.chapter_number || !form.image_urls.trim() || create.isPending}
+                  disabled={
+                    !form.chapter_number ||
+                    (series.data?.type === "novel" ? !form.novel_content.trim() : !form.image_urls.trim()) ||
+                    create.isPending
+                  }
                   className="bg-violet-600 hover:bg-violet-700"
                 >
                   {create.isPending ? "Uploading..." : "Upload Chapter"}
@@ -2377,20 +2428,39 @@ export default function ChapterManager({ seriesId, onBack }: { seriesId: string;
                 onNewGroupNameChange={setGroupNewName}
               />
             </div>
-            <div>
-              <Label>Image URLs (one per line) *</Label>
-              <Textarea
-                rows={12}
-                value={form.image_urls}
-                onChange={(e) => setForm({ ...form, image_urls: e.target.value })}
-                className="font-mono text-sm"
-              />
-            </div>
+            {series.data?.type === "novel" ? (
+              <div>
+                <Label>Novel Content (HTML supported) *</Label>
+                <Textarea
+                  rows={15}
+                  value={form.novel_content}
+                  onChange={(e) => setForm({ ...form, novel_content: e.target.value })}
+                  className="font-mono text-sm mt-1.5"
+                />
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Edit your novel chapter text. HTML tags like &lt;p&gt; and &lt;strong&gt; are supported.
+                </p>
+              </div>
+            ) : (
+              <div>
+                <Label>Image URLs (one per line) *</Label>
+                <Textarea
+                  rows={12}
+                  value={form.image_urls}
+                  onChange={(e) => setForm({ ...form, image_urls: e.target.value })}
+                  className="font-mono text-sm"
+                />
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button
               onClick={() => updateChapter.mutate()}
-              disabled={!form.chapter_number || !form.image_urls.trim() || updateChapter.isPending}
+              disabled={
+                !form.chapter_number ||
+                (series.data?.type === "novel" ? !form.novel_content.trim() : !form.image_urls.trim()) ||
+                updateChapter.isPending
+              }
             >
               {updateChapter.isPending ? "Saving..." : "Save changes"}
             </Button>

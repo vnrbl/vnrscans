@@ -1,6 +1,6 @@
 import { Link, useNavigate } from "@/lib/router-compat";
 import { useState, useEffect, lazy, Suspense } from "react";
-import { Menu, X, Search, BookOpen, User as UserIcon, LogOut, ShieldCheck, Library, Home, Sparkles, Trophy, Dice1, Dice2, Dice3, Dice4, Dice5, Dice6, Loader2, Users, Newspaper } from "lucide-react";
+import { Menu, X, Search, BookOpen, User as UserIcon, LogOut, ShieldCheck, Library, Home, Sparkles, Trophy, Dice1, Dice2, Dice3, Dice4, Dice5, Dice6, Loader2, Users } from "lucide-react";
 import type { DiceSeries } from "@/components/DiceRollOverlay";
 
 const DiceRollOverlay = lazy(() => import("@/components/DiceRollOverlay").then(m => ({ default: m.DiceRollOverlay })));
@@ -93,7 +93,7 @@ export function Navbar() {
     { to: "/browse", label: "Browse", icon: BookOpen },
     { to: "/rankings", label: "Rankings", icon: Trophy },
     { to: "/recommendations", label: "For You", icon: Sparkles },
-    { to: "/news", label: "News & Reviews", icon: Newspaper },
+    { to: "/novels", label: "Novels", icon: BookOpen },
   ];
 
   const hotSeries = useQuery({
@@ -647,12 +647,12 @@ export function Navbar() {
         </Link>
 
         <Link
-          to="/news"
+          to="/novels"
           className="flex flex-col items-center justify-center gap-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground hover:text-primary transition-colors py-1 flex-1"
           activeProps={{ className: "text-primary font-black" }}
         >
-          <Newspaper className="h-5 w-5 stroke-[1.8]" />
-          <span>News</span>
+          <BookOpen className="h-5 w-5 stroke-[1.8]" />
+          <span>Novels</span>
         </Link>
 
         <Link

@@ -21,6 +21,7 @@ import {
   Award,
   TerminalSquare,
   Globe2,
+  Book,
 } from "lucide-react";
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -112,6 +113,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { to: "/admin/announcements", label: "Announcements", icon: Megaphone, roles: ["admin", "moderator"] },
     { to: "/admin/banners", label: "Banners", icon: Image, roles: ["admin", "moderator"] },
     { to: "/admin/series", label: "Titles", icon: Library, roles: ["admin", "moderator", "uploader"] },
+    { to: "/admin/novels", label: "Novels Writer", icon: Book, roles: ["admin", "moderator", "uploader"] },
     { to: "/admin/tags", label: "Genres & Tags", icon: Tag, roles: ["admin", "moderator", "uploader"] },
     { to: "/admin/moderation", label: "Moderation", icon: Gavel, roles: ["admin", "moderator"] },
     { to: "/admin/comments", label: "Comments", icon: MessageSquare, roles: ["admin", "moderator"] },
