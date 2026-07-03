@@ -397,13 +397,14 @@ async function syncSeriesTaxonomy(seriesId: string, form: SeriesForm) {
 
 async function syncSeriesCoverHistory(seriesId: string, coverUrl: string | null) {
   if (!coverUrl) return;
-  let { data: chapter, error: chError } = await supabase
+  const { data: chapterData, error: chError } = await supabase
     .from("chapters")
     .select("id")
     .eq("series_id", seriesId)
     .eq("chapter_number", 0)
     .maybeSingle();
   if (chError) throw chError;
+  let chapter = chapterData;
   if (!chapter) {
     const { data: newCh, error } = await supabase
       .from("chapters")
