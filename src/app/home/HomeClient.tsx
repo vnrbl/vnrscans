@@ -19,6 +19,7 @@ import { useDragScroll, DRAG_SCROLL_CONTAINER_CLASS } from "@/hooks/useDragScrol
 import { TITLE_CARD_WIDTH, TITLE_COVER_CLASS } from "@/components/titleCardStyles";
 import { HomeHeroCarousel } from "@/components/HomeHeroCarousel";
 import { OptimizedImage } from "@/components/OptimizedImage";
+import { useReaderSettings } from "@/contexts/ReaderSettingsContext";
 
 const LATEST_UPDATES_CHAPTER_LIMIT = 5;
 const LATEST_UPDATES_PAGE_SIZE = 1000;
@@ -63,6 +64,7 @@ export type HomeInitialData = {
 
 function HomeContent({ initialData }: { initialData?: HomeInitialData }) {
   const { user } = useAuth();
+  const { settings } = useReaderSettings();
   
   // Hidden sections state (stored in localStorage)
   const [hiddenSections, setHiddenSections] = React.useState<Set<string>>(() => {
@@ -89,17 +91,22 @@ function HomeContent({ initialData }: { initialData?: HomeInitialData }) {
 
   // Recently added chapters
   const recentChapters = useQuery({
-    queryKey: ["recent-chapters"],
+    queryKey: ["recent-chapters", settings.showNovelsOnHome],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("chapters")
-        .select("id,slug,title,chapter_number,created_at,series:series_id(slug,title,cover_url)")
+        .select("id,slug,title,chapter_number,created_at,series:series_id(id,slug,title,cover_url,type)")
         .eq("status", "published")
         .order("created_at", { ascending: false })
         .order("chapter_number", { ascending: false })
-        .limit(18);
+        .limit(settings.showNovelsOnHome ? 18 : 40);
       if (error) throw error;
-      return data ?? [];
+      
+      let chapters = data ?? [];
+      if (!settings.showNovelsOnHome) {
+        chapters = chapters.filter((ch: any) => ch.series?.type !== "novel");
+      }
+      return chapters.slice(0, 18);
     },
     staleTime: 1000 * 60 * 2, // 2 minutes
     gcTime: 1000 * 60 * 5, // 5 minutes
@@ -111,7 +118,7 @@ function HomeContent({ initialData }: { initialData?: HomeInitialData }) {
       const { data, error } = await supabase
         .from("reading_history")
         .select(
-          "id,updated_at,series_id,series:series_id(slug,title,cover_url),chapters:chapter_id(slug,chapter_number,title)"
+          "id,updated_at,series_id,series:series_id(id,slug,title,cover_url),chapters:chapter_id(slug,chapter_number,title)"
         )
         .eq("user_id", user!.id)
         .order("updated_at", { ascending: false });
@@ -146,7 +153,7 @@ function HomeContent({ initialData }: { initialData?: HomeInitialData }) {
 
       const { data, error } = await supabase
         .from("chapters")
-        .select("id,slug,title,chapter_number,created_at,series_id,series:series_id(slug,title,cover_url)")
+        .select("id,slug,title,chapter_number,created_at,series_id,series:series_id(id,slug,title,cover_url)")
         .in("series_id", seriesIds)
         .eq("status", "published")
         .order("created_at", { ascending: false })
@@ -170,13 +177,24 @@ function HomeContent({ initialData }: { initialData?: HomeInitialData }) {
   });
 
   // Popular manhwa
+  const popularInitialData = React.useMemo(() => {
+    if (settings.showNovelsOnHome) return initialData?.popular;
+    return initialData?.popular?.filter((s: any) => s.type !== "novel");
+  }, [initialData?.popular, settings.showNovelsOnHome]);
+
   const popular = useQuery({
-    queryKey: ["popular"],
-    initialData: initialData?.popular,
+    queryKey: ["popular", settings.showNovelsOnHome],
+    initialData: popularInitialData,
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from("series")
-        .select("id,slug,title,cover_url,type,rating_average,status,view_count")
+        .select("id,slug,title,cover_url,type,rating_average,status,view_count");
+      
+      if (!settings.showNovelsOnHome) {
+        query = query.neq("type", "novel");
+      }
+      
+      const { data, error } = await query
         .order("view_count", { ascending: false })
         .limit(15);
       if (error) throw error;
@@ -187,14 +205,25 @@ function HomeContent({ initialData }: { initialData?: HomeInitialData }) {
   });
 
   // Latest updates - series with recent chapter releases
+  const latestUpdatesInitialData = React.useMemo(() => {
+    if (settings.showNovelsOnHome) return initialData?.latestUpdates;
+    return initialData?.latestUpdates?.filter((s: any) => s.type !== "novel");
+  }, [initialData?.latestUpdates, settings.showNovelsOnHome]);
+
   const latestUpdates = useQuery({
-    queryKey: ["latest-updates"],
+    queryKey: ["latest-updates", settings.showNovelsOnHome],
     queryFn: async () => {
       const { data, error } = await supabase
         .rpc("get_series_with_latest_chapters", { limit_count: 100 });
 
       if (error) throw error;
-      return (data ?? []).map((series: any) => ({
+      
+      let list = data ?? [];
+      if (!settings.showNovelsOnHome) {
+        list = list.filter((series: any) => series.type !== "novel");
+      }
+
+      return list.map((series: any) => ({
         id: series.id,
         slug: series.slug,
         title: series.title,
@@ -209,18 +238,30 @@ function HomeContent({ initialData }: { initialData?: HomeInitialData }) {
         })),
       }));
     },
-    initialData: initialData?.latestUpdates,
+    initialData: latestUpdatesInitialData,
     staleTime: 1000 * 60 * 5,
     gcTime: 1000 * 60 * 20,
   });
+
   // High score manhwa
+  const highScoreInitialData = React.useMemo(() => {
+    if (settings.showNovelsOnHome) return initialData?.highScore;
+    return initialData?.highScore?.filter((s: any) => s.type !== "novel");
+  }, [initialData?.highScore, settings.showNovelsOnHome]);
+
   const highScore = useQuery({
-    queryKey: ["high-score"],
-    initialData: initialData?.highScore,
+    queryKey: ["high-score", settings.showNovelsOnHome],
+    initialData: highScoreInitialData,
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from("series")
-        .select("id,slug,title,cover_url,type,rating_average,status,view_count")
+        .select("id,slug,title,cover_url,type,rating_average,status,view_count");
+      
+      if (!settings.showNovelsOnHome) {
+        query = query.neq("type", "novel");
+      }
+
+      const { data, error } = await query
         .order("rating_average", { ascending: false })
         .limit(15);
       if (error) throw error;
@@ -353,13 +394,13 @@ type RecentChapter = {
   title: string | null;
   chapter_number: number;
   created_at: string;
-  series: { slug: string; title: string; cover_url: string | null } | null;
+  series: { id: string; slug: string; title: string; cover_url: string | null } | null;
 };
 
 type HistoryRow = {
   id: string;
   updated_at: string;
-  series: { slug: string; title: string; cover_url: string | null } | null;
+  series: { id: string; slug: string; title: string; cover_url: string | null } | null;
   chapters: { slug: string; chapter_number: number; title: string | null } | null;
 };
 
@@ -692,6 +733,7 @@ function SeriesCarouselSection({
                 <OptimizedImage
                   src={item.cover_url}
                   alt={item.title}
+                  seriesId={item.id}
                   className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
                 />
                 <div className="absolute left-2 top-2">
@@ -851,6 +893,7 @@ function LatestUpdatesSection({
                       <OptimizedImage
                         src={item.cover_url}
                         alt={item.title}
+                        seriesId={item.id}
                         className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
                       />
                     </div>
@@ -1017,6 +1060,7 @@ function FollowedChapterCard({ chapter }: { chapter: RecentChapter }) {
           <OptimizedImage
             src={chapter.series?.cover_url ?? null}
             alt={chapter.series?.title ?? ""}
+            seriesId={chapter.series?.id}
             className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
           />
           <Badge className="absolute bottom-2 left-2 gap-1 rounded bg-background/85 px-1.5 py-0.5 text-[11px] font-bold text-foreground shadow backdrop-blur">
@@ -1068,6 +1112,7 @@ function RecentChapterCard({
       <OptimizedImage
         src={chapter.series?.cover_url ?? null}
         alt={chapter.series?.title ?? ""}
+        seriesId={chapter.series?.id}
         className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
       />
     </div>

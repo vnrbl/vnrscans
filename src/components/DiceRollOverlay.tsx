@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { X, BookOpen, RotateCcw } from "lucide-react";
+import { OptimizedImage } from "./OptimizedImage";
 
 export interface DiceSeries {
   id: string;
@@ -427,32 +428,12 @@ export function DiceRollOverlay({
                   <div
                     style={{ aspectRatio: "2/3", overflow: "hidden", position: "relative", width: "100%" }}
                   >
-                    {s.cover_url ? (
-                      <img
-                        src={s.cover_url}
-                        alt={s.title}
-                        style={{
-                          width: "100%",
-                          height: "100%",
-                          objectFit: "cover",
-                          display: "block",
-                        }}
-                        loading="lazy"
-                      />
-                    ) : (
-                      <div
-                        style={{
-                          width: "100%",
-                          height: "100%",
-                          background: "#080808",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                        }}
-                      >
-                        <BookOpen size={24} color="#333" />
-                      </div>
-                    )}
+                    <OptimizedImage
+                      src={s.cover_url}
+                      alt={s.title}
+                      seriesId={s.id}
+                      className="w-full h-full object-cover"
+                    />
                     {/* Cover gradient */}
                     <div
                       style={{

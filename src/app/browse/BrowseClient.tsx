@@ -8,9 +8,10 @@ import { OptimizedImage } from "@/components/OptimizedImage";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, Suspense, useMemo } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
+import { useReaderSettings } from "@/contexts/ReaderSettingsContext";
 import {
   Select,
   SelectContent,
@@ -35,6 +36,7 @@ export type BrowseInitialData = {
 };
 
 function BrowsePageContent({ initialData }: { initialData?: BrowseInitialData }) {
+  const { settings } = useReaderSettings();
   const router = useRouter();
   const searchParams = useSearchParams();
   const pathname = usePathname();

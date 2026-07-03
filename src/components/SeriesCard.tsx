@@ -26,6 +26,7 @@ export function SeriesCard({ s, rank }: { s: Series; rank?: number }) {
         <OptimizedImage
           src={s.cover_url}
           alt={s.title}
+          seriesId={s.id}
           className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
         />
         {rank !== undefined && (

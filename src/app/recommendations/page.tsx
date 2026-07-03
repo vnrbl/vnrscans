@@ -8,6 +8,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { OptimizedImage } from "@/components/OptimizedImage";
 
 export default function RecommendationsPage() {
   const { user } = useAuth();
@@ -234,30 +235,12 @@ function SeriesCard({ series }: { series: any }) {
       className="group overflow-hidden rounded-xl border border-border/30 bg-card/35 p-1.5 transition-all duration-300 hover:border-primary/50 hover:bg-card/65 hover:shadow-lg hover:shadow-primary/5"
     >
       <div className="aspect-[2/3] overflow-hidden rounded-lg bg-secondary relative shadow-sm border border-border/10">
-        {series.cover_url ? (
-          series.cover_url.toLowerCase().split("?")[0].endsWith(".mp4") ? (
-            <video
-              src={series.cover_url}
-              autoPlay
-              loop
-              muted
-              playsInline
-              className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
-            />
-          ) : (
-            <img
-              src={series.cover_url}
-              alt={series.title}
-              className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
-              loading="lazy"
-              referrerPolicy="no-referrer"
-            />
-          )
-        ) : (
-          <div className="flex h-full w-full items-center justify-center text-muted-foreground">
-            <BookOpen className="h-10 w-10" />
-          </div>
-        )}
+        <OptimizedImage
+          src={series.cover_url}
+          alt={series.title}
+          seriesId={series.id}
+          className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
+        />
         {series.rating_average && Number(series.rating_average) > 0 && (
           <div className="absolute right-2 top-2 flex items-center gap-1 rounded-md bg-background/85 px-1.5 py-0.5 text-xs font-bold backdrop-blur border border-border/40">
             <Star className="h-3 w-3 fill-primary text-primary" />

@@ -1,7 +1,8 @@
 import { Link, useNavigate } from "@/lib/router-compat";
 import { useState, useEffect, lazy, Suspense } from "react";
-import { Menu, X, Search, BookOpen, User as UserIcon, LogOut, ShieldCheck, Library, Home, Sparkles, Trophy, Dice1, Dice2, Dice3, Dice4, Dice5, Dice6, Loader2, Users } from "lucide-react";
+import { Menu, X, Search, BookOpen, User as UserIcon, LogOut, ShieldCheck, Library, Home, Sparkles, Trophy, Dice1, Dice2, Dice3, Dice4, Dice5, Dice6, Loader2, Users, Settings as SettingsIcon } from "lucide-react";
 import type { DiceSeries } from "@/components/DiceRollOverlay";
+import { useReaderSettings } from "@/contexts/ReaderSettingsContext";
 
 const DiceRollOverlay = lazy(() => import("@/components/DiceRollOverlay").then(m => ({ default: m.DiceRollOverlay })));
 import { Button } from "@/components/ui/button";
@@ -78,6 +79,7 @@ export function Navbar() {
   }, [isRolling]);
 
   const { user } = useAuth();
+  const { settings } = useReaderSettings();
   const { isAdmin, isMod, isUploader } = useIsAdmin();
   const showPanel = isAdmin || isMod || isUploader;
 
@@ -320,6 +322,18 @@ export function Navbar() {
                       </Link>
                     )}
 
+                    {user && (
+                      <Link
+                        to="/settings"
+                        onClick={() => setMenuDrawerOpen(false)}
+                        className="flex items-center gap-4 w-full px-3 py-2.5 rounded-xl text-sm font-medium text-neutral-300 hover:text-white hover:bg-neutral-800/80 transition-colors"
+                        activeProps={{ className: "text-white bg-neutral-800 font-bold" }}
+                      >
+                        <SettingsIcon className="h-5 w-5 stroke-[1.8] text-neutral-400" />
+                        <span>Settings</span>
+                      </Link>
+                    )}
+
                     {showPanel && (
                       <Link
                         to="/admin"
@@ -499,6 +513,9 @@ export function Navbar() {
                   )}
                   <DropdownMenuItem onClick={() => navigate({ to: "/profile" })}>
                     <UserIcon className="mr-2 h-4 w-4" /> Profile
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate({ to: "/settings" })}>
+                    <SettingsIcon className="mr-2 h-4 w-4" /> Settings
                   </DropdownMenuItem>
                   {showPanel && (
                     <>

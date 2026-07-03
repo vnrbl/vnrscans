@@ -4,6 +4,8 @@ import { useQuery } from "@tanstack/react-query";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
+import { useReaderSettings } from "@/contexts/ReaderSettingsContext";
+import { OptimizedImage } from "@/components/OptimizedImage";
 
 type CarouselItem = {
   id: string;
@@ -18,6 +20,7 @@ type CarouselItem = {
 };
 
 export function HomeHeroCarousel() {
+  const { settings } = useReaderSettings();
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [showLeftArrow, setShowLeftArrow] = useState(false);
   const [showRightArrow, setShowRightArrow] = useState(true);
@@ -71,7 +74,12 @@ export function HomeHeroCarousel() {
     staleTime: 5 * 60 * 1000, // Cache for 5 minutes
   });
 
-  const items = carouselSeries.data ?? [];
+  const rawItems = carouselSeries.data ?? [];
+  
+  const items = useMemo(() => {
+    if (settings.showNovelsOnHome) return rawItems;
+    return rawItems.filter(item => item.series?.type !== "novel");
+  }, [rawItems, settings.showNovelsOnHome]);
   
   // Shuffle function (Fisher-Yates algorithm)
   const shuffleArray = <T,>(array: T[]): T[] => {
@@ -285,23 +293,13 @@ export function HomeHeroCarousel() {
                   onMouseLeave={resetCardTilt}
                 >
                   {/* Cover Image */}
-                  {item.series.cover_url ? (
-                    <img
-                      src={item.series.cover_url}
-                      alt={item.series.title}
-                      width={270}
-                      height={390}
-                      className="w-full h-full object-cover"
-                      loading={isAboveFold ? "eager" : "lazy"}
-                      fetchPriority={index < 3 ? "high" : "auto"}
-                      decoding="async"
-                      referrerPolicy="no-referrer"
-                    />
-                  ) : (
-                    <div className="w-full h-full bg-neutral-950 flex items-center justify-center">
-                      <span className="text-muted-foreground text-sm font-light uppercase tracking-wider">No Cover</span>
-                    </div>
-                  )}
+                  <OptimizedImage
+                    src={item.series.cover_url}
+                    alt={item.series.title}
+                    seriesId={item.series.id}
+                    className="w-full h-full object-cover"
+                    priority={isAboveFold}
+                  />
                   
                   {/* Glass Reflection Effect */}
                   <div className="absolute inset-0 opacity-0 group-hover/card:opacity-100 transition-opacity duration-500 pointer-events-none">

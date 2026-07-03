@@ -8,6 +8,7 @@ interface OptimizedImageProps {
   fallbackClassName?: string;
   priority?: boolean;
   onLoad?: () => void;
+  seriesId?: string;
 }
 
 export function OptimizedImage({
@@ -17,10 +18,12 @@ export function OptimizedImage({
   fallbackClassName = "",
   priority = false,
   onLoad,
+  seriesId,
 }: OptimizedImageProps) {
   const [isLoaded, setIsLoaded] = useState(false);
   const [error, setError] = useState(false);
   const [isInView, setIsInView] = useState(priority);
+  const [displaySrc, setDisplaySrc] = useState<string | null>(src);
   const imgRef = useRef<HTMLImageElement>(null);
 
   // Intersection Observer for lazy loading
@@ -46,6 +49,18 @@ export function OptimizedImage({
     return () => observer.disconnect();
   }, [priority]);
 
+  // Update displaySrc based on favorite cover in localStorage if seriesId is provided
+  useEffect(() => {
+    if (seriesId && typeof window !== "undefined") {
+      const fav = localStorage.getItem(`fav-cover-${seriesId}`);
+      if (fav) {
+        setDisplaySrc(fav);
+        return;
+      }
+    }
+    setDisplaySrc(src);
+  }, [src, seriesId]);
+
   const handleLoad = () => {
     setIsLoaded(true);
     onLoad?.();
@@ -55,13 +70,13 @@ export function OptimizedImage({
     setError(true);
   };
 
-  const isVideo = src ? src.toLowerCase().split("?")[0].endsWith(".mp4") : false;
+  const isVideo = displaySrc ? displaySrc.toLowerCase().split("?")[0].endsWith(".mp4") : false;
 
-  if (isVideo && src) {
+  if (isVideo && displaySrc) {
     return (
       <div className={`relative overflow-hidden ${className}`}>
         <video
-          src={src}
+          src={displaySrc}
           autoPlay
           loop
           muted
@@ -73,7 +88,7 @@ export function OptimizedImage({
     );
   }
 
-  if (!src || error) {
+  if (!displaySrc || error) {
     return (
       <div
         className={`flex items-center justify-center bg-secondary text-muted-foreground ${fallbackClassName || className}`}
@@ -90,7 +105,7 @@ export function OptimizedImage({
       )}
       {isInView && (
         <img
-          src={src}
+          src={displaySrc}
           alt={alt}
           width={300}
           height={450}

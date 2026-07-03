@@ -1,12 +1,13 @@
 "use client";
 
-import { Settings as SettingsIcon, BookOpen } from "lucide-react";
+import { Settings as SettingsIcon, BookOpen, Menu } from "lucide-react";
 import { useReaderSettings } from "@/contexts/ReaderSettingsContext";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { Separator } from "@/components/ui/separator";
+import { Switch } from "@/components/ui/switch";
 
 export default function SettingsPage() {
   const { settings, updateSettings } = useReaderSettings();
@@ -146,6 +147,37 @@ export default function SettingsPage() {
                 <p className="text-xs text-muted-foreground">
                   Speed for automatic scrolling in webtoon mode (0 = disabled)
                 </p>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Home Feed Settings */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Menu className="h-5 w-5" />
+                Home Feed Settings
+              </CardTitle>
+              <CardDescription>
+                Configure what content types are visible on the home page feed
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Show Novels Toggle */}
+              <div className="flex items-center justify-between gap-4">
+                <div className="min-w-0 space-y-1">
+                  <Label htmlFor="show-novels" className="cursor-pointer font-medium">
+                    Show Novels on Home Page
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    Toggle visibility of Novels in home page lists, recently added chapters, and the hero carousel
+                  </p>
+                </div>
+                <Switch
+                  id="show-novels"
+                  checked={settings.showNovelsOnHome}
+                  onCheckedChange={(checked) => updateSettings({ showNovelsOnHome: checked })}
+                />
               </div>
             </CardContent>
           </Card>

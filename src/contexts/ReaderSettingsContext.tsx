@@ -8,6 +8,7 @@ export interface ReaderSettings {
   readingMode: "page" | "webtoon";
   imageQuality: "high" | "medium" | "low";
   autoScrollSpeed: number;
+  showNovelsOnHome: boolean;
 }
 
 const defaultSettings: ReaderSettings = {
@@ -16,6 +17,7 @@ const defaultSettings: ReaderSettings = {
   readingMode: "page",
   imageQuality: "high",
   autoScrollSpeed: 50,
+  showNovelsOnHome: false,
 };
 
 interface ReaderSettingsContextType {
