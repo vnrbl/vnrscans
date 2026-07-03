@@ -560,7 +560,7 @@ export const SeriesActions = React.memo(function SeriesActions({
             </DialogHeader>
 
             {activeView === "grid" ? (
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mt-4 overflow-y-auto max-h-[70vh] p-1 scrollbar-thin scrollbar-thumb-primary/30">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-6 mt-4 overflow-y-auto max-h-[70vh] p-1.5 scrollbar-thin scrollbar-thumb-primary/30">
                 {allCovers.map((url, idx) => (
                   <div
                     key={idx}
@@ -568,7 +568,7 @@ export const SeriesActions = React.memo(function SeriesActions({
                       setGalleryIdx(idx);
                       setActiveView("lightbox");
                     }}
-                    className="relative w-full aspect-[2/3] rounded-lg overflow-hidden border border-border/20 cursor-pointer transition-all duration-300 hover:border-primary/50 hover:scale-102 hover:shadow-xl hover:shadow-primary/5 group bg-secondary/35"
+                    className="relative w-full h-0 pb-[150%] rounded-lg overflow-hidden border border-border/20 cursor-pointer transition-all duration-300 hover:border-primary/50 hover:scale-102 hover:shadow-xl hover:shadow-primary/5 group bg-secondary/35"
                   >
                     {isVideoUrl(url) ? (
                       <video
