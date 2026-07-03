@@ -8,6 +8,8 @@ import {
   Star, 
   ChevronLeft, 
   ChevronRight, 
+  ChevronDown,
+  ChevronUp,
   Clock, 
   Bell, 
   Trophy, 
@@ -74,6 +76,10 @@ export default function TitleDetailPageContent({
   initialChaptersData?: any[];
 }) {
   const { user } = useAuth();
+  const [showTimeline, setShowTimeline] = React.useState(false);
+  const [showDossier, setShowDossier] = React.useState(false);
+  const [showRealms, setShowRealms] = React.useState(false);
+  const [realmsTab, setRealmsTab] = React.useState("standard");
 
   const seriesQ = useQuery({
     queryKey: ["series", "detail", slug],
@@ -300,6 +306,684 @@ export default function TitleDetailPageContent({
             totalChapters={uniqueChapterCount || (initialChaptersData?.length ?? 0)}
           />
         </div>
+
+        {/* Dossier Section (Taboo only) */}
+        {slug === "taboo-son-of-the-lonely-frost-sovereign" && (
+          <div className="mt-14 pt-10 border-t border-border/40">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-black tracking-tight text-foreground flex items-center gap-2">
+                <Users className="h-6 w-6 text-primary" /> Earth Archives: Voss Family Dossier
+              </h2>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowDossier(!showDossier)}
+                className="gap-2 font-bold text-xs border-primary/30 hover:border-primary/60 text-primary hover:bg-primary/10 cursor-pointer shadow-sm"
+              >
+                {showDossier ? "Hide Dossier" : "View Dossier"}
+                {showDossier ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+              </Button>
+            </div>
+            
+            {showDossier && (
+              <div className="animate-in fade-in slide-in-from-top-4 duration-300">
+                {/* Family Card */}
+                <div className="mb-8 flex flex-col lg:flex-row bg-card/30 border border-border/50 rounded-xl overflow-hidden hover:border-primary/30 transition-all duration-300 shadow-sm backdrop-blur-sm">
+                  <div className="lg:w-[55%] w-full">
+                    <img
+                      src="https://edvqhmvqbtujzcfqkrbe.supabase.co/storage/v1/object/public/comment-media/character-sheets/media__1783069287834.jpg"
+                      alt="The Voss Family"
+                      className="w-full h-auto block"
+                    />
+                  </div>
+                  <div className="p-6 lg:w-[45%] flex flex-col justify-center bg-card/20">
+                    <h3 className="text-lg font-bold text-foreground mb-2">The Voss Family Legacy</h3>
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                      Bound together by blood, research, and an absolute rejection of Earth's societal constraints. In the public eye, they were elite figures of the global biotech sector. Behind closed doors in the Elysium Spire penthouse, they formed a closed circle of unmatched intellect. Their combined expertise in artificial gestation, gene-refinement, and cyber-consciousness mapping culminated in Project Godseed—an ambition that threatened global power structures and ultimately provoked their execution.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Collapsible Dossier Widget */}
+                <div className="mb-8">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowTimeline(!showTimeline)}
+                    className="gap-2 font-semibold text-xs border-primary/30 hover:border-primary/60 text-primary hover:bg-primary/10 cursor-pointer shadow-sm"
+                  >
+                    <Clock className="h-4 w-4" />
+                    {showTimeline ? "Hide Earth Timeline Archive" : "Decrypt Earth Timeline Archive"}
+                    {showTimeline ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+                  </Button>
+
+                  {showTimeline && (
+                    <div className="mt-4 p-5 rounded-xl border border-border/50 bg-card/25 backdrop-blur-sm animate-in fade-in slide-in-from-top-4 duration-300">
+                      <h3 className="text-xs font-bold text-foreground mb-4 flex items-center gap-1.5 uppercase tracking-wider text-primary">
+                        <Clock className="h-4 w-4 text-primary" /> Chronological Timeline of Dr. Elias Voss & Dr. Lena Park
+                      </h3>
+                      
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-left text-xs border-collapse">
+                          <thead>
+                            <tr className="border-b border-border/40 text-muted-foreground font-bold uppercase tracking-wider text-[9px]">
+                              <th className="py-2.5 px-3">Milestone</th>
+                              <th className="py-2.5 px-3 text-center">Elias Age</th>
+                              <th className="py-2.5 px-3 text-center">Lena Age</th>
+                              <th className="py-2.5 px-3 text-center">Sera Age</th>
+                              <th className="py-2.5 px-3 text-center">Cass Age</th>
+                              <th className="py-2.5 px-3">Story Context</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-border/10 text-muted-foreground">
+                            {[
+                              {
+                                milestone: "Birth of Seraphine",
+                                elias: "19",
+                                lena: "23",
+                                sera: "0",
+                                cass: "—",
+                                context: "Lena has her first child at age 23."
+                              },
+                              {
+                                milestone: "Birth of Cassian",
+                                elias: "22",
+                                lena: "26",
+                                sera: "3",
+                                cass: "0",
+                                context: "Lena has her second child at age 26."
+                              },
+                              {
+                                milestone: "Elias & Lena Meet",
+                                elias: "29",
+                                lena: "33",
+                                sera: "10",
+                                cass: "7",
+                                context: "They begin working together on Project Godseed (6 years before Chapter 1)."
+                              },
+                              {
+                                milestone: "Introduction (Ch. 1 & 2)",
+                                elias: "35",
+                                lena: "39",
+                                sera: "16",
+                                cass: "13",
+                                context: "Elias is 35 (Ch. 1, line 3). Lena is 39 (Ch. 1, line 9). Seraphine is 16 (Ch. 1/2)."
+                              },
+                              {
+                                milestone: "Marriage",
+                                elias: "43.5",
+                                lena: "47.5",
+                                sera: "24.5",
+                                cass: "21.5",
+                                context: "Elias and Lena marry 18 months before the attack (Ch. 3, line 35)."
+                              },
+                              {
+                                milestone: "The Attack & Death (Ch. 3)",
+                                elias: "45",
+                                lena: "49",
+                                sera: "26",
+                                cass: "23",
+                                context: "Elias dies at 45 (Ch. 3, line 3). Lena dies at 49 (Ch. 3, line 4) while 8 weeks pregnant."
+                              }
+                            ].map((row, idx) => (
+                              <tr key={idx} className="hover:bg-card/10 transition-colors">
+                                <td className="py-2.5 px-3 font-semibold text-foreground">{row.milestone}</td>
+                                <td className="py-2.5 px-3 text-center font-mono">{row.elias}</td>
+                                <td className="py-2.5 px-3 text-center font-mono">{row.lena}</td>
+                                <td className="py-2.5 px-3 text-center font-mono">{row.sera}</td>
+                                <td className="py-2.5 px-3 text-center font-mono">{row.cass}</td>
+                                <td className="py-2.5 px-3 text-foreground/80">{row.context}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Individual Profiles Grid */}
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                  {[
+                    {
+                      name: "Dr. Elias Voss",
+                      role: "The Creator",
+                      age: "45 (At time of death)",
+                      height: "6'5\"",
+                      biometrics: "Silver-Blond Hair, Pale Silver Eyes",
+                      status: "Deceased (Earth) / Reincarnated as Xue Chen",
+                      image: "https://edvqhmvqbtujzcfqkrbe.supabase.co/storage/v1/object/public/comment-media/character-sheets/media__1783069266003.jpg",
+                      bio: "The greatest biotech mind of the century. A cold, hyper-disciplined scientist who viewed human emotion and life not as sentimental experiences, but as complex, rewritable data. Elias established Project Godseed to transcend biological limitations, securing his research behind lethal security protocols.",
+                      connection: "Reincarnated as Xue Chen, the son of the Eternal Frost Sovereign. Retains his analytical mindset, seeing the cultivation world through his Abyssal Void Eye."
+                    },
+                    {
+                      name: "Dr. Lena Park",
+                      role: "The Anchor",
+                      age: "49 (At time of death)",
+                      height: "5'8\"",
+                      biometrics: "Dark Wavy Hair, Dark Brown Eyes",
+                      status: "Deceased (Earth)",
+                      image: "https://edvqhmvqbtujzcfqkrbe.supabase.co/storage/v1/object/public/comment-media/character-sheets/media__1783069287904.jpg",
+                      bio: "Lead researcher of artificial womb stabilization and gene-line refinement. Elegant, brilliant, and polished. Lena was the only person to penetrate Elias's cold exterior, eventually marrying him and carrying his unborn child. She triggered the database purge to protect their work while mortally wounded, dying in Elias's arms.",
+                      connection: "Her death and the loss of their unborn child served as the catalyst for Elias to activate the Eternal Anchor Protocol. Her memory is the sole emotional anchor in Xue Chen's cold soul."
+                    },
+                    {
+                      name: "Seraphine Voss",
+                      role: "The Successor",
+                      age: "26",
+                      height: "5'9\"",
+                      biometrics: "Dark Hair, Blue/Grey Eyes",
+                      status: "Alive (Earth) — In Hiding",
+                      image: "https://edvqhmvqbtujzcfqkrbe.supabase.co/storage/v1/object/public/comment-media/character-sheets/media__1783069287752.jpg",
+                      bio: "Lena's daughter (older sister of Cassian) and Elias's stepdaughter. Surviving because Elias ordered her to stay away from the lab for 72 hours prior to the breach, she recognized the carrier wave signature of the Eternal Anchor Protocol during the facility's detonation. She is now underground, using Elias's backdoor codes to scan the void for his consciousness.",
+                      connection: "Her breakthrough analysis on anomalous consciousness fragments directly enabled the calibration of the carrier waves used in the Eternal Anchor Protocol."
+                    },
+                    {
+                      name: "Cassian Voss",
+                      role: "The Shield",
+                      age: "23",
+                      height: "6'2\"",
+                      biometrics: "Dark Messy Hair, Dark Brown Eyes, Facial Scars",
+                      status: "Alive (Earth) — Operational / Guardian",
+                      image: "https://edvqhmvqbtujzcfqkrbe.supabase.co/storage/v1/object/public/comment-media/character-sheets/media__1783069287807.jpg",
+                      bio: "Lena's son (younger brother of Seraphine) and Elias's stepson. A brooding, street-hardened fighter. Although severely wounded and left for dead by mercenaries during the raid, he survived the breach and escaped before the facility detonated. Carrying the physical scars of that night, he now acts as Seraphine's guardian in the shadows.",
+                      connection: "His desperate stand in the outer corridors delayed the mercenaries long enough for Lena to purge the database and Elias to prepare the final protocols."
+                    }
+                  ].map((char) => (
+                    <div key={char.name} className="flex flex-col sm:flex-row bg-card/30 border border-border/50 rounded-xl overflow-hidden hover:border-primary/40 hover:shadow-[0_0_20px_rgba(127,34,254,0.12)] transition-all duration-300 shadow-sm backdrop-blur-sm">
+                      <div className="sm:w-[35%] relative min-h-[240px] sm:min-h-auto">
+                        <Image
+                          src={char.image}
+                          alt={char.name}
+                          fill
+                          unoptimized
+                          className="object-cover transition-transform duration-500 hover:scale-105"
+                        />
+                      </div>
+                      <div className="p-5 sm:w-[65%] flex flex-col justify-between bg-card/10">
+                        <div>
+                          <div className="flex items-center justify-between gap-2 mb-2">
+                            <h4 className="font-bold text-base text-foreground leading-none">{char.name}</h4>
+                            <span className="text-[9px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20 font-bold">{char.role}</span>
+                          </div>
+                          
+                          <div className="grid grid-cols-2 gap-x-2 gap-y-1 text-[11px] border-b border-border/20 pb-2 mb-2.5">
+                            <div>
+                              <span className="text-muted-foreground block">Age</span>
+                              <span className="text-foreground font-semibold">{char.age}</span>
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground block">Height</span>
+                              <span className="text-foreground font-semibold">{char.height}</span>
+                            </div>
+                            <div className="col-span-2">
+                              <span className="text-muted-foreground block">Biometrics</span>
+                              <span className="text-foreground font-semibold">{char.biometrics}</span>
+                            </div>
+                          </div>
+
+                          <p className="text-xs text-muted-foreground leading-relaxed mb-3 line-clamp-4">{char.bio}</p>
+                        </div>
+
+                        <div className="p-2.5 bg-black/30 border-l-2 border-primary rounded-r-md">
+                          <span className="block text-[9px] uppercase font-bold text-primary mb-0.5">Dimensional Transition Link</span>
+                          <p className="text-[11px] text-foreground leading-snug">{char.connection}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Cultivation Realms Section (Taboo only) */}
+        {slug === "taboo-son-of-the-lonely-frost-sovereign" && (
+          <div className="mt-10 pt-10 border-t border-border/40">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-black tracking-tight text-foreground flex items-center gap-2">
+                <Flame className="h-6 w-6 text-primary" /> Cultivation Archives: World Realms Database
+              </h2>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowRealms(!showRealms)}
+                className="gap-2 font-bold text-xs border-primary/30 hover:border-primary/60 text-primary hover:bg-primary/10 cursor-pointer shadow-sm"
+              >
+                {showRealms ? "Hide Realms Database" : "Decrypt Realms Database"}
+                {showRealms ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+              </Button>
+            </div>
+
+            {showRealms && (
+              <div className="animate-in fade-in slide-in-from-top-4 duration-300">
+                <div className="p-5 rounded-xl border border-border/50 bg-card/25 backdrop-blur-sm shadow-sm">
+                  
+                  {/* Tab Selector */}
+                  <div className="flex gap-2 mb-4 border-b border-border/20 pb-3">
+                    <button
+                      onClick={() => setRealmsTab("standard")}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all duration-200 cursor-pointer ${
+                        realmsTab === "standard"
+                          ? "bg-primary/20 text-primary border border-primary/30 shadow-[0_0_10px_rgba(127,34,254,0.15)]"
+                          : "text-muted-foreground hover:text-foreground hover:bg-card/30 border border-transparent"
+                      }`}
+                    >
+                      Standard Cultivation Realms
+                    </button>
+                    <button
+                      onClick={() => setRealmsTab("devourer")}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all duration-200 cursor-pointer ${
+                        realmsTab === "devourer"
+                          ? "bg-primary/20 text-primary border border-primary/30 shadow-[0_0_10px_rgba(127,34,254,0.15)]"
+                          : "text-muted-foreground hover:text-foreground hover:bg-card/30 border border-transparent"
+                      }`}
+                    >
+                      Xue Chen's Abyssal Void Devourer Path
+                    </button>
+                  </div>
+
+                  {realmsTab === "standard" ? (
+                    <div className="overflow-x-auto max-h-[480px] overflow-y-auto pr-1">
+                      <table className="w-full text-left text-xs border-collapse">
+                        <thead className="sticky top-0 bg-[#0c0f17] z-10 shadow-sm border-b border-border/30">
+                          <tr className="text-muted-foreground font-bold uppercase tracking-wider text-[9px]">
+                            <th className="py-2.5 px-3 w-[5%] pb-3">#</th>
+                            <th className="py-2.5 px-3 w-[22%] pb-3">Realm Name</th>
+                            <th className="py-2.5 px-3 w-[15%] pb-3">Stages</th>
+                            <th className="py-2.5 px-3 w-[18%] pb-3">Lifespan</th>
+                            <th className="py-2.5 px-3 w-[22%] pb-3">Power Description</th>
+                            <th className="py-2.5 px-3 w-[18%] pb-3">Advancement Requirements</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-border/10 text-muted-foreground">
+                          {[
+  {
+    "num": 1,
+    "name": "Mortal Breath Realm",
+    "stages": "Early / Mid / Late / Peak",
+    "lifespan": "120–150 years",
+    "desc": "Basic qi absorption and body strengthening",
+    "reqs": "Absorb spiritual energy from the world and open all major meridians"
+  },
+  {
+    "num": 2,
+    "name": "Spirit Foundation Realm",
+    "stages": "Early / Mid / Late / Peak",
+    "lifespan": "250–400 years",
+    "desc": "Build spiritual foundation, short flight",
+    "reqs": "Compress and solidify qi foundation, survive minor qi deviation"
+  },
+  {
+    "num": 3,
+    "name": "Golden Core Realm",
+    "stages": "Early / Mid / Late / Peak",
+    "lifespan": "600–900 years",
+    "desc": "Form Golden Core, release powerful attacks",
+    "reqs": "Compress all qi into a solid Golden Core and survive Core Formation Tribulation"
+  },
+  {
+    "num": 4,
+    "name": "Nascent Soul Realm",
+    "stages": "Early / Mid / Late / Peak",
+    "lifespan": "1,200–2,000 years",
+    "desc": "Nascent Soul can leave body, possession",
+    "reqs": "Form Nascent Soul inside the core and survive Nascent Soul Tribulation"
+  },
+  {
+    "num": 5,
+    "name": "Soul Metamorphosis Realm",
+    "stages": "Early / Mid / Late / Peak",
+    "lifespan": "2,500–4,000 years",
+    "desc": "Soul evolution, elemental control",
+    "reqs": "Evolve and strengthen the soul, comprehend elemental laws"
+  },
+  {
+    "num": 6,
+    "name": "Void Refinement Realm",
+    "stages": "Early / Mid / Late / Peak",
+    "lifespan": "5,000–8,000 years",
+    "desc": "Touch space and void laws",
+    "reqs": "Begin refining the void inside the body and comprehend space laws"
+  },
+  {
+    "num": 7,
+    "name": "Dao Fusion Realm",
+    "stages": "Early / Mid / Late / Peak",
+    "lifespan": "10,000–18,000 years",
+    "desc": "Merge personal Dao with the world",
+    "reqs": "Fully merge personal Dao with heaven and earth, create a personal domain"
+  },
+  {
+    "num": 8,
+    "name": "Heavenly Tribulation Realm",
+    "stages": "Early / Mid / Late / Peak",
+    "lifespan": "25,000–40,000 years",
+    "desc": "Survive major heavenly tribulations",
+    "reqs": "Comprehend deeper Dao and survive a major Heavenly Tribulation"
+  },
+  {
+    "num": 9,
+    "name": "True Immortal Realm",
+    "stages": "Early / Mid / Late / Peak",
+    "lifespan": "60,000–100,000 years",
+    "desc": "Become a True Immortal",
+    "reqs": "Officially transcend mortality, body and soul reach immortal level"
+  },
+  {
+    "num": 10,
+    "name": "Golden Immortal Realm",
+    "stages": "Early / Mid / Late / Peak",
+    "lifespan": "200,000+ years",
+    "desc": "Indestructible golden immortal body",
+    "reqs": "Refine the entire body into an indestructible Golden Immortal body"
+  },
+  {
+    "num": 11,
+    "name": "Mystic World Realm",
+    "stages": "Early / Mid / Late / Peak",
+    "lifespan": "500,000+ years",
+    "desc": "Create small personal world inside body",
+    "reqs": "Create a stable small world inside the body using personal Dao"
+  },
+  {
+    "num": 12,
+    "name": "Celestial Law Realm",
+    "stages": "Early / Mid / Late / Peak",
+    "lifespan": "1.2 Million+ years",
+    "desc": "Influence heavenly laws",
+    "reqs": "Begin influencing and slightly altering heavenly laws"
+  },
+  {
+    "num": 13,
+    "name": "Divine King Realm",
+    "stages": "Early / Mid / Late / Peak",
+    "lifespan": "4 Million+ years",
+    "desc": "Ruler-level power",
+    "reqs": "Gather territory or faith and establish rule over a region or small planet"
+  },
+  {
+    "num": 14,
+    "name": "Divine Emperor Realm",
+    "stages": "Early / Mid / Late / Peak",
+    "lifespan": "12 Million+ years",
+    "desc": "Rule over multiple planets",
+    "reqs": "Expand rule over multiple planets or large territories"
+  },
+  {
+    "num": 15,
+    "name": "Heavenly Sovereign Realm",
+    "stages": "Early / Mid / Late / Peak",
+    "lifespan": "40 Million+ years",
+    "desc": "Sovereign of major forces",
+    "reqs": "Become a recognized sovereign of a major sect, force, or planet"
+  },
+  {
+    "num": 16,
+    "name": "Eternal Sovereign Realm",
+    "stages": "Early / Mid / Late / Peak",
+    "lifespan": "120 Million+ years",
+    "desc": "Near-indestructible, planet-destroying power",
+    "reqs": "Reach near-indestructible level through extreme Dao comprehension"
+  },
+  {
+    "num": 17,
+    "name": "Abyssal Void Realm",
+    "stages": "Early / Mid / Late / Peak",
+    "lifespan": "350 Million+ years",
+    "desc": "Touch true Void laws",
+    "reqs": "Begin comprehending and touching true Void laws"
+  },
+  {
+    "num": 18,
+    "name": "Taboo Breaker Realm",
+    "stages": "Early / Mid / Late / Peak",
+    "lifespan": "700 Million+ years",
+    "desc": "Break heavenly laws and taboos",
+    "reqs": "Deliberately break a major heavenly taboo and survive the consequences"
+  },
+  {
+    "num": 19,
+    "name": "Origin Devourer Realm",
+    "stages": "Early / Mid / Late / Peak",
+    "lifespan": "1.5 Billion+ years",
+    "desc": "Devour and understand origin-level concepts",
+    "reqs": "Devour and fully comprehend an origin-level concept or law"
+  },
+  {
+    "num": 20,
+    "name": "Supreme Dao Realm",
+    "stages": "Early / Mid / Late / Peak",
+    "lifespan": "Near Immortality",
+    "desc": "Peak of known cultivation",
+    "reqs": "Stand at the absolute peak of known Dao and create/destroy small worlds"
+  },
+  {
+    "num": 21,
+    "name": "Chaos Origin Realm",
+    "stages": "Early / Mid / Late / Peak",
+    "lifespan": "3 Billion+ years",
+    "desc": "Understand primal chaos",
+    "reqs": "Comprehend and stabilize primal chaos energy inside the body"
+  },
+  {
+    "num": 22,
+    "name": "Void Transcendent Realm",
+    "stages": "Early / Mid / Late / Peak",
+    "lifespan": "8 Billion+ years",
+    "desc": "Freely travel between realms",
+    "reqs": "Open stable void rifts and travel between different realms/planets"
+  },
+  {
+    "num": 23,
+    "name": "Heaven Defying Realm",
+    "stages": "Early / Mid / Late / Peak",
+    "lifespan": "20 Billion+ years",
+    "desc": "Defy heavenly will",
+    "reqs": "Successfully defy and resist heavenly will multiple times"
+  },
+  {
+    "num": 24,
+    "name": "Primordial Taboo Realm",
+    "stages": "Early / Mid / Late / Peak",
+    "lifespan": "50 Billion+ years",
+    "desc": "Cultivate forbidden primordial powers",
+    "reqs": "Cultivate and survive using primordial forbidden powers"
+  },
+  {
+    "num": 25,
+    "name": "Supreme Origin Realm",
+    "stages": "Early / Mid / Late / Peak",
+    "lifespan": "Near True Immortality",
+    "desc": "Absolute peak of existence",
+    "reqs": "Reach the absolute peak where one can create, destroy, and rewrite world laws"
+  }
+].map((row) => (
+                            <tr key={row.num} className="hover:bg-card/10 transition-colors">
+                              <td className="py-2.5 px-3 font-mono text-[10px] text-primary">{row.num}</td>
+                              <td className="py-2.5 px-3 font-bold text-foreground">{row.name}</td>
+                              <td className="py-2.5 px-3 text-[11px] font-medium">{row.stages}</td>
+                              <td className="py-2.5 px-3 text-[11px] font-mono text-purple-400 font-semibold">{row.lifespan}</td>
+                              <td className="py-2.5 px-3 text-foreground/80">{row.desc}</td>
+                              <td className="py-2.5 px-3 text-[11px] italic text-muted-foreground/90">{row.reqs}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto max-h-[480px] overflow-y-auto pr-1">
+                      <table className="w-full text-left text-xs border-collapse">
+                        <thead className="sticky top-0 bg-[#0c0f17] z-10 shadow-sm border-b border-border/30">
+                          <tr className="text-muted-foreground font-bold uppercase tracking-wider text-[9px]">
+                            <th className="py-2.5 px-3 w-[5%] pb-3">#</th>
+                            <th className="py-2.5 px-3 w-[20%] pb-3">Devourer Realm</th>
+                            <th className="py-2.5 px-3 w-[12%] pb-3">Stages</th>
+                            <th className="py-2.5 px-3 w-[15%] pb-3">Combat Equivalent</th>
+                            <th className="py-2.5 px-3 w-[13%] pb-3">Lifespan</th>
+                            <th className="py-2.5 px-3 w-[20%] pb-3">Unique Abilities</th>
+                            <th className="py-2.5 px-3 w-[15%] pb-3">Advancement Requirements</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-border/10 text-muted-foreground">
+                          {[
+  {
+    "num": 1,
+    "name": "Void Embryo Realm",
+    "stages": "Early / Mid / Late / Peak",
+    "eq": "Golden Core Realm",
+    "lifespan": "300–500 years",
+    "desc": "Abyssal Void Eye, see inside bodies & weaknesses",
+    "reqs": "Devour and fully refine at least 10 Golden Core level cultivators (or equivalent)"
+  },
+  {
+    "num": 2,
+    "name": "Devouring Core Realm",
+    "stages": "Early / Mid / Late / Peak",
+    "eq": "Nascent Soul Realm",
+    "lifespan": "800–1,200 years",
+    "desc": "Devour cultivation bases, steal partial techniques",
+    "reqs": "Devour and completely refine one Nascent Soul level being’s cultivation"
+  },
+  {
+    "num": 3,
+    "name": "Abyssal Nascent Realm",
+    "stages": "Early / Mid / Late / Peak",
+    "eq": "Soul Metamorphosis Realm",
+    "lifespan": "2,000–3,500 years",
+    "desc": "Devour souls & memories, create small void zones",
+    "reqs": "Devour and absorb the soul of a Soul Metamorphosis level cultivator"
+  },
+  {
+    "num": 4,
+    "name": "Void Refiner Realm",
+    "stages": "Early / Mid / Late / Peak",
+    "eq": "Void Refinement Realm",
+    "lifespan": "6,000–10,000 years",
+    "desc": "Permanently refine stolen power into his own",
+    "reqs": "Successfully refine and integrate power from multiple high-level experts without backlash"
+  },
+  {
+    "num": 5,
+    "name": "Soul Devourer Realm",
+    "stages": "Early / Mid / Late / Peak",
+    "eq": "Dao Fusion Realm",
+    "lifespan": "15,000–25,000 years",
+    "desc": "Fully use enemy techniques as his own",
+    "reqs": "Devour and perfectly replicate one complete technique from a Dao Fusion level expert"
+  },
+  {
+    "num": 6,
+    "name": "Abyssal Sovereign Realm",
+    "stages": "Early / Mid / Late / Peak",
+    "eq": "True Immortal Realm",
+    "lifespan": "50,000–80,000 years",
+    "desc": "Create personal Abyssal Domain",
+    "reqs": "Devour enough life force to create a stable personal Abyssal Domain"
+  },
+  {
+    "num": 7,
+    "name": "Taboo Devourer Realm",
+    "stages": "Early / Mid / Late / Peak",
+    "eq": "Golden Immortal Realm",
+    "lifespan": "150,000–250,000 years",
+    "desc": "Partially ignore heavenly tribulations",
+    "reqs": "Survive and devour the energy of a Heavenly Tribulation (or equivalent power)"
+  },
+  {
+    "num": 8,
+    "name": "Eternal Void Realm",
+    "stages": "Early / Mid / Late / Peak",
+    "eq": "Mystic World Realm",
+    "lifespan": "500,000–800,000 years",
+    "desc": "Body becomes semi-void, extremely hard to kill",
+    "reqs": "Transform a significant portion of his body into void by devouring void-law beings"
+  },
+  {
+    "num": 9,
+    "name": "Origin Devourer Realm",
+    "stages": "Early / Mid / Late / Peak",
+    "eq": "Divine Emperor Realm",
+    "lifespan": "2 Million+ years",
+    "desc": "Devour concepts (fear, pain, life force)",
+    "reqs": "Successfully devour and digest one conceptual law (e.g., “Fear”, “Pain”, or “Life Force”)"
+  },
+  {
+    "num": 10,
+    "name": "Supreme Abyssal Realm",
+    "stages": "Early / Mid / Late / Peak",
+    "eq": "Heavenly Sovereign Realm",
+    "lifespan": "8 Million+ years",
+    "desc": "Create large-scale devouring fields",
+    "reqs": "Create a devouring field capable of affecting multiple experts at once"
+  },
+  {
+    "num": 11,
+    "name": "Chaos Void Realm",
+    "stages": "Early / Mid / Late / Peak",
+    "eq": "Eternal Sovereign Realm",
+    "lifespan": "30 Million+ years",
+    "desc": "Devour chaotic energy, immune to some laws",
+    "reqs": "Devour and stabilize chaotic or primordial energy inside the body"
+  },
+  {
+    "num": 12,
+    "name": "Void Transcendent Realm",
+    "stages": "Early / Mid / Late / Peak",
+    "eq": "Abyssal Void Realm",
+    "lifespan": "100 Million+ years",
+    "desc": "Freely travel between realms through void",
+    "reqs": "Open a stable void rift and travel to another realm or planet through it"
+  },
+  {
+    "num": 13,
+    "name": "Heaven Defying Devourer Realm",
+    "stages": "Early / Mid / Late / Peak",
+    "eq": "Taboo Breaker Realm",
+    "lifespan": "400 Million+ years",
+    "desc": "Weaken heavenly tribulations",
+    "reqs": "Directly devour and weaken a Heavenly Tribulation"
+  },
+  {
+    "num": 14,
+    "name": "Primordial Devourer Realm",
+    "stages": "Early / Mid / Late / Peak",
+    "eq": "Primordial Taboo Realm",
+    "lifespan": "1.5 Billion+ years",
+    "desc": "Devour primordial laws and ancient powers",
+    "reqs": "Devour and refine a primordial law or ancient forbidden power"
+  },
+  {
+    "num": 15,
+    "name": "Supreme Void Origin Realm",
+    "stages": "Early / Mid / Late / Peak",
+    "eq": "Supreme Origin Realm",
+    "lifespan": "Near Immortality",
+    "desc": "Rewrite small world laws",
+    "reqs": "Devour and partially rewrite the laws of a small world or domain"
+  }
+].map((row) => (
+                            <tr key={row.num} className="hover:bg-card/10 transition-colors">
+                              <td className="py-2.5 px-3 font-mono text-[10px] text-primary">{row.num}</td>
+                              <td className="py-2.5 px-3 font-bold text-foreground">{row.name}</td>
+                              <td className="py-2.5 px-3 text-[11px] font-medium">{row.stages}</td>
+                              <td className="py-2.5 px-3 text-[11px] font-semibold text-purple-400 font-mono">{row.eq}</td>
+                              <td className="py-2.5 px-3 text-[11px] font-mono text-purple-400 font-semibold">{row.lifespan}</td>
+                              <td className="py-2.5 px-3 text-foreground/80">{row.desc}</td>
+                              <td className="py-2.5 px-3 text-[11px] italic text-muted-foreground/90">{row.reqs}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Recommendations Section — Moved below chapters, full width */}
         <div className="mt-14 pt-10 border-t border-border/40">
