@@ -14,6 +14,7 @@ type HistorySection = "followed-chapters" | "reading-history" | "latest-updates"
 type Period = "day" | "week" | "month" | "all";
 
 interface GroupedSeries {
+  id: string;
   title: string;
   slug: string;
   cover_url: string | null;
@@ -36,7 +37,7 @@ type ChapterItem = {
   title: string | null;
   chapter_number: number;
   created_at: string;
-  series: { slug: string; title: string; cover_url: string | null } | null;
+  series: { id: string; slug: string; title: string; cover_url: string | null } | null;
 };
 
 const SECTION_META: Record<HistorySection, { title: string; description: string; requiresAuth: boolean; timeLabel: string }> = {
@@ -102,6 +103,7 @@ export default function HomeHistoryContent({ section, period = "day" }: { sectio
 
       if (!seriesMap.has(seriesSlug)) {
         seriesMap.set(seriesSlug, {
+          id: ch.series?.id || "",
           title: ch.series?.title || "",
           slug: seriesSlug,
           cover_url: ch.series?.cover_url || null,
@@ -224,7 +226,7 @@ async function fetchFollowedChapters(userId: string, period: Period): Promise<Ch
     const to = from + pageSize - 1;
     let query = supabase
       .from("chapters")
-      .select("id,slug,title,chapter_number,created_at,series:series_id(slug,title,cover_url)")
+      .select("id,slug,title,chapter_number,created_at,series:series_id(id,slug,title,cover_url)")
       .in("series_id", seriesIds)
       .eq("status", "published")
       .order("created_at", { ascending: false })
@@ -255,7 +257,7 @@ async function fetchReadingHistory(userId: string, period: Period): Promise<Chap
     const to = from + pageSize - 1;
     let query = supabase
       .from("reading_history")
-      .select("id,updated_at,series:series_id(slug,title,cover_url),chapters:chapter_id(slug,chapter_number,title)")
+      .select("id,updated_at,series:series_id(id,slug,title,cover_url),chapters:chapter_id(slug,chapter_number,title)")
       .eq("user_id", userId)
       .order("updated_at", { ascending: false })
       .range(from, to);
@@ -293,7 +295,7 @@ async function fetchLatestUpdates(period: Period): Promise<ChapterItem[]> {
     const to = from + pageSize - 1;
     let query = supabase
       .from("chapters")
-      .select("id,slug,title,chapter_number,created_at,series:series_id(slug,title,cover_url)")
+      .select("id,slug,title,chapter_number,created_at,series:series_id(id,slug,title,cover_url)")
       .eq("status", "published")
       .order("created_at", { ascending: false })
       .order("chapter_number", { ascending: false })
@@ -326,6 +328,7 @@ function GroupedSeriesCard({ item, timeLabel }: { item: GroupedSeries; timeLabel
             <OptimizedImage
               src={item.cover_url}
               alt={item.title}
+              seriesId={item.id}
               className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
             />
           </div>
@@ -381,6 +384,7 @@ function HistoryChapterCard({ chapter, timeLabel }: { chapter: ChapterItem; time
           <OptimizedImage
             src={chapter.series?.cover_url ?? null}
             alt={chapter.series?.title ?? ""}
+            seriesId={chapter.series?.id}
             className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
           />
           <Badge className="absolute bottom-2 left-2 gap-1 rounded bg-background/85 px-1.5 py-0.5 text-[11px] font-bold text-foreground shadow backdrop-blur">

@@ -190,6 +190,7 @@ export default function NovelsClient({ initialNovels }: NovelsClientProps) {
                       <OptimizedImage
                         src={featuredNovel.cover_url}
                         alt={featuredNovel.title}
+                        seriesId={featuredNovel.id}
                         className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
                       />
                       <div className="absolute inset-0 bg-gradient-to-t from-background/90 via-transparent to-transparent md:hidden" />
@@ -301,6 +302,7 @@ export default function NovelsClient({ initialNovels }: NovelsClientProps) {
                         <OptimizedImage
                           src={novel.cover_url}
                           alt={novel.title}
+                          seriesId={novel.id}
                           className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
                         />
                         <Badge variant="secondary" className="absolute top-3 left-3 bg-background/80 backdrop-blur text-[10px] font-semibold uppercase">

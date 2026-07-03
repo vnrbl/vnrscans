@@ -663,7 +663,7 @@ function SeriesList({ items, loading }: { items?: any[]; loading: boolean }) {
 
           {/* Cover Image */}
           <div className="w-32 shrink-0 overflow-hidden rounded-lg bg-secondary shadow-md lg:w-40">
-            <OptimizedImage src={s.cover_url} alt={s.title} className="h-48 w-full object-cover lg:h-60" />
+            <OptimizedImage src={s.cover_url} alt={s.title} seriesId={s.id} className="h-48 w-full object-cover lg:h-60" />
           </div>
 
           {/* Content */}
