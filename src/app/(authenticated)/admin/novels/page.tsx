@@ -1158,7 +1158,7 @@ function NovelsWriterContent() {
                 {/* Cover Pictures / Chapter Illustrations Upload field */}
                 <div>
                   <div className="flex items-center justify-between">
-                    <Label>Chapter Illustrations / Cover Pictures (one URL per line) (optional)</Label>
+                    <Label>Chapter Illustrations / Cover Pictures (optional)</Label>
                     <div className="relative">
                       <input
                         type="file"
@@ -1182,14 +1182,33 @@ function NovelsWriterContent() {
                       </Button>
                     </div>
                   </div>
-                  <Textarea
-                    rows={2}
-                    placeholder="https://example.com/chapter-illustration-1.jpg&#10;https://example.com/chapter-illustration-2.jpg"
-                    value={imageUrls}
-                    onChange={(e) => setImageUrls(e.target.value)}
-                    className="font-mono text-xs mt-1.5 bg-card/30 border-border/45"
-                  />
-                  <p className="mt-1 text-[10px] text-muted-foreground">
+
+                  {imageUrls.trim() !== "" ? (
+                    <div className="grid grid-cols-4 gap-2 mt-2">
+                      {imageUrls.split("\n").map((url, idx) => (
+                        <div key={idx} className="relative aspect-[3/4] rounded-lg overflow-hidden border border-border/40 group">
+                          <img src={url} alt="" className="object-cover h-full w-full" />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const urls = imageUrls.split("\n").filter((_, i) => i !== idx);
+                              setImageUrls(urls.join("\n"));
+                            }}
+                            className="absolute top-1 right-1 p-1 rounded bg-black/60 hover:bg-red-600 text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                            title="Remove illustration"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="mt-2 p-3 text-center rounded-lg border border-dashed border-border/40 text-xs text-muted-foreground">
+                      No illustrations uploaded yet. Click "Upload Images" to add chapter covers.
+                    </div>
+                  )}
+
+                  <p className="mt-2 text-[10px] text-muted-foreground">
                     Add cover illustrations for this specific chapter. These will show inside the chapter reader and in the main series details cover slideshow.
                   </p>
                 </div>

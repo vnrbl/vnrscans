@@ -87,6 +87,24 @@ export const SeriesActions = React.memo(function SeriesActions({
     return list;
   }, [coverUrl, chapterCoversQuery.data]);
 
+  // Keyboard navigation for Lightbox view
+  React.useEffect(() => {
+    if (!isGalleryOpen || activeView !== "lightbox") return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "ArrowLeft") {
+        setGalleryIdx((prev) => (prev - 1 + allCovers.length) % allCovers.length);
+      } else if (e.key === "ArrowRight") {
+        setGalleryIdx((prev) => (prev + 1) % allCovers.length);
+      } else if (e.key === "Escape") {
+        setActiveView("grid");
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isGalleryOpen, activeView, allCovers.length]);
+
   const isFollowing = useQuery({
     queryKey: ["following", slug, user?.id],
     queryFn: async () => {
@@ -436,12 +454,12 @@ export const SeriesActions = React.memo(function SeriesActions({
                       setGalleryIdx(idx);
                       setActiveView("lightbox");
                     }}
-                    className="relative aspect-[2/3] rounded-lg overflow-hidden border border-border/20 cursor-pointer transition-all duration-300 hover:border-primary/50 hover:scale-102 hover:shadow-xl hover:shadow-primary/5 group"
+                    className="relative w-full aspect-[2/3] rounded-lg overflow-hidden border border-border/20 cursor-pointer transition-all duration-300 hover:border-primary/50 hover:scale-102 hover:shadow-xl hover:shadow-primary/5 group bg-secondary/35"
                   >
                     <img
                       src={url}
                       alt={`Cover ${idx + 1}`}
-                      className="object-cover h-full w-full transition-transform duration-300 group-hover:scale-105"
+                      className="absolute inset-0 w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
                     />
                     <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
                       <span className="text-white text-xs font-semibold px-2.5 py-1 rounded bg-black/70 backdrop-blur-sm border border-white/10">
