@@ -3,11 +3,11 @@
 import React from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowLeft, BookOpen, UserPlus, UserCheck, Star, Bookmark, Bell, BellRing, BellOff, ChevronLeft, ChevronRight } from "lucide-react";
+import { ArrowLeft, BookOpen, UserPlus, UserCheck, Star, Bookmark, Bell, BellRing, BellOff, ChevronLeft, ChevronRight, Heart, Trash2 } from "lucide-react";
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth, useIsAdmin } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -55,11 +55,13 @@ export const SeriesActions = React.memo(function SeriesActions({
   hasChapters,
 }: SeriesActionsProps) {
   const { user } = useAuth();
+  const { isAdmin } = useIsAdmin();
   const qc = useQueryClient();
   const [activeCoverIdx, setActiveCoverIdx] = React.useState(0);
   const [isGalleryOpen, setIsGalleryOpen] = React.useState(false);
   const [galleryIdx, setGalleryIdx] = React.useState(0);
   const [activeView, setActiveView] = React.useState<"grid" | "lightbox">("grid");
+  const [favTrigger, setFavTrigger] = React.useState(0);
 
   // Fetch all images uploaded for chapters of this series to use as supplementary cover pictures/illustrations
   const chapterCoversQuery = useQuery({
@@ -110,6 +112,62 @@ export const SeriesActions = React.memo(function SeriesActions({
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isGalleryOpen, activeView, allCovers.length]);
+
+  // Load favorite cover on mount or allCovers change
+  React.useEffect(() => {
+    if (allCovers.length > 0) {
+      const favCover = localStorage.getItem(`fav-cover-${seriesId}`);
+      if (favCover) {
+        const idx = allCovers.indexOf(favCover);
+        if (idx !== -1) {
+          setActiveCoverIdx(idx);
+        }
+      }
+    }
+  }, [allCovers, seriesId]);
+
+  // Delete Cover Mutation (Admin only)
+  const deleteCoverMutation = useMutation({
+    mutationFn: async (urlToDelete: string) => {
+      if (!user || !isAdmin) throw new Error("Unauthorized");
+
+      // 1. Delete matching row from chapter_pages (handles Covers chapter and chapter illustrations)
+      const { error: deleteErr } = await supabase
+        .from("chapter_pages")
+        .delete()
+        .eq("image_url", urlToDelete);
+      if (deleteErr) throw deleteErr;
+
+      // 2. If this deleted cover was the main series cover_url, promote the next available or set to null
+      if (coverUrl === urlToDelete) {
+        const remainingCovers = allCovers.filter(c => c !== urlToDelete);
+        const nextCover = remainingCovers.length > 0 ? remainingCovers[0] : null;
+
+        const { error: updateErr } = await supabase
+          .from("series")
+          .update({ cover_url: nextCover })
+          .eq("id", seriesId);
+        if (updateErr) throw updateErr;
+      }
+    },
+    onSuccess: (_, urlToDelete) => {
+      toast.success("Cover picture deleted successfully");
+      
+      // Invalidate queries to refresh lists and slideshows
+      qc.invalidateQueries({ queryKey: ["series"] });
+      
+      const nextCovers = allCovers.filter(c => c !== urlToDelete);
+      if (activeCoverIdx >= nextCovers.length) {
+        setActiveCoverIdx(Math.max(0, nextCovers.length - 1));
+      }
+      if (galleryIdx >= nextCovers.length) {
+        setGalleryIdx(Math.max(0, nextCovers.length - 1));
+      }
+    },
+    onError: (err: any) => {
+      toast.error(`Delete failed: ${err.message}`);
+    }
+  });
 
   const isFollowing = useQuery({
     queryKey: ["following", slug, user?.id],
@@ -282,6 +340,34 @@ export const SeriesActions = React.memo(function SeriesActions({
                 referrerPolicy="no-referrer"
               />
             )}
+            {/* Favorite Cover Heart Button */}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const favKey = `fav-cover-${seriesId}`;
+                const currentUrl = allCovers[activeCoverIdx];
+                const isFav = localStorage.getItem(favKey) === currentUrl;
+                
+                if (isFav) {
+                  localStorage.removeItem(favKey);
+                  toast.success("Removed from favorite covers");
+                } else {
+                  localStorage.setItem(favKey, currentUrl);
+                  toast.success("Set as favorite cover!");
+                }
+                setFavTrigger(prev => prev + 1);
+              }}
+              className={`absolute top-2.5 right-2.5 p-2 rounded-full backdrop-blur-md border transition-all duration-300 z-20 hover:scale-110 shadow-md ${
+                localStorage.getItem(`fav-cover-${seriesId}`) === allCovers[activeCoverIdx]
+                  ? "bg-pink-600/85 border-pink-500 text-white"
+                  : "bg-black/60 border-white/10 text-white/80 hover:text-white"
+              }`}
+              aria-label="Set as favorite cover"
+            >
+              <Heart className={`h-4 w-4 ${localStorage.getItem(`fav-cover-${seriesId}`) === allCovers[activeCoverIdx] ? "fill-current" : ""}`} />
+            </button>
 
             {allCovers.length > 1 && (
               <>
@@ -505,6 +591,22 @@ export const SeriesActions = React.memo(function SeriesActions({
                         View Image
                       </span>
                     </div>
+
+                    {isAdmin && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (confirm("Are you sure you want to delete this cover?")) {
+                            deleteCoverMutation.mutate(url);
+                          }
+                        }}
+                        className="absolute top-2 right-2 p-1.5 rounded bg-black/60 hover:bg-red-600 text-white z-30 transition-all shadow-md hover:scale-105"
+                        title="Delete cover picture"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    )}
                   </div>
                 ))}
               </div>
@@ -544,6 +646,27 @@ export const SeriesActions = React.memo(function SeriesActions({
                       alt={`${title} Cover ${galleryIdx + 1}`}
                       className="relative z-10 max-h-[60vh] max-w-full object-contain shadow-2xl"
                     />
+                  )}
+
+                  {isAdmin && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (confirm("Are you sure you want to delete this cover?")) {
+                          deleteCoverMutation.mutate(allCovers[galleryIdx]);
+                          if (allCovers.length <= 1) {
+                            setIsGalleryOpen(false);
+                          } else {
+                            setActiveView("grid");
+                          }
+                        }
+                      }}
+                      className="absolute top-4 right-4 p-2.5 rounded-full bg-black/60 border border-white/10 text-white hover:bg-red-600 hover:border-red-500 transition-all hover:scale-105 z-20 shadow-md"
+                      title="Delete cover picture"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
                   )}
 
                   {allCovers.length > 1 && (
