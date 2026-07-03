@@ -191,11 +191,11 @@ function NovelsWriterContent() {
     const file = e.target.files?.[0];
     if (!file) return;
     setUploadingCover(true);
-    const toastId = toast.loading("Uploading cover image...");
+    const toastId = toast.loading("Uploading cover media...");
     try {
       const url = await handleUploadImage(file);
       setNewCoverUrl(url);
-      toast.success("Cover image uploaded successfully!", { id: toastId });
+      toast.success("Cover media uploaded successfully!", { id: toastId });
     } catch (err: any) {
       toast.error(`Upload failed: ${err.message}`, { id: toastId });
     } finally {
@@ -208,13 +208,13 @@ function NovelsWriterContent() {
     if (files.length === 0) return;
     
     setUploadingIllustrations(true);
-    const toastId = toast.loading(`Uploading ${files.length} illustration(s)...`);
+    const toastId = toast.loading(`Uploading ${files.length} media file(s)...`);
     try {
       const urls = await Promise.all(files.map(file => handleUploadImage(file)));
       const currentUrls = imageUrls.split("\n").map(u => u.trim()).filter(Boolean);
       const combined = [...currentUrls, ...urls].join("\n");
       setImageUrls(combined);
-      toast.success("Illustrations uploaded successfully!", { id: toastId });
+      toast.success("Media files uploaded successfully!", { id: toastId });
     } catch (err: any) {
       toast.error(`Upload failed: ${err.message}`, { id: toastId });
     } finally {
@@ -847,7 +847,7 @@ function NovelsWriterContent() {
                           <div className="relative shrink-0">
                             <input
                               type="file"
-                              accept="image/*"
+                              accept="image/*,video/mp4"
                               id="novel-cover-file-input"
                               onChange={onCoverFileChange}
                               className="hidden"
@@ -1163,7 +1163,7 @@ function NovelsWriterContent() {
                     <div className="relative">
                       <input
                         type="file"
-                        accept="image/*"
+                        accept="image/*,video/mp4"
                         id="illustration-files-input"
                         multiple
                         onChange={onIllustrationFilesChange}

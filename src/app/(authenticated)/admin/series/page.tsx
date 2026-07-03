@@ -536,11 +536,11 @@ export default function AdminSeries() {
     const file = e.target.files?.[0];
     if (!file) return;
     setUploadingCover(true);
-    const toastId = toast.loading("Uploading cover image...");
+    const toastId = toast.loading("Uploading cover media...");
     try {
       const url = await handleUploadImage(file);
       setForm((prev) => ({ ...prev, cover_url: url }));
-      toast.success("Cover image uploaded successfully!", { id: toastId });
+      toast.success("Cover media uploaded successfully!", { id: toastId });
     } catch (err: any) {
       toast.error(`Upload failed: ${err.message}`, { id: toastId });
     } finally {
@@ -1267,7 +1267,7 @@ function SeriesFormFields({
           <div className="relative shrink-0">
             <input
               type="file"
-              accept="image/*"
+              accept="image/*,video/mp4"
               id="manga-cover-file-input"
               onChange={onCoverFileChange}
               className="hidden"

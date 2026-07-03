@@ -29,6 +29,12 @@ import { XP_AMOUNTS } from "@/lib/xp";
 /*  Isolated so chapter interactions never trigger these to re-render. */
 /* ------------------------------------------------------------------ */
 
+const isVideoUrl = (url: string) => {
+  if (!url) return false;
+  const cleanUrl = url.toLowerCase().split("?")[0];
+  return cleanUrl.endsWith(".mp4");
+};
+
 interface SeriesActionsProps {
   slug: string;
   seriesId: string;
@@ -238,22 +244,44 @@ export const SeriesActions = React.memo(function SeriesActions({
         {allCovers.length > 0 ? (
           <div className="relative aspect-[2/3] w-full bg-black/60 overflow-hidden flex items-center justify-center">
             {/* Blurred Backdrop */}
-            <img
-              src={allCovers[activeCoverIdx]}
-              alt=""
-              className="absolute inset-0 h-full w-full object-cover blur-md opacity-25 scale-105 pointer-events-none"
-            />
+            {isVideoUrl(allCovers[activeCoverIdx]) ? (
+              <video
+                src={allCovers[activeCoverIdx]}
+                autoPlay
+                loop
+                muted
+                playsInline
+                className="absolute inset-0 h-full w-full object-cover blur-md opacity-25 scale-105 pointer-events-none"
+              />
+            ) : (
+              <img
+                src={allCovers[activeCoverIdx]}
+                alt=""
+                className="absolute inset-0 h-full w-full object-cover blur-md opacity-25 scale-105 pointer-events-none"
+              />
+            )}
             {/* Main Image */}
-            <Image
-              src={allCovers[activeCoverIdx]}
-              alt={title}
-              fill
-              priority
-              unoptimized
-              sizes="(max-width: 640px) 180px, 220px"
-              className="relative z-10 object-contain transition-transform duration-500 hover:scale-102"
-              referrerPolicy="no-referrer"
-            />
+            {isVideoUrl(allCovers[activeCoverIdx]) ? (
+              <video
+                src={allCovers[activeCoverIdx]}
+                autoPlay
+                loop
+                muted
+                playsInline
+                className="relative z-10 w-full h-full object-contain"
+              />
+            ) : (
+              <Image
+                src={allCovers[activeCoverIdx]}
+                alt={title}
+                fill
+                priority
+                unoptimized
+                sizes="(max-width: 640px) 180px, 220px"
+                className="relative z-10 object-contain transition-transform duration-500 hover:scale-102"
+                referrerPolicy="no-referrer"
+              />
+            )}
 
             {allCovers.length > 1 && (
               <>
@@ -456,11 +484,22 @@ export const SeriesActions = React.memo(function SeriesActions({
                     }}
                     className="relative w-full aspect-[2/3] rounded-lg overflow-hidden border border-border/20 cursor-pointer transition-all duration-300 hover:border-primary/50 hover:scale-102 hover:shadow-xl hover:shadow-primary/5 group bg-secondary/35"
                   >
-                    <img
-                      src={url}
-                      alt={`Cover ${idx + 1}`}
-                      className="absolute inset-0 w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-                    />
+                    {isVideoUrl(url) ? (
+                      <video
+                        src={url}
+                        autoPlay
+                        loop
+                        muted
+                        playsInline
+                        className="absolute inset-0 w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                      />
+                    ) : (
+                      <img
+                        src={url}
+                        alt={`Cover ${idx + 1}`}
+                        className="absolute inset-0 w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                      />
+                    )}
                     <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
                       <span className="text-white text-xs font-semibold px-2.5 py-1 rounded bg-black/70 backdrop-blur-sm border border-white/10">
                         View Image
@@ -473,17 +512,39 @@ export const SeriesActions = React.memo(function SeriesActions({
               <>
                 <div className="relative aspect-[3/4] max-h-[60vh] w-full flex items-center justify-center bg-black/90 rounded-lg overflow-hidden mt-4 border border-border/10">
                   {/* Blurred background image for immersive depth */}
-                  <img
-                    src={allCovers[galleryIdx]}
-                    alt=""
-                    className="absolute inset-0 h-full w-full object-cover blur-2xl opacity-40 scale-105 pointer-events-none"
-                  />
+                  {isVideoUrl(allCovers[galleryIdx]) ? (
+                    <video
+                      src={allCovers[galleryIdx]}
+                      autoPlay
+                      loop
+                      muted
+                      playsInline
+                      className="absolute inset-0 h-full w-full object-cover blur-2xl opacity-40 scale-105 pointer-events-none"
+                    />
+                  ) : (
+                    <img
+                      src={allCovers[galleryIdx]}
+                      alt=""
+                      className="absolute inset-0 h-full w-full object-cover blur-2xl opacity-40 scale-105 pointer-events-none"
+                    />
+                  )}
                   {/* Main cover in full aspect ratio fit */}
-                  <img
-                    src={allCovers[galleryIdx]}
-                    alt={`${title} Cover ${galleryIdx + 1}`}
-                    className="relative z-10 max-h-[60vh] max-w-full object-contain shadow-2xl"
-                  />
+                  {isVideoUrl(allCovers[galleryIdx]) ? (
+                    <video
+                      src={allCovers[galleryIdx]}
+                      autoPlay
+                      loop
+                      muted
+                      playsInline
+                      className="relative z-10 max-h-[60vh] max-w-full object-contain shadow-2xl"
+                    />
+                  ) : (
+                    <img
+                      src={allCovers[galleryIdx]}
+                      alt={`${title} Cover ${galleryIdx + 1}`}
+                      className="relative z-10 max-h-[60vh] max-w-full object-contain shadow-2xl"
+                    />
+                  )}
 
                   {allCovers.length > 1 && (
                     <>
@@ -525,7 +586,11 @@ export const SeriesActions = React.memo(function SeriesActions({
                           galleryIdx === idx ? "border-primary scale-95" : "border-transparent opacity-60 hover:opacity-100"
                         }`}
                       >
-                        <img src={url} alt="" className="object-cover h-full w-full" />
+                        {isVideoUrl(url) ? (
+                          <video src={url} muted className="object-cover h-full w-full" />
+                        ) : (
+                          <img src={url} alt="" className="object-cover h-full w-full" />
+                        )}
                       </button>
                     ))}
                   </div>

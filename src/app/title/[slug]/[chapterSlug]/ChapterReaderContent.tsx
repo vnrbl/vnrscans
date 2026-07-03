@@ -1320,11 +1320,22 @@ function NovelView({
           <div className="mb-8 space-y-4">
             {illustrations.map((url, idx) => (
               <div key={idx} className="relative w-full max-h-[600px] overflow-hidden rounded-lg border border-border/40 bg-card/10 shadow-lg">
-                <img
-                  src={url}
-                  alt={`Illustration ${idx + 1}`}
-                  className="w-full h-auto max-h-[600px] object-contain mx-auto"
-                />
+                {url.toLowerCase().split("?")[0].endsWith(".mp4") ? (
+                  <video
+                    src={url}
+                    autoPlay
+                    loop
+                    muted
+                    playsInline
+                    className="w-full h-auto max-h-[600px] object-contain mx-auto"
+                  />
+                ) : (
+                  <img
+                    src={url}
+                    alt={`Illustration ${idx + 1}`}
+                    className="w-full h-auto max-h-[600px] object-contain mx-auto"
+                  />
+                )}
               </div>
             ))}
           </div>
