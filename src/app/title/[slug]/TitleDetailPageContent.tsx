@@ -66,6 +66,29 @@ import { ChapterList } from "./ChapterList";
 /*  3. Does NOT hold chapter pagination/search/sort state             */
 /* ------------------------------------------------------------------ */
 
+const getRarityColor = (rarity: string) => {
+  switch (rarity?.toLowerCase()) {
+    case "common":
+      return "text-slate-400";
+    case "uncommon":
+      return "text-emerald-400";
+    case "rare":
+      return "text-blue-400 font-bold";
+    case "very rare":
+      return "text-purple-400 font-bold";
+    case "extremely rare":
+      return "text-orange-400 font-extrabold";
+    case "legendary":
+      return "text-yellow-400 font-extrabold shadow-[0_0_8px_rgba(250,204,21,0.2)]";
+    case "mythical":
+      return "text-red-400 font-extrabold animate-pulse";
+    case "near non-existent":
+      return "text-pink-400 font-extrabold uppercase animate-pulse shadow-[0_0_12px_rgba(244,63,94,0.3)]";
+    default:
+      return "text-foreground";
+  }
+};
+
 export default function TitleDetailPageContent({
   slug,
   initialSeriesData,
@@ -817,12 +840,13 @@ export default function TitleDetailPageContent({
                       <table className="w-full text-left text-xs border-collapse">
                         <thead className="sticky top-0 bg-[#0c0f17] z-10 shadow-sm border-b border-border/30">
                           <tr className="text-muted-foreground font-bold uppercase tracking-wider text-[9px]">
-                            <th className="py-2.5 px-3 w-[5%] pb-3">#</th>
-                            <th className="py-2.5 px-3 w-[20%] pb-3">Devourer Realm</th>
-                            <th className="py-2.5 px-3 w-[12%] pb-3">Stages</th>
-                            <th className="py-2.5 px-3 w-[15%] pb-3">Combat Equivalent</th>
-                            <th className="py-2.5 px-3 w-[13%] pb-3">Lifespan</th>
-                            <th className="py-2.5 px-3 w-[20%] pb-3">Unique Abilities</th>
+                            <th className="py-2.5 px-3 w-[4%] pb-3">#</th>
+                            <th className="py-2.5 px-3 w-[15%] pb-3">Devourer Realm</th>
+                            <th className="py-2.5 px-3 w-[10%] pb-3">Stages</th>
+                            <th className="py-2.5 px-3 w-[14%] pb-3">Combat Equivalent</th>
+                            <th className="py-2.5 px-3 w-[12%] pb-3">Rarity / Difficulty</th>
+                            <th className="py-2.5 px-3 w-[12%] pb-3">Lifespan</th>
+                            <th className="py-2.5 px-3 w-[18%] pb-3">Unique Abilities</th>
                             <th className="py-2.5 px-3 w-[15%] pb-3">Advancement Requirements</th>
                           </tr>
                         </thead>
@@ -833,135 +857,150 @@ export default function TitleDetailPageContent({
     "name": "Void Embryo Realm",
     "stages": "Early / Mid / Late / Peak",
     "eq": "Golden Core Realm",
+    "rarity": "Common",
     "lifespan": "300–500 years",
-    "desc": "Abyssal Void Eye, see inside bodies & weaknesses",
-    "reqs": "Devour and fully refine at least 10 Golden Core level cultivators (or equivalent)"
+    "desc": "Abyssal Void Eye (basic analysis), see emotions, weaknesses, and energy flow",
+    "reqs": "Devour and refine 10+ Golden Core level cultivators"
   },
   {
     "num": 2,
     "name": "Devouring Core Realm",
     "stages": "Early / Mid / Late / Peak",
     "eq": "Nascent Soul Realm",
+    "rarity": "Common",
     "lifespan": "800–1,200 years",
     "desc": "Devour cultivation bases, steal partial techniques",
-    "reqs": "Devour and completely refine one Nascent Soul level being’s cultivation"
+    "reqs": "Devour and refine 1 Nascent Soul level being"
   },
   {
     "num": 3,
     "name": "Abyssal Nascent Realm",
     "stages": "Early / Mid / Late / Peak",
     "eq": "Soul Metamorphosis Realm",
+    "rarity": "Uncommon",
     "lifespan": "2,000–3,500 years",
     "desc": "Devour souls & memories, create small void zones",
-    "reqs": "Devour and absorb the soul of a Soul Metamorphosis level cultivator"
+    "reqs": "Devour and absorb the soul of a Soul Metamorphosis expert"
   },
   {
     "num": 4,
     "name": "Void Refiner Realm",
     "stages": "Early / Mid / Late / Peak",
     "eq": "Void Refinement Realm",
+    "rarity": "Uncommon",
     "lifespan": "6,000–10,000 years",
     "desc": "Permanently refine stolen power into his own",
-    "reqs": "Successfully refine and integrate power from multiple high-level experts without backlash"
+    "reqs": "Refine power from multiple high-level experts without backlash"
   },
   {
     "num": 5,
     "name": "Soul Devourer Realm",
     "stages": "Early / Mid / Late / Peak",
     "eq": "Dao Fusion Realm",
+    "rarity": "Rare",
     "lifespan": "15,000–25,000 years",
     "desc": "Fully use enemy techniques as his own",
-    "reqs": "Devour and perfectly replicate one complete technique from a Dao Fusion level expert"
+    "reqs": "Devour and perfectly replicate one complete high-level technique"
   },
   {
     "num": 6,
     "name": "Abyssal Sovereign Realm",
     "stages": "Early / Mid / Late / Peak",
     "eq": "True Immortal Realm",
+    "rarity": "Rare",
     "lifespan": "50,000–80,000 years",
-    "desc": "Create personal Abyssal Domain",
-    "reqs": "Devour enough life force to create a stable personal Abyssal Domain"
+    "desc": "Create personal Abyssal Domain that weakens enemies",
+    "reqs": "Devour enough life force to stabilize a personal domain"
   },
   {
     "num": 7,
     "name": "Taboo Devourer Realm",
     "stages": "Early / Mid / Late / Peak",
     "eq": "Golden Immortal Realm",
+    "rarity": "Very Rare",
     "lifespan": "150,000–250,000 years",
-    "desc": "Partially ignore heavenly tribulations",
-    "reqs": "Survive and devour the energy of a Heavenly Tribulation (or equivalent power)"
+    "desc": "Partially ignore or devour heavenly tribulations",
+    "reqs": "Survive and devour the energy of a Heavenly Tribulation"
   },
   {
     "num": 8,
     "name": "Eternal Void Realm",
     "stages": "Early / Mid / Late / Peak",
     "eq": "Mystic World Realm",
+    "rarity": "Very Rare",
     "lifespan": "500,000–800,000 years",
-    "desc": "Body becomes semi-void, extremely hard to kill",
-    "reqs": "Transform a significant portion of his body into void by devouring void-law beings"
+    "desc": "Body becomes semi-void, extremely difficult to kill",
+    "reqs": "Transform a large portion of his body into void"
   },
   {
     "num": 9,
     "name": "Origin Devourer Realm",
     "stages": "Early / Mid / Late / Peak",
     "eq": "Divine Emperor Realm",
+    "rarity": "Extremely Rare",
     "lifespan": "2 Million+ years",
-    "desc": "Devour concepts (fear, pain, life force)",
-    "reqs": "Successfully devour and digest one conceptual law (e.g., “Fear”, “Pain”, or “Life Force”)"
+    "desc": "Devour abstract concepts (fear, pain, killing intent, life force)",
+    "reqs": "Successfully devour and digest one conceptual law"
   },
   {
     "num": 10,
     "name": "Supreme Abyssal Realm",
     "stages": "Early / Mid / Late / Peak",
     "eq": "Heavenly Sovereign Realm",
+    "rarity": "Extremely Rare",
     "lifespan": "8 Million+ years",
-    "desc": "Create large-scale devouring fields",
-    "reqs": "Create a devouring field capable of affecting multiple experts at once"
+    "desc": "Create large-scale devouring fields affecting multiple experts",
+    "reqs": "Create a devouring field capable of threatening Realm 15+ experts"
   },
   {
     "num": 11,
     "name": "Chaos Void Realm",
     "stages": "Early / Mid / Late / Peak",
     "eq": "Eternal Sovereign Realm",
+    "rarity": "Legendary",
     "lifespan": "30 Million+ years",
-    "desc": "Devour chaotic energy, immune to some laws",
-    "reqs": "Devour and stabilize chaotic or primordial energy inside the body"
+    "desc": "Devour chaotic/primordial energy, gain partial immunity to natural laws",
+    "reqs": "Devour and stabilize chaotic or primordial energy"
   },
   {
     "num": 12,
     "name": "Void Transcendent Realm",
     "stages": "Early / Mid / Late / Peak",
     "eq": "Abyssal Void Realm",
+    "rarity": "Legendary",
     "lifespan": "100 Million+ years",
-    "desc": "Freely travel between realms through void",
-    "reqs": "Open a stable void rift and travel to another realm or planet through it"
+    "desc": "Freely travel between realms and planets through stable void rifts",
+    "reqs": "Open a stable cross-realm void rift and survive the journey"
   },
   {
     "num": 13,
     "name": "Heaven Defying Devourer Realm",
     "stages": "Early / Mid / Late / Peak",
     "eq": "Taboo Breaker Realm",
+    "rarity": "Mythical",
     "lifespan": "400 Million+ years",
-    "desc": "Weaken heavenly tribulations",
-    "reqs": "Directly devour and weaken a Heavenly Tribulation"
+    "desc": "Directly weaken or partially devour Heavenly Dao tribulations",
+    "reqs": "Devour and survive a direct confrontation with Heavenly Will"
   },
   {
     "num": 14,
     "name": "Primordial Devourer Realm",
     "stages": "Early / Mid / Late / Peak",
     "eq": "Primordial Taboo Realm",
+    "rarity": "Mythical",
     "lifespan": "1.5 Billion+ years",
-    "desc": "Devour primordial laws and ancient powers",
-    "reqs": "Devour and refine a primordial law or ancient forbidden power"
+    "desc": "Devour and refine primordial laws and ancient forbidden powers",
+    "reqs": "Devour and integrate a primordial law or ancient taboo power"
   },
   {
     "num": 15,
     "name": "Supreme Void Origin Realm",
     "stages": "Early / Mid / Late / Peak",
     "eq": "Supreme Origin Realm",
+    "rarity": "Near Non-existent",
     "lifespan": "Near Immortality",
-    "desc": "Rewrite small world laws",
-    "reqs": "Devour and partially rewrite the laws of a small world or domain"
+    "desc": "Devour and partially rewrite the laws of small worlds or domains",
+    "reqs": "Devour and successfully rewrite part of a world's laws"
   }
 ].map((row) => (
                             <tr key={row.num} className="hover:bg-card/10 transition-colors">
@@ -969,6 +1008,7 @@ export default function TitleDetailPageContent({
                               <td className="py-2.5 px-3 font-bold text-foreground">{row.name}</td>
                               <td className="py-2.5 px-3 text-[11px] font-medium">{row.stages}</td>
                               <td className="py-2.5 px-3 text-[11px] font-semibold text-purple-400 font-mono">{row.eq}</td>
+                              <td className={`py-2.5 px-3 text-[11px] font-semibold ${getRarityColor(row.rarity)}`}>{row.rarity}</td>
                               <td className="py-2.5 px-3 text-[11px] font-mono text-purple-400 font-semibold">{row.lifespan}</td>
                               <td className="py-2.5 px-3 text-foreground/80">{row.desc}</td>
                               <td className="py-2.5 px-3 text-[11px] italic text-muted-foreground/90">{row.reqs}</td>
