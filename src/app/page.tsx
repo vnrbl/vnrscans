@@ -246,13 +246,24 @@ export default async function Home() {
                   <div className="relative aspect-[16/10] overflow-hidden bg-neutral-900">
                     <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent opacity-90 z-10 pointer-events-none" />
                     {item.cover_url ? (
-                      <img
-                        src={item.cover_url}
-                        alt={`${item.title} cover`}
-                        className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
-                        referrerPolicy="no-referrer"
-                        loading="lazy"
-                      />
+                      item.cover_url.toLowerCase().split("?")[0].endsWith(".mp4") ? (
+                        <video
+                          src={item.cover_url}
+                          autoPlay
+                          loop
+                          muted
+                          playsInline
+                          className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
+                        />
+                      ) : (
+                        <img
+                          src={item.cover_url}
+                          alt={`${item.title} cover`}
+                          className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
+                          referrerPolicy="no-referrer"
+                          loading="lazy"
+                        />
+                      )
                     ) : (
                       <div className="grid h-full w-full place-items-center text-muted-foreground">
                         <BookOpen className="h-8 w-8" />

@@ -658,15 +658,26 @@ const RecommendationsSection = React.memo(function RecommendationsSection({
             >
               <div className={TITLE_COVER_CLASS}>
                 {title.cover_url ? (
-                  <Image
-                    src={title.cover_url}
-                    alt={title.title}
-                    fill
-                    unoptimized
-                    sizes="(max-width: 640px) 150px, (max-width: 768px) 180px, 220px"
-                    className="object-cover transition-transform duration-500 group-hover:scale-105"
-                    draggable={false}
-                  />
+                  title.cover_url.toLowerCase().split("?")[0].endsWith(".mp4") ? (
+                    <video
+                      src={title.cover_url}
+                      autoPlay
+                      loop
+                      muted
+                      playsInline
+                      className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                    />
+                  ) : (
+                    <Image
+                      src={title.cover_url}
+                      alt={title.title}
+                      fill
+                      unoptimized
+                      sizes="(max-width: 640px) 150px, (max-width: 768px) 180px, 220px"
+                      className="object-cover transition-transform duration-500 group-hover:scale-105"
+                      draggable={false}
+                    />
+                  )
                 ) : (
                   <div className="flex h-full w-full items-center justify-center text-muted-foreground">
                     <BookOpen className="h-8 w-8" />

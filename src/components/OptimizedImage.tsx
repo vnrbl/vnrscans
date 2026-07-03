@@ -55,6 +55,24 @@ export function OptimizedImage({
     setError(true);
   };
 
+  const isVideo = src ? src.toLowerCase().split("?")[0].endsWith(".mp4") : false;
+
+  if (isVideo && src) {
+    return (
+      <div className={`relative overflow-hidden ${className}`}>
+        <video
+          src={src}
+          autoPlay
+          loop
+          muted
+          playsInline
+          className="h-full w-full object-cover transition-opacity duration-300 opacity-100"
+          draggable={false}
+        />
+      </div>
+    );
+  }
+
   if (!src || error) {
     return (
       <div

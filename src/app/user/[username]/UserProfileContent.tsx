@@ -1268,13 +1268,24 @@ export default function UserProfileContent({ username }: { username: string }) {
                   <div className="flex gap-3">
                     <div className="h-20 w-14 flex-shrink-0 overflow-hidden rounded-md bg-secondary">
                       {item.series_cover_url ? (
-                        <img
-                          src={item.series_cover_url}
-                          alt={item.series_title}
-                          className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-                          loading="lazy"
-                          referrerPolicy="no-referrer"
-                        />
+                        item.series_cover_url.toLowerCase().split("?")[0].endsWith(".mp4") ? (
+                          <video
+                            src={item.series_cover_url}
+                            autoPlay
+                            loop
+                            muted
+                            playsInline
+                            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                          />
+                        ) : (
+                          <img
+                            src={item.series_cover_url}
+                            alt={item.series_title}
+                            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                            loading="lazy"
+                            referrerPolicy="no-referrer"
+                          />
+                        )
                       ) : (
                         <div className="flex h-full w-full items-center justify-center text-muted-foreground">
                           <BookOpen className="h-5 w-5" />
@@ -1370,12 +1381,23 @@ export default function UserProfileContent({ username }: { username: string }) {
                     <div className="flex gap-4 items-start">
                       {seriesInfo?.cover_url && (
                         <div className="relative h-16 w-11 overflow-hidden rounded border border-border/30 bg-secondary shrink-0 shadow-sm">
-                          <img
-                            src={seriesInfo.cover_url}
-                            alt={seriesInfo.title}
-                            className="h-full w-full object-cover animate-[profileFadeInUp_0.3s_ease-out]"
-                            referrerPolicy="no-referrer"
-                          />
+                          {seriesInfo.cover_url.toLowerCase().split("?")[0].endsWith(".mp4") ? (
+                            <video
+                              src={seriesInfo.cover_url}
+                              autoPlay
+                              loop
+                              muted
+                              playsInline
+                              className="h-full w-full object-cover animate-[profileFadeInUp_0.3s_ease-out]"
+                            />
+                          ) : (
+                            <img
+                              src={seriesInfo.cover_url}
+                              alt={seriesInfo.title}
+                              className="h-full w-full object-cover animate-[profileFadeInUp_0.3s_ease-out]"
+                              referrerPolicy="no-referrer"
+                            />
+                          )}
                         </div>
                       )}
                       <div className="flex-1 min-w-0">

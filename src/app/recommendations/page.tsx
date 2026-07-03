@@ -235,13 +235,24 @@ function SeriesCard({ series }: { series: any }) {
     >
       <div className="aspect-[2/3] overflow-hidden rounded-lg bg-secondary relative shadow-sm border border-border/10">
         {series.cover_url ? (
-          <img
-            src={series.cover_url}
-            alt={series.title}
-            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
-            loading="lazy"
-            referrerPolicy="no-referrer"
-          />
+          series.cover_url.toLowerCase().split("?")[0].endsWith(".mp4") ? (
+            <video
+              src={series.cover_url}
+              autoPlay
+              loop
+              muted
+              playsInline
+              className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
+            />
+          ) : (
+            <img
+              src={series.cover_url}
+              alt={series.title}
+              className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
+              loading="lazy"
+              referrerPolicy="no-referrer"
+            />
+          )
         ) : (
           <div className="flex h-full w-full items-center justify-center text-muted-foreground">
             <BookOpen className="h-10 w-10" />
