@@ -10,7 +10,6 @@ import {
   ChevronRight, 
   ChevronDown,
   ChevronUp,
-  Clock, 
   Bell, 
   Trophy, 
   Zap, 
@@ -18,7 +17,6 @@ import {
   CheckCircle2, 
   Sparkles,
   Award,
-  Users,
   Share2
 } from "lucide-react";
 import { toast } from "sonner";
@@ -99,8 +97,6 @@ export default function TitleDetailPageContent({
   initialChaptersData?: any[];
 }) {
   const { user } = useAuth();
-  const [showTimeline, setShowTimeline] = React.useState(false);
-  const [showDossier, setShowDossier] = React.useState(false);
   const [showRealms, setShowRealms] = React.useState(false);
   const [realmsTab, setRealmsTab] = React.useState("standard");
 
@@ -330,236 +326,7 @@ export default function TitleDetailPageContent({
           />
         </div>
 
-        {/* Dossier Section (Taboo only) */}
-        {slug === "taboo-son-of-the-lonely-frost-sovereign" && (
-          <div className="mt-14 pt-10 border-t border-border/40">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-black tracking-tight text-foreground flex items-center gap-2">
-                <Users className="h-6 w-6 text-primary" /> Earth Archives: Voss Family Dossier
-              </h2>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowDossier(!showDossier)}
-                className="gap-2 font-bold text-xs border-primary/30 hover:border-primary/60 text-primary hover:bg-primary/10 cursor-pointer shadow-sm"
-              >
-                {showDossier ? "Hide Dossier" : "View Dossier"}
-                {showDossier ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
-              </Button>
-            </div>
-            
-            {showDossier && (
-              <div className="animate-in fade-in slide-in-from-top-4 duration-300">
-                {/* Family Card */}
-                <div className="mb-8 flex flex-col lg:flex-row bg-card/30 border border-border/50 rounded-xl overflow-hidden hover:border-primary/30 transition-all duration-300 shadow-sm backdrop-blur-sm">
-                  <div className="lg:w-[55%] w-full">
-                    <img
-                      src="https://edvqhmvqbtujzcfqkrbe.supabase.co/storage/v1/object/public/comment-media/character-sheets/media__1783069287834.jpg"
-                      alt="The Voss Family"
-                      className="w-full h-auto block"
-                    />
-                  </div>
-                  <div className="p-6 lg:w-[45%] flex flex-col justify-center bg-card/20">
-                    <h3 className="text-lg font-bold text-foreground mb-2">The Voss Family Legacy</h3>
-                    <p className="text-xs text-muted-foreground leading-relaxed">
-                      Bound together by blood, research, and an absolute rejection of Earth's societal constraints. In the public eye, they were elite figures of the global biotech sector. Behind closed doors in the Elysium Spire penthouse, they formed a closed circle of unmatched intellect. Their combined expertise in artificial gestation, gene-refinement, and cyber-consciousness mapping culminated in Project Godseed—an ambition that threatened global power structures and ultimately provoked their execution.
-                    </p>
-                  </div>
-                </div>
 
-                {/* Collapsible Dossier Widget */}
-                <div className="mb-8">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setShowTimeline(!showTimeline)}
-                    className="gap-2 font-semibold text-xs border-primary/30 hover:border-primary/60 text-primary hover:bg-primary/10 cursor-pointer shadow-sm"
-                  >
-                    <Clock className="h-4 w-4" />
-                    {showTimeline ? "Hide Earth Timeline Archive" : "Decrypt Earth Timeline Archive"}
-                    {showTimeline ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
-                  </Button>
-
-                  {showTimeline && (
-                    <div className="mt-4 p-5 rounded-xl border border-border/50 bg-card/25 backdrop-blur-sm animate-in fade-in slide-in-from-top-4 duration-300">
-                      <h3 className="text-xs font-bold text-foreground mb-4 flex items-center gap-1.5 uppercase tracking-wider text-primary">
-                        <Clock className="h-4 w-4 text-primary" /> Chronological Timeline of Dr. Elias Voss & Dr. Lena Park
-                      </h3>
-                      
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-left text-xs border-collapse">
-                          <thead>
-                            <tr className="border-b border-border/40 text-muted-foreground font-bold uppercase tracking-wider text-[9px]">
-                              <th className="py-2.5 px-3">Milestone</th>
-                              <th className="py-2.5 px-3 text-center">Elias Age</th>
-                              <th className="py-2.5 px-3 text-center">Lena Age</th>
-                              <th className="py-2.5 px-3 text-center">Sera Age</th>
-                              <th className="py-2.5 px-3 text-center">Cass Age</th>
-                              <th className="py-2.5 px-3">Story Context</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-border/10 text-muted-foreground">
-                            {[
-                              {
-                                milestone: "Birth of Seraphine",
-                                elias: "19",
-                                lena: "23",
-                                sera: "0",
-                                cass: "—",
-                                context: "Lena has her first child at age 23."
-                              },
-                              {
-                                milestone: "Birth of Cassian",
-                                elias: "22",
-                                lena: "26",
-                                sera: "3",
-                                cass: "0",
-                                context: "Lena has her second child at age 26."
-                              },
-                              {
-                                milestone: "Elias & Lena Meet",
-                                elias: "29",
-                                lena: "33",
-                                sera: "10",
-                                cass: "7",
-                                context: "They begin working together on Project Godseed (6 years before Chapter 1)."
-                              },
-                              {
-                                milestone: "Introduction (Ch. 1 & 2)",
-                                elias: "35",
-                                lena: "39",
-                                sera: "16",
-                                cass: "13",
-                                context: "Elias is 35 (Ch. 1, line 3). Lena is 39 (Ch. 1, line 9). Seraphine is 16 (Ch. 1/2)."
-                              },
-                              {
-                                milestone: "Marriage",
-                                elias: "43.5",
-                                lena: "47.5",
-                                sera: "24.5",
-                                cass: "21.5",
-                                context: "Elias and Lena marry 18 months before the attack (Ch. 3, line 35)."
-                              },
-                              {
-                                milestone: "The Attack & Death (Ch. 3)",
-                                elias: "45",
-                                lena: "49",
-                                sera: "26",
-                                cass: "23",
-                                context: "Elias dies at 45 (Ch. 3, line 3). Lena dies at 49 (Ch. 3, line 4) while 8 weeks pregnant."
-                              }
-                            ].map((row, idx) => (
-                              <tr key={idx} className="hover:bg-card/10 transition-colors">
-                                <td className="py-2.5 px-3 font-semibold text-foreground">{row.milestone}</td>
-                                <td className="py-2.5 px-3 text-center font-mono">{row.elias}</td>
-                                <td className="py-2.5 px-3 text-center font-mono">{row.lena}</td>
-                                <td className="py-2.5 px-3 text-center font-mono">{row.sera}</td>
-                                <td className="py-2.5 px-3 text-center font-mono">{row.cass}</td>
-                                <td className="py-2.5 px-3 text-foreground/80">{row.context}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Individual Profiles Grid */}
-                <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-                  {[
-                    {
-                      name: "Dr. Elias Voss",
-                      role: "The Creator",
-                      age: "45 (At time of death)",
-                      height: "6'5\"",
-                      biometrics: "Silver-Blond Hair, Pale Silver Eyes",
-                      status: "Deceased (Earth) / Reincarnated as Xue Chen",
-                      image: "https://edvqhmvqbtujzcfqkrbe.supabase.co/storage/v1/object/public/comment-media/character-sheets/media__1783069266003.jpg",
-                      bio: "The greatest biotech mind of the century. A cold, hyper-disciplined scientist who viewed human emotion and life not as sentimental experiences, but as complex, rewritable data. Elias established Project Godseed to transcend biological limitations, securing his research behind lethal security protocols.",
-                      connection: "Reincarnated as Xue Chen, the son of the Eternal Frost Sovereign. Retains his analytical mindset, seeing the cultivation world through his Abyssal Void Eye."
-                    },
-                    {
-                      name: "Dr. Lena Park",
-                      role: "The Anchor",
-                      age: "49 (At time of death)",
-                      height: "5'8\"",
-                      biometrics: "Dark Wavy Hair, Dark Brown Eyes",
-                      status: "Deceased (Earth)",
-                      image: "https://edvqhmvqbtujzcfqkrbe.supabase.co/storage/v1/object/public/comment-media/character-sheets/media__1783069287904.jpg",
-                      bio: "Lead researcher of artificial womb stabilization and gene-line refinement. Elegant, brilliant, and polished. Lena was the only person to penetrate Elias's cold exterior, eventually marrying him and carrying his unborn child. She triggered the database purge to protect their work while mortally wounded, dying in Elias's arms.",
-                      connection: "Her death and the loss of their unborn child served as the catalyst for Elias to activate the Eternal Anchor Protocol. Her memory is the sole emotional anchor in Xue Chen's cold soul."
-                    },
-                    {
-                      name: "Seraphine Voss",
-                      role: "The Successor",
-                      age: "26",
-                      height: "5'9\"",
-                      biometrics: "Dark Hair, Blue/Grey Eyes",
-                      status: "Alive (Earth) — In Hiding",
-                      image: "https://edvqhmvqbtujzcfqkrbe.supabase.co/storage/v1/object/public/comment-media/character-sheets/media__1783069287752.jpg",
-                      bio: "Lena's daughter (older sister of Cassian) and Elias's stepdaughter. Surviving because Elias ordered her to stay away from the lab for 72 hours prior to the breach, she recognized the carrier wave signature of the Eternal Anchor Protocol during the facility's detonation. She is now underground, using Elias's backdoor codes to scan the void for his consciousness.",
-                      connection: "Her breakthrough analysis on anomalous consciousness fragments directly enabled the calibration of the carrier waves used in the Eternal Anchor Protocol."
-                    },
-                    {
-                      name: "Cassian Voss",
-                      role: "The Shield",
-                      age: "23",
-                      height: "6'2\"",
-                      biometrics: "Dark Messy Hair, Dark Brown Eyes, Facial Scars",
-                      status: "Alive (Earth) — Operational / Guardian",
-                      image: "https://edvqhmvqbtujzcfqkrbe.supabase.co/storage/v1/object/public/comment-media/character-sheets/media__1783069287807.jpg",
-                      bio: "Lena's son (younger brother of Seraphine) and Elias's stepson. A brooding, street-hardened fighter. Although severely wounded and left for dead by mercenaries during the raid, he survived the breach and escaped before the facility detonated. Carrying the physical scars of that night, he now acts as Seraphine's guardian in the shadows.",
-                      connection: "His desperate stand in the outer corridors delayed the mercenaries long enough for Lena to purge the database and Elias to prepare the final protocols."
-                    }
-                  ].map((char) => (
-                    <div key={char.name} className="flex flex-col sm:flex-row bg-card/30 border border-border/50 rounded-xl overflow-hidden hover:border-primary/40 hover:shadow-[0_0_20px_rgba(127,34,254,0.12)] transition-all duration-300 shadow-sm backdrop-blur-sm">
-                      <div className="sm:w-[35%] relative min-h-[240px] sm:min-h-auto">
-                        <Image
-                          src={char.image}
-                          alt={char.name}
-                          fill
-                          unoptimized
-                          className="object-cover transition-transform duration-500 hover:scale-105"
-                        />
-                      </div>
-                      <div className="p-5 sm:w-[65%] flex flex-col justify-between bg-card/10">
-                        <div>
-                          <div className="flex items-center justify-between gap-2 mb-2">
-                            <h4 className="font-bold text-base text-foreground leading-none">{char.name}</h4>
-                            <span className="text-[9px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20 font-bold">{char.role}</span>
-                          </div>
-                          
-                          <div className="grid grid-cols-2 gap-x-2 gap-y-1 text-[11px] border-b border-border/20 pb-2 mb-2.5">
-                            <div>
-                              <span className="text-muted-foreground block">Age</span>
-                              <span className="text-foreground font-semibold">{char.age}</span>
-                            </div>
-                            <div>
-                              <span className="text-muted-foreground block">Height</span>
-                              <span className="text-foreground font-semibold">{char.height}</span>
-                            </div>
-                            <div className="col-span-2">
-                              <span className="text-muted-foreground block">Biometrics</span>
-                              <span className="text-foreground font-semibold">{char.biometrics}</span>
-                            </div>
-                          </div>
-
-                          <p className="text-xs text-muted-foreground leading-relaxed mb-3 line-clamp-4">{char.bio}</p>
-                        </div>
-
-                        <div className="p-2.5 bg-black/30 border-l-2 border-primary rounded-r-md">
-                          <span className="block text-[9px] uppercase font-bold text-primary mb-0.5">Dimensional Transition Link</span>
-                          <p className="text-[11px] text-foreground leading-snug">{char.connection}</p>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
 
         {/* Cultivation Realms Section (Taboo only) */}
         {slug === "taboo-son-of-the-lonely-frost-sovereign" && (

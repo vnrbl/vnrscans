@@ -3,7 +3,7 @@
 import NextLink from "next/link";
 import { useRouter } from "next/navigation";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
-import { useEffect, useState, useRef, type ReactNode } from "react";
+import { useEffect, useState, useRef, useMemo, type ReactNode } from "react";
 import {
   ChevronLeft,
   ChevronRight,
@@ -53,6 +53,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { safeUrlOrNull } from "@/lib/safe-url";
+import NovelSettingsPanel from "@/components/NovelSettingsPanel";
 
 function Link({ to, params, search, children, ...props }: any) {
   let href = to || "";
@@ -1230,13 +1231,49 @@ function NovelView({
   chapterNumber: number;
   illustrations?: string[];
 }) {
+  const [fontSize, setFontSize] = useState(18);
+  const [fontFamily, setFontFamily] = useState("sans-serif");
+  const [lineHeight, setLineHeight] = useState(1.8);
+  const [theme, setTheme] = useState("dark");
+  const [scrollProgress, setScrollProgress] = useState(0);
+
+  // Load preferences from localStorage on client-side mount
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const storedSize = localStorage.getItem("novel-font-size");
+      const storedFamily = localStorage.getItem("novel-font-family");
+      const storedLineHeight = localStorage.getItem("novel-line-height");
+      const storedTheme = localStorage.getItem("novel-theme");
+
+      if (storedSize) setFontSize(parseInt(storedSize, 10));
+      if (storedFamily) setFontFamily(storedFamily);
+      if (storedLineHeight) setLineHeight(parseFloat(storedLineHeight));
+      if (storedTheme) setTheme(storedTheme);
+    } catch (e) {
+      console.error("Failed to load novel preferences", e);
+    }
+  }, []);
+
+  // Track page scroll progress for the top progress bar
+  useEffect(() => {
+    const handleScroll = () => {
+      const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+      const scrollHeight = document.documentElement.scrollHeight - window.innerHeight;
+      const progress = scrollHeight > 0 ? (scrollTop / scrollHeight) * 100 : 0;
+      setScrollProgress(progress);
+    };
+
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
   // Scroll position restoration for novels
   useEffect(() => {
     if (!chapterId || !content) return;
 
     const scrollKey = `chapter-scroll-${chapterId}`;
 
-    // Restore scroll position after content loads
     const restoreScroll = () => {
       const savedPosition = localStorage.getItem(scrollKey);
       if (savedPosition) {
@@ -1247,26 +1284,20 @@ function NovelView({
       }
     };
 
-    // Save scroll position periodically
     const saveScrollPosition = () => {
       const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
       localStorage.setItem(scrollKey, scrollTop.toString());
     };
 
-    // Throttled scroll handler
     let scrollTimeout: NodeJS.Timeout;
     const handleScroll = () => {
       clearTimeout(scrollTimeout);
       scrollTimeout = setTimeout(saveScrollPosition, 150);
     };
 
-    // Restore scroll position when content is loaded
     restoreScroll();
-
-    // Add scroll listener
     window.addEventListener("scroll", handleScroll);
 
-    // Save scroll position when leaving the page
     const handleBeforeUnload = () => {
       saveScrollPosition();
     };
@@ -1279,94 +1310,178 @@ function NovelView({
     };
   }, [chapterId, content]);
 
-  const isHtml = /<[a-z][\s\S]*>/i.test(content);
+  // Determine content mode (HTML vs Plain Text split)
+  const isHtml = useMemo(() => /<[a-z][\s\S]*>/i.test(content), [content]);
+  const plainTextParagraphs = useMemo(() => {
+    if (isHtml) return [];
+    return content
+      .split(/\n{2,}/)
+      .map((p) => p.trim())
+      .filter(Boolean);
+  }, [content, isHtml]);
+
+  // Map theme styles for background, text and borders
+  const themeStyles = useMemo(() => {
+    switch (theme) {
+      case "charcoal":
+        return {
+          bg: "bg-[#0f0f10]",
+          text: "text-[#d0d0d0]",
+          border: "border-neutral-800",
+        };
+      case "sepia":
+        return {
+          bg: "bg-[#f4ecd8]",
+          text: "text-[#3c2a21]",
+          border: "border-[#e4dcbf]",
+        };
+      case "slate":
+        return {
+          bg: "bg-[#0f172a]",
+          text: "text-[#cbd5e1]",
+          border: "border-slate-800",
+        };
+      case "dark":
+      default:
+        return {
+          bg: "bg-black",
+          text: "text-[#e5e5e5]",
+          border: "border-neutral-900",
+        };
+    }
+  }, [theme]);
 
   return (
-    <div className="mx-auto max-w-4xl px-4 sm:px-6 md:px-8 py-10">
-      <style dangerouslySetInnerHTML={{ __html: `
-        .novel-body-text p {
-          margin-bottom: 2rem !important;
-          line-height: 1.95 !important;
-          letter-spacing: -0.012em !important;
-          word-spacing: -0.02em !important;
-          text-align: justify !important;
-          text-justify: inter-word !important;
-        }
-        .novel-body-text {
-          line-height: 1.95 !important;
-          letter-spacing: -0.012em !important;
-          word-spacing: -0.02em !important;
-          text-align: justify !important;
-          text-justify: inter-word !important;
-        }
-      `}} />
-      <article
-        className="text-foreground"
-        style={{
-          fontSize: "var(--novel-font-size, 18px)",
-          lineHeight: "var(--novel-line-height, 1.9)",
-        }}
-      >
-        <header className="mb-8 border-b border-border pb-6">
-          <h1 className="text-3xl font-bold tracking-tight mb-2">
-            {seriesTitle || "Novel"} — Chapter {chapterNumber}
-          </h1>
-          <p className="text-muted-foreground text-sm">
-            Read the full chapter online at vnrscans.
-          </p>
-        </header>
-
-        {illustrations && illustrations.length > 0 && (
-          <div className="mb-8 space-y-4">
-            {illustrations.map((url, idx) => (
-              <div key={idx} className="relative w-full max-h-[600px] overflow-hidden rounded-lg border border-border/40 bg-card/10 shadow-lg">
-                {url.toLowerCase().split("?")[0].endsWith(".mp4") ? (
-                  <video
-                    src={url}
-                    autoPlay
-                    loop
-                    muted
-                    playsInline
-                    className="w-full h-auto max-h-[600px] object-contain mx-auto"
-                  />
-                ) : (
-                  <img
-                    src={url}
-                    alt={`Illustration ${idx + 1}`}
-                    className="w-full h-auto max-h-[600px] object-contain mx-auto"
-                  />
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-        
-        {isHtml ? (
-          <div 
-            className="novel-body-text whitespace-pre-wrap"
-            dangerouslySetInnerHTML={{ __html: content }}
-          />
-        ) : (
-          <div className="novel-body-text">
-            {content.split(/\n{2,}/).map((p, i) => (
-              <p key={i} className="whitespace-pre-wrap">
-                {p}
-              </p>
-            ))}
-          </div>
-        )}
-      </article>
-
-      {/* Chapter Navigation Buttons - Above Reactions */}
-      <ChapterNavigation
-        hasPrev={hasPrev}
-        hasNext={hasNext}
-        onPrev={onPrev}
-        onNext={onNext}
-        seriesSlug={seriesSlug}
+    <div className={`min-h-screen w-full transition-colors duration-300 pb-16 ${themeStyles.bg} ${themeStyles.text}`}>
+      {/* Top Scroll Progress Indicator */}
+      <div
+        className="fixed top-0 left-0 right-0 z-[100] h-[3px] bg-violet-600 transition-all duration-75 origin-left"
+        style={{ transform: `scaleX(${scrollProgress / 100})` }}
       />
 
-      <ChapterReactions chapterId={chapterId} seriesId={seriesId} />
+      <div className="mx-auto max-w-4xl px-4 sm:px-6 md:px-8 py-10">
+        <style dangerouslySetInnerHTML={{ __html: `
+          .novel-body-text p {
+            margin-bottom: 2rem !important;
+            line-height: inherit !important;
+            font-family: inherit !important;
+            font-size: inherit !important;
+            letter-spacing: -0.012em !important;
+            word-spacing: -0.02em !important;
+            text-align: justify !important;
+            text-justify: inter-word !important;
+          }
+          .novel-body-text {
+            line-height: inherit !important;
+            font-family: inherit !important;
+            font-size: inherit !important;
+            letter-spacing: -0.012em !important;
+            word-spacing: -0.02em !important;
+            text-align: justify !important;
+            text-justify: inter-word !important;
+          }
+        `}} />
+        <article
+          style={{
+            fontSize: `${fontSize}px`,
+            lineHeight: lineHeight,
+            fontFamily:
+              fontFamily === "serif"
+                ? "Georgia, Cambria, 'Times New Roman', Times, serif"
+                : fontFamily === "mono"
+                ? "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace"
+                : "var(--font-barlow), system-ui, sans-serif",
+          }}
+        >
+          <header className={`mb-8 border-b ${themeStyles.border} pb-6`}>
+            <h1 className="text-3xl font-bold tracking-tight mb-2">
+              {seriesTitle || "Novel"} — Chapter {chapterNumber}
+            </h1>
+            <p className="text-muted-foreground text-sm">
+              Read the full chapter online at vnrscans.
+            </p>
+          </header>
+
+          {illustrations && illustrations.length > 0 && (
+            <div className="mb-8 space-y-4">
+              {illustrations.map((url, idx) => (
+                <div key={idx} className="relative w-full max-h-[600px] overflow-hidden rounded-lg border border-border/40 bg-card/10 shadow-lg">
+                  {url.toLowerCase().split("?")[0].endsWith(".mp4") ? (
+                    <video
+                      src={url}
+                      autoPlay
+                      loop
+                      muted
+                      playsInline
+                      className="w-full h-auto max-h-[600px] object-contain mx-auto"
+                    />
+                  ) : (
+                    <img
+                      src={url}
+                      alt={`Illustration ${idx + 1}`}
+                      className="w-full h-auto max-h-[600px] object-contain mx-auto"
+                    />
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+          
+          {isHtml ? (
+            <div 
+              className="novel-body-text whitespace-pre-wrap"
+              dangerouslySetInnerHTML={{ __html: content }}
+            />
+          ) : (
+            <div className="novel-body-text space-y-6">
+              {plainTextParagraphs.map((p, i) => (
+                <p key={i}>
+                  {p}
+                </p>
+              ))}
+            </div>
+          )}
+        </article>
+
+        {/* Chapter Navigation Buttons - Above Reactions */}
+        <div className={`mt-10 border-t ${themeStyles.border} pt-6`}>
+          <ChapterNavigation
+            hasPrev={hasPrev}
+            hasNext={hasNext}
+            onPrev={onPrev}
+            onNext={onNext}
+            seriesSlug={seriesSlug}
+          />
+        </div>
+
+        <div className={`mt-8 border-t ${themeStyles.border} pt-6`}>
+          <ChapterReactions chapterId={chapterId} seriesId={seriesId} />
+        </div>
+      </div>
+
+      {/* Typography & Color Theme panel */}
+      <NovelSettingsPanel
+        fontSize={fontSize}
+        setFontSize={(size) => {
+          setFontSize(size);
+          localStorage.setItem("novel-font-size", size.toString());
+        }}
+        fontFamily={fontFamily}
+        setFontFamily={(family) => {
+          setFontFamily(family);
+          localStorage.setItem("novel-font-family", family);
+        }}
+        lineHeight={lineHeight}
+        setLineHeight={(height) => {
+          setLineHeight(height);
+          localStorage.setItem("novel-line-height", height.toString());
+        }}
+        theme={theme}
+        setTheme={(newTheme) => {
+          setTheme(newTheme);
+          localStorage.setItem("novel-theme", newTheme);
+        }}
+      />
     </div>
   );
 }
