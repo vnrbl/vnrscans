@@ -69,6 +69,10 @@ export async function extractChaptersFromSeriesUrl(seriesUrl: string): Promise<C
         }
       } else {
         html = await response.text();
+        const directChapters = extractChapterLinks(html, seriesUrl);
+        if (directChapters.length > 0) {
+          return directChapters;
+        }
         if (isProtectedPage(html)) {
           usePuppeteerFallback = true;
         }
@@ -380,6 +384,15 @@ async function collectLiveReaderImageUrls(page: any): Promise<string[]> {
             );
           });
 
+          const isHivetoonReaderImage = img.hasAttribute('data-reader-page-image') ||
+            values.some((val) => {
+              const lVal = String(val).toLowerCase();
+              return (
+                lVal.includes('storage.hivetoon.com') &&
+                lVal.includes('/public/upload/series/')
+              );
+            });
+
           return {
             index,
             top: rect.top + window.scrollY,
@@ -395,7 +408,8 @@ async function collectLiveReaderImageUrls(page: any): Promise<string[]> {
               alt.startsWith('page ') ||
               (alt.includes('chapter') && alt.includes('page')) ||
               (nw >= 500 && nh >= 800) ||
-              isAsuraReaderImage
+              isAsuraReaderImage ||
+              isHivetoonReaderImage
           };
         });
 
@@ -1012,25 +1026,27 @@ export async function extractImagesFromChapterUrl(
         }
       } else {
         html = await response.text();
+        const exampleModeImages = extractImageUrls(html, chapterUrl);
+        const exampleMatches = findImagesMatchingExampleUrl(exampleModeImages, imageUrlExample);
+        const sourceImages = filterReaderImagesForSource(exampleModeImages, chapterUrl, imageUrlExample);
+        if (exampleMatches.length > 0) {
+          return exampleMatches;
+        }
+
+        if (sourceImages.length > 0) {
+          return sourceImages;
+        }
+
         if (isProtectedPage(html)) {
           usePuppeteerFallback = true;
         } else {
-          const exampleModeImages = extractImageUrls(html, chapterUrl);
-          const exampleMatches = findImagesMatchingExampleUrl(exampleModeImages, imageUrlExample);
-          const sourceImages = filterReaderImagesForSource(exampleModeImages, chapterUrl, imageUrlExample);
-          if (exampleMatches.length > 0) {
-            return exampleMatches;
-          }
-
-          if (sourceImages.length > 0) {
-            return sourceImages;
-          }
-
           const usesClientRenderedReader =
             isQimanhwaLikeUrl(chapterUrl) ||
             isAsuraScansUrl(chapterUrl) ||
             isVortexLikeUrl(chapterUrl) ||
-            isVortexLikeUrl(imageUrlExample);
+            isVortexLikeUrl(imageUrlExample) ||
+            isHivetoonUrl(chapterUrl) ||
+            isHivetoonUrl(imageUrlExample);
 
           if (usesClientRenderedReader) {
             usePuppeteerFallback = true;
@@ -1327,7 +1343,53 @@ function extractImagesFromNgState(html: string): string[] {
   }
 }
 
+function extractImagesFromMetaTags(html: string, baseUrl: string): string[] {
+  const images: string[] = [];
+  // Match <meta itemprop="image" content="..."> tags
+  const metaPattern = /<meta\b[^>]*?itemprop\s*=\s*["']image["'][^>]*?content\s*=\s*["']([^"']+)["'][^>]*?\/?>/gi;
+  // Also match reversed attribute order: content before itemprop
+  const metaPatternReversed = /<meta\b[^>]*?content\s*=\s*["']([^"']+)["'][^>]*?itemprop\s*=\s*["']image["'][^>]*?\/?>/gi;
+
+  for (const pattern of [metaPattern, metaPatternReversed]) {
+    let match;
+    while ((match = pattern.exec(html)) !== null) {
+      let url = match[1]?.trim();
+      if (!url) continue;
+
+      if (!url.startsWith('http')) {
+        try {
+          const base = new URL(baseUrl);
+          if (url.startsWith('//')) {
+            url = `https:${url}`;
+          } else {
+            url = new URL(url, base.href).href;
+          }
+        } catch {
+          continue;
+        }
+      }
+
+      if (!images.includes(url)) {
+        images.push(url);
+      }
+    }
+  }
+
+  return images;
+}
+
 export function extractImageUrls(html: string, baseUrl: string): string[] {
+  // Hivetoons: extract from <meta itemprop="image" content="..."> tags (SEO structured data)
+  // Hivetoons stores ALL chapter images in hidden <figure> elements with <meta> tags,
+  // not in <img> tags. The reader <img> tags are rendered client-side by Astro islands.
+  const metaTagImages = extractImagesFromMetaTags(html, baseUrl);
+  if (metaTagImages.length > 0) {
+    const hivetoonImages = metaTagImages.filter(isHivetoonReaderPageImage);
+    if (hivetoonImages.length > 0) {
+      return hivetoonImages;
+    }
+  }
+
   // First try to extract from Angular's transferState JSON if present (common for Qi Manga / Qi Scans)
   const ngStateUrls = extractImagesFromNgState(html);
   if (ngStateUrls.length > 0) {
@@ -1535,6 +1597,12 @@ function filterReaderImagesForSource(
     return sourceImages.filter(isAsuraReaderPageImage);
   }
 
+  if (isHivetoonUrl(pageUrl) || isHivetoonUrl(exampleUrl || '')) {
+    // Hivetoons uses image_{n}_{hash}.webp filenames. The images from meta tags
+    // or the DOM are already in the correct reading order.
+    return sourceImages.filter(isHivetoonReaderPageImage);
+  }
+
   return selectChapterImageCluster(
     sourceImages.filter((url) => isLikelyChapterReaderImage(url, pageUrl, exampleUrl)),
     pageUrl,
@@ -1556,6 +1624,11 @@ function findImagesMatchingExampleUrl(images: string[], exampleUrl?: string | nu
   if (isAsuraScansUrl(cleanExampleUrl)) {
     const asuraImages = images.filter((url) => isAsuraReaderPageImage(url));
     if (asuraImages.length > 0) return asuraImages;
+  }
+
+  if (isHivetoonUrl(cleanExampleUrl)) {
+    const hivetoonImages = images.filter((url) => isHivetoonReaderPageImage(url));
+    if (hivetoonImages.length > 0) return hivetoonImages;
   }
 
   const exampleFamily = getImageUrlFamilyPrefix(cleanExampleUrl);
@@ -1629,6 +1702,11 @@ function isLikelyChapterReaderImage(url: string, pageUrl: string = '', exampleUr
           return false;
         }
       })();
+
+    // Custom check for Hivetoons
+    if (isHivetoonReaderPageImage(url)) {
+      return true;
+    }
 
     // Custom check for Elftoon
     const isElftoon =
@@ -1749,7 +1827,8 @@ function selectChapterImageCluster(
   const uniqueImages = Array.from(new Set(images)).filter((url) =>
     isLikelyChapterReaderImage(url, pageUrl, exampleUrl) ||
     isQimanhwaReaderPageImage(url) ||
-    isAsuraReaderPageImage(url),
+    isAsuraReaderPageImage(url) ||
+    isHivetoonReaderPageImage(url),
   );
 
   if (uniqueImages.length <= 2) return uniqueImages;
@@ -1911,5 +1990,29 @@ function isVortexLikeUrl(url: string): boolean {
     return hostname.includes('vortexscans') || hostname.includes('vortex');
   } catch {
     return url.toLowerCase().includes('vortexscans') || url.toLowerCase().includes('vortex');
+  }
+}
+
+function isHivetoonUrl(url: string): boolean {
+  try {
+    return new URL(url).hostname.toLowerCase().includes('hivetoon');
+  } catch {
+    return url.toLowerCase().includes('hivetoon');
+  }
+}
+
+function isHivetoonReaderPageImage(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    const lowercaseUrl = url.toLowerCase();
+    const filename = parsed.pathname.split('/').pop() ?? '';
+    const isHivetoonStorage = lowercaseUrl.includes('storage.hivetoon.com');
+    const isSeriesPath = lowercaseUrl.includes('/public/upload/series/');
+    const isReaderImage = 
+      /^(?:image|page|\d+)/i.test(filename) && 
+      /\.(?:jpe?g|png|webp)$/i.test(filename);
+    return isHivetoonStorage && isSeriesPath && isReaderImage;
+  } catch {
+    return false;
   }
 }

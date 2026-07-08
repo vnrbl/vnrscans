@@ -67,6 +67,12 @@ const SOURCE_PRESETS: Array<{
     scanlationGroup: "Elftoon",
     imageUrlExample: "https://elftoon.xyz/wp-content/uploads/2024/01/001.webp",
   },
+  {
+    hostIncludes: "hivetoon",
+    sourceSite: "Hive Toons",
+    scanlationGroup: "Hive Toons",
+    imageUrlExample: "https://storage.hivetoon.com/public/upload/series/lookism/503468341f2bfb17/image_1_9c56338a.webp",
+  },
 ];
 
 export function detectImportSource(url: string): ImportSourcePreset {

@@ -146,7 +146,7 @@ export async function $runCloudScrape(args: {
 
   const { data: existingRows, error: existingError } = await admin
     .from("chapters")
-    .select("chapter_number,scanlation_group")
+    .select("id,chapter_number,scanlation_group,chapter_type,chapter_pages(id)")
     .eq("series_id", validated.seriesId);
 
   if (existingError) {
@@ -161,8 +161,20 @@ export async function $runCloudScrape(args: {
     };
   }
 
+  // Clean up empty image chapters
+  const emptyChapterIds = (existingRows ?? [])
+    .filter((ch: any) => ch.chapter_type === "image" && (!ch.chapter_pages || ch.chapter_pages.length === 0))
+    .map((ch: any) => ch.id);
+
+  if (emptyChapterIds.length > 0) {
+    console.log(`[CloudScrape] Cleaning up ${emptyChapterIds.length} empty chapter(s)...`);
+    await admin.from("chapters").delete().in("id", emptyChapterIds);
+  }
+
+  const activeRows = (existingRows ?? []).filter((ch: any) => !emptyChapterIds.includes(ch.id));
+
   const existingKeys = new Set(
-    (existingRows ?? []).map((chapter: any) =>
+    activeRows.map((chapter: any) =>
       chapterScanKey(Number(chapter.chapter_number), chapter.scanlation_group),
     ),
   );
@@ -175,12 +187,14 @@ export async function $runCloudScrape(args: {
   // only caused new chapters to be missed. It has been removed.
 
   let exactDuplicateCount = 0;
+  const seenKeys = new Set<string>();
   const missing = discovered.filter((chapter) => {
-    const isExactDuplicate = existingKeys.has(chapterScanKey(chapter.chapterNumber, scanlationGroup));
-    if (isExactDuplicate) {
+    const key = chapterScanKey(chapter.chapterNumber, scanlationGroup);
+    if (existingKeys.has(key) || seenKeys.has(key)) {
       exactDuplicateCount++;
       return false;
     }
+    seenKeys.add(key);
     return true;
   });
 
@@ -385,13 +399,25 @@ export async function $syncImportSource(args: {
 
     const { data: existingRows, error: existingError } = await admin
       .from("chapters")
-      .select("chapter_number,scanlation_group")
+      .select("id,chapter_number,scanlation_group,chapter_type,chapter_pages(id)")
       .eq("series_id", source.series_id);
 
     if (existingError) throw existingError;
 
+    // Clean up empty image chapters
+    const emptyChapterIds = (existingRows ?? [])
+      .filter((ch: any) => ch.chapter_type === "image" && (!ch.chapter_pages || ch.chapter_pages.length === 0))
+      .map((ch: any) => ch.id);
+
+    if (emptyChapterIds.length > 0) {
+      console.log(`[SyncImport] Cleaning up ${emptyChapterIds.length} empty chapter(s)...`);
+      await admin.from("chapters").delete().in("id", emptyChapterIds);
+    }
+
+    const activeRows = (existingRows ?? []).filter((ch: any) => !emptyChapterIds.includes(ch.id));
+
     const existingKeys = new Set(
-      (existingRows ?? []).map((chapter: any) =>
+      activeRows.map((chapter: any) =>
         chapterScanKey(Number(chapter.chapter_number), chapter.scanlation_group),
       ),
     );
@@ -399,8 +425,16 @@ export async function $syncImportSource(args: {
     // Note: the old "<= maxChapterNumber" guard was removed because it dropped
     // legitimate decimal/re-published chapters. Exact duplicates are already
     // covered by existingKeys. Sort newest-last so we import chronologically.
+    const seenKeys = new Set<string>();
     const missing = discovered
-      .filter((chapter) => !existingKeys.has(chapterScanKey(chapter.chapterNumber, scanlationGroup)))
+      .filter((chapter) => {
+        const key = chapterScanKey(chapter.chapterNumber, scanlationGroup);
+        if (existingKeys.has(key) || seenKeys.has(key)) {
+          return false;
+        }
+        seenKeys.add(key);
+        return true;
+      })
       .sort((a, b) => a.chapterNumber - b.chapterNumber)
       .slice(0, maxChapters);
 

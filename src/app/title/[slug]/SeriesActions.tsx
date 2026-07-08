@@ -70,7 +70,8 @@ export const SeriesActions = React.memo(function SeriesActions({
       const { data, error } = await supabase
         .from("chapters")
         .select("id, chapter_pages(image_url)")
-        .eq("series_id", seriesId);
+        .eq("series_id", seriesId)
+        .or("title.ilike.%cover%,title.ilike.%illustration%,slug.ilike.%cover%,slug.ilike.%illustration%");
       if (error) throw error;
       
       const urls: string[] = [];

@@ -83,6 +83,14 @@ const isAsuraUrl = (url: string): boolean => {
   }
 };
 
+const isHivetoonUrl = (url: string): boolean => {
+  try {
+    return new URL(url.trim()).hostname.toLowerCase().includes('hivetoon');
+  } catch {
+    return url.toLowerCase().includes('hivetoon');
+  }
+};
+
 const isNumberedImageUrl = (url: string): boolean => {
   try {
     const filename = new URL(url).pathname.split('/').pop() ?? '';
@@ -226,6 +234,15 @@ async function collectLiveReaderImageUrls(page: any): Promise<string[]> {
           !lowercaseSrc.includes('/series/featured/') &&
           /^page[-_]\d{1,4}/i.test(filename);
 
+        const isHivetoonReaderImage = img.hasAttribute('data-reader-page-image') ||
+          values.some((val) => {
+            const lVal = String(val).toLowerCase();
+            return (
+              lVal.includes('storage.hivetoon.com') &&
+              lVal.includes('/public/upload/series/')
+            );
+          });
+
         return {
           index,
           top: rect.top + window.scrollY,
@@ -238,7 +255,8 @@ async function collectLiveReaderImageUrls(page: any): Promise<string[]> {
             className.includes('chapter') ||
             alt.startsWith('page ') ||
             (alt.includes('chapter') && alt.includes('page')) ||
-            (img.naturalWidth >= 500 && img.naturalHeight >= 800),
+            (img.naturalWidth >= 500 && img.naturalHeight >= 800) ||
+            isHivetoonReaderImage,
         };
       });
 
@@ -611,21 +629,36 @@ async function main() {
   try {
     const { data: existing, error } = await supabase
       .from('chapters')
-      .select('chapter_number, scanlation_group')
+      .select('id, chapter_number, scanlation_group, chapter_type, chapter_pages(id)')
       .eq('series_id', seriesId);
 
     if (error) throw error;
 
+    // Clean up empty image chapters
+    const emptyChapterIds = (existing ?? [])
+      .filter((ch: any) => ch.chapter_type === 'image' && (!ch.chapter_pages || ch.chapter_pages.length === 0))
+      .map((ch: any) => ch.id);
+
+    if (emptyChapterIds.length > 0) {
+      console.log(`[Scraper] Cleaning up ${emptyChapterIds.length} empty chapter(s)...`);
+      await supabase.from('chapters').delete().in('id', emptyChapterIds);
+    }
+
+    const activeRows = (existing ?? []).filter((ch: any) => !emptyChapterIds.includes(ch.id));
+
     const targetGroup = scanlationGroup || null;
     const existingScanKeys = new Set(
-      existing?.map((c) => chapterScanKey(c.chapter_number, c.scanlation_group)) || [],
+      activeRows.map((c: any) => chapterScanKey(c.chapter_number, c.scanlation_group)),
     );
+    const seenScanKeys = new Set<string>();
     missing = discovered.filter((ch) => {
-      const isExactDuplicate = existingScanKeys.has(chapterScanKey(ch.chapterNumber, targetGroup));
-      if (isExactDuplicate) {
+      const scanKey = chapterScanKey(ch.chapterNumber, targetGroup);
+      if (existingScanKeys.has(scanKey) || seenScanKeys.has(scanKey)) {
         exactDuplicateCount++;
+        return false;
       }
-      return !isExactDuplicate;
+      seenScanKeys.add(scanKey);
+      return true;
     });
 
     console.log(`📊 Stats:`);
