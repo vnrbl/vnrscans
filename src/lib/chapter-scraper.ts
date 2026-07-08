@@ -1710,8 +1710,8 @@ function isLikelyChapterReaderImage(url: string, pageUrl: string = '', exampleUr
       })();
 
     // Custom check for Hivetoons
-    if (isHivetoonReaderPageImage(url)) {
-      return true;
+    if (isHivetoonUrl(url)) {
+      return isHivetoonReaderPageImage(url);
     }
 
     // Custom check for Elftoon
@@ -1806,7 +1806,12 @@ function isNonChapterImageUrl(lowercaseUrl: string): boolean {
     lowercaseUrl.includes('/icons/') ||
     lowercaseUrl.includes('/logos/') ||
     lowercaseUrl.includes('/profiles/') ||
-    lowercaseUrl.includes('/profile/')
+    lowercaseUrl.includes('/profile/') ||
+    // Blacklisted static promo/banner image hashes
+    lowercaseUrl.includes('ebbb7aa3-e6a7-4e7a-8841-2de84d8026e9') ||
+    lowercaseUrl.includes('fecb6dc2-5e7f-4d5d-80e5-99c3e1c2bfd8') ||
+    lowercaseUrl.includes('26436e08-1b05-4c54-bd83-6dfeb75ea597') ||
+    lowercaseUrl.includes('1f823395-2e70-4437-8395-cb709812f899')
   );
 }
 

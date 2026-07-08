@@ -327,12 +327,21 @@ export default function SiteImportPage() {
             >
               Elf Toons
             </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setSiteUrl("https://vortexscans.org/series")}
+              className={siteUrl.includes("vortex") ? "border-primary text-primary" : ""}
+            >
+              Vortex Scans
+            </Button>
           </div>
           <div className="flex flex-col gap-3 sm:flex-row">
             <Input
               value={siteUrl}
               onChange={(event) => setSiteUrl(event.target.value)}
-              placeholder="https://hivetoons.org/series , https://elftoon.com/manga/ , https://qiscans.org/series or https://asurascans.com/browse"
+              placeholder="https://vortexscans.org/series , https://hivetoons.org/series , https://elftoon.com/manga/ , https://qiscans.org/series or https://asurascans.com/browse"
               className="font-mono"
             />
             <Button onClick={discoverCatalog} disabled={discovering || !siteUrl.trim()}>

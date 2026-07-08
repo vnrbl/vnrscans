@@ -13,6 +13,7 @@ import { discoverAsuraCatalog, isSupportedAsuraCatalogUrl } from "../site-import
 import { discoverQiScansCatalog, isSupportedQiScansCatalogUrl } from "../site-import/qiscans";
 import { discoverHivetoonCatalog, isSupportedHivetoonCatalogUrl } from "../site-import/hivetoons";
 import { discoverElftoonCatalog, isSupportedElftoonCatalogUrl } from "../site-import/elftoon";
+import { discoverVortexCatalog, isSupportedVortexCatalogUrl } from "../site-import/vortex";
 import type { SiteSeriesMetadata } from "../site-import/types";
 
 const IMPORT_BATCH_SIZE = 8;
@@ -127,9 +128,10 @@ export async function $discoverSiteCatalog(args: {
     const isQiScans = isSupportedQiScansCatalogUrl(validated.siteUrl);
     const isHivetoon = isSupportedHivetoonCatalogUrl(validated.siteUrl);
     const isElftoon = isSupportedElftoonCatalogUrl(validated.siteUrl);
+    const isVortex = isSupportedVortexCatalogUrl(validated.siteUrl);
 
-    if (!isAsura && !isQiScans && !isHivetoon && !isElftoon) {
-      throw new Error("Currently supported sites: Asura Scans, Qi Scans, Hive Toons, and Elf Toons.");
+    if (!isAsura && !isQiScans && !isHivetoon && !isElftoon && !isVortex) {
+      throw new Error("Currently supported sites: Asura Scans, Qi Scans, Hive Toons, Elf Toons, and Vortex Scans.");
     }
 
     const discovery = isAsura
@@ -138,7 +140,9 @@ export async function $discoverSiteCatalog(args: {
       ? await discoverQiScansCatalog(validated.siteUrl)
       : isHivetoon
       ? await discoverHivetoonCatalog(validated.siteUrl)
-      : await discoverElftoonCatalog(validated.siteUrl);
+      : isElftoon
+      ? await discoverElftoonCatalog(validated.siteUrl)
+      : await discoverVortexCatalog(validated.siteUrl);
     const admin = getAdminSupabase();
     const { data: job, error: jobError } = await admin
       .from("site_import_jobs")
