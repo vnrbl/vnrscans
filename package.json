@@ -16,7 +16,16 @@
     "scrape": "npx tsx scripts/scrape-series.ts",
     "scrape:edk": "edk run -- npx tsx scripts/scrape-series.ts",
     "auto-import": "npx tsx scripts/auto-import-sources.ts",
-    "auto-import:edk": "edk run -- npx tsx scripts/auto-import-sources.ts"
+    "auto-import:edk": "edk run -- npx tsx scripts/auto-import-sources.ts",
+    "cf:login": "wrangler login",
+    "cf:dev": "wrangler dev",
+    "cf:deploy": "wrangler deploy",
+    "cf:tail": "wrangler tail",
+    "cf:secret:list": "wrangler secret list",
+    "cf:secret": "wrangler secret put",
+    "cf:pages:deploy": "wrangler pages deploy .vercel/output/static --project-name=vnrscans",
+    "cf:build": "npx @cloudflare/next-on-pages",
+    "cf:preview": "wrangler pages dev .vercel/output/static"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
@@ -72,6 +81,7 @@
     "react-hook-form": "^7.71.2",
     "react-resizable-panels": "^4.6.5",
     "recharts": "^2.15.4",
+    "resend": "^6.17.1",
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.5.0",
     "tailwindcss": "^4.2.1",
@@ -81,6 +91,8 @@
     "zod": "^3.24.2"
   },
   "devDependencies": {
+    "@cloudflare/next-on-pages": "^1.13.16",
+    "@cloudflare/workers-types": "^5.20260708.1",
     "@eslint/js": "^9.32.0",
     "@next/bundle-analyzer": "^16.2.9",
     "@tailwindcss/postcss": "^4.3.0",
@@ -97,6 +109,7 @@
     "prettier": "^3.7.3",
     "puppeteer": "^25.1.0",
     "typescript": "^5.8.3",
-    "typescript-eslint": "^8.56.1"
+    "typescript-eslint": "^8.56.1",
+    "wrangler": "^4.108.0"
   }
 }

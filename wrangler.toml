@@ -1,0 +1,41 @@
+name = "vnrscans"
+main = "src/workers/index.ts"
+compatibility_date = "2025-07-01"
+
+# Cloudflare account (you can set via env or wrangler login)
+# account_id = "your-account-id"
+
+# Non-sensitive variables
+[vars]
+OWNER_EMAIL = "creator@vnrscans.com"
+FROM_EMAIL = "VNR Scans <onboarding@resend.dev>"
+
+# Optional: set via `wrangler secret put WORKER_UPLOAD_SECRET` to protect /assets/upload
+# WORKER_UPLOAD_SECRET = "a-very-long-random-secret"  # better as secret than var
+
+# Use .dev.vars for local development (gitignored)
+# Example .dev.vars:
+# RESEND_API_KEY=re_xxx
+
+# ==================== BINDINGS ====================
+
+# KV Namespace - used for rate limiting contact + signup emails
+[[kv_namespaces]]
+binding = "RATE_LIMIT"
+id = "e1d69198b5f849d09099a51be1f7f443"   # vnrscans-rate-limit (existing)
+
+# R2 Bucket - for assets, images, backups, etc.
+[[r2_buckets]]
+binding = "MEDIA"
+bucket_name = "vnrscans-media"
+
+# D1 (optional - uncomment if you create one)
+# [[d1_databases]]
+# binding = "DB"
+# database_name = "vnrscans"
+# database_id = "your-d1-id"
+
+# ==================== ROUTES (optional) ====================
+# routes = [
+#   { pattern = "api.vnrscans.com/*", zone_name = "vnrscans.com" }
+# ]

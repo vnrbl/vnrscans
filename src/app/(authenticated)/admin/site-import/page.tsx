@@ -309,12 +309,30 @@ export default function SiteImportPage() {
             >
               Qi Scans
             </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setSiteUrl("https://hivetoons.org/series")}
+              className={siteUrl.includes("hivetoon") ? "border-primary text-primary" : ""}
+            >
+              Hive Toons
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setSiteUrl("https://elftoon.com/manga/")}
+              className={siteUrl.includes("elftoon") ? "border-primary text-primary" : ""}
+            >
+              Elf Toons
+            </Button>
           </div>
           <div className="flex flex-col gap-3 sm:flex-row">
             <Input
               value={siteUrl}
               onChange={(event) => setSiteUrl(event.target.value)}
-              placeholder="https://qiscans.org/series or https://asurascans.com/browse"
+              placeholder="https://hivetoons.org/series , https://elftoon.com/manga/ , https://qiscans.org/series or https://asurascans.com/browse"
               className="font-mono"
             />
             <Button onClick={discoverCatalog} disabled={discovering || !siteUrl.trim()}>

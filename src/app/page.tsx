@@ -514,7 +514,7 @@ export default async function Home() {
                 Can independent creators publish their work here?
               </AccordionTrigger>
               <AccordionContent className="text-xs text-muted-foreground leading-relaxed font-light pb-4">
-                Absolutely! We love supporting independent authors and illustrators. Please reach out to hello@vnrscans.com or use our Contact page form to send us details of your work, and our admin team will assist you in setting up your series.
+                Absolutely! We love supporting independent authors and illustrators. Please reach out to creator@vnrscans.com or use our Contact page form to send us details of your work, and our admin team will assist you in setting up your series.
               </AccordionContent>
             </AccordionItem>
           </Accordion>

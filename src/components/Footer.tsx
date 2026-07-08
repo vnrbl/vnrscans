@@ -82,8 +82,8 @@ export function Footer() {
                 </a>
               </li>
               <li>
-                <a href="mailto:hello@vnrscans.com" className="flex items-center gap-1 hover:text-primary transition-colors">
-                  <Mail className="h-3 w-3" /> hello@vnrscans.com
+                <a href="mailto:creator@vnrscans.com" className="flex items-center gap-1 hover:text-primary transition-colors">
+                  <Mail className="h-3 w-3" /> creator@vnrscans.com
                 </a>
               </li>
             </ul>

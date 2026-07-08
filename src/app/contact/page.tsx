@@ -25,7 +25,7 @@ export default function ContactPage() {
   const [sending, setSending] = useState(false);
   const [submitted, setSubmitted] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name || !email || !subject || !message) {
       toast.error("Please fill in all required fields");
@@ -33,12 +33,32 @@ export default function ContactPage() {
     }
 
     setSending(true);
-    // Simulate sending email API request
-    setTimeout(() => {
-      setSending(false);
+
+    try {
+      const res = await fetch("/api/contact", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          name, 
+          email, 
+          subject: subject,           // the selected category value
+          message,
+          inquiryType: subject,       // for nicer display in email
+        }),
+      });
+
+      if (!res.ok) {
+        const data = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(data?.error || "Failed to send message");
+      }
+
       setSubmitted(true);
-      toast.success("Message sent successfully!");
-    }, 1200);
+      toast.success("Message sent successfully! We'll get back to you soon.");
+    } catch (err: any) {
+      toast.error(err?.message || "Something went wrong. Please try again.");
+    } finally {
+      setSending(false);
+    }
   };
 
   return (
@@ -76,7 +96,7 @@ export default function ContactPage() {
                 </div>
                 <div>
                   <h4 className="text-xs font-bold text-foreground uppercase tracking-wider">General Email</h4>
-                  <p className="text-sm mt-0.5 text-muted-foreground">hello@vnrscans.com</p>
+                  <p className="text-sm mt-0.5 text-muted-foreground">creator@vnrscans.com</p>
                 </div>
               </div>
 

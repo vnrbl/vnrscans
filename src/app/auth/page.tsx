@@ -45,17 +45,40 @@ export default function AuthPage() {
     e.preventDefault();
     setLoading(true);
     const fd = new FormData(e.currentTarget);
-    const { error } = await supabase.auth.signUp({
-      email: String(fd.get("email")),
+    const email = String(fd.get("email"));
+    const username = String(fd.get("username") || "");
+
+    const { data, error } = await supabase.auth.signUp({
+      email,
       password: String(fd.get("password")),
       options: {
         emailRedirectTo: window.location.origin,
-        data: { username: String(fd.get("username") || "") },
+        data: { username },
       },
     });
     setLoading(false);
-    if (error) toast.error(error.message);
-    else toast.success("Check your email to verify your account");
+
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+
+    toast.success("Check your email to verify your account");
+
+    // Notify site owner about the new registration (best-effort)
+    if (data?.user) {
+      fetch("/api/notify-signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email,
+          userId: data.user.id,
+          username,
+        }),
+      }).catch(() => {
+        /* ignore - webhook or DB trigger will catch it */
+      });
+    }
   };
 
   const onForgotPassword = async (e: React.FormEvent<HTMLFormElement>) => {

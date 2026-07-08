@@ -335,10 +335,10 @@ export default function PrivacyPage() {
               please reach out:
             </p>
             <a
-              href="mailto:hello@vnrscans.com"
+              href="mailto:creator@vnrscans.com"
               className="inline-flex items-center gap-2 rounded-xl border border-primary/20 bg-primary/5 hover:bg-primary/10 transition-colors px-5 py-3.5 text-sm font-bold text-primary mt-3"
             >
-              <Mail className="h-4.5 w-4.5" /> hello@vnrscans.com
+              <Mail className="h-4.5 w-4.5" /> creator@vnrscans.com
             </a>
             <p className="mt-3">
               For copyright concerns, see our{" "}
