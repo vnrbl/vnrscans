@@ -38,6 +38,15 @@ export const metadata: Metadata = {
     card: "summary",
   },
   manifest: "/site.webmanifest",
+  // Google Search Console verification. Set NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION
+  // (e.g. "abc123def456") in env to enable the <meta> tag. No-op until then.
+  ...(process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION
+    ? {
+        verification: {
+          google: process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION,
+        },
+      }
+    : {}),
   icons: {
     icon: [
       { url: "/favicon-96x96.png", sizes: "96x96", type: "image/png" },

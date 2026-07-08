@@ -50,3 +50,4 @@ tiny.dat
 nul
 my-agent/
 
+.env*
