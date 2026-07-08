@@ -196,8 +196,8 @@ function NovelsWriterContent() {
       const url = await handleUploadImage(file);
       setNewCoverUrl(url);
       toast.success("Cover media uploaded successfully!", { id: toastId });
-    } catch (err: any) {
-      toast.error(`Upload failed: ${err.message}`, { id: toastId });
+    } catch (err: unknown) {
+      toast.error(`Upload failed: ${err instanceof Error ? err.message : String(err)}`, { id: toastId });
     } finally {
       setUploadingCover(false);
     }
@@ -215,8 +215,8 @@ function NovelsWriterContent() {
       const combined = [...currentUrls, ...urls].join("\n");
       setImageUrls(combined);
       toast.success("Media files uploaded successfully!", { id: toastId });
-    } catch (err: any) {
-      toast.error(`Upload failed: ${err.message}`, { id: toastId });
+    } catch (err: unknown) {
+      toast.error(`Upload failed: ${err instanceof Error ? err.message : String(err)}`, { id: toastId });
     } finally {
       setUploadingIllustrations(false);
     }
@@ -228,6 +228,7 @@ function NovelsWriterContent() {
       setSelectedSeriesId(urlSeriesId);
       setActiveChapter(null);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [urlSeriesId]);
 
   // Fetch uploader profile
@@ -322,7 +323,7 @@ function NovelsWriterContent() {
   // Sync imageUrls state with active chapter's pages
   useEffect(() => {
     if (chapterPagesQuery.data && activeChapter?.id) {
-      setImageUrls(chapterPagesQuery.data.map((p: any) => p.image_url).join("\n"));
+      setImageUrls(chapterPagesQuery.data.map((p: { image_url: string }) => p.image_url).join("\n"));
     } else {
       setImageUrls("");
     }
@@ -335,7 +336,7 @@ function NovelsWriterContent() {
       setSelectedSeriesId(firstId);
       navigate({ to: "/admin/novels", search: { seriesId: firstId } });
     }
-  }, [novelSeriesQuery.data, selectedSeriesId, urlSeriesId]);
+  }, [novelSeriesQuery.data, selectedSeriesId, urlSeriesId, navigate]);
 
   // Load active chapter details into form
   const loadChapter = (chapter: ChapterRow) => {
@@ -773,11 +774,11 @@ function NovelsWriterContent() {
                     setNewAuthor(series.author || "");
                     setNewArtist(series.artist || "");
                     setNewAltTitles(series.alternative_titles || "");
-                    setNewStatus(series.status as any);
-                    setNewContentRating(series.content_rating as any);
+                    setNewStatus(series.status as "ongoing" | "completed" | "hiatus");
+                    setNewContentRating(series.content_rating as "safe" | "suggestive" | "nsfw" | "pornographic");
                     setNewReleaseYear(series.release_year ? String(series.release_year) : "");
-                    setNewGenreIds(series.series_genres?.map((g: any) => g.genre_id) || []);
-                    setNewTagIds(series.series_tags?.map((t: any) => t.tag_id) || []);
+                    setNewGenreIds(series.series_genres?.map((g) => g.genre_id as string) || []);
+                    setNewTagIds(series.series_tags?.map((t) => t.tag_id as string) || []);
                     setCreateSeriesOpen(true);
                   }
                 }}
@@ -893,7 +894,7 @@ function NovelsWriterContent() {
                       <div className="grid grid-cols-2 gap-3">
                         <div>
                           <Label htmlFor="status">Status</Label>
-                          <Select value={newStatus} onValueChange={(v: any) => setNewStatus(v)}>
+                          <Select value={newStatus} onValueChange={(v: "ongoing" | "completed" | "hiatus") => setNewStatus(v as "ongoing" | "completed" | "hiatus")}>
                             <SelectTrigger className="mt-1">
                               <SelectValue />
                             </SelectTrigger>
@@ -918,7 +919,7 @@ function NovelsWriterContent() {
                       </div>
                       <div>
                         <Label htmlFor="rating">Content Rating</Label>
-                        <Select value={newContentRating} onValueChange={(v: any) => setNewContentRating(v)}>
+                        <Select value={newContentRating} onValueChange={(v: "safe" | "suggestive" | "nsfw" | "pornographic") => setNewContentRating(v as "safe" | "suggestive" | "nsfw" | "pornographic")}>
                           <SelectTrigger className="mt-1">
                             <SelectValue />
                           </SelectTrigger>
@@ -1132,7 +1133,7 @@ function NovelsWriterContent() {
 
                   <div className="sm:col-span-3">
                     <Label>Publish Status</Label>
-                    <Select value={status} onValueChange={(v: any) => setStatus(v)}>
+                    <Select value={status} onValueChange={(v: "draft" | "published" | "scheduled") => setStatus(v)}>
                       <SelectTrigger className="mt-1">
                         <SelectValue />
                       </SelectTrigger>

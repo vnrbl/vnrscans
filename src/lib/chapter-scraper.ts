@@ -665,7 +665,7 @@ export async function buildClientChapterLinksHtml(page: any, seriesUrl: string):
           break;
         }
 
-        const payload = await response.json();
+        const payload = await response.json() as { data?: any[]; next?: number | null };
         if (Array.isArray(payload.data)) {
           all.push(
             ...payload.data

@@ -1028,7 +1028,7 @@ function SeriesFormFields({
     try {
       const res = await fetch('https://api.jikan.moe/v4/manga?q=' + encodeURIComponent(form.title) + '&limit=1');
       if (!res.ok) throw new Error('Failed to fetch suggestions');
-      const json = await res.json();
+      const json = await res.json() as { data?: any[] };
       const manga = json.data?.[0];
       if (!manga) {
         toast.error('No AI suggestions found for this title');

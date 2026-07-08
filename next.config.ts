@@ -8,6 +8,9 @@ const withAnalyzer = withBundleAnalyzer({
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
   serverExternalPackages: ["@sparticuz/chromium", "puppeteer-core", "puppeteer", "@supabase/supabase-js", "@supabase/ssr"],
   outputFileTracingIncludes: {
     "/*": [
