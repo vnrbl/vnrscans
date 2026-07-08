@@ -78,7 +78,7 @@ export default function SiteImportPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<CatalogFilter>("all");
-  const [importMode, setImportMode] = useState<SiteImportMode>("latest");
+  const [importMode, setImportMode] = useState<SiteImportMode>("all");
   const [chapterLimit, setChapterLimit] = useState(5);
   const [autoPublish, setAutoPublish] = useState(true);
   const [discovering, setDiscovering] = useState(false);

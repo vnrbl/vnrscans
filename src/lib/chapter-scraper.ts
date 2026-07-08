@@ -151,15 +151,18 @@ async function scrapeWithPuppeteer(url: string, isChapterPage: boolean = false):
   console.log(`[Scraper] Launching Puppeteer browser to bypass Cloudflare protection for: ${url}`);
   const puppeteer = await import('puppeteer');
   const chrome = await resolveChromeExecutable(puppeteer.default);
+  const isHeadless = process.env.PUPPETEER_HEADLESS === 'true';
   const launchOptions: any = {
-    headless: chrome.headless,
+    headless: isHeadless ? (chrome.headless === 'shell' ? 'shell' : true) : false,
     pipe: true,
     args: [
-      ...chrome.args,
+      ...chrome.args.filter((a: string) => a !== '--headless' && !a.startsWith('--window-size')),
       '--disable-blink-features=AutomationControlled',
       '--no-sandbox',
       '--disable-setuid-sandbox',
+      '--window-size=1024,768',
     ],
+    defaultViewport: isHeadless ? null : { width: 1024, height: 768 },
   };
 
   if (chrome.executablePath) {
@@ -1131,15 +1134,18 @@ async function extractReaderImagesWithSharedBrowser(
   console.log(`[Scraper] Launching one shared browser for ${urls.length} reader chapter(s)...`);
   const puppeteer = await import('puppeteer');
   const chrome = await resolveChromeExecutable(puppeteer.default);
+  const isHeadless = process.env.PUPPETEER_HEADLESS === 'true';
   const launchOptions: any = {
-    headless: chrome.headless,
+    headless: isHeadless ? (chrome.headless === 'shell' ? 'shell' : true) : false,
     pipe: true,
     args: [
-      ...chrome.args,
+      ...chrome.args.filter((a: string) => a !== '--headless' && !a.startsWith('--window-size')),
       '--disable-blink-features=AutomationControlled',
       '--no-sandbox',
       '--disable-setuid-sandbox',
+      '--window-size=1024,768',
     ],
+    defaultViewport: isHeadless ? null : { width: 1024, height: 768 },
   };
 
   if (chrome.executablePath) {
