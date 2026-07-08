@@ -48,6 +48,67 @@ const LIVE_READER_IMAGES_PREFIX = '__LIVE_READER_IMAGES__';
 
 export async function extractChaptersFromSeriesUrl(seriesUrl: string): Promise<ChapterInfo[]> {
   try {
+    // Custom endpoint/API extraction for Qi Scans / Qi Manga
+    if (isQimanhwaLikeUrl(seriesUrl)) {
+      try {
+        const urlObj = new URL(seriesUrl);
+        const parts = urlObj.pathname.split('/').filter(Boolean);
+        const slug = parts[parts.length - 1];
+        if (slug) {
+          console.log(`[Scraper] Using custom API chapters discovery for Qi Scans: ${slug}`);
+          // Fetch first page
+          const firstPageUrl = `https://api.qimanga.com/api/v1/series/${encodeURIComponent(slug)}/chapters?page=1&perPage=100`;
+          const firstPageRes = await fetch(firstPageUrl, {
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+              'Accept': 'application/json',
+            },
+          });
+          if (firstPageRes.ok) {
+            const firstPageData = (await firstPageRes.json()) as any;
+            const totalPages = Math.max(1, Number(firstPageData.totalPages) || 1);
+            let allChaptersRaw = [...(firstPageData.data || [])];
+            
+            if (totalPages > 1) {
+              const remainingPages = Array.from({ length: totalPages - 1 }, (_, i) => i + 2);
+              const remainingResults = await Promise.all(
+                remainingPages.map(async (page) => {
+                  try {
+                    const pageUrl = `https://api.qimanga.com/api/v1/series/${encodeURIComponent(slug)}/chapters?page=${page}&perPage=100`;
+                    const res = await fetch(pageUrl, {
+                      headers: {
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                        'Accept': 'application/json',
+                      },
+                    });
+                    if (res.ok) {
+                      const data = (await res.json()) as any;
+                      return data.data || [];
+                    }
+                  } catch (err) {
+                    console.warn(`[Scraper] Failed to fetch Qi Scans chapters page ${page}:`, err);
+                  }
+                  return [];
+                })
+              );
+              allChaptersRaw = allChaptersRaw.concat(remainingResults.flat());
+            }
+
+            if (allChaptersRaw.length > 0) {
+              const chapters: ChapterInfo[] = allChaptersRaw.map((c: any) => ({
+                chapterNumber: Number(c.number),
+                title: c.title || undefined,
+                url: `${urlObj.origin}/series/${slug}/${c.slug}`,
+              }));
+              return chapters;
+            }
+          }
+        }
+      } catch (apiError) {
+        console.warn('[Scraper] Qi Scans API chapter extraction failed, falling back to html scraping:', apiError);
+      }
+    }
+
     let html = '';
     let usePuppeteerFallback = false;
 
@@ -638,7 +699,7 @@ async function findExecutableOnPath(names: string[]): Promise<string | undefined
 export async function buildClientChapterLinksHtml(page: any, seriesUrl: string): Promise<string> {
   try {
     const parsed = new URL(seriesUrl);
-    const isQimanhwa = parsed.hostname.includes('qimanhwa.com');
+    const isQimanhwa = isQimanhwaLikeUrl(seriesUrl);
     const isVortex = isVortexLikeUrl(seriesUrl);
     const [, section, ...rest] = parsed.pathname.split('/');
 
@@ -656,9 +717,9 @@ export async function buildClientChapterLinksHtml(page: any, seriesUrl: string):
       let pageNumber = 1;
       let next: number | null = 1;
 
-      while (next && pageNumber <= 20) {
+      while (next && pageNumber <= 100) {
         const response = await fetch(
-          `https://api.qimanhwa.com/api/v1/series/${encodeURIComponent(slug)}/chapters?page=${pageNumber}`,
+          `https://api.qimanga.com/api/v1/series/${encodeURIComponent(slug)}/chapters?page=${pageNumber}&perPage=100`,
         );
 
         if (!response.ok) {
@@ -1811,7 +1872,9 @@ function isNonChapterImageUrl(lowercaseUrl: string): boolean {
     lowercaseUrl.includes('ebbb7aa3-e6a7-4e7a-8841-2de84d8026e9') ||
     lowercaseUrl.includes('fecb6dc2-5e7f-4d5d-80e5-99c3e1c2bfd8') ||
     lowercaseUrl.includes('26436e08-1b05-4c54-bd83-6dfeb75ea597') ||
-    lowercaseUrl.includes('1f823395-2e70-4437-8395-cb709812f899')
+    lowercaseUrl.includes('1f823395-2e70-4437-8395-cb709812f899') ||
+    lowercaseUrl.includes('ffedf8d5-3365-4e34-84d4-8796937dfec2') ||
+    lowercaseUrl.includes('45edc923-884e-4163-a52b-d9b5383ec672')
   );
 }
 
