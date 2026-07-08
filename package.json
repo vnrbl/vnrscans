@@ -90,6 +90,11 @@
     "vite-tsconfig-paths": "^6.0.2",
     "zod": "^3.24.2"
   },
+  "overrides": {
+    "@cloudflare/next-on-pages": {
+      "@cloudflare/workers-types": "^5.0.0"
+    }
+  },
   "devDependencies": {
     "@cloudflare/next-on-pages": "^1.13.16",
     "@cloudflare/workers-types": "^5.20260708.1",
