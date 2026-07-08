@@ -43,7 +43,7 @@ export async function discoverElftoonCatalog(inputUrl: string): Promise<SiteCata
     const block = cardBlocks[i];
     
     // Extract href/slug
-    const hrefMatch = block.match(/href="https:\/\/elftoon\.com\/manga\/([^"\/]+)\/"/i);
+    const hrefMatch = block.match(/href="https:\/\/elftoon\.com\/manga\/([^"/]+)\/"/i);
     if (!hrefMatch) continue;
     const slug = hrefMatch[1];
     const sourceUrl = `${origin}/manga/${slug}/`;
@@ -59,7 +59,7 @@ export async function discoverElftoonCatalog(inputUrl: string): Promise<SiteCata
 
     // Extract type (Manhwa/Manga/Manhua/Novel)
     const typeMatch = block.match(/class="type ([^"]+)"/i);
-    let typeVal = typeMatch ? typeMatch[1].trim().toLowerCase() : "manhwa";
+    const typeVal = typeMatch ? typeMatch[1].trim().toLowerCase() : "manhwa";
     const type: SiteSeriesMetadata["type"] =
       typeVal === "manga" || typeVal === "manhua" || typeVal === "novel" ? typeVal : "manhwa";
 

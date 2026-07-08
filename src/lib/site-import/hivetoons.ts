@@ -43,7 +43,7 @@ export async function discoverHivetoonCatalog(inputUrl: string): Promise<SiteCat
     const block = cardBlocks[i];
     
     // Extract href
-    const hrefMatch = block.match(/href="\/series\/([^"\/]+)"/i);
+    const hrefMatch = block.match(/href="\/series\/([^"/]+)"/i);
     if (!hrefMatch) continue;
     const slug = hrefMatch[1];
     const sourceUrl = `${origin}/series/${slug}`;
@@ -65,13 +65,13 @@ export async function discoverHivetoonCatalog(inputUrl: string): Promise<SiteCat
 
     // Extract type (Manhwa/Manga/Manhua/Novel)
     const typeMatch = block.match(/bg-pink-500\/90">([\s\S]*?)<\/span>/i);
-    let typeVal = typeMatch ? typeMatch[1].trim().toLowerCase() : "manhwa";
+    const typeVal = typeMatch ? typeMatch[1].trim().toLowerCase() : "manhwa";
     const type: SiteSeriesMetadata["type"] =
       typeVal === "manga" || typeVal === "manhua" || typeVal === "novel" ? typeVal : "manhwa";
 
     // Extract status (Ongoing/Completed)
     const statusMatch = block.match(/bg-green-500">[\s\S]*?<p[^>]*>([\s\S]*?)<\/p>/i);
-    let statusVal = statusMatch ? statusMatch[1].trim().toLowerCase() : "ongoing";
+    const statusVal = statusMatch ? statusMatch[1].trim().toLowerCase() : "ongoing";
     const status: SiteSeriesMetadata["status"] =
       statusVal.includes("completed") || statusVal.includes("complete") ? "completed" : "ongoing";
 
