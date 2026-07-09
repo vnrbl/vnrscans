@@ -1874,7 +1874,9 @@ function isNonChapterImageUrl(lowercaseUrl: string): boolean {
     lowercaseUrl.includes('26436e08-1b05-4c54-bd83-6dfeb75ea597') ||
     lowercaseUrl.includes('1f823395-2e70-4437-8395-cb709812f899') ||
     lowercaseUrl.includes('ffedf8d5-3365-4e34-84d4-8796937dfec2') ||
-    lowercaseUrl.includes('45edc923-884e-4163-a52b-d9b5383ec672')
+    lowercaseUrl.includes('45edc923-884e-4163-a52b-d9b5383ec672') ||
+    lowercaseUrl.includes('tcfynnpqjt') ||
+    (lowercaseUrl.includes('vortexscans') && (lowercaseUrl.includes('/upload/20') || lowercaseUrl.includes('//upload/20')))
   );
 }
 

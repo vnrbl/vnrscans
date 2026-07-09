@@ -29,6 +29,10 @@ const nextConfig: NextConfig = {
       },
       {
         protocol: "https",
+        hostname: "meo.comick.cc",
+      },
+      {
+        protocol: "https",
         hostname: "roliascan.com",
       },
       {

@@ -71,7 +71,7 @@ export const SeriesActions = React.memo(function SeriesActions({
         .from("chapters")
         .select("id, chapter_pages(image_url)")
         .eq("series_id", seriesId)
-        .or("title.ilike.%cover%,title.ilike.%illustration%,slug.ilike.%cover%,slug.ilike.%illustration%");
+        .eq("slug", "covers");
       if (error) throw error;
       
       const urls: string[] = [];

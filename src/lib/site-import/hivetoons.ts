@@ -45,23 +45,19 @@ export async function discoverHivetoonCatalog(inputUrl: string): Promise<SiteCat
     // Extract href
     const hrefMatch = block.match(/href="\/series\/([^"/]+)"/i);
     if (!hrefMatch) continue;
-    const slug = hrefMatch[1];
+    const slug = decodeHtmlEntities(hrefMatch[1]);
     const sourceUrl = `${origin}/series/${slug}`;
     if (seen.has(sourceUrl)) continue;
 
     // Extract title from h1
     const titleMatch = block.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i);
-    const title = (titleMatch ? titleMatch[1] : slug)
+    const title = decodeHtmlEntities(titleMatch ? titleMatch[1] : slug)
       .replace(/<[^>]+>/g, "")
-      .replace(/&amp;/g, "&")
-      .replace(/&#x27;/g, "'")
-      .replace(/&quot;/g, '"')
-      .replace(/&#x27;s/g, "'s")
       .trim();
 
     // Extract cover image src
     const imgMatch = block.match(/<img[^>]*src="([^"]+)"/i);
-    const coverUrl = imgMatch ? imgMatch[1].trim() : null;
+    const coverUrl = imgMatch ? decodeHtmlEntities(imgMatch[1].trim()) : null;
 
     // Extract type (Manhwa/Manga/Manhua/Novel)
     const typeMatch = block.match(/bg-pink-500\/90">([\s\S]*?)<\/span>/i);
@@ -103,4 +99,19 @@ export async function discoverHivetoonCatalog(inputUrl: string): Promise<SiteCat
     canonicalUrl: url,
     series,
   };
+}
+
+function decodeHtmlEntities(value: string): string {
+  return value
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;|&apos;/g, "'")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&#x([0-9a-f]+);/gi, (_, hex: string) =>
+      String.fromCodePoint(Number.parseInt(hex, 16))
+    )
+    .replace(/&#(\d+);/g, (_, decimal: string) =>
+      String.fromCodePoint(Number.parseInt(decimal, 10))
+    )
+    .replace(/&amp;/g, "&");
 }

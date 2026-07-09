@@ -96,7 +96,7 @@ export async function discoverVortexCatalog(inputUrl: string): Promise<SiteCatal
       const block = cardBlocks[i];
       const hrefMatch = block.match(/href="\/series\/([^"/]+)"/i);
       if (!hrefMatch) continue;
-      const slug = hrefMatch[1];
+      const slug = decodeHtmlEntities(hrefMatch[1]);
       if (seen.has(slug)) continue;
       seen.add(slug);
 
@@ -104,7 +104,7 @@ export async function discoverVortexCatalog(inputUrl: string): Promise<SiteCatal
       const title = titleMatch ? titleMatch[1].trim() : slug;
 
       const imgMatch = block.match(/<img[^>]*src="([^"]+)"/i);
-      const coverUrl = imgMatch ? imgMatch[1] : null;
+      const coverUrl = imgMatch ? decodeHtmlEntities(imgMatch[1]) : null;
 
       const typeMatch =
         block.match(/bg-pink-500\/90">([\s\S]*?)<\/span>/i) ||

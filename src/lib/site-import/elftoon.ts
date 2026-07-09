@@ -45,17 +45,17 @@ export async function discoverElftoonCatalog(inputUrl: string): Promise<SiteCata
     // Extract href/slug
     const hrefMatch = block.match(/href="https:\/\/elftoon\.com\/manga\/([^"/]+)\/"/i);
     if (!hrefMatch) continue;
-    const slug = hrefMatch[1];
+    const slug = decodeHtmlEntities(hrefMatch[1]);
     const sourceUrl = `${origin}/manga/${slug}/`;
     if (seen.has(sourceUrl)) continue;
 
     // Extract title from the anchor title or class="tt"
     const titleMatch = block.match(/title="([^"]+)"/i) || block.match(/class="tt">([\s\S]*?)<\/div>/i);
-    const title = titleMatch ? titleMatch[1].trim() : slug;
+    const title = decodeHtmlEntities(titleMatch ? titleMatch[1].trim() : slug);
 
     // Extract cover image src
     const imgMatch = block.match(/data-src="([^"]+)"/i) || block.match(/src="([^"]+)"/i);
-    const coverUrl = imgMatch ? imgMatch[1].trim() : null;
+    const coverUrl = imgMatch ? decodeHtmlEntities(imgMatch[1].trim()) : null;
 
     // Extract type (Manhwa/Manga/Manhua/Novel)
     const typeMatch = block.match(/class="type ([^"]+)"/i);
@@ -95,4 +95,19 @@ export async function discoverElftoonCatalog(inputUrl: string): Promise<SiteCata
     canonicalUrl: url,
     series,
   };
+}
+
+function decodeHtmlEntities(value: string): string {
+  return value
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;|&apos;/g, "'")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&#x([0-9a-f]+);/gi, (_, hex: string) =>
+      String.fromCodePoint(Number.parseInt(hex, 16))
+    )
+    .replace(/&#(\d+);/g, (_, decimal: string) =>
+      String.fromCodePoint(Number.parseInt(decimal, 10))
+    )
+    .replace(/&amp;/g, "&");
 }

@@ -188,13 +188,20 @@ export async function $discoverSiteCatalog(args: {
           seriesMatches.get(normalizeMatchKey(series.slug)) ??
           seriesMatches.get(normalizeMatchKey(series.title)) ??
           null;
+
+        const sanitizedCoverUrl = series.coverUrl
+          ? series.coverUrl.replace("meo.comick.pictures", "meo.comick.cc")
+          : null;
+
+        series.coverUrl = sanitizedCoverUrl;
+
         return {
           job_id: job.id,
           source_series_id: series.sourceId,
           source_url: series.sourceUrl,
           title: series.title,
           slug: series.slug,
-          cover_url: series.coverUrl,
+          cover_url: sanitizedCoverUrl,
           chapter_count: series.chapterCount,
           last_chapter_at: series.lastChapterAt,
           metadata: series,
@@ -657,11 +664,97 @@ async function ensureSeriesAndSource(
     seriesId = slugMatch?.id ?? null;
   }
 
+  const newCoverUrl = metadata.coverUrl
+    ? metadata.coverUrl.replace("meo.comick.pictures", "meo.comick.cc")
+    : null;
+
+  let finalCoverUrl = newCoverUrl;
+
+  if (seriesId) {
+    // 1. Fetch the existing series cover_url
+    const { data: existingSeries, error: fetchError } = await admin
+      .from("series")
+      .select("cover_url")
+      .eq("id", seriesId)
+      .maybeSingle();
+
+    if (!fetchError && existingSeries && existingSeries.cover_url) {
+      // 2. Keep the existing cover_url as the main cover
+      finalCoverUrl = existingSeries.cover_url;
+
+      // 3. If the incoming cover is different and not null, store it as an alternate cover in the Covers library
+      if (newCoverUrl && newCoverUrl !== existingSeries.cover_url) {
+        try {
+          // Find or create the special "Covers" chapter for this series
+          const { data: existingCoversChapter, error: chapterError } = await admin
+            .from("chapters")
+            .select("id")
+            .eq("series_id", seriesId)
+            .eq("slug", "covers")
+            .maybeSingle();
+
+          let coversChapterId: string;
+          if (chapterError) throw chapterError;
+
+          if (existingCoversChapter) {
+            coversChapterId = existingCoversChapter.id;
+          } else {
+            const { data: newChapter, error: createError } = await admin
+              .from("chapters")
+              .insert({
+                series_id: seriesId,
+                title: "Covers",
+                slug: "covers",
+                chapter_number: 0,
+                chapter_type: "image",
+                status: "published",
+              })
+              .select("id")
+              .single();
+            if (createError || !newChapter) throw createError ?? new Error("Failed to create covers chapter");
+            coversChapterId = newChapter.id;
+          }
+
+          // Check if this image URL is already a page in the Covers chapter
+          const { data: existingPage, error: pageError } = await admin
+            .from("chapter_pages")
+            .select("id")
+            .eq("chapter_id", coversChapterId)
+            .eq("image_url", newCoverUrl)
+            .maybeSingle();
+          if (pageError) throw pageError;
+
+          if (!existingPage) {
+            // Count current pages to determine next page_number
+            const { count, error: countError } = await admin
+              .from("chapter_pages")
+              .select("*", { count: "exact", head: true })
+              .eq("chapter_id", coversChapterId);
+            if (countError) throw countError;
+
+            const nextPageNum = (count ?? 0) + 1;
+            const { error: pageInsertError } = await admin
+              .from("chapter_pages")
+              .insert({
+                chapter_id: coversChapterId,
+                page_number: nextPageNum,
+                image_url: newCoverUrl,
+              });
+            if (pageInsertError) throw pageInsertError;
+            console.log(`[Import] Saved new alternate cover ${newCoverUrl} in covers library.`);
+          }
+        } catch (chapterSaveError: any) {
+          console.error(`Failed to save alternate cover to Covers chapter: ${chapterSaveError.message}`);
+        }
+      }
+    }
+  }
+
   const payload = {
     title: metadata.title,
     alternative_titles: metadata.alternativeTitles.join("\n") || null,
     description: metadata.description || null,
-    cover_url: metadata.coverUrl,
+    cover_url: finalCoverUrl,
     type: metadata.type,
     status: metadata.status,
     author: metadata.author,
