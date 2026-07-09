@@ -69,17 +69,23 @@ async function run() {
 
   const now = new Date();
   const nowString = now.toISOString().split("T")[0];
+  // Keep in sync with src/app/sitemap-static.xml/route.ts
+  // Prefer the dynamic /sitemap.xml in production; this script is a static fallback.
   const staticPages = [
-    "",
-    "/home",
-    "/browse",
-    "/rankings",
-    "/about",
-    "/contact",
-    "/dmca",
-    "/request-series",
-    "/tags",
-    "/data-map",
+    { path: "", changefreq: "daily", priority: "1.0" },
+    { path: "/home", changefreq: "daily", priority: "0.9" },
+    { path: "/browse", changefreq: "daily", priority: "0.9" },
+    { path: "/novels", changefreq: "daily", priority: "0.9" },
+    { path: "/rankings", changefreq: "daily", priority: "0.7" },
+    { path: "/recommendations", changefreq: "weekly", priority: "0.6" },
+    { path: "/tags", changefreq: "weekly", priority: "0.7" },
+    { path: "/data-map", changefreq: "daily", priority: "0.8" },
+    { path: "/about", changefreq: "monthly", priority: "0.5" },
+    { path: "/contact", changefreq: "monthly", priority: "0.5" },
+    { path: "/dmca", changefreq: "monthly", priority: "0.5" },
+    { path: "/privacy", changefreq: "monthly", priority: "0.5" },
+    { path: "/terms", changefreq: "monthly", priority: "0.5" },
+    { path: "/request-series", changefreq: "monthly", priority: "0.4" },
   ];
 
   const xmlParts = [
@@ -88,7 +94,30 @@ async function run() {
   ];
 
   for (const page of staticPages) {
-    addUrl(xmlParts, page, nowString, "daily", page === "" || page === "/home" ? "1.0" : "0.8");
+    addUrl(xmlParts, page.path, nowString, page.changefreq, page.priority);
+  }
+
+  console.log("Fetching tags for sitemap...");
+  try {
+    const tags = await fetchAll(() =>
+      supabase
+        .from("tags")
+        .select("slug, updated_at")
+        .not("slug", "is", null)
+        .order("usage_count", { ascending: false })
+    );
+    for (const tag of tags) {
+      if (!tag.slug) continue;
+      addUrl(
+        xmlParts,
+        `/tags/${tag.slug}`,
+        formatDate(tag.updated_at, nowString),
+        "weekly",
+        "0.6"
+      );
+    }
+  } catch (error) {
+    console.error("Error fetching tags:", error);
   }
 
   console.log("Fetching series for sitemap...");
