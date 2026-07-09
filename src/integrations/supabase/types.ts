@@ -394,6 +394,38 @@ export type Database = {
         }
         Relationships: []
       }
+      series_covers: {
+        Row: {
+          id: string
+          series_id: string
+          image_url: string
+          position: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          series_id: string
+          image_url: string
+          position?: number
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          series_id?: string
+          image_url?: string
+          position?: number
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "series_covers_series_id_fkey"
+            columns: ["series_id"]
+            isOneToOne: false
+            referencedRelation: "series"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       series: {
         Row: {
           alternative_titles: string | null
@@ -734,32 +766,26 @@ export type Database = {
         Row: {
           id: string
           series_id: string
-          image_url: string | null
-          title: string | null
-          description: string | null
-          priority: number | null
-          is_active: boolean | null
-          created_at: string | null
+          position: number
+          is_active: boolean
+          created_at: string
+          updated_at: string
         }
         Insert: {
           id?: string
           series_id: string
-          image_url?: string | null
-          title?: string | null
-          description?: string | null
-          priority?: number | null
-          is_active?: boolean | null
-          created_at?: string | null
+          position?: number
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
         }
         Update: {
           id?: string
           series_id?: string
-          image_url?: string | null
-          title?: string | null
-          description?: string | null
-          priority?: number | null
-          is_active?: boolean | null
-          created_at?: string | null
+          position?: number
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
         }
         Relationships: [
           {

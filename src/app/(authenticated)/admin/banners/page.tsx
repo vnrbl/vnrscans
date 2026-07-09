@@ -122,7 +122,7 @@ export default function AdminBanners() {
         const { data, error} = await supabase
           .from("carousel_items")
           .select("*, series:series_id(id, title, slug, cover_url)")
-          .order("priority", { ascending: true });
+          .order("position", { ascending: true });
         
         console.log("Carousel items query result:", { data, error });
         if (error) {
@@ -275,7 +275,7 @@ export default function AdminBanners() {
       
       const { data, error } = await supabase.from("carousel_items").insert({
         series_id: seriesId,
-        priority: count,
+        position: count,
         is_active: true,
       }).select();
       
@@ -314,10 +314,10 @@ export default function AdminBanners() {
   });
 
   const updateCarouselPosition = useMutation({
-    mutationFn: async ({ id, priority }: { id: string; priority: number }) => {
+    mutationFn: async ({ id, position }: { id: string; position: number }) => {
       const { error } = await supabase
         .from("carousel_items")
-        .update({ priority })
+        .update({ position })
         .eq("id", id);
       if (error) throw error;
     },
@@ -330,10 +330,10 @@ export default function AdminBanners() {
   const reorderCarouselPositions = async () => {
     const items = carouselItems.data || [];
     for (let i = 0; i < items.length; i++) {
-      if (items[i].priority !== i) {
+      if (items[i].position !== i) {
         await supabase
           .from("carousel_items")
-          .update({ priority: i })
+          .update({ position: i })
           .eq("id", items[i].id);
       }
     }
@@ -349,8 +349,8 @@ export default function AdminBanners() {
     const item1 = items[index];
     const item2 = items[newIndex];
 
-    updateCarouselPosition.mutate({ id: item1.id, priority: newIndex });
-    updateCarouselPosition.mutate({ id: item2.id, priority: index });
+    updateCarouselPosition.mutate({ id: item1.id, position: newIndex });
+    updateCarouselPosition.mutate({ id: item2.id, position: index });
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
@@ -369,8 +369,8 @@ export default function AdminBanners() {
     
     // Update positions in database
     newItems.forEach((item, index) => {
-      if (item.priority !== index) {
-        updateCarouselPosition.mutate({ id: item.id, priority: index });
+      if (item.position !== index) {
+        updateCarouselPosition.mutate({ id: item.id, position: index });
       }
     });
   };
@@ -504,11 +504,22 @@ export default function AdminBanners() {
               <div className="flex gap-4 flex-1">
                 {item.image_url && (
                   <div className="h-24 w-40 flex-shrink-0 overflow-hidden rounded-md border border-border/40">
-                    <img 
-                      src={item.image_url} 
-                      alt={item.title} 
-                      className="h-full w-full object-cover" 
-                    />
+                    {item.image_url.toLowerCase().split("?")[0].endsWith(".mp4") ? (
+                      <video
+                        src={item.image_url}
+                        loop
+                        muted
+                        autoPlay
+                        playsInline
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <img 
+                        src={item.image_url} 
+                        alt={item.title} 
+                        className="h-full w-full object-cover" 
+                      />
+                    )}
                   </div>
                 )}
                 <div className="flex-1">
@@ -648,11 +659,22 @@ function SortableCarouselCard({
     >
       <div className="aspect-[2/3] rounded-lg border-2 border-violet-500/20 overflow-hidden bg-card hover:border-violet-500/50 transition-colors">
         {item.series?.cover_url ? (
-          <img
-            src={item.series.cover_url}
-            alt={item.series.title}
-            className="w-full h-full object-cover"
-          />
+          item.series.cover_url.toLowerCase().split("?")[0].endsWith(".mp4") ? (
+            <video
+              src={item.series.cover_url}
+              loop
+              muted
+              autoPlay
+              playsInline
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            <img
+              src={item.series.cover_url}
+              alt={item.series.title}
+              className="w-full h-full object-cover"
+            />
+          )
         ) : (
           <div className="w-full h-full flex items-center justify-center bg-muted">
             <ImageIcon className="h-12 w-12 text-muted-foreground" />

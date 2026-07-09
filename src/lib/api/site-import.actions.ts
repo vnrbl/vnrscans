@@ -682,69 +682,41 @@ async function ensureSeriesAndSource(
       // 2. Keep the existing cover_url as the main cover
       finalCoverUrl = existingSeries.cover_url;
 
-      // 3. If the incoming cover is different and not null, store it as an alternate cover in the Covers library
+      // 3. If the incoming cover is different and not null, store it as an alternate cover in series_covers
       if (newCoverUrl && newCoverUrl !== existingSeries.cover_url) {
         try {
-          // Find or create the special "Covers" chapter for this series
-          const { data: existingCoversChapter, error: chapterError } = await admin
-            .from("chapters")
+          // Check if this cover URL already exists in series_covers
+          const { data: existingCover, error: coverCheckErr } = await admin
+            .from("series_covers")
             .select("id")
             .eq("series_id", seriesId)
-            .eq("slug", "covers")
-            .maybeSingle();
-
-          let coversChapterId: string;
-          if (chapterError) throw chapterError;
-
-          if (existingCoversChapter) {
-            coversChapterId = existingCoversChapter.id;
-          } else {
-            const { data: newChapter, error: createError } = await admin
-              .from("chapters")
-              .insert({
-                series_id: seriesId,
-                title: "Covers",
-                slug: "covers",
-                chapter_number: 0,
-                chapter_type: "image",
-                status: "published",
-              })
-              .select("id")
-              .single();
-            if (createError || !newChapter) throw createError ?? new Error("Failed to create covers chapter");
-            coversChapterId = newChapter.id;
-          }
-
-          // Check if this image URL is already a page in the Covers chapter
-          const { data: existingPage, error: pageError } = await admin
-            .from("chapter_pages")
-            .select("id")
-            .eq("chapter_id", coversChapterId)
             .eq("image_url", newCoverUrl)
             .maybeSingle();
-          if (pageError) throw pageError;
+          if (coverCheckErr) throw coverCheckErr;
 
-          if (!existingPage) {
-            // Count current pages to determine next page_number
-            const { count, error: countError } = await admin
-              .from("chapter_pages")
-              .select("*", { count: "exact", head: true })
-              .eq("chapter_id", coversChapterId);
-            if (countError) throw countError;
+          if (!existingCover) {
+            // Get next position
+            const { data: lastCover, error: posErr } = await admin
+              .from("series_covers")
+              .select("position")
+              .eq("series_id", seriesId)
+              .order("position", { ascending: false })
+              .limit(1);
+            if (posErr) throw posErr;
 
-            const nextPageNum = (count ?? 0) + 1;
-            const { error: pageInsertError } = await admin
-              .from("chapter_pages")
+            const nextPos = lastCover && lastCover.length > 0 ? lastCover[0].position + 1 : 0;
+            const { error: insertErr } = await admin
+              .from("series_covers")
               .insert({
-                chapter_id: coversChapterId,
-                page_number: nextPageNum,
+                series_id: seriesId,
                 image_url: newCoverUrl,
+                position: nextPos,
               });
-            if (pageInsertError) throw pageInsertError;
-            console.log(`[Import] Saved new alternate cover ${newCoverUrl} in covers library.`);
+            if (insertErr) throw insertErr;
+            console.log(`[Import] Saved new alternate cover ${newCoverUrl} in series_covers.`);
           }
-        } catch (chapterSaveError: any) {
-          console.error(`Failed to save alternate cover to Covers chapter: ${chapterSaveError.message}`);
+        } catch (coverSaveError: any) {
+          console.error(`Failed to save alternate cover to series_covers: ${coverSaveError.message}`);
         }
       }
     }

@@ -63,24 +63,17 @@ export const SeriesActions = React.memo(function SeriesActions({
   const [activeView, setActiveView] = React.useState<"grid" | "lightbox">("grid");
   const [favTrigger, setFavTrigger] = React.useState(0);
 
-  // Fetch all images uploaded for chapters of this series to use as supplementary cover pictures/illustrations
+  // Fetch all cover images from the dedicated series_covers table
   const chapterCoversQuery = useQuery({
-    queryKey: ["series", "chapter-covers", seriesId],
+    queryKey: ["series", "covers", seriesId],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("chapters")
-        .select("id, chapter_pages(image_url)")
+        .from("series_covers")
+        .select("image_url")
         .eq("series_id", seriesId)
-        .eq("slug", "covers");
+        .order("position", { ascending: true });
       if (error) throw error;
-      
-      const urls: string[] = [];
-      (data || []).forEach((ch: any) => {
-        (ch.chapter_pages || []).forEach((cp: any) => {
-          if (cp.image_url) urls.push(cp.image_url);
-        });
-      });
-      return urls.reverse();
+      return (data || []).map((row: any) => row.image_url as string);
     },
     staleTime: 1000 * 60 * 5,
   });
@@ -132,10 +125,11 @@ export const SeriesActions = React.memo(function SeriesActions({
     mutationFn: async (urlToDelete: string) => {
       if (!user || !isAdmin) throw new Error("Unauthorized");
 
-      // 1. Delete matching row from chapter_pages (handles Covers chapter and chapter illustrations)
+      // 1. Delete matching row from series_covers
       const { error: deleteErr } = await supabase
-        .from("chapter_pages")
+        .from("series_covers")
         .delete()
+        .eq("series_id", seriesId)
         .eq("image_url", urlToDelete);
       if (deleteErr) throw deleteErr;
 

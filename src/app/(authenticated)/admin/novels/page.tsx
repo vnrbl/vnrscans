@@ -78,55 +78,32 @@ function slugify(s: string) {
 
 async function syncSeriesCoverHistory(seriesId: string, coverUrl: string | null) {
   if (!coverUrl) return;
-  const { data: chapterData, error: chError } = await supabase
-    .from("chapters")
+  // Check if this cover URL already exists in series_covers
+  const { data: existing, error: checkErr } = await supabase
+    .from("series_covers")
     .select("id")
     .eq("series_id", seriesId)
-    .eq("chapter_number", 0)
-    .maybeSingle();
-  if (chError) throw chError;
-  let chapter = chapterData;
-  if (!chapter) {
-    const { data: newCh, error } = await supabase
-      .from("chapters")
-      .insert({
-        series_id: seriesId,
-        chapter_number: 0,
-        title: "Covers",
-        slug: "covers",
-        chapter_type: "image",
-        status: "published",
-        uploaded_by: "System"
-      })
-      .select("id")
-      .single();
-    if (error) throw error;
-    chapter = newCh;
-  }
-  const { data: existingPages, error: pError } = await supabase
-    .from("chapter_pages")
-    .select("id")
-    .eq("chapter_id", chapter.id)
     .eq("image_url", coverUrl)
     .maybeSingle();
-  if (pError) throw pError;
-  if (!existingPages) {
-    const { data: pages, error: countError } = await supabase
-      .from("chapter_pages")
-      .select("page_number")
-      .eq("chapter_id", chapter.id)
-      .order("page_number", { ascending: false })
+  if (checkErr) throw checkErr;
+  if (!existing) {
+    // Get next position
+    const { data: lastCover, error: posErr } = await supabase
+      .from("series_covers")
+      .select("position")
+      .eq("series_id", seriesId)
+      .order("position", { ascending: false })
       .limit(1);
-    if (countError) throw countError;
-    const nextNum = pages && pages.length > 0 ? pages[0].page_number + 1 : 1;
-    const { error: insertError } = await supabase
-      .from("chapter_pages")
+    if (posErr) throw posErr;
+    const nextPos = lastCover && lastCover.length > 0 ? lastCover[0].position + 1 : 0;
+    const { error: insertErr } = await supabase
+      .from("series_covers")
       .insert({
-        chapter_id: chapter.id,
-        page_number: nextNum,
-        image_url: coverUrl
+        series_id: seriesId,
+        image_url: coverUrl,
+        position: nextPos,
       });
-    if (insertError) throw insertError;
+    if (insertErr) throw insertErr;
   }
 }
 
@@ -1187,22 +1164,36 @@ function NovelsWriterContent() {
 
                   {imageUrls.trim() !== "" ? (
                     <div className="grid grid-cols-4 gap-2 mt-2">
-                      {imageUrls.split("\n").map((url, idx) => (
-                        <div key={idx} className="relative aspect-[3/4] rounded-lg overflow-hidden border border-border/40 group">
-                          <img src={url} alt="" className="object-cover h-full w-full" />
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const urls = imageUrls.split("\n").filter((_, i) => i !== idx);
-                              setImageUrls(urls.join("\n"));
-                            }}
-                            className="absolute top-1 right-1 p-1 rounded bg-black/60 hover:bg-red-600 text-white opacity-0 group-hover:opacity-100 transition-opacity"
-                            title="Remove illustration"
-                          >
-                            <Trash2 className="h-3 w-3" />
-                          </button>
-                        </div>
-                      ))}
+                      {imageUrls.split("\n").map((url, idx) => {
+                        const isVideo = url.toLowerCase().split("?")[0].endsWith(".mp4");
+                        return (
+                          <div key={idx} className="relative aspect-[3/4] rounded-lg overflow-hidden border border-border/40 group">
+                            {isVideo ? (
+                              <video
+                                src={url}
+                                loop
+                                muted
+                                autoPlay
+                                playsInline
+                                className="object-cover h-full w-full"
+                              />
+                            ) : (
+                              <img src={url} alt="" className="object-cover h-full w-full" />
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const urls = imageUrls.split("\n").filter((_, i) => i !== idx);
+                                setImageUrls(urls.join("\n"));
+                              }}
+                              className="absolute top-1 right-1 p-1 rounded bg-black/60 hover:bg-red-600 text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                              title="Remove illustration"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </button>
+                          </div>
+                        );
+                      })}
                     </div>
                   ) : (
                     <div className="mt-2 p-3 text-center rounded-lg border border-dashed border-border/40 text-xs text-muted-foreground">

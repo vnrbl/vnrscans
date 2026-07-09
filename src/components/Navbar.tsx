@@ -763,16 +763,27 @@ function SeriesSearchPanel({
               >
                 <div className="relative aspect-[2/3] overflow-hidden rounded bg-neutral-950 ring-1 ring-neutral-800 transition group-hover:ring-neutral-500">
                   {series.cover_url ? (
-                    <img
-                      src={series.cover_url}
-                      alt={series.title}
-                      width={200}
-                      height={300}
-                      className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
-                      loading="lazy"
-                      decoding="async"
-                      referrerPolicy="no-referrer"
-                    />
+                    series.cover_url.toLowerCase().split("?")[0].endsWith(".mp4") ? (
+                      <video
+                        src={series.cover_url}
+                        loop
+                        muted
+                        autoPlay
+                        playsInline
+                        className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
+                      />
+                    ) : (
+                      <img
+                        src={series.cover_url}
+                        alt={series.title}
+                        width={200}
+                        height={300}
+                        className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
+                        loading="lazy"
+                        decoding="async"
+                        referrerPolicy="no-referrer"
+                      />
+                    )
                   ) : (
                     <div className="grid h-full w-full place-items-center text-muted-foreground">
                       <BookOpen className="h-6 w-6" />

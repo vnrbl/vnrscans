@@ -55,6 +55,12 @@ import { toast } from "sonner";
 import { safeUrlOrNull } from "@/lib/safe-url";
 import NovelSettingsPanel from "@/components/NovelSettingsPanel";
 
+const isVideoUrl = (url: string) => {
+  if (!url) return false;
+  const cleanUrl = url.toLowerCase().split("?")[0];
+  return cleanUrl.endsWith(".mp4");
+};
+
 function Link({ to, params, search, children, ...props }: any) {
   let href = to || "";
   if (params) {
@@ -566,6 +572,21 @@ export default function Reader({ slug, chapterSlug }: { slug: string; chapterSlu
       }
     };
   }, [isAutoScrolling, autoScrollSpeed]);
+
+  // Redirect stale /covers URLs to the series page (covers are no longer a chapter)
+  useEffect(() => {
+    if (chapterSlug === "covers") {
+      navigate({ to: `/title/${titleSlug}` });
+    }
+  }, [chapterSlug, titleSlug, navigate]);
+
+  if (chapterSlug === "covers") {
+    return (
+      <div className="grid min-h-screen place-items-center bg-background text-muted-foreground">
+        Redirecting…
+      </div>
+    );
+  }
 
   if (chapterQ.isLoading) {
     return (
@@ -1171,20 +1192,37 @@ function ImageView({
                     <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
                   </div>
                 )}
-                <img
-                  data-page-id={p.id}
-                  src={p.image_url}
-                  alt={`${seriesTitle || "Manga"} Chapter ${chapterNumber} Page ${p.page_number} - vnrscans`}
-                  loading={idx < 2 ? "eager" : "lazy"}
-                  fetchPriority={idx < 2 ? "high" : "auto"}
-                  className="mx-auto block w-full transition-transform duration-200"
-                  referrerPolicy="no-referrer"
-                  style={{
-                    opacity: imageLoading[p.id] ? 0.3 : 1,
-                  }}
-                  onLoad={() => handleImageLoad(p.id)}
-                  onError={() => handleImageError(p.id, p.image_url)}
-                />
+                {isVideoUrl(p.image_url) ? (
+                  <video
+                    data-page-id={p.id}
+                    src={p.image_url}
+                    autoPlay
+                    loop
+                    muted
+                    playsInline
+                    className="mx-auto block w-full transition-transform duration-200"
+                    style={{
+                      opacity: imageLoading[p.id] ? 0.3 : 1,
+                    }}
+                    onLoadedData={() => handleImageLoad(p.id)}
+                    onError={() => handleImageError(p.id, p.image_url)}
+                  />
+                ) : (
+                  <img
+                    data-page-id={p.id}
+                    src={p.image_url}
+                    alt={`${seriesTitle || "Manga"} Chapter ${chapterNumber} Page ${p.page_number} - vnrscans`}
+                    loading={idx < 2 ? "eager" : "lazy"}
+                    fetchPriority={idx < 2 ? "high" : "auto"}
+                    className="mx-auto block w-full transition-transform duration-200"
+                    referrerPolicy="no-referrer"
+                    style={{
+                      opacity: imageLoading[p.id] ? 0.3 : 1,
+                    }}
+                    onLoad={() => handleImageLoad(p.id)}
+                    onError={() => handleImageError(p.id, p.image_url)}
+                  />
+                )}
               </>
             )}
           </div>
