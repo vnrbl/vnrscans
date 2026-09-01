@@ -25,7 +25,7 @@ const supabaseKey =
   process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
   'sb_publishable_jVdWorDtLlkVYzRh6EbEOA_lwnu59an';
 
-const supabase = createClient(supabaseUrl, supabaseKey, {
+let supabase = createClient(supabaseUrl, supabaseKey, {
   auth: { autoRefreshToken: false, persistSession: false },
 });
 
@@ -376,23 +376,18 @@ async function main() {
   );
 
   if (!hasServiceKey) {
-    const sessionRes = await supabase.auth.getSession();
-    if (!sessionRes.data.session) {
-      console.log('🔒 Supabase Admin Login Required for Database Write Access:');
-      console.log('(Or set SUPABASE_SERVICE_ROLE_KEY in your .env file to skip login)\n');
-      const email = (await askQuestion('Admin Email: ')).trim();
-      if (email) {
-        const password = (await askQuestion('Admin Password: ')).trim();
-        const { data: authData, error: authError } = await supabase.auth.signInWithPassword({ email, password });
-        if (authError) {
-          console.error('❌ Admin login failed:', authError.message);
-          process.exit(1);
-        }
-        uploadedBy = authData.user?.id || null;
-        console.log(`✅ Logged in successfully as ${email}!\n`);
-      }
-    } else {
-      uploadedBy = sessionRes.data.session.user?.id || null;
+    console.log('🔒 Supabase Service Role Key Required to Save Chapters:');
+    console.log('Because you log in with GitHub OAuth, scripts use the secret service_role key to write to Supabase.');
+    console.log('👉 Get it at: Supabase Dashboard -> Project Settings -> API -> "service_role" secret\n');
+
+    const keyInput = (await askQuestion('Paste SUPABASE_SERVICE_ROLE_KEY (or press Enter if already configured): ')).trim();
+    if (keyInput && !keyInput.startsWith('sb_publishable')) {
+      const { createClient } = await import('@supabase/supabase-js');
+      // Reassign client with service role key
+      supabase = createClient(supabaseUrl, keyInput, {
+        auth: { autoRefreshToken: false, persistSession: false },
+      });
+      console.log('✅ Service Role Key applied successfully!\n');
     }
   }
 
