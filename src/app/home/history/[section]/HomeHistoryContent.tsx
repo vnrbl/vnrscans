@@ -378,28 +378,38 @@ function HistoryChapterCard({ chapter, timeLabel }: { chapter: ChapterItem; time
   if (!seriesSlug) return null;
 
   return (
-    <article className="group overflow-hidden rounded-lg border border-border/40 bg-card transition-all hover:border-primary/50 hover:shadow-lg hover:shadow-primary/10">
-      <Link to="/title/$titleSlug/$chapterSlug" params={{ titleSlug: seriesSlug, chapterSlug: chapter.slug }} className="block">
-        <div className="relative aspect-[3/4] overflow-hidden bg-secondary">
+    <article className="group glass-card flex flex-col h-full rounded-lg overflow-hidden hover-lift transition-all">
+      <Link to="/title/$titleSlug/$chapterSlug" params={{ titleSlug: seriesSlug, chapterSlug: chapter.slug }} className="block shrink-0">
+        <div className="relative aspect-[3/4] overflow-hidden bg-neutral-950">
           <OptimizedImage
             src={chapter.series?.cover_url ?? null}
             alt={chapter.series?.title ?? ""}
             seriesId={chapter.series?.id}
             className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
           />
-          <Badge className="absolute bottom-2 left-2 gap-1 rounded bg-background/85 px-1.5 py-0.5 text-[11px] font-bold text-foreground shadow backdrop-blur">
-            <BookOpen className="h-3 w-3" />
-            Ch.{chapter.chapter_number}
-          </Badge>
+          <div className="absolute bottom-2 left-2 flex items-center gap-1.5 rounded bg-black/80 border border-white/20 px-2 py-0.5 text-xs font-semibold text-white shadow-md backdrop-blur-md">
+            <BookOpen className="h-3.5 w-3.5 text-purple-400" />
+            <span>Ch. {chapter.chapter_number}</span>
+          </div>
         </div>
       </Link>
-      <div className="p-3">
-        <Link to="/title/$slug" params={{ slug: seriesSlug }} className="line-clamp-2 text-sm font-semibold leading-tight hover:text-primary">
-          {chapter.series?.title}
-        </Link>
-        <div className="mt-2 flex items-center gap-1 text-xs text-muted-foreground">
-          <Clock className="h-3 w-3 shrink-0" />
-          <span>
+      <div className="p-3 bg-surface-1/90 flex flex-col justify-between flex-1 min-w-0">
+        <div>
+          <Link
+            to="/title/$slug"
+            params={{ slug: seriesSlug }}
+            title={chapter.series?.title || ""}
+            className="block truncate text-sm font-semibold leading-snug text-white hover:text-purple-400 transition-colors"
+          >
+            {chapter.series?.title}
+          </Link>
+          <p className="mt-1 text-xs text-neutral-400 truncate font-medium">
+            Chapter {chapter.chapter_number}
+          </p>
+        </div>
+        <div className="mt-1 flex items-center gap-1 text-xs text-neutral-400">
+          <Clock className="h-3.5 w-3.5 shrink-0 text-neutral-400" />
+          <span className="truncate">
             {timeLabel} {formatTimeAgo(chapter.created_at)}
           </span>
         </div>

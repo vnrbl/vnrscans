@@ -745,9 +745,10 @@ function SeriesCarouselSection({
               key={item.id}
               to="/title/$slug"
               params={{ slug: item.slug }}
-              className={`group ${TITLE_CARD_WIDTH} glass-card rounded-[4px] overflow-hidden hover-lift block flex-shrink-0`}
+              title={item.title}
+              className={`group ${TITLE_CARD_WIDTH} glass-card flex flex-col h-full rounded-lg overflow-hidden hover-lift block flex-shrink-0`}
             >
-              <div className={`${TITLE_COVER_CLASS} relative overflow-hidden bg-neutral-950`}>
+              <div className={`${TITLE_COVER_CLASS} relative overflow-hidden bg-neutral-950 shrink-0`}>
                 <OptimizedImage
                   src={item.cover_url}
                   alt={item.title}
@@ -756,19 +757,19 @@ function SeriesCarouselSection({
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-transparent to-transparent pointer-events-none" />
                 <div className="absolute left-2.5 top-2.5">
-                  <Badge variant="outline" className="badge-glass text-3xs font-semibold uppercase tracking-[0.08em] py-0.5 px-2">
+                  <Badge variant="outline" className="badge-glass text-xs font-medium uppercase py-0.5 px-2">
                     {item.type}
                   </Badge>
                 </div>
                 {item.rating_average && Number(item.rating_average) > 0 ? (
-                  <div className="absolute right-2.5 bottom-2.5 flex items-center gap-1 rounded border border-white/10 bg-black/75 px-1.5 py-0.5 text-3xs backdrop-blur-md text-amber-300 font-mono font-bold">
+                  <div className="absolute right-2.5 bottom-2.5 flex items-center gap-1 rounded border border-white/10 bg-black/75 px-1.5 py-0.5 text-xs backdrop-blur-md text-amber-300 font-bold">
                     <Star className="h-3 w-3 fill-amber-400 text-amber-400 stroke-[1.5]" />
                     {Number(item.rating_average).toFixed(1)}
                   </div>
                 ) : null}
               </div>
-              <div className="p-3 bg-surface-1/90">
-                <h3 className="line-clamp-1 text-xs font-bold leading-tight text-white uppercase tracking-[0.02em] group-hover:text-purple-300 transition-colors">
+              <div className="p-3 bg-surface-1/90 flex flex-col justify-between flex-1 min-w-0">
+                <h3 className="truncate text-sm font-semibold leading-snug text-white group-hover:text-purple-400 transition-colors">
                   {item.title}
                 </h3>
               </div>
@@ -1065,11 +1066,11 @@ function FollowedChapterCard({ chapter }: { chapter: RecentChapter }) {
   if (!seriesSlug) return null;
 
   return (
-    <article className="group glass-card rounded-lg overflow-hidden hover-lift transition-all">
+    <article className="group glass-card flex flex-col h-full rounded-lg overflow-hidden hover-lift transition-all">
       <Link
         to="/title/$titleSlug/$chapterSlug"
         params={{ titleSlug: seriesSlug, chapterSlug: chapter.slug }}
-        className="block"
+        className="block shrink-0"
       >
         <div className={`${TITLE_COVER_CLASS} relative overflow-hidden bg-neutral-950`}>
           <OptimizedImage
@@ -1084,21 +1085,24 @@ function FollowedChapterCard({ chapter }: { chapter: RecentChapter }) {
           </div>
         </div>
       </Link>
-      <div className="p-3 bg-surface-1/90">
-        <Link
-          to="/title/$slug"
-          params={{ slug: seriesSlug }}
-          className="block font-semibold text-sm text-white line-clamp-1 leading-snug group-hover:text-purple-400 transition-colors"
-        >
-          {chapter.series?.title}
-        </Link>
+      <div className="p-3 bg-surface-1/90 flex flex-col justify-between flex-1 min-w-0">
+        <div>
+          <Link
+            to="/title/$slug"
+            params={{ slug: seriesSlug }}
+            title={chapter.series?.title || ""}
+            className="block font-semibold text-sm text-white truncate leading-snug group-hover:text-purple-400 transition-colors"
+          >
+            {chapter.series?.title}
+          </Link>
+        </div>
         <Link
           to="/title/$titleSlug/$chapterSlug"
           params={{ titleSlug: seriesSlug, chapterSlug: chapter.slug }}
-          className="mt-1 flex items-center justify-between gap-2 text-xs text-neutral-400 hover:text-purple-300 transition-colors"
+          className="mt-1 flex items-center justify-between gap-2 text-xs text-neutral-400 hover:text-purple-300 transition-colors truncate"
         >
-          <span>Chapter {chapter.chapter_number}</span>
-          <span>{formatTimeAgo(chapter.created_at)}</span>
+          <span className="truncate">Chapter {chapter.chapter_number}</span>
+          <span className="shrink-0">{formatTimeAgo(chapter.created_at)}</span>
         </Link>
       </div>
     </article>
@@ -1117,9 +1121,7 @@ function RecentChapterCard({
   const seriesSlug = chapter.series?.slug;
   if (!seriesSlug) return null;
 
-  const chapterLabel = timeField === "created"
-    ? `Chapter ${chapter.chapter_number} uploaded`
-    : `Chapter ${chapter.chapter_number}`;
+  const chapterLabel = `Chapter ${chapter.chapter_number}`;
   const timeLabel = timeField === "updated" ? "Last read" : "Uploaded";
 
   const cover = (
@@ -1136,48 +1138,53 @@ function RecentChapterCard({
   const timeRow = (
     <div className="mt-1 flex items-center gap-1.5 text-xs text-neutral-400">
       <Clock className="h-3.5 w-3.5 shrink-0 text-neutral-400" />
-      <span>
+      <span className="truncate">
         {timeLabel} {formatTimeAgo(chapter.created_at)}
       </span>
     </div>
   );
 
   return (
-    <article className="group glass-card rounded-lg overflow-hidden hover-lift transition-all">
-      <Link to="/title/$slug" params={{ slug: seriesSlug }} className="block">
+    <article className="group glass-card flex flex-col h-full rounded-lg overflow-hidden hover-lift transition-all">
+      <Link to="/title/$slug" params={{ slug: seriesSlug }} className="block shrink-0">
         {cover}
       </Link>
-      <div className="p-3 bg-surface-1/90">
-        <Link
-          to="/title/$slug"
-          params={{ slug: seriesSlug }}
-          className="block font-semibold text-sm text-white line-clamp-1 leading-snug group-hover:text-purple-400 transition-colors"
-        >
-          {chapter.series?.title}
-        </Link>
-        {linkVariant === "seriesOnly" ? (
-          <>
-            <p className="mt-1 text-xs text-neutral-400 line-clamp-1 font-medium">{chapterLabel}</p>
-            {timeRow}
-          </>
-        ) : (
-          <>
-            <Button
-              asChild
-              variant="secondary"
-              size="sm"
-              className="mt-2 h-8 w-full text-xs font-semibold rounded bg-surface-2 hover:bg-purple-950/40 hover:text-purple-200 border border-border/40"
-            >
-              <Link
-                to="/title/$titleSlug/$chapterSlug"
-                params={{ titleSlug: seriesSlug, chapterSlug: chapter.slug }}
+      <div className="p-3 bg-surface-1/90 flex flex-col justify-between flex-1 min-w-0">
+        <div>
+          <Link
+            to="/title/$slug"
+            params={{ slug: seriesSlug }}
+            title={chapter.series?.title || ""}
+            className="block font-semibold text-sm text-white truncate leading-snug group-hover:text-purple-400 transition-colors"
+          >
+            {chapter.series?.title}
+          </Link>
+          <p className="mt-1 text-xs text-neutral-400 truncate font-medium">
+            {chapterLabel}
+          </p>
+        </div>
+        <div className="mt-1">
+          {linkVariant === "seriesOnly" ? (
+            timeRow
+          ) : (
+            <>
+              <Button
+                asChild
+                variant="secondary"
+                size="sm"
+                className="mt-2 h-8 w-full text-xs font-semibold rounded bg-surface-2 hover:bg-purple-950/40 hover:text-purple-200 border border-border/40"
               >
-                Chapter {chapter.chapter_number}
-              </Link>
-            </Button>
-            {timeRow}
-          </>
-        )}
+                <Link
+                  to="/title/$titleSlug/$chapterSlug"
+                  params={{ titleSlug: seriesSlug, chapterSlug: chapter.slug }}
+                >
+                  Chapter {chapter.chapter_number}
+                </Link>
+              </Button>
+              {timeRow}
+            </>
+          )}
+        </div>
       </div>
     </article>
   );
