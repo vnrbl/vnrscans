@@ -435,7 +435,7 @@ function ChapterCarouselSection({
   emptyMessage,
   chapters,
   timeField = "created",
-  linkVariant = "chapterDirect",
+  linkVariant = "split",
   sectionId,
   onHide,
 }: {
@@ -446,7 +446,7 @@ function ChapterCarouselSection({
   emptyMessage: string;
   chapters: RecentChapter[];
   timeField?: "created" | "updated";
-  linkVariant?: "chapterDirect" | "seriesOnly";
+  linkVariant?: "split" | "seriesOnly";
   sectionId?: string;
   onHide?: () => void;
 }) {
@@ -1065,30 +1065,30 @@ function FollowedChapterCard({ chapter }: { chapter: RecentChapter }) {
   if (!seriesSlug) return null;
 
   return (
-    <article className="group overflow-hidden rounded-lg border border-border/40 bg-card transition-all hover:border-primary/50 hover:shadow-lg hover:shadow-primary/10">
+    <article className="group glass-card rounded-[4px] overflow-hidden hover-lift transition-all">
       <Link
         to="/title/$titleSlug/$chapterSlug"
         params={{ titleSlug: seriesSlug, chapterSlug: chapter.slug }}
         className="block"
       >
-        <div className={TITLE_COVER_CLASS}>
+        <div className={`${TITLE_COVER_CLASS} relative overflow-hidden bg-neutral-950`}>
           <OptimizedImage
             src={chapter.series?.cover_url ?? null}
             alt={chapter.series?.title ?? ""}
             seriesId={chapter.series?.id}
             className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
           />
-          <Badge className="absolute bottom-2 left-2 gap-1 rounded bg-background/85 px-1.5 py-0.5 text-[11px] font-bold text-foreground shadow backdrop-blur">
-            <BookOpen className="h-3 w-3" />
+          <Badge className="absolute bottom-2 left-2 gap-1 rounded badge-glass px-1.5 py-0.5 text-3xs font-mono font-bold text-white shadow backdrop-blur-md">
+            <BookOpen className="h-3 w-3 text-purple-400" />
             Ch.{chapter.chapter_number}
           </Badge>
         </div>
       </Link>
-      <div className="p-3">
+      <div className="p-3 bg-surface-1/90">
         <Link
           to="/title/$titleSlug/$chapterSlug"
           params={{ titleSlug: seriesSlug, chapterSlug: chapter.slug }}
-          className="flex items-center justify-between gap-2 text-xs text-muted-foreground hover:text-primary"
+          className="flex items-center justify-between gap-2 text-3xs font-mono text-muted-foreground hover:text-purple-300"
         >
           <span>Ch.{chapter.chapter_number}</span>
           <span>{formatTimeAgo(chapter.created_at)}</span>
@@ -1096,7 +1096,7 @@ function FollowedChapterCard({ chapter }: { chapter: RecentChapter }) {
         <Link
           to="/title/$slug"
           params={{ slug: seriesSlug }}
-          className="mt-1 line-clamp-1 text-sm font-semibold leading-snug text-foreground group-hover:text-primary"
+          className="mt-1 line-clamp-1 text-xs font-bold uppercase leading-snug text-white group-hover:text-purple-300 transition-colors"
         >
           {chapter.series?.title}
         </Link>
@@ -1123,7 +1123,7 @@ function RecentChapterCard({
   const timeLabel = timeField === "updated" ? "Last read" : "Uploaded";
 
   const cover = (
-    <div className={TITLE_COVER_CLASS}>
+    <div className={`${TITLE_COVER_CLASS} relative overflow-hidden bg-neutral-950`}>
       <OptimizedImage
         src={chapter.series?.cover_url ?? null}
         alt={chapter.series?.title ?? ""}
@@ -1134,8 +1134,8 @@ function RecentChapterCard({
   );
 
   const timeRow = (
-    <div className="mt-2 flex items-center gap-1 text-xs text-muted-foreground">
-      <Clock className="h-3 w-3 shrink-0" />
+    <div className="mt-2 flex items-center gap-1 text-3xs font-mono text-muted-foreground">
+      <Clock className="h-3 w-3 shrink-0 text-neutral-400" />
       <span>
         {timeLabel} {formatTimeAgo(chapter.created_at)}
       </span>
@@ -1143,21 +1143,21 @@ function RecentChapterCard({
   );
 
   return (
-    <article className="group overflow-hidden rounded-lg border border-border/40 bg-card transition-all hover:border-primary/50 hover:shadow-lg hover:shadow-primary/10">
+    <article className="group glass-card rounded-[4px] overflow-hidden hover-lift transition-all">
       <Link to="/title/$slug" params={{ slug: seriesSlug }} className="block">
         {cover}
       </Link>
-      <div className="p-3">
+      <div className="p-3 bg-surface-1/90">
         <Link
           to="/title/$slug"
           params={{ slug: seriesSlug }}
-          className="line-clamp-1 text-sm font-semibold leading-tight text-foreground hover:text-primary"
+          className="line-clamp-1 text-xs font-bold uppercase leading-tight text-white group-hover:text-purple-300 transition-colors"
         >
           {chapter.series?.title}
         </Link>
         {linkVariant === "seriesOnly" ? (
           <>
-            <p className="mt-1 line-clamp-1 text-xs text-muted-foreground">{chapterLabel}</p>
+            <p className="mt-1 line-clamp-1 text-3xs font-mono text-muted-foreground">{chapterLabel}</p>
             {timeRow}
           </>
         ) : (
@@ -1166,7 +1166,7 @@ function RecentChapterCard({
               asChild
               variant="secondary"
               size="sm"
-              className="mt-2 h-8 w-full text-xs font-semibold"
+              className="mt-2 h-7 w-full text-3xs font-mono font-bold uppercase rounded-[4px] bg-surface-2 hover:bg-purple-950/40 hover:text-purple-200 border border-border/40"
             >
               <Link
                 to="/title/$titleSlug/$chapterSlug"
