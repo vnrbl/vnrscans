@@ -15,8 +15,8 @@ import {
   Eye,
   Heart,
 } from "lucide-react";
-import dynamic from "next/dynamic";
-const LandingFaq = dynamic(() => import("./LandingFaq").then((m) => m.LandingFaq), {
+import nextDynamic from "next/dynamic";
+const LandingFaq = nextDynamic(() => import("./LandingFaq").then((m) => m.LandingFaq), {
   ssr: true,
 });
 import { Badge } from "@/components/ui/badge";
