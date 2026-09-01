@@ -4,50 +4,50 @@ import { ShieldCheck, Mail, ExternalLink, Globe } from "lucide-react";
 
 export function Footer() {
   return (
-    <footer className="border-t border-border/40 bg-secondary/10 text-muted-foreground transition-all">
+    <footer className="border-t border-hairline bg-[#06060a]/90 backdrop-blur-md text-muted-foreground transition-all">
       {/* Top half */}
       <div className="container mx-auto px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16 py-12">
         <div className="grid gap-8 grid-cols-3 lg:grid-cols-4 text-center sm:text-left">
           {/* Logo & Description */}
           <div className="col-span-3 lg:col-span-1 flex flex-col items-center sm:items-start text-center sm:text-left space-y-4">
-            <Link to="/home" className="flex items-center gap-2.5 transition-transform hover:scale-102 w-fit">
-              <div className="relative grid h-9 w-9 place-items-center rounded border border-neutral-800 bg-neutral-950 font-bold text-white text-xs">
+            <Link to="/home" className="flex items-center gap-2.5 transition-transform hover:scale-102 w-fit group">
+              <div className="relative grid h-9 w-9 place-items-center rounded-[4px] border border-purple-500/40 bg-purple-950/20 font-bold text-white text-xs shadow-[0_0_12px_rgba(168,85,247,0.2)] group-hover:border-purple-400 group-hover:shadow-[0_0_16px_rgba(168,85,247,0.4)] transition-all">
                 VS
               </div>
-              <span className="text-lg font-bold text-white tracking-widest uppercase">
+              <span className="text-lg font-bold text-white tracking-widest uppercase group-hover:text-purple-300 transition-colors">
                 vnrscans
               </span>
             </Link>
-            <p className="text-xs leading-relaxed max-w-xs font-light">
+            <p className="text-xs leading-relaxed max-w-xs font-light text-neutral-400">
               A premium, lightning-fast scanlation reading platform designed for the community. Fast loading, secure, and fully optimized.
             </p>
             {/* Safe / Trusted Badge */}
-            <div className="inline-flex items-center gap-1.5 rounded border border-neutral-800 bg-neutral-950 px-2.5 py-1 text-neutral-400 text-3xs font-bold uppercase tracking-widest">
+            <div className="inline-flex items-center gap-1.5 rounded-[4px] border border-emerald-900/40 bg-emerald-950/20 px-2.5 py-1 text-emerald-400 text-3xs font-bold uppercase tracking-widest backdrop-blur-md">
               <ShieldCheck className="h-3.5 w-3.5 stroke-[1.5]" /> DMCA Compliant
             </div>
           </div>
 
           {/* Navigation Links */}
           <div className="flex flex-col items-center sm:items-start">
-            <h4 className="text-xs font-bold text-foreground uppercase tracking-widest mb-4">Navigation</h4>
+            <h4 className="text-xs font-bold text-white uppercase tracking-widest mb-4">Navigation</h4>
             <ul className="space-y-2 text-xs">
               <li>
-                <Link to="/home" className="hover:text-primary transition-colors">Home Page</Link>
+                <Link to="/home" className="hover:text-purple-300 transition-colors">Home Page</Link>
               </li>
               <li>
-                <Link to="/browse" className="hover:text-primary transition-colors">Browse Directory</Link>
+                <Link to="/browse" className="hover:text-purple-300 transition-colors">Browse Directory</Link>
               </li>
               <li>
-                <Link to="/rankings" className="hover:text-primary transition-colors">Top Rankings</Link>
+                <Link to="/rankings" className="hover:text-purple-300 transition-colors">Top Rankings</Link>
               </li>
               <li>
-                <Link to="/recommendations" className="hover:text-primary transition-colors">Recommendations</Link>
+                <Link to="/recommendations" className="hover:text-purple-300 transition-colors">Recommendations</Link>
               </li>
               <li>
-                <Link to="/request-series" className="hover:text-primary transition-colors">Request Series</Link>
+                <Link to="/request-series" className="hover:text-purple-300 transition-colors">Request Series</Link>
               </li>
               <li>
-                <Link to="/data-map" className="hover:text-primary transition-colors">Data Directory Map</Link>
+                <Link to="/data-map" className="hover:text-purple-300 transition-colors">Data Directory Map</Link>
               </li>
             </ul>
           </div>

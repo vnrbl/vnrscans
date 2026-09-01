@@ -226,13 +226,13 @@ export const ChapterList = React.memo(function ChapterList({
         </div>
 
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400 stroke-[1.8]" />
           <Input
             type="text"
             placeholder="Search chapters by number, title, uploader, or group..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9"
+            className="pl-10 h-10 rounded-[4px] bg-surface-1/90 border border-hairline focus:border-purple-500 focus:ring-1 focus:ring-purple-500/30 text-white placeholder:text-neutral-500 text-xs transition-all"
           />
         </div>
       </div>
@@ -240,15 +240,15 @@ export const ChapterList = React.memo(function ChapterList({
       {chaptersQ.isLoading ? (
         <div className="space-y-2">
           {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="h-12 animate-pulse rounded bg-secondary/50" />
+            <div key={i} className="h-12 rounded-[4px] shimmer-dark" />
           ))}
         </div>
       ) : !filteredChapters || filteredChapters.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-border/50 p-8 text-center text-sm text-muted-foreground">
+        <div className="glass-panel rounded-[4px] p-8 text-center text-xs text-muted-foreground font-light">
           {searchQuery ? (
-            <>No chapters found matching "{searchQuery}"</>
+            <>No chapters found matching &quot;{searchQuery}&quot;</>
           ) : selectedGroup !== "all" ? (
-            <>No chapters from {selectedGroup}. Try selecting "All Groups".</>
+            <>No chapters from {selectedGroup}. Try selecting &quot;All Groups&quot;.</>
           ) : (
             <>No chapters yet. Check back soon.</>
           )}
@@ -270,21 +270,21 @@ export const ChapterList = React.memo(function ChapterList({
                 <Link
                   key={c.id}
                   href={`/title/${slug}/${c.slug}`}
-                  className="block rounded-lg border border-border/40 bg-card p-3 transition hover:border-primary/40 hover:bg-secondary/30"
+                  className="glass-card block rounded-[4px] p-3.5 hover-lift transition-all"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
                         <span
-                          className="font-semibold"
-                          style={isRead ? { color: "#7f22fe" } : undefined}
+                          className="font-bold text-sm font-mono tracking-tight"
+                          style={isRead ? { color: "#a855f7" } : undefined}
                         >
                           Chapter {c.chapter_number}
                         </span>
                         {showNewBadge && (
-                          <Badge className="bg-violet-600 text-xs uppercase text-white hover:bg-violet-700">
+                          <span className="shrink-0 rounded bg-purple-600 border border-purple-400/50 px-1.5 py-0.2 text-[9px] font-mono font-black uppercase text-white shadow-sm shadow-purple-900/50">
                             NEW
-                          </Badge>
+                          </span>
                         )}
                         <XpBadge
                           isRead={isRead}
@@ -293,16 +293,16 @@ export const ChapterList = React.memo(function ChapterList({
                         />
                       </div>
                       {c.title && (
-                        <p className="mt-1 line-clamp-1 text-sm text-muted-foreground">{c.title}</p>
+                        <p className="mt-1 line-clamp-1 text-xs text-muted-foreground font-light">{c.title}</p>
                       )}
                     </div>
-                    <Badge variant="outline" className="shrink-0 gap-1 text-xs">
-                      <Eye className="h-3 w-3" />
+                    <Badge variant="outline" className="shrink-0 gap-1 text-3xs badge-glass font-mono">
+                      <Eye className="h-3 w-3 text-neutral-400" />
                       {formatReaderCount(readerCount)}
                     </Badge>
                   </div>
-                  <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
-                    {scanlationGroup && <span className="font-medium text-violet-400">{scanlationGroup}</span>}
+                  <div className="mt-2.5 flex flex-wrap gap-x-3 gap-y-1 text-3xs text-muted-foreground font-mono">
+                    {scanlationGroup && <span className="font-semibold text-purple-400">{scanlationGroup}</span>}
                     {uploadedBy && <span>by {uploadedBy}</span>}
                     <span>{new Date(c.created_at).toLocaleDateString()}</span>
                     <span>{formatChapterAge(c.created_at)}</span>
@@ -313,19 +313,19 @@ export const ChapterList = React.memo(function ChapterList({
           </div>
 
           {/* Desktop table layout */}
-          <div className="hidden overflow-x-auto rounded-lg border border-border/40 bg-card md:block">
+          <div className="hidden overflow-x-auto rounded-[4px] border border-hairline glass-panel md:block shadow-lg">
             <table className="w-full min-w-[820px]">
-            <thead className="border-b border-border/40 bg-secondary/30">
+            <thead className="border-b border-border/40 bg-surface-1/90">
               <tr>
-                <th className="px-4 py-3 text-left text-sm font-semibold">Chapter</th>
-                <th className="px-4 py-3 text-left text-sm font-semibold">Uploaded By</th>
-                <th className="px-4 py-3 text-left text-sm font-semibold">Group</th>
-                <th className="px-4 py-3 text-left text-sm font-semibold">Upload Date</th>
-                <th className="px-4 py-3 text-left text-sm font-semibold">XP</th>
-                <th className="px-4 py-3 text-right text-sm font-semibold">Readers</th>
+                <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider text-muted-foreground">Chapter</th>
+                <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider text-muted-foreground">Uploaded By</th>
+                <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider text-muted-foreground">Group</th>
+                <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider text-muted-foreground">Upload Date</th>
+                <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider text-muted-foreground">XP</th>
+                <th className="px-4 py-3 text-right text-xs font-bold uppercase tracking-wider text-muted-foreground">Readers</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-border/40">
+            <tbody className="divide-y divide-border/20">
               {paginatedChapters.map((c) => {
                 const isRead = readChapters.data?.has(c.id) ?? false;
                 const isNew = new Date(c.created_at) > new Date(Date.now() - 2 * 60 * 60 * 1000);
@@ -334,19 +334,19 @@ export const ChapterList = React.memo(function ChapterList({
                 const readerCount = readerCounts.data?.get(c.id) ?? 0;
 
                 return (
-                  <tr key={c.id} className="transition hover:bg-secondary/40">
+                  <tr key={c.id} className="transition-colors hover:bg-surface-2/60 group">
                     <td className="px-4 py-3">
                       <Link
                         href={`/title/${slug}/${c.slug}`}
                         className="flex items-center gap-2"
                       >
-                        <span className="font-medium" style={isRead ? { color: "#7f22fe" } : undefined}>
+                        <span className="font-bold text-xs font-mono group-hover:text-purple-300 transition-colors" style={isRead ? { color: "#a855f7" } : undefined}>
                           Chapter {c.chapter_number}
                         </span>
                         {showNewBadge && (
-                          <Badge className="bg-violet-600 text-xs uppercase text-white hover:bg-violet-700">
+                          <span className="shrink-0 rounded bg-purple-600 border border-purple-400/50 px-1.5 py-0.2 text-[9px] font-mono font-black uppercase text-white shadow-sm shadow-purple-900/50">
                             NEW
-                          </Badge>
+                          </span>
                         )}
                       </Link>
                     </td>

@@ -20,36 +20,47 @@ export function SeriesCard({ s, rank }: { s: Series; rank?: number }) {
     <Link
       to="/title/$slug"
       params={{ slug: s.slug }}
-      className="card-spacex bg-surface-1 group block"
+      className="glass-card group block rounded-[4px] overflow-hidden hover-lift"
     >
-      <div className={TITLE_COVER_CLASS}>
+      <div className={`${TITLE_COVER_CLASS} relative overflow-hidden bg-neutral-950`}>
         <OptimizedImage
           src={s.cover_url}
           alt={s.title}
           seriesId={s.id}
-          className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
+          className="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-105"
         />
+        
+        {/* Cinematic bottom gradient */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent opacity-80 group-hover:opacity-60 transition-opacity duration-300 pointer-events-none" />
+
         {rank !== undefined && (
-          <div className="absolute left-3 top-3 flex h-7 w-7 items-center justify-center rounded bg-black/85 border border-neutral-800 text-xs font-mono font-bold text-white">
+          <div className="absolute left-2.5 top-2.5 flex h-7 w-7 items-center justify-center rounded bg-black/80 border border-neutral-700/80 text-xs font-mono font-bold text-white shadow-md backdrop-blur-md">
             #{rank}
           </div>
         )}
-        <div className={rank !== undefined ? "absolute right-3 top-3" : "absolute left-3 top-3"}>
-          <Badge variant="outline" className="bg-black/60 text-neutral-300 border-neutral-800 text-3xs uppercase tracking-[0.05em] py-0.5 px-2">
+        
+        <div className={rank !== undefined ? "absolute right-2.5 top-2.5" : "absolute left-2.5 top-2.5"}>
+          <Badge variant="outline" className="badge-glass text-neutral-300 text-3xs uppercase tracking-[0.08em] py-0.5 px-2 font-semibold">
             {s.type}
           </Badge>
         </div>
+
         {s.rating_average && Number(s.rating_average) > 0 ? (
-          <div className="absolute right-3 bottom-3 flex items-center gap-1 rounded border border-neutral-800 bg-black/60 px-1.5 py-0.5 text-3xs backdrop-blur text-neutral-300">
-            <Star className="h-3 w-3 fill-neutral-400 text-neutral-400 stroke-[1.5]" />
+          <div className="absolute right-2.5 bottom-2.5 flex items-center gap-1 rounded border border-white/10 bg-black/75 px-2 py-0.5 text-3xs backdrop-blur-md text-amber-300 font-mono font-bold shadow-sm">
+            <Star className="h-3 w-3 fill-amber-400 text-amber-400 stroke-[1.5]" />
             {Number(s.rating_average).toFixed(1)}
           </div>
         ) : null}
       </div>
-      <div className="p-4">
-        <h3 className="line-clamp-1 text-xs font-bold leading-none text-white uppercase tracking-[0.02em] group-hover:text-neutral-200 transition-colors">
+      <div className="p-3.5 bg-surface-1/90">
+        <h3 className="line-clamp-1 text-xs font-bold leading-snug text-white uppercase tracking-[0.03em] group-hover:text-purple-300 transition-colors duration-200">
           {s.title}
         </h3>
+        {s.chapter_count !== undefined && s.chapter_count !== null && s.chapter_count > 0 && (
+          <p className="mt-1 text-3xs text-muted-foreground font-mono font-medium">
+            {s.chapter_count} {s.chapter_count === 1 ? "Chapter" : "Chapters"}
+          </p>
+        )}
       </div>
     </Link>
   );
@@ -57,10 +68,11 @@ export function SeriesCard({ s, rank }: { s: Series; rank?: number }) {
 
 export function SeriesCardSkeleton() {
   return (
-    <div className="card-spacex bg-surface-1">
-      <div className={`${TITLE_COVER_CLASS} animate-pulse bg-neutral-950`} />
-      <div className="p-4">
-        <div className="h-3.5 w-3/4 animate-pulse rounded bg-neutral-950" />
+    <div className="glass-card rounded-[4px] overflow-hidden">
+      <div className={`${TITLE_COVER_CLASS} shimmer-dark`} />
+      <div className="p-3.5 space-y-2">
+        <div className="h-3 w-3/4 rounded shimmer-dark" />
+        <div className="h-2.5 w-1/3 rounded shimmer-dark" />
       </div>
     </div>
   );

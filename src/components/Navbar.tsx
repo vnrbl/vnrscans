@@ -281,13 +281,13 @@ export function Navbar() {
             <button
               onClick={() => setSearchOpen(true)}
               title="Search (Ctrl+K)"
-              className="flex items-center gap-2 w-[200px] md:w-[260px] lg:w-[320px] h-9 rounded-lg border border-border/60 bg-secondary/50 px-3 text-sm text-muted-foreground transition-all hover:border-border hover:bg-secondary hover:text-foreground focus:outline-none"
+              className="flex items-center gap-2.5 w-[200px] md:w-[260px] lg:w-[320px] h-9 rounded-[4px] border border-hairline bg-surface-1/80 px-3 text-xs text-muted-foreground transition-all hover:border-purple-500/50 hover:bg-surface-2 hover:text-white focus:outline-none shadow-sm"
             >
-              <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
-              <span className="flex-1 truncate text-left font-sans font-normal tracking-normal text-muted-foreground">
+              <Search className="h-3.5 w-3.5 shrink-0 text-neutral-400 stroke-[1.8]" />
+              <span className="flex-1 truncate text-left font-sans font-normal tracking-normal text-neutral-400">
                 Search titles, authors...
               </span>
-              <kbd className="hidden lg:inline-flex items-center rounded border border-border/60 bg-background/60 px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground">
+              <kbd className="hidden lg:inline-flex items-center rounded border border-border/60 bg-neutral-900/80 px-1.5 py-0.5 text-[9px] font-mono font-bold text-neutral-400">
                 Ctrl K
               </kbd>
             </button>

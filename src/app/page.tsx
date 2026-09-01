@@ -139,9 +139,16 @@ export default async function Home() {
       />
 
       {/* ─── Hero Section ─── */}
-      <section className="relative border-b border-border/20 pb-16 pt-24 md:pb-28 md:pt-40">
+      <section className="relative border-b border-border/20 pb-16 pt-24 md:pb-28 md:pt-40 overflow-hidden">
+        {/* Ambient Top Glow */}
+        <div 
+          aria-hidden="true"
+          className="absolute -top-40 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-purple-600/10 rounded-full blur-[120px] pointer-events-none -z-10"
+        />
+
         <div className="container mx-auto px-4 text-center sm:px-6 md:px-8 lg:px-12 xl:px-16">
-          <div className="eyebrow mb-6 tracking-[0.15em] opacity-80">
+          <div className="inline-flex items-center gap-2 mb-6 px-3 py-1 rounded-full border border-purple-500/30 bg-purple-950/20 text-purple-300 text-3xs font-mono font-bold tracking-[0.12em] uppercase backdrop-blur-md">
+            <span className="h-1.5 w-1.5 rounded-full bg-purple-400 animate-pulse" />
             Next-Gen Reading Platform
           </div>
 
@@ -157,12 +164,12 @@ export default async function Home() {
 
           <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
             <Link href="/home" className="w-full sm:w-auto">
-              <span className="btn-solid-pill w-full justify-center cursor-pointer">
+              <span className="btn-solid-pill w-full justify-center cursor-pointer shadow-lg hover:shadow-white/10 hover:scale-[1.02] transition-all">
                 Start Reading <ArrowRight className="ml-1 h-4 w-4" />
               </span>
             </Link>
             <Link href="/browse" className="w-full sm:w-auto">
-              <span className="btn-ghost-pill w-full justify-center cursor-pointer">
+              <span className="btn-ghost-pill w-full justify-center cursor-pointer hover:border-purple-400 hover:text-purple-200 transition-all">
                 Explore Library
               </span>
             </Link>
@@ -195,9 +202,9 @@ export default async function Home() {
               return (
                 <div
                   key={i}
-                  className="card-spacex bg-surface-1 p-8 text-left hover:border-hairline-strong transition-all duration-300"
+                  className="glass-card p-8 text-left hover-lift rounded-[4px] group"
                 >
-                  <div className="mb-4 text-muted-foreground">
+                  <div className="mb-4 text-muted-foreground group-hover:text-purple-400 transition-colors duration-300">
                     <Icon className="h-5 w-5 stroke-[1.5]" />
                   </div>
                   <HomeStats value={shown} />
@@ -216,7 +223,7 @@ export default async function Home() {
         <div className="container mx-auto px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16">
           <div className="flex flex-col md:flex-row md:items-end justify-between mb-16">
             <div>
-              <div className="eyebrow mb-3 tracking-[0.1em]">
+              <div className="eyebrow mb-3 tracking-[0.1em] text-purple-400/90 font-medium">
                 <Compass className="inline h-4.5 w-4.5 mr-1.5 align-text-bottom stroke-[1.5]" /> Discover Content
               </div>
               <h2 className="text-3xl font-bold tracking-[0.04em] text-white uppercase leading-none">
@@ -227,7 +234,7 @@ export default async function Home() {
               </p>
             </div>
             <Link href="/browse" className="mt-6 md:mt-0">
-              <span className="btn-ghost-pill cursor-pointer">
+              <span className="btn-ghost-pill cursor-pointer hover:border-purple-400 transition-all">
                 Browse Catalog <ArrowRight className="ml-1 h-3.5 w-3.5" />
               </span>
             </Link>
@@ -239,7 +246,7 @@ export default async function Home() {
                 <Link
                   key={item.id}
                   href={`/title/${item.slug}`}
-                  className="card-spacex bg-surface-1 group flex flex-col h-full hover:border-hairline-strong transition-all duration-300"
+                  className="glass-card group flex flex-col h-full rounded-[4px] overflow-hidden hover-lift"
                 >
                   <div className="relative aspect-[16/10] overflow-hidden bg-neutral-900">
                     <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent opacity-90 z-10 pointer-events-none" />
@@ -251,13 +258,13 @@ export default async function Home() {
                           loop
                           muted
                           playsInline
-                          className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
+                          className="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-105"
                         />
                       ) : (
                         <img
                           src={item.cover_url}
                           alt={`${item.title} cover`}
-                          className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
+                          className="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-105"
                           referrerPolicy="no-referrer"
                           loading="lazy"
                         />
@@ -267,16 +274,16 @@ export default async function Home() {
                         <BookOpen className="h-8 w-8" />
                       </div>
                     )}
-                    <div className="absolute top-4 left-4 z-20 flex gap-2">
-                      <Badge variant="outline" className="capitalize text-3xs font-semibold bg-black/60 text-neutral-300 border-neutral-800 tracking-[0.05em] py-0.5 px-2">
+                    <div className="absolute top-3 left-3 z-20 flex gap-2">
+                      <Badge variant="outline" className="capitalize text-3xs font-semibold badge-glass tracking-[0.05em] py-0.5 px-2">
                         {item.type}
                       </Badge>
                       <Badge
                         variant="outline"
-                        className={`capitalize text-3xs font-semibold py-0.5 px-2 tracking-[0.05em] ${
+                        className={`capitalize text-3xs font-semibold py-0.5 px-2 tracking-[0.05em] backdrop-blur-md ${
                           item.status === "ongoing"
-                            ? "bg-emerald-950/20 border-emerald-900/40 text-emerald-400"
-                            : "bg-neutral-900/60 border-neutral-800/40 text-neutral-400"
+                            ? "bg-emerald-950/40 border-emerald-800/50 text-emerald-400"
+                            : "bg-neutral-900/60 border-neutral-700/50 text-neutral-300"
                         }`}
                       >
                         {item.status}
@@ -286,7 +293,7 @@ export default async function Home() {
 
                   <div className="p-6 flex-1 flex flex-col justify-between">
                     <div>
-                      <h3 className="text-lg font-bold tracking-[0.02em] text-white uppercase group-hover:text-neutral-200 transition-colors line-clamp-1">
+                      <h3 className="text-lg font-bold tracking-[0.02em] text-white uppercase group-hover:text-purple-300 transition-colors line-clamp-1">
                         {item.title}
                       </h3>
                       <p className="mt-3 text-xs text-muted-foreground line-clamp-3 leading-relaxed font-light">
@@ -294,12 +301,12 @@ export default async function Home() {
                       </p>
                     </div>
 
-                    <div className="mt-6 pt-4 border-t border-border/20 flex items-center justify-between text-3xs font-bold text-muted-foreground uppercase tracking-widest">
+                    <div className="mt-6 pt-4 border-t border-border/30 flex items-center justify-between text-3xs font-bold text-muted-foreground uppercase tracking-widest">
                       <span className="flex items-center gap-1.5">
                         <Eye className="h-3.5 w-3.5 text-neutral-400 stroke-[1.5]" />
                         {item.view_count?.toLocaleString() || "0"} Views
                       </span>
-                      <span className="flex items-center gap-1 text-white">
+                      <span className="flex items-center gap-1 text-white group-hover:text-purple-300 transition-colors">
                         Read Now <ArrowRight className="h-3 w-3" />
                       </span>
                     </div>
@@ -308,7 +315,7 @@ export default async function Home() {
               ))}
             </div>
           ) : (
-            <div className="card-spacex bg-surface-1 p-12 text-center">
+            <div className="glass-panel p-12 text-center rounded-[4px]">
               <BookOpen className="mx-auto h-10 w-10 text-muted-foreground mb-4" />
               <h3 className="text-lg font-bold text-white">New series are being added</h3>
               <p className="mt-2 text-sm text-muted-foreground">
@@ -325,10 +332,10 @@ export default async function Home() {
       </section>
 
       {/* ─── Value Propositions (Showroom) ─── */}
-      <section className="py-24 bg-surface-1 border-b border-border/20">
+      <section className="py-24 bg-surface-1/40 border-b border-border/20">
         <div className="container mx-auto px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16">
           <div className="text-center max-w-2xl mx-auto mb-20">
-            <div className="eyebrow mb-3 tracking-[0.1em]">
+            <div className="eyebrow mb-3 tracking-[0.1em] text-purple-400 font-medium">
               <Zap className="inline h-4 w-4 mr-1.5 align-text-bottom stroke-[1.5]" /> Ultimate Reader
             </div>
             <h2 className="text-3xl font-bold tracking-[0.04em] text-white uppercase leading-none">
@@ -366,12 +373,14 @@ export default async function Home() {
               return (
                 <div
                   key={i}
-                  className="card-spacex bg-background p-8 hover:border-hairline-strong transition-all duration-300"
+                  className="glass-card p-8 hover-lift rounded-[4px] group"
                 >
-                  <div className="mb-5 text-neutral-400">
+                  <div className="mb-5 text-neutral-400 group-hover:text-purple-400 group-hover:scale-110 transition-all duration-300 w-fit">
                     <Icon className="h-6 w-6 stroke-[1.5]" />
                   </div>
-                  <h3 className="text-sm font-bold uppercase tracking-[0.04em] text-white mb-2">{prop.title}</h3>
+                  <h3 className="text-sm font-bold uppercase tracking-[0.04em] text-white mb-2 group-hover:text-purple-300 transition-colors">
+                    {prop.title}
+                  </h3>
                   <p className="text-xs text-muted-foreground leading-relaxed font-light">{prop.desc}</p>
                 </div>
               );
@@ -381,11 +390,11 @@ export default async function Home() {
       </section>
 
       {/* ─── Trust, Legal & Compliance Section ─── */}
-      <section className="py-24 border-b border-border/20">
+      <section className="py-24 border-b border-border/20 relative">
         <div className="container mx-auto px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16">
           <div className="grid gap-12 lg:grid-cols-2 items-center">
             <div>
-              <div className="eyebrow mb-3 tracking-[0.1em]">
+              <div className="eyebrow mb-3 tracking-[0.1em] text-emerald-400 font-medium">
                 <ShieldCheck className="inline h-4.5 w-4.5 mr-1.5 align-text-bottom stroke-[1.5]" /> Trust & Security
               </div>
               <h2 className="text-3xl font-bold tracking-[0.04em] text-white uppercase leading-tight">
@@ -415,12 +424,12 @@ export default async function Home() {
                 ].map((item, idx) => {
                   const ItemIcon = item.icon;
                   return (
-                    <div key={idx} className="flex gap-4">
-                      <div className="grid h-10 w-10 shrink-0 place-items-center rounded bg-surface-1 border border-border/40 text-neutral-400">
+                    <div key={idx} className="flex gap-4 group">
+                      <div className="grid h-10 w-10 shrink-0 place-items-center rounded bg-surface-1 border border-border/40 text-neutral-400 group-hover:border-purple-500/50 group-hover:text-purple-300 transition-colors">
                         <ItemIcon className="h-5 w-5 stroke-[1.5]" />
                       </div>
                       <div>
-                        <h4 className="text-sm font-bold uppercase tracking-[0.02em] text-white">{item.title}</h4>
+                        <h4 className="text-sm font-bold uppercase tracking-[0.02em] text-white group-hover:text-purple-200 transition-colors">{item.title}</h4>
                         <p className="mt-1 text-xs text-muted-foreground leading-relaxed font-light">
                           {item.desc}
                         </p>
@@ -432,8 +441,8 @@ export default async function Home() {
             </div>
 
             <div className="relative max-w-md mx-auto lg:max-w-none w-full">
-              <div className="card-spacex bg-surface-1 p-8 hover:border-hairline-strong transition-all duration-300">
-                <Badge variant="outline" className="border-emerald-900/60 text-emerald-400 bg-emerald-950/10 mb-5 text-3xs font-bold uppercase tracking-widest py-0.5 px-2">
+              <div className="glass-card p-8 rounded-[4px] hover-lift">
+                <Badge variant="outline" className="border-emerald-500/40 text-emerald-400 bg-emerald-950/30 mb-5 text-3xs font-bold uppercase tracking-widest py-0.5 px-2.5 backdrop-blur-md">
                   Safe Browsing Certified
                 </Badge>
                 <h3 className="text-xl font-bold uppercase tracking-[0.02em] text-white">Creator-First Ecosystem</h3>
@@ -442,12 +451,12 @@ export default async function Home() {
                 </p>
                 <div className="mt-8 flex flex-wrap gap-4">
                   <Link href="/about">
-                    <span className="btn-ghost-pill cursor-pointer py-2 px-4 text-xs">
+                    <span className="btn-ghost-pill cursor-pointer py-2 px-4 text-xs hover:border-purple-400 transition-all">
                       Policy Details
                     </span>
                   </Link>
                   <Link href="/contact">
-                    <span className="btn-solid-pill cursor-pointer py-2 px-4 text-xs">
+                    <span className="btn-solid-pill cursor-pointer py-2 px-4 text-xs hover:scale-[1.02] transition-all">
                       Submit Your Work
                     </span>
                   </Link>

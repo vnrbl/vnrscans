@@ -341,20 +341,23 @@ function BrowsePageContent({ initialData }: { initialData?: BrowseInitialData })
       <div className="container mx-auto px-4 py-6 sm:px-6 md:px-8 lg:px-12 xl:px-16">
         {/* Header */}
         <div className="mb-6 sm:mb-8">
-          <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">Browse Manga</h1>
-          <p className="mt-2 text-muted-foreground">Discover your next favorite series</p>
+          <div className="flex items-center gap-2.5">
+            <span className="h-2 w-2 rounded-full bg-purple-400 shadow-[0_0_8px_rgba(168,85,247,0.8)] animate-pulse" />
+            <h1 className="text-2xl sm:text-3xl font-bold uppercase tracking-[0.04em] text-white">Browse Manga</h1>
+          </div>
+          <p className="mt-1.5 text-xs text-muted-foreground font-light">Explore indexed series by genre, tags, status, and community ratings</p>
         </div>
 
         {/* Search Bar */}
         <div className="mb-6">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400 stroke-[1.8]" />
             <Input
               type="text"
-              placeholder="Search manga by title..."
+              placeholder="Search manga by title, author or genre..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="h-12 pl-10 pr-4"
+              className="h-12 pl-11 pr-4 rounded-[4px] bg-surface-1/90 border border-hairline focus:border-purple-500 focus:ring-1 focus:ring-purple-500/30 text-white placeholder:text-neutral-500 text-sm transition-all"
             />
           </div>
         </div>
@@ -632,7 +635,7 @@ function SeriesList({ items, loading }: { items?: any[]; loading: boolean }) {
     return (
       <div className="space-y-3">
         {Array.from({ length: 6 }).map((_, i) => (
-          <div key={i} className="h-32 animate-pulse rounded-lg bg-secondary" />
+          <div key={i} className="h-36 rounded-[4px] shimmer-dark" />
         ))}
       </div>
     );
@@ -640,8 +643,8 @@ function SeriesList({ items, loading }: { items?: any[]; loading: boolean }) {
 
   if (!items || items.length === 0) {
     return (
-      <div className="rounded-lg border border-dashed border-border/50 p-12 text-center">
-        <p className="text-muted-foreground">No manga found. Try adjusting your filters.</p>
+      <div className="glass-panel rounded-[4px] p-12 text-center">
+        <p className="text-sm text-muted-foreground font-light">No manga found. Try adjusting your filters.</p>
       </div>
     );
   }
@@ -652,114 +655,78 @@ function SeriesList({ items, loading }: { items?: any[]; loading: boolean }) {
         <Link
           key={s.id}
           href={`/title/${s.slug}`}
-          className="flex gap-4 rounded-lg border border-border/40 bg-card p-4 transition-all hover:border-primary/50 hover:shadow-lg"
+          className="glass-card group flex gap-4 rounded-[4px] p-3.5 hover-lift transition-all"
         >
           {/* Ranking Number */}
           <div className="flex shrink-0 items-start">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-violet-600/20 text-lg font-bold text-violet-600">
+            <div className="flex h-8 w-8 items-center justify-center rounded-[4px] bg-purple-950/40 border border-purple-500/30 text-sm font-mono font-bold text-purple-300 shadow-sm">
               #{index + 1}
             </div>
           </div>
 
           {/* Cover Image */}
-          <div className="w-32 shrink-0 overflow-hidden rounded-lg bg-secondary shadow-md lg:w-40">
-            <OptimizedImage src={s.cover_url} alt={s.title} seriesId={s.id} className="h-48 w-full object-cover lg:h-60" />
+          <div className="w-28 shrink-0 overflow-hidden rounded-[4px] bg-neutral-950 shadow-md sm:w-36">
+            <OptimizedImage src={s.cover_url} alt={s.title} seriesId={s.id} className="h-40 w-full object-cover sm:h-52 transition-transform duration-500 group-hover:scale-105" />
           </div>
 
           {/* Content */}
-          <div className="flex-1 min-w-0 space-y-2">
+          <div className="flex-1 min-w-0 space-y-2 py-0.5">
             {/* Title and Rating */}
             <div className="flex items-start justify-between gap-2">
               <div className="flex-1 min-w-0">
-                <h3 className="font-bold text-lg line-clamp-1 hover:text-violet-600 transition-colors">{s.title}</h3>
+                <h3 className="font-bold text-base sm:text-lg line-clamp-1 uppercase tracking-[0.02em] text-white group-hover:text-purple-300 transition-colors">{s.title}</h3>
                 {s.alternative_titles && (
-                  <p className="text-xs text-muted-foreground line-clamp-1 mt-0.5">{s.alternative_titles}</p>
+                  <p className="text-3xs text-muted-foreground line-clamp-1 mt-0.5 font-light">{s.alternative_titles}</p>
                 )}
               </div>
               {s.rating_average && Number(s.rating_average) > 0 && (
-                <div className="flex items-center gap-1 rounded-full bg-accent/20 px-2 py-1">
-                  <Star className="h-4 w-4 fill-accent text-accent" />
-                  <span className="font-semibold">{Number(s.rating_average).toFixed(2)}</span>
+                <div className="flex items-center gap-1 rounded border border-white/10 bg-black/75 px-2 py-0.5 text-xs backdrop-blur-md text-amber-300 font-mono font-bold">
+                  <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
+                  <span>{Number(s.rating_average).toFixed(1)}</span>
                 </div>
               )}
             </div>
 
             {/* Badges */}
-            <div className="flex flex-wrap items-center gap-2">
-              <Badge variant="secondary" className="text-xs uppercase font-semibold">{s.type}</Badge>
-              <Badge variant="outline" className="text-xs">{s.status}</Badge>
+            <div className="flex flex-wrap items-center gap-1.5">
+              <Badge variant="outline" className="badge-glass text-3xs font-semibold uppercase tracking-[0.06em] py-0.5 px-2">{s.type}</Badge>
+              <Badge variant="outline" className="text-3xs capitalize py-0.5 px-2 bg-surface-1 border-border/40 text-neutral-300">{s.status}</Badge>
               {s.content_rating && (
                 <Badge 
-                  variant={s.content_rating === "safe" ? "default" : s.content_rating === "suggestive" ? "secondary" : "destructive"} 
-                  className="text-xs uppercase"
+                  variant="outline"
+                  className={`text-3xs uppercase py-0.5 px-2 ${
+                    s.content_rating === "safe" ? "bg-emerald-950/30 text-emerald-400 border-emerald-800/40" : "bg-neutral-900 text-neutral-400 border-border/30"
+                  }`}
                 >
                   {s.content_rating}
                 </Badge>
               )}
               {s.release_year && (
-                <Badge variant="outline" className="text-xs">{s.release_year}</Badge>
+                <Badge variant="outline" className="text-3xs py-0.5 px-2 bg-surface-1 border-border/40 text-neutral-400">{s.release_year}</Badge>
               )}
             </div>
 
             {/* Metadata with icons */}
-            <div className="flex items-center gap-4 text-sm text-muted-foreground">
+            <div className="flex items-center gap-4 text-xs text-muted-foreground font-mono">
               {s.chapter_count && s.chapter_count > 0 && (
-                <span className="flex items-center gap-1">
-                  <BookOpen className="h-3.5 w-3.5" />
-                  <span className="font-medium">{s.chapter_count}</span>
-                  <span>chapters</span>
+                <span className="flex items-center gap-1 text-neutral-300">
+                  <BookOpen className="h-3.5 w-3.5 text-purple-400" />
+                  <span>{s.chapter_count} chs</span>
                 </span>
               )}
               {s.view_count && s.view_count > 0 && (
-                <span className="flex items-center gap-1">
-                  <span className="font-medium">Views:</span> {s.view_count.toLocaleString()}
+                <span>
+                  {s.view_count.toLocaleString()} views
                 </span>
               )}
             </div>
 
-            {/* Author/Artist */}
-            {(s.author || s.artist) && (
-              <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                {s.author && (
-                  <span className="flex items-center gap-1">
-                    <span className="font-medium">Author:</span> {s.author}
-                  </span>
-                )}
-                {s.artist && s.artist !== s.author && (
-                  <span className="flex items-center gap-1">
-                    <span className="font-medium">Artist:</span> {s.artist}
-                  </span>
-                )}
-              </div>
-            )}
-
             {/* Description */}
             {s.description && (
-              <p className="text-sm text-muted-foreground line-clamp-2 leading-relaxed">
+              <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed font-light">
                 {s.description}
               </p>
             )}
-
-            {/* Genres (Tags) */}
-            <div className="flex flex-wrap gap-1">
-              {(s.series_tags as any[])?.slice(0, 5).map((st) =>
-                st.tag ? (
-                  <Badge 
-                    key={st.tag.id} 
-                    variant="secondary" 
-                    className="text-xs hover:bg-violet-600/20"
-                    style={{
-                      borderColor: st.tag.color,
-                      backgroundColor: `${st.tag.color}10`,
-                      color: st.tag.color,
-                    }}
-                  >
-                    {st.tag.icon && <span className="mr-1">{st.tag.icon}</span>}
-                    {st.tag.name}
-                  </Badge>
-                ) : null
-              )}
-            </div>
           </div>
         </Link>
       ))}

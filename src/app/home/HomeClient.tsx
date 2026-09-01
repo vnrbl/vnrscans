@@ -434,8 +434,8 @@ function ChapterCarouselSection({
   loading,
   emptyMessage,
   chapters,
-  timeField,
-  linkVariant,
+  timeField = "created",
+  linkVariant = "chapterDirect",
   sectionId,
   onHide,
 }: {
@@ -445,23 +445,24 @@ function ChapterCarouselSection({
   loading: boolean;
   emptyMessage: string;
   chapters: RecentChapter[];
-  timeField: "created" | "updated";
-  linkVariant: "split" | "seriesOnly";
+  timeField?: "created" | "updated";
+  linkVariant?: "chapterDirect" | "seriesOnly";
   sectionId?: string;
   onHide?: () => void;
 }) {
   const { scrollRef, scrollBy, dragHandlers } = useDragScroll<HTMLDivElement>();
 
   return (
-    <section className="container mx-auto px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16 py-4">
-      <div className="mb-4 flex items-center justify-between">
+    <section className="container mx-auto px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16 py-6 border-b border-border/20">
+      <div className="mb-5 flex items-center justify-between">
         <div>
-          <div className="flex items-center gap-2">
-            {icon}
-            <h2 className="text-2xl font-bold">{title}</h2>
+          <div className="flex items-center gap-2.5">
+            <span className="h-2 w-2 rounded-full bg-purple-400 shadow-[0_0_8px_rgba(168,85,247,0.8)] animate-pulse" />
+            {icon && <span className="text-purple-400">{icon}</span>}
+            <h2 className="text-xl sm:text-2xl font-bold uppercase tracking-[0.04em] text-white">{title}</h2>
           </div>
           {description && (
-            <p className="mt-1 text-sm text-muted-foreground">{description}</p>
+            <p className="mt-1 text-xs text-muted-foreground font-light tracking-[0.01em]">{description}</p>
           )}
         </div>
         <div className="flex items-center gap-2">
@@ -471,7 +472,7 @@ function ChapterCarouselSection({
                 variant="outline"
                 size="icon"
                 onClick={() => scrollBy("left")}
-                className="h-8 w-8"
+                className="h-8 w-8 rounded-[4px] border-border/60 bg-surface-1/80 hover:border-purple-500/50 hover:text-purple-300 transition-all"
               >
                 <ChevronLeft className="h-4 w-4" />
               </Button>
@@ -479,7 +480,7 @@ function ChapterCarouselSection({
                 variant="outline"
                 size="icon"
                 onClick={() => scrollBy("right")}
-                className="h-8 w-8"
+                className="h-8 w-8 rounded-[4px] border-border/60 bg-surface-1/80 hover:border-purple-500/50 hover:text-purple-300 transition-all"
               >
                 <ChevronRight className="h-4 w-4" />
               </Button>
@@ -488,12 +489,12 @@ function ChapterCarouselSection({
           {sectionId && onHide && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8">
+                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-[4px] text-muted-foreground hover:text-white">
                   <MoreVertical className="h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={onHide}>
+              <DropdownMenuContent align="end" className="glass-panel">
+                <DropdownMenuItem onClick={onHide} className="text-xs">
                   <EyeOff className="mr-2 h-4 w-4" />
                   Hide this section
                 </DropdownMenuItem>
@@ -506,11 +507,11 @@ function ChapterCarouselSection({
       {loading ? (
         <div className="flex gap-4 overflow-hidden">
           {[...Array(6)].map((_, i) => (
-            <div key={i} className={`${TITLE_CARD_WIDTH} overflow-hidden rounded-lg border border-border/40 bg-card`}>
-              <div className={`${TITLE_COVER_CLASS} animate-pulse bg-secondary`} />
+            <div key={i} className={`${TITLE_CARD_WIDTH} glass-card rounded-[4px] overflow-hidden`}>
+              <div className={`${TITLE_COVER_CLASS} shimmer-dark`} />
               <div className="space-y-2 p-3">
-                <div className="h-4 w-3/4 animate-pulse rounded bg-secondary" />
-                <div className="h-3 w-1/2 animate-pulse rounded bg-secondary" />
+                <div className="h-3.5 w-3/4 shimmer-dark rounded" />
+                <div className="h-3 w-1/2 shimmer-dark rounded" />
               </div>
             </div>
           ))}
@@ -533,8 +534,8 @@ function ChapterCarouselSection({
           ))}
         </div>
       ) : (
-        <div className="rounded-lg border border-border/40 bg-card p-8 text-center">
-          <p className="text-muted-foreground">{emptyMessage}</p>
+        <div className="glass-panel rounded-[4px] p-8 text-center">
+          <p className="text-sm text-muted-foreground font-light">{emptyMessage}</p>
         </div>
       )}
     </section>
@@ -543,6 +544,7 @@ function ChapterCarouselSection({
 
 function FollowedUpdatesCarouselSection({
   title,
+  description,
   loading,
   emptyMessage,
   chapters,
@@ -560,12 +562,16 @@ function FollowedUpdatesCarouselSection({
   const { scrollRef, scrollBy, dragHandlers } = useDragScroll<HTMLDivElement>();
 
   return (
-    <section className="container mx-auto px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16 py-4">
-      <div className="mb-4 flex items-center justify-between">
+    <section className="container mx-auto px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16 py-6 border-b border-border/20">
+      <div className="mb-5 flex items-center justify-between">
         <div>
-          <div className="flex items-center gap-2">
-            <h2 className="text-2xl font-bold">{title}</h2>
+          <div className="flex items-center gap-2.5">
+            <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)] animate-pulse" />
+            <h2 className="text-xl sm:text-2xl font-bold uppercase tracking-[0.04em] text-white">{title}</h2>
           </div>
+          {description && (
+            <p className="mt-1 text-xs text-muted-foreground font-light tracking-[0.01em]">{description}</p>
+          )}
         </div>
         <div className="flex items-center gap-2">
           {chapters.length > 0 && (
@@ -574,7 +580,7 @@ function FollowedUpdatesCarouselSection({
                 variant="outline"
                 size="icon"
                 onClick={() => scrollBy("left")}
-                className="h-8 w-8"
+                className="h-8 w-8 rounded-[4px] border-border/60 bg-surface-1/80 hover:border-emerald-500/50 hover:text-emerald-300 transition-all"
               >
                 <ChevronLeft className="h-4 w-4" />
               </Button>
@@ -582,7 +588,7 @@ function FollowedUpdatesCarouselSection({
                 variant="outline"
                 size="icon"
                 onClick={() => scrollBy("right")}
-                className="h-8 w-8"
+                className="h-8 w-8 rounded-[4px] border-border/60 bg-surface-1/80 hover:border-emerald-500/50 hover:text-emerald-300 transition-all"
               >
                 <ChevronRight className="h-4 w-4" />
               </Button>
@@ -591,12 +597,12 @@ function FollowedUpdatesCarouselSection({
           {sectionId && onHide && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8">
+                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-[4px] text-muted-foreground hover:text-white">
                   <MoreVertical className="h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={onHide}>
+              <DropdownMenuContent align="end" className="glass-panel">
+                <DropdownMenuItem onClick={onHide} className="text-xs">
                   <EyeOff className="mr-2 h-4 w-4" />
                   Hide this section
                 </DropdownMenuItem>
@@ -609,11 +615,11 @@ function FollowedUpdatesCarouselSection({
       {loading ? (
         <div className="flex gap-4 overflow-hidden">
           {[...Array(6)].map((_, i) => (
-            <div key={i} className={`${TITLE_CARD_WIDTH} overflow-hidden rounded-lg border border-border/40 bg-card`}>
-              <div className={`${TITLE_COVER_CLASS} animate-pulse bg-secondary`} />
+            <div key={i} className={`${TITLE_CARD_WIDTH} glass-card rounded-[4px] overflow-hidden`}>
+              <div className={`${TITLE_COVER_CLASS} shimmer-dark`} />
               <div className="space-y-2 p-3">
-                <div className="h-4 w-3/4 animate-pulse rounded bg-secondary" />
-                <div className="h-3 w-1/2 animate-pulse rounded bg-secondary" />
+                <div className="h-3.5 w-3/4 shimmer-dark rounded" />
+                <div className="h-3 w-1/2 shimmer-dark rounded" />
               </div>
             </div>
           ))}
@@ -632,8 +638,8 @@ function FollowedUpdatesCarouselSection({
           ))}
         </div>
       ) : (
-        <div className="rounded-lg border border-border/40 bg-card p-8 text-center">
-          <p className="text-muted-foreground">{emptyMessage}</p>
+        <div className="glass-panel rounded-[4px] p-8 text-center">
+          <p className="text-sm text-muted-foreground font-light">{emptyMessage}</p>
         </div>
       )}
     </section>
@@ -665,12 +671,15 @@ function SeriesCarouselSection({
   const { scrollRef, scrollBy, dragHandlers } = useDragScroll<HTMLDivElement>();
 
   return (
-    <section className="container mx-auto px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16 py-4">
-      <div className="mb-4 flex items-center justify-between">
+    <section className="container mx-auto px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16 py-6 border-b border-border/20">
+      <div className="mb-5 flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold">{title}</h2>
+          <div className="flex items-center gap-2.5">
+            <span className="h-2 w-2 rounded-full bg-purple-400 shadow-[0_0_8px_rgba(168,85,247,0.8)] animate-pulse" />
+            <h2 className="text-xl sm:text-2xl font-bold uppercase tracking-[0.04em] text-white">{title}</h2>
+          </div>
           {description && (
-            <p className="mt-1 text-sm text-muted-foreground">{description}</p>
+            <p className="mt-1 text-xs text-muted-foreground font-light tracking-[0.01em]">{description}</p>
           )}
         </div>
         <div className="flex items-center gap-2">
@@ -680,7 +689,7 @@ function SeriesCarouselSection({
                 variant="outline"
                 size="icon"
                 onClick={() => scrollBy("left")}
-                className="h-8 w-8"
+                className="h-8 w-8 rounded-[4px] border-border/60 bg-surface-1/80 hover:border-purple-500/50 hover:text-purple-300 transition-all"
               >
                 <ChevronLeft className="h-4 w-4" />
               </Button>
@@ -688,7 +697,7 @@ function SeriesCarouselSection({
                 variant="outline"
                 size="icon"
                 onClick={() => scrollBy("right")}
-                className="h-8 w-8"
+                className="h-8 w-8 rounded-[4px] border-border/60 bg-surface-1/80 hover:border-purple-500/50 hover:text-purple-300 transition-all"
               >
                 <ChevronRight className="h-4 w-4" />
               </Button>
@@ -697,12 +706,12 @@ function SeriesCarouselSection({
           {sectionId && onHide && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8">
+                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-[4px] text-muted-foreground hover:text-white">
                   <MoreVertical className="h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={onHide}>
+              <DropdownMenuContent align="end" className="glass-panel">
+                <DropdownMenuItem onClick={onHide} className="text-xs">
                   <EyeOff className="mr-2 h-4 w-4" />
                   Hide this section
                 </DropdownMenuItem>
@@ -715,11 +724,11 @@ function SeriesCarouselSection({
       {loading ? (
         <div className="flex gap-4 overflow-hidden">
           {[...Array(6)].map((_, i) => (
-            <div key={i} className={`${TITLE_CARD_WIDTH} overflow-hidden rounded-lg border border-border/40 bg-card`}>
-              <div className={`${TITLE_COVER_CLASS} animate-pulse bg-secondary`} />
+            <div key={i} className={`${TITLE_CARD_WIDTH} glass-card rounded-[4px] overflow-hidden`}>
+              <div className={`${TITLE_COVER_CLASS} shimmer-dark`} />
               <div className="space-y-2 p-3">
-                <div className="h-4 w-3/4 animate-pulse rounded bg-secondary" />
-                <div className="h-3 w-1/2 animate-pulse rounded bg-secondary" />
+                <div className="h-3.5 w-3/4 shimmer-dark rounded" />
+                <div className="h-3 w-1/2 shimmer-dark rounded" />
               </div>
             </div>
           ))}
@@ -736,29 +745,30 @@ function SeriesCarouselSection({
               key={item.id}
               to="/title/$slug"
               params={{ slug: item.slug }}
-              className={`group ${TITLE_CARD_WIDTH} overflow-hidden rounded-lg border border-border/40 bg-card transition-all hover:border-primary/50 hover:shadow-lg`}
+              className={`group ${TITLE_CARD_WIDTH} glass-card rounded-[4px] overflow-hidden hover-lift block flex-shrink-0`}
             >
-              <div className={TITLE_COVER_CLASS}>
+              <div className={`${TITLE_COVER_CLASS} relative overflow-hidden bg-neutral-950`}>
                 <OptimizedImage
                   src={item.cover_url}
                   alt={item.title}
                   seriesId={item.id}
-                  className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                  className="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-105"
                 />
-                <div className="absolute left-2 top-2">
-                  <Badge variant="secondary" className="bg-background/80 text-xs uppercase backdrop-blur">
+                <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-transparent to-transparent pointer-events-none" />
+                <div className="absolute left-2.5 top-2.5">
+                  <Badge variant="outline" className="badge-glass text-3xs font-semibold uppercase tracking-[0.08em] py-0.5 px-2">
                     {item.type}
                   </Badge>
                 </div>
                 {item.rating_average && Number(item.rating_average) > 0 ? (
-                  <div className="absolute right-2 bottom-2 flex items-center gap-1 rounded-md bg-background/80 px-1.5 py-0.5 text-xs backdrop-blur">
-                    <Star className="h-3 w-3 fill-violet-600 text-violet-600" />
+                  <div className="absolute right-2.5 bottom-2.5 flex items-center gap-1 rounded border border-white/10 bg-black/75 px-1.5 py-0.5 text-3xs backdrop-blur-md text-amber-300 font-mono font-bold">
+                    <Star className="h-3 w-3 fill-amber-400 text-amber-400 stroke-[1.5]" />
                     {Number(item.rating_average).toFixed(1)}
                   </div>
                 ) : null}
               </div>
-              <div className="p-3">
-                <h3 className="line-clamp-1 text-sm font-semibold leading-tight text-foreground group-hover:text-primary">
+              <div className="p-3 bg-surface-1/90">
+                <h3 className="line-clamp-1 text-xs font-bold leading-tight text-white uppercase tracking-[0.02em] group-hover:text-purple-300 transition-colors">
                   {item.title}
                 </h3>
               </div>
@@ -766,8 +776,8 @@ function SeriesCarouselSection({
           ))}
         </div>
       ) : (
-        <div className="rounded-lg border border-border/40 bg-card p-8 text-center">
-          <p className="text-muted-foreground">No series available yet.</p>
+        <div className="glass-panel rounded-[4px] p-8 text-center">
+          <p className="text-sm text-muted-foreground font-light">No series available yet.</p>
         </div>
       )}
     </section>
@@ -833,30 +843,33 @@ function LatestUpdatesSection({
   const isNewChapter = (createdAt: string) => {
     const now = new Date();
     const chapterDate = new Date(createdAt);
-    const twoHoursInMs = 2 * 60 * 60 * 1000; // 2 hours in milliseconds
+    const twoHoursInMs = 2 * 60 * 60 * 1000;
     const timeDiff = now.getTime() - chapterDate.getTime();
-    return timeDiff < twoHoursInMs && timeDiff >= 0; // Less than 2 hours old
+    return timeDiff < twoHoursInMs && timeDiff >= 0;
   };
 
   return (
-    <section className="container mx-auto px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16 py-4">
-      <div className="mb-4 flex items-center justify-between">
+    <section className="container mx-auto px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16 py-6 border-b border-border/20">
+      <div className="mb-6 flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold">{title}</h2>
+          <div className="flex items-center gap-2.5">
+            <span className="h-2 w-2 rounded-full bg-purple-400 shadow-[0_0_8px_rgba(168,85,247,0.8)] animate-pulse" />
+            <h2 className="text-xl sm:text-2xl font-bold uppercase tracking-[0.04em] text-white">{title}</h2>
+          </div>
           {description && (
-            <p className="mt-1 text-sm text-muted-foreground">{description}</p>
+            <p className="mt-1 text-xs text-muted-foreground font-light tracking-[0.01em]">{description}</p>
           )}
         </div>
         <div className="flex items-center gap-2">
           {sectionId && onHide && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8">
+                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-[4px] text-muted-foreground hover:text-white">
                   <MoreVertical className="h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={onHide}>
+              <DropdownMenuContent align="end" className="glass-panel">
+                <DropdownMenuItem onClick={onHide} className="text-xs">
                   <EyeOff className="mr-2 h-4 w-4" />
                   Hide this section
                 </DropdownMenuItem>
@@ -869,15 +882,14 @@ function LatestUpdatesSection({
       {loading ? (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
           {[...Array(6)].map((_, i) => (
-            <div key={i} className="overflow-hidden rounded-lg border border-border/40 bg-card">
-              <div className="flex gap-4 p-4">
-                <div className="h-[200px] w-[140px] shrink-0 animate-pulse rounded-lg bg-secondary" />
-                <div className="flex-1 space-y-3">
-                  <div className="h-5 w-3/4 animate-pulse rounded bg-secondary" />
-                  <div className="h-4 w-1/2 animate-pulse rounded bg-secondary" />
-                  <div className="h-4 w-full animate-pulse rounded bg-secondary" />
-                  <div className="h-4 w-full animate-pulse rounded bg-secondary" />
-                  <div className="h-4 w-full animate-pulse rounded bg-secondary" />
+            <div key={i} className="glass-card rounded-[4px] p-3.5 overflow-hidden">
+              <div className="flex gap-3.5">
+                <div className="h-[180px] w-[125px] shrink-0 rounded-[4px] shimmer-dark" />
+                <div className="flex-1 space-y-2.5 py-1">
+                  <div className="h-4 w-3/4 shimmer-dark rounded" />
+                  <div className="h-3 w-1/3 shimmer-dark rounded" />
+                  <div className="h-7 w-full shimmer-dark rounded mt-4" />
+                  <div className="h-7 w-full shimmer-dark rounded" />
                 </div>
               </div>
             </div>
@@ -889,40 +901,47 @@ function LatestUpdatesSection({
             {visibleSeries.map((item) => (
               <div
                 key={item.id}
-                className="group overflow-hidden rounded-lg border border-border/40 bg-card transition-all hover:border-primary/50 hover:shadow-lg"
+                className="glass-card group rounded-[4px] p-3.5 hover-lift transition-all"
               >
-                <div className="flex gap-4 p-4">
+                <div className="flex gap-3.5">
                   {/* Cover Image */}
                   <Link
                     to="/title/$slug"
                     params={{ slug: item.slug }}
                     className="shrink-0"
                   >
-                    <div className="relative h-[200px] w-[140px] overflow-hidden rounded-lg bg-secondary">
+                    <div className="relative h-[180px] w-[125px] overflow-hidden rounded-[4px] bg-neutral-950">
                       <OptimizedImage
                         src={item.cover_url}
                         alt={item.title}
                         seriesId={item.id}
                         className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
                       />
+                      <div className="absolute top-2 left-2">
+                        <Badge variant="outline" className="badge-glass text-3xs font-semibold uppercase tracking-[0.06em] py-0.5 px-1.5">
+                          {item.type}
+                        </Badge>
+                      </div>
                     </div>
                   </Link>
 
                   {/* Series Info and Chapters */}
-                  <div className="flex min-w-0 flex-1 flex-col">
-                    <Link
-                      to="/title/$slug"
-                      params={{ slug: item.slug }}
-                      className="line-clamp-2 text-base font-bold leading-tight hover:text-violet-600"
-                    >
-                      {item.title}
-                    </Link>
-                    <div className="mt-1 text-xs text-muted-foreground">
-                      {item.recent_chapters.length} recent chapter{item.recent_chapters.length !== 1 ? "s" : ""}
+                  <div className="flex min-w-0 flex-1 flex-col justify-between py-0.5">
+                    <div>
+                      <Link
+                        to="/title/$slug"
+                        params={{ slug: item.slug }}
+                        className="line-clamp-2 text-sm font-bold uppercase tracking-[0.02em] leading-snug text-white hover:text-purple-300 transition-colors"
+                      >
+                        {item.title}
+                      </Link>
+                      <div className="mt-1 text-3xs text-muted-foreground font-mono font-medium">
+                        {item.recent_chapters.length} recent {item.recent_chapters.length === 1 ? "release" : "releases"}
+                      </div>
                     </div>
 
-                    {/* Recent Chapters List with Read Status */}
-                    <div className="mt-3 space-y-2">
+                    {/* Recent Chapters List */}
+                    <div className="mt-3 space-y-1.5">
                       {item.recent_chapters.map((chapter) => {
                         const isRead = readChapterIds.has(chapter.id);
                         const isNew = isNewChapter(chapter.created_at);
@@ -932,28 +951,15 @@ function LatestUpdatesSection({
                             key={chapter.id}
                             to="/title/$titleSlug/$chapterSlug"
                             params={{ titleSlug: item.slug, chapterSlug: chapter.slug }}
-                            className={`flex items-center justify-between text-sm transition-colors ${isRead
-                                ? 'text-muted-foreground hover:text-muted-foreground/80'
-                                : 'hover:text-violet-600 font-medium'
-                              }`}
+                            className={`flex items-center justify-between text-xs px-2.5 py-1.5 rounded-[4px] border border-border/30 bg-surface-1/60 hover:bg-surface-2 hover:border-purple-500/40 transition-all ${
+                              isRead ? 'text-muted-foreground opacity-75' : 'text-neutral-200 font-medium'
+                            }`}
                           >
-                            <div className="flex min-w-0 flex-1 items-center gap-2">
-                              {isRead ? (
-                                <BookOpen className="h-3.5 w-3.5 shrink-0 text-green-600" />
-                              ) : (
-                                <BookOpen className="h-3.5 w-3.5 shrink-0 text-violet-600" />
-                              )}
-                              <span className="truncate">
-                                Chapter {chapter.chapter_number}
+                            <div className="flex min-w-0 flex-1 items-center gap-1.5">
+                              <BookOpen className={`h-3 w-3 shrink-0 ${isRead ? 'text-neutral-500' : 'text-purple-400'}`} />
+                              <span className="truncate text-3xs font-mono font-semibold uppercase">
+                                Ch. {chapter.chapter_number}
                               </span>
-                              {isNew && !isRead && (
-                                <span className="shrink-0 flex items-center gap-1 rounded-full bg-violet-600 px-2 py-0.5 text-[10px] font-bold text-white">
-                                  <svg className="h-2.5 w-2.5" fill="currentColor" viewBox="0 0 20 20">
-                                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8 2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                                  </svg>
-                                  NEW
-                                </span>
-                              )}
                             </div>
                             <span className="ml-2 shrink-0 text-xs text-muted-foreground">
                               {formatTimeAgo(chapter.created_at)}
