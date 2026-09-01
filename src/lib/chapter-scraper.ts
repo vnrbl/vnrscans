@@ -134,9 +134,8 @@ export async function extractChaptersFromSeriesUrl(seriesUrl: string): Promise<C
         if (directChapters.length > 0) {
           return directChapters;
         }
-        if (isProtectedPage(html)) {
-          usePuppeteerFallback = true;
-        }
+        // Direct fetch didn't find chapters (likely dynamic React/Next.js page like Asura), use Puppeteer
+        usePuppeteerFallback = true;
       }
     } catch (fetchError) {
       console.warn('[Scraper] Direct fetch failed, trying Puppeteer fallback:', fetchError);
@@ -212,7 +211,7 @@ async function scrapeWithPuppeteer(url: string, isChapterPage: boolean = false):
   console.log(`[Scraper] Launching Puppeteer browser to bypass Cloudflare protection for: ${url}`);
   const puppeteer = await import('puppeteer');
   const chrome = await resolveChromeExecutable(puppeteer.default);
-  const isHeadless = process.env.PUPPETEER_HEADLESS === 'true';
+  const isHeadless = process.env.PUPPETEER_HEADLESS !== 'false';
   const launchOptions: any = {
     headless: isHeadless ? (chrome.headless === 'shell' ? 'shell' : true) : false,
     pipe: true,
@@ -901,6 +900,26 @@ export function extractChapterLinks(html: string, baseUrl: string): ChapterInfo[
       } catch {
         return;
       }
+    }
+
+    // Filter out sidebar / footer recommendations for other series
+    try {
+      const parsedBase = new URL(baseUrl);
+      const baseSlugMatch = parsedBase.pathname.match(/\/(?:series|manga|comic|comics|manhwa|novel)\/([^\/]+)/i);
+      if (baseSlugMatch && baseSlugMatch[1]) {
+        const baseSlug = baseSlugMatch[1].toLowerCase().replace(/-[a-f0-9]{6,}$/i, '');
+        const parsedUrl = new URL(url);
+        const urlSlugMatch = parsedUrl.pathname.match(/\/(?:series|manga|comic|comics|manhwa|novel)\/([^\/]+)/i);
+        if (urlSlugMatch && urlSlugMatch[1]) {
+          const urlSlug = urlSlugMatch[1].toLowerCase().replace(/-[a-f0-9]{6,}$/i, '');
+          if (baseSlug && urlSlug && !urlSlug.includes(baseSlug) && !baseSlug.includes(urlSlug)) {
+            // Unrelated series chapter from sidebar/recommendations
+            return;
+          }
+        }
+      }
+    } catch {
+      // ignore
     }
 
     if (seenUrls.has(url)) return;
