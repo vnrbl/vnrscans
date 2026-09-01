@@ -365,7 +365,36 @@ async function insertInChunks(tableName: string, rows: any[], chunkSize: number)
 }
 
 async function main() {
-  console.log('📚 --- Shadow Shelf CLI Scraper --- 📚\n');
+  console.log('📚 --- VNRScans CLI Scraper --- 📚\n');
+
+  let uploadedBy: string | null = null;
+
+  // Check if service role key exists or sign in as Admin to pass Row Level Security (RLS)
+  const hasServiceKey = Boolean(
+    process.env.SUPABASE_SERVICE_ROLE_KEY &&
+    !process.env.SUPABASE_SERVICE_ROLE_KEY.startsWith('sb_publishable')
+  );
+
+  if (!hasServiceKey) {
+    const sessionRes = await supabase.auth.getSession();
+    if (!sessionRes.data.session) {
+      console.log('🔒 Supabase Admin Login Required for Database Write Access:');
+      console.log('(Or set SUPABASE_SERVICE_ROLE_KEY in your .env file to skip login)\n');
+      const email = (await askQuestion('Admin Email: ')).trim();
+      if (email) {
+        const password = (await askQuestion('Admin Password: ')).trim();
+        const { data: authData, error: authError } = await supabase.auth.signInWithPassword({ email, password });
+        if (authError) {
+          console.error('❌ Admin login failed:', authError.message);
+          process.exit(1);
+        }
+        uploadedBy = authData.user?.id || null;
+        console.log(`✅ Logged in successfully as ${email}!\n`);
+      }
+    } else {
+      uploadedBy = sessionRes.data.session.user?.id || null;
+    }
+  }
 
   let seriesId = '';
   let seriesTitle = '';
@@ -696,7 +725,7 @@ async function main() {
       console.log(`  ✅ Chapter ${chapter.chapterNumber} imported successfully with ${images.length} page(s)!`);
       successCount++;
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown error';
+      const message = (error as any)?.message || (error instanceof Error ? error.message : JSON.stringify(error));
       console.error(`  ❌ Failed to import Chapter ${chapter.chapterNumber}:`, message);
       failCount++;
     }
