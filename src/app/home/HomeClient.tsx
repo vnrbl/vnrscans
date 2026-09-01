@@ -881,11 +881,11 @@ function LatestUpdatesSection({
       </div>
 
       {loading ? (
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {[...Array(6)].map((_, i) => (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {[...Array(8)].map((_, i) => (
             <div key={i} className="glass-card rounded-lg p-3 overflow-hidden">
               <div className="flex gap-3">
-                <div className="h-[170px] w-[120px] shrink-0 rounded shimmer-dark" />
+                <div className="h-[160px] w-[105px] shrink-0 rounded shimmer-dark" />
                 <div className="flex-1 space-y-2 py-1">
                   <div className="h-4 w-3/4 shimmer-dark rounded" />
                   <div className="h-6 w-full shimmer-dark rounded mt-3" />
@@ -898,7 +898,7 @@ function LatestUpdatesSection({
         </div>
       ) : series.length > 0 ? (
         <>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {visibleSeries.map((item) => (
               <div
                 key={item.id}
@@ -911,7 +911,7 @@ function LatestUpdatesSection({
                     params={{ slug: item.slug }}
                     className="shrink-0 block"
                   >
-                    <div className="relative h-[170px] w-[115px] sm:w-[120px] overflow-hidden rounded bg-neutral-950">
+                    <div className="relative h-[160px] w-[105px] overflow-hidden rounded bg-neutral-950">
                       <OptimizedImage
                         src={item.cover_url}
                         alt={item.title}
@@ -928,19 +928,19 @@ function LatestUpdatesSection({
 
                   {/* Series Info and Chapters */}
                   <div className="flex min-w-0 flex-1 flex-col justify-between">
-                    <div>
+                    <div className="mb-2">
                       <Link
                         to="/title/$slug"
                         params={{ slug: item.slug }}
                         title={item.title}
-                        className="block font-semibold text-sm sm:text-base leading-snug text-white hover:text-purple-400 transition-colors line-clamp-2"
+                        className="block font-semibold text-sm leading-snug text-white hover:text-purple-400 transition-colors line-clamp-2"
                       >
                         {item.title}
                       </Link>
                     </div>
 
                     {/* Recent Chapters List */}
-                    <div className="mt-2 space-y-1">
+                    <div className="space-y-1.5">
                       {item.recent_chapters.map((chapter) => {
                         const isRead = readChapterIds.has(chapter.id);
 
@@ -949,7 +949,7 @@ function LatestUpdatesSection({
                             key={chapter.id}
                             to="/title/$titleSlug/$chapterSlug"
                             params={{ titleSlug: item.slug, chapterSlug: chapter.slug }}
-                            className={`flex items-center justify-between text-xs px-2.5 py-1 rounded border border-white/10 bg-surface-1/60 hover:bg-surface-2 hover:border-purple-500/40 hover:text-white transition-all ${
+                            className={`flex items-center justify-between text-xs px-2.5 py-1.5 rounded border border-white/10 bg-surface-1/60 hover:bg-surface-2 hover:border-purple-500/40 hover:text-white transition-all ${
                               isRead ? 'text-neutral-500 opacity-75' : 'text-neutral-200'
                             }`}
                           >
@@ -959,7 +959,7 @@ function LatestUpdatesSection({
                                 Chapter {chapter.chapter_number}
                               </span>
                             </div>
-                            <span className="ml-2 shrink-0 text-xs text-neutral-400">
+                            <span className="ml-1.5 shrink-0 text-xs text-neutral-400">
                               {formatTimeAgo(chapter.created_at)}
                             </span>
                           </Link>
