@@ -12,15 +12,22 @@ import { buildChapterSlug } from '../src/lib/chapter-utils';
 
 config();
 
-const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const supabaseUrl =
+  process.env.SUPABASE_URL ||
+  process.env.VITE_SUPABASE_URL ||
+  process.env.NEXT_PUBLIC_SUPABASE_URL ||
+  'https://edvqhmvqbtujzcfqkrbe.supabase.co';
 
-if (!supabaseUrl || !supabaseKey) {
-  console.error('❌ Supabase credentials missing in .env file.');
-  process.exit(1);
-}
+const supabaseKey =
+  process.env.SUPABASE_SERVICE_ROLE_KEY ||
+  process.env.SUPABASE_KEY ||
+  process.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
+  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
+  'sb_publishable_jVdWorDtLlkVYzRh6EbEOA_lwnu59an';
 
-const supabase = createClient(supabaseUrl, supabaseKey);
+const supabase = createClient(supabaseUrl, supabaseKey, {
+  auth: { autoRefreshToken: false, persistSession: false },
+});
 
 type ChapterToImport = {
   chapterNumber: number;
