@@ -1,12 +1,9 @@
 @echo off
 setlocal
+set "PATH=C:\Program Files\nodejs;%PATH%"
 echo ===================================================
 echo   VNRScans - Interactive Scraper
 echo ===================================================
 echo.
-if exist "C:\Program Files\nodejs\npx.cmd" (
-    "C:\Program Files\nodejs\npx.cmd" tsx scripts/scrape-series.ts %*
-) else (
-    npx.cmd tsx scripts/scrape-series.ts %*
-)
+npx.cmd -y tsx scripts/scrape-series.ts %*
 pause
