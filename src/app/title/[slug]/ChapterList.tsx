@@ -270,19 +270,19 @@ export const ChapterList = React.memo(function ChapterList({
                 <Link
                   key={c.id}
                   href={`/title/${slug}/${c.slug}`}
-                  className="glass-card block rounded-[4px] p-3.5 hover-lift transition-all"
+                  className="glass-card block rounded-lg p-3 hover-lift transition-all"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
                         <span
-                          className="font-bold text-sm font-mono tracking-tight"
-                          style={isRead ? { color: "#a855f7" } : undefined}
+                          className="font-semibold text-sm text-white"
+                          style={isRead ? { color: "#c084fc" } : undefined}
                         >
                           Chapter {c.chapter_number}
                         </span>
                         {showNewBadge && (
-                          <span className="shrink-0 rounded bg-purple-600 border border-purple-400/50 px-1.5 py-0.2 text-[9px] font-mono font-black uppercase text-white shadow-sm shadow-purple-900/50">
+                          <span className="shrink-0 rounded bg-purple-600 px-1.5 py-0.5 text-[10px] font-bold uppercase text-white">
                             NEW
                           </span>
                         )}
@@ -293,15 +293,15 @@ export const ChapterList = React.memo(function ChapterList({
                         />
                       </div>
                       {c.title && (
-                        <p className="mt-1 line-clamp-1 text-xs text-muted-foreground font-light">{c.title}</p>
+                        <p className="mt-1 line-clamp-1 text-xs text-neutral-400">{c.title}</p>
                       )}
                     </div>
-                    <Badge variant="outline" className="shrink-0 gap-1 text-3xs badge-glass font-mono">
+                    <Badge variant="outline" className="shrink-0 gap-1 text-xs badge-glass">
                       <Eye className="h-3 w-3 text-neutral-400" />
                       {formatReaderCount(readerCount)}
                     </Badge>
                   </div>
-                  <div className="mt-2.5 flex flex-wrap gap-x-3 gap-y-1 text-3xs text-muted-foreground font-mono">
+                  <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-neutral-400">
                     {scanlationGroup && <span className="font-semibold text-purple-400">{scanlationGroup}</span>}
                     {uploadedBy && <span>by {uploadedBy}</span>}
                     <span>{new Date(c.created_at).toLocaleDateString()}</span>
@@ -313,16 +313,16 @@ export const ChapterList = React.memo(function ChapterList({
           </div>
 
           {/* Desktop table layout */}
-          <div className="hidden overflow-x-auto rounded-[4px] border border-hairline glass-panel md:block shadow-lg">
+          <div className="hidden overflow-x-auto rounded-lg border border-hairline glass-panel md:block shadow-lg">
             <table className="w-full min-w-[820px]">
             <thead className="border-b border-border/40 bg-surface-1/90">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider text-muted-foreground">Chapter</th>
-                <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider text-muted-foreground">Uploaded By</th>
-                <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider text-muted-foreground">Group</th>
-                <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider text-muted-foreground">Upload Date</th>
-                <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider text-muted-foreground">XP</th>
-                <th className="px-4 py-3 text-right text-xs font-bold uppercase tracking-wider text-muted-foreground">Readers</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-neutral-400">Chapter</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-neutral-400">Uploaded By</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-neutral-400">Group</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-neutral-400">Upload Date</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-neutral-400">XP</th>
+                <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-neutral-400">Readers</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border/20">
@@ -340,11 +340,11 @@ export const ChapterList = React.memo(function ChapterList({
                         href={`/title/${slug}/${c.slug}`}
                         className="flex items-center gap-2"
                       >
-                        <span className="font-bold text-xs font-mono group-hover:text-purple-300 transition-colors" style={isRead ? { color: "#a855f7" } : undefined}>
+                        <span className="font-semibold text-sm text-white group-hover:text-purple-400 transition-colors" style={isRead ? { color: "#c084fc" } : undefined}>
                           Chapter {c.chapter_number}
                         </span>
                         {showNewBadge && (
-                          <span className="shrink-0 rounded bg-purple-600 border border-purple-400/50 px-1.5 py-0.2 text-[9px] font-mono font-black uppercase text-white shadow-sm shadow-purple-900/50">
+                          <span className="shrink-0 rounded bg-purple-600 px-1.5 py-0.5 text-[10px] font-bold uppercase text-white">
                             NEW
                           </span>
                         )}
