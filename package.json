@@ -17,6 +17,7 @@
     "scrape:edk": "edk run -- npx tsx scripts/scrape-series.ts",
     "auto-import": "npx tsx scripts/auto-import-sources.ts",
     "auto-import:edk": "edk run -- npx tsx scripts/auto-import-sources.ts",
+    "sync-chapters": "npx tsx scripts/sync-all-chapters.ts",
     "cf:login": "wrangler login",
     "cf:dev": "wrangler dev",
     "cf:deploy": "wrangler deploy",
