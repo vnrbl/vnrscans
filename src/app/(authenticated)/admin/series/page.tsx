@@ -25,7 +25,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { logAdminAction } from "@/lib/adminLog";
 import { useAuth } from "@/hooks/useAuth";
-import { $extractChaptersFromUrl, $extractImagesFromUrl, $syncImportSource } from "@/lib/api/scraper.actions";
+import { $extractChaptersFromUrl, $extractImagesFromUrl, $syncImportSource, $syncAllSeriesImportSources } from "@/lib/api/scraper.actions";
 import type { ChapterInfo } from "@/lib/chapter-scraper";
 import { detectImportSource } from "@/lib/import-source-utils";
 import { Button } from "@/components/ui/button";
@@ -645,38 +645,81 @@ export default function AdminSeries() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const [isSyncingAll, setIsSyncingAll] = useState(false);
+  const handleSyncAll = async () => {
+    try {
+      const session = (await supabase.auth.getSession()).data.session;
+      if (!session?.access_token) {
+        toast.error("Please sign in as admin to sync series.");
+        return;
+      }
+      setIsSyncingAll(true);
+      const toastId = toast.loading("Syncing latest chapters for all series in database...");
+      const res = await $syncAllSeriesImportSources({
+        data: {
+          accessToken: session.access_token,
+          maxChaptersPerSeries: 50,
+        },
+      });
 
+      if (!res.success) {
+        toast.error(res.error || "Failed to sync all series", { id: toastId });
+      } else {
+        toast.success(
+          `Sync completed! Imported ${res.totalImported} new chapters across ${res.totalSources} series.`,
+          { id: toastId, duration: 6000 }
+        );
+        qc.invalidateQueries({ queryKey: ["admin", "series"] });
+        qc.invalidateQueries({ queryKey: ["series"] });
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Sync failed");
+    } finally {
+      setIsSyncingAll(false);
+    }
+  };
 
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold tracking-tight">Titles</h1>
-        <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="mr-1 h-4 w-4" />
-              New title
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Create title</DialogTitle>
-            </DialogHeader>
-            <SeriesFormFields
-              form={form}
-              setForm={setForm}
-              genres={genres.data ?? []}
-              tags={tags.data ?? []}
-              uploadingCover={uploadingCover}
-              onCoverFileChange={onCoverFileChange}
-            />
-            <DialogFooter>
-              <Button onClick={() => create.mutate()} disabled={!form.title || create.isPending}>
-                Create
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            onClick={handleSyncAll}
+            disabled={isSyncingAll}
+            className="border-purple-500/40 hover:border-purple-500 text-purple-300 hover:text-purple-200 bg-purple-950/20"
+          >
+            <RefreshCw className={`mr-1.5 h-4 w-4 ${isSyncingAll ? "animate-spin" : ""}`} />
+            {isSyncingAll ? "Syncing All Series..." : "Sync All Series"}
+          </Button>
+          <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="mr-1 h-4 w-4" />
+                New title
               </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+            </DialogTrigger>
+            <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Create title</DialogTitle>
+              </DialogHeader>
+              <SeriesFormFields
+                form={form}
+                setForm={setForm}
+                genres={genres.data ?? []}
+                tags={tags.data ?? []}
+                uploadingCover={uploadingCover}
+                onCoverFileChange={onCoverFileChange}
+              />
+              <DialogFooter>
+                <Button onClick={() => create.mutate()} disabled={!form.title || create.isPending}>
+                  Create
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
       {/* Search and Filters */}

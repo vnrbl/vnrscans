@@ -364,14 +364,14 @@ export async function $syncImportSource(args: {
     .object({
       sourceId: z.string().uuid(),
       accessToken: z.string().min(1),
-      maxChapters: z.number().int().min(1).max(25).optional(),
+      maxChapters: z.number().int().min(1).max(500).optional(),
     })
     .parse(data);
 
   await verifyAdmin(validated.accessToken);
 
   const admin = getAdminSupabase();
-  const maxChapters = validated.maxChapters ?? 10;
+  const maxChapters = validated.maxChapters ?? 50;
   const startedAt = new Date().toISOString();
 
   const { data: source, error: sourceError } = await admin
@@ -604,6 +604,98 @@ export async function $syncImportSource(args: {
     console.error("[SyncImportSource] Unhandled error:", outerError);
     const message = outerError instanceof Error ? outerError.message : "Sync failed";
     return { success: false, error: message };
+  }
+}
+
+export async function $syncAllSeriesImportSources(args: {
+  data: {
+    accessToken: string;
+    maxChaptersPerSeries?: number;
+  };
+}) {
+  try {
+    const { data } = args;
+    const validated = z
+      .object({
+        accessToken: z.string().min(1),
+        maxChaptersPerSeries: z.number().int().min(1).max(500).optional(),
+      })
+      .parse(data);
+
+    await verifyAdmin(validated.accessToken);
+    const admin = getAdminSupabase();
+
+    const { data: sources, error } = await admin
+      .from("series_import_sources")
+      .select("id, series_id, source_url, source_site, scanlation_group, auto_publish, image_url_example")
+      .eq("enabled", true);
+
+    if (error) throw error;
+    if (!sources || sources.length === 0) {
+      return {
+        success: true,
+        message: "No enabled import sources found in database",
+        totalSources: 0,
+        totalImported: 0,
+        results: [],
+      };
+    }
+
+    const results: Array<{
+      sourceId: string;
+      sourceUrl: string;
+      chaptersFound: number;
+      imported: number;
+      skipped: number;
+      failed: number;
+      error?: string;
+    }> = [];
+
+    let totalImported = 0;
+
+    for (const source of sources) {
+      const syncRes = await $syncImportSource({
+        data: {
+          sourceId: source.id,
+          accessToken: validated.accessToken,
+          maxChapters: validated.maxChaptersPerSeries ?? 50,
+        },
+      });
+
+      if (syncRes.success) {
+        totalImported += syncRes.imported ?? 0;
+        results.push({
+          sourceId: source.id,
+          sourceUrl: source.source_url,
+          chaptersFound: syncRes.chaptersFound ?? 0,
+          imported: syncRes.imported ?? 0,
+          skipped: syncRes.skipped ?? 0,
+          failed: syncRes.failed ?? 0,
+        });
+      } else {
+        results.push({
+          sourceId: source.id,
+          sourceUrl: source.source_url,
+          chaptersFound: 0,
+          imported: 0,
+          skipped: 0,
+          failed: 1,
+          error: syncRes.error,
+        });
+      }
+    }
+
+    return {
+      success: true,
+      totalSources: sources.length,
+      totalImported,
+      results,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to sync all series",
+    };
   }
 }
 

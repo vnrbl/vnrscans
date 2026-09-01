@@ -2,7 +2,7 @@
 
 import { Link, useNavigate } from "@/lib/router-compat";
 import { useState, useRef, useEffect } from "react";
-import { $runCloudScrape } from "@/lib/api/scraper.actions";
+import { $runCloudScrape, $syncAllSeriesImportSources } from "@/lib/api/scraper.actions";
 import { supabase } from "@/integrations/supabase/client";
 import { logAdminAction } from "@/lib/adminLog";
 
@@ -49,6 +49,7 @@ const formatSeriesPrompt = (seriesList: SeriesOption[]) => [
   "",
   "Available Series in database:",
   ...seriesList.map((series, index) => `  [${index + 1}] ${series.title}`),
+  "  [A] ⚡ Sync ALL Series' New Chapters (Automated Update)",
   "  [S] Search by Title",
   "  [M] Enter UUID manually",
   "  [skip] Press Enter to run without DB linking (Dry-run)",
@@ -312,6 +313,56 @@ export default function ScrapeTerminal() {
 
     if (step === "AWAITING_SERIES_OPTION") {
       const choice = val.toLowerCase();
+
+      if (choice === "a") {
+        setStep("PROCESSING");
+        appendLine("");
+        appendLine("⚡ Initiating Global Sync for all series in database...");
+        appendLine("Please wait while sources are checked for new chapters...");
+
+        (async () => {
+          try {
+            const { data: sessionData } = await supabase.auth.getSession();
+            const accessToken = sessionData.session?.access_token;
+            if (!accessToken) {
+              appendLine("❌ You must be signed in as admin to sync series.");
+              printSeriesPrompt();
+              setStep("AWAITING_SERIES_OPTION");
+              return;
+            }
+
+            const res = await $syncAllSeriesImportSources({
+              data: {
+                accessToken,
+                maxChaptersPerSeries: 50,
+              },
+            });
+
+            if (!res.success) {
+              appendLine(`❌ Sync failed: ${res.error || "Unknown error"}`);
+            } else {
+              appendLine(`✅ Global Sync Complete!`);
+              appendLine(`📈 Total Series Checked: ${res.totalSources}`);
+              appendLine(`✨ Total New Chapters Imported: ${res.totalImported}`);
+              if (res.results && res.results.length > 0) {
+                appendLine("");
+                appendLine("Results Breakdown:");
+                res.results.forEach((r: any) => {
+                  appendLine(`  - ${r.sourceUrl}: ${r.imported} imported, ${r.skipped} skipped, ${r.failed} failed${r.error ? ` (${r.error})` : ''}`);
+                });
+              }
+            }
+          } catch (err: any) {
+            appendLine(`❌ Fatal error: ${err.message}`);
+          } finally {
+            appendLine("");
+            appendLine("---");
+            printSeriesPrompt();
+            setStep("AWAITING_SERIES_OPTION");
+          }
+        })();
+        return;
+      }
 
       if (choice === "s") {
         setStep("AWAITING_SEARCH_QUERY");
