@@ -1,0 +1,513 @@
+@import "tailwindcss" source(none);
+@source "../src";
+@import "tw-animate-css";
+
+/*
+ * ─────────────────────────────────────────────────────────────────────────────
+ *  Design System — SpaceX-inspired applied to vnrscans
+ *
+ *  PHILOSOPHY (from DESIGN.md)
+ *  "An exercise in negation: pure black canvas, white display type set in tight
+ *   vertical leading and uppercase, full-bleed photography as the only chrome.
+ *   There is no brand color beyond black-and-white; there are no decorative
+ *   shapes. The composition is closer to a film title card than a SaaS page."
+ *
+ *  SURFACES
+ *  canvas-night       → #000000  (pure black — the only background)
+ *  canvas-night-soft  → #0a0a0a  (barely-lifted near-black for panels)
+ *  canvas-cool        → #0d0d12  (slight cool tint for depth variance)
+ *
+ *  TYPOGRAPHY  → D-DIN (condensed industrial), Arial Narrow fallback
+ *    Display: D-DIN-Bold, UPPERCASE, positive tracking (+1.6px at 80px),
+ *             tight vertical leading (0.95–1.25)
+ *    Body:    D-DIN regular, 16px, 1.5–1.7 leading, +0.32px tracking
+ *    Buttons: D-DIN Bold, ALL-CAPS, +1.17px tracking
+ *
+ *  ACCENTS
+ *  SpaceX has NO brand color — pure monochrome.
+ *  For vnrscans we keep a single restrained accent (our purple) used ONLY
+ *  on interactive focus rings and active states — never decoratively.
+ *  Everything visible is black, white, or dark grey.
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
+
+/* Fonts are loaded via next/font in app/layout.tsx (self-hosted, render-blocking-free).
+   They are exposed as CSS variables --font-barlow and --font-barlow-condensed. */
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --radius-sm:  calc(var(--radius) - 4px);
+  --radius-md:  calc(var(--radius) - 2px);
+  --radius-lg:  var(--radius);
+  --radius-xl:  calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 12px);
+  --radius-4xl: calc(var(--radius) + 16px);
+
+  --color-background:              var(--background);
+  --color-foreground:              var(--foreground);
+  --color-card:                    var(--card);
+  --color-card-foreground:         var(--card-foreground);
+  --color-popover:                 var(--popover);
+  --color-popover-foreground:      var(--popover-foreground);
+  --color-primary:                 var(--primary);
+  --color-primary-foreground:      var(--primary-foreground);
+  --color-secondary:               var(--secondary);
+  --color-secondary-foreground:    var(--secondary-foreground);
+  --color-muted:                   var(--muted);
+  --color-muted-foreground:        var(--muted-foreground);
+  --color-accent:                  var(--accent);
+  --color-accent-foreground:       var(--accent-foreground);
+  --color-destructive:             var(--destructive);
+  --color-destructive-foreground:  var(--destructive-foreground);
+  --color-border:                  var(--border);
+  --color-input:                   var(--input);
+  --color-ring:                    var(--ring);
+  --color-ring-offset-background:  var(--background);
+  --color-chart-1:                 var(--chart-1);
+  --color-chart-2:                 var(--chart-2);
+  --color-chart-3:                 var(--chart-3);
+  --color-chart-4:                 var(--chart-4);
+  --color-chart-5:                 var(--chart-5);
+  --color-sidebar:                 var(--sidebar);
+  --color-sidebar-foreground:      var(--sidebar-foreground);
+  --color-sidebar-primary:         var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent:          var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border:          var(--sidebar-border);
+  --color-sidebar-ring:            var(--sidebar-ring);
+}
+
+/* ─── BASE TOKENS ──────────────────────────────────────────────────────────── */
+:root {
+  /*
+   * SpaceX radius scale: xs=4 sm=8 md=16 pill=32
+   * We use 4px as base (xs) — everything is tight and engineered.
+   */
+  --radius: 0.25rem; /* 4px */
+
+  /* ── SURFACES (pure black — SpaceX canvas-night ladder) ─────────────────── */
+  --background:  oklch(0.04 0.002 270);    /* #000000 / pure black canvas     */
+  --card:        oklch(0.07 0.003 270);    /* #0a0a0a — canvas-night-soft     */
+  --popover:     oklch(0.09 0.004 270);    /* slightly lifted for popovers    */
+  --input:       oklch(0.10 0.004 270);    /* input fields                    */
+  --secondary:   oklch(0.12 0.004 270);    /* secondary surface               */
+
+  /* ── FOREGROUNDS (white & grey — SpaceX only uses ink hierarchy) ────────── */
+  --foreground:           oklch(0.97 0.002 270);   /* #ffffff / near-white ink */
+  --card-foreground:      oklch(0.97 0.002 270);
+  --popover-foreground:   oklch(0.97 0.002 270);
+  --secondary-foreground: oklch(0.75 0.003 270);   /* charcoal #c0c0c0         */
+  --muted:                oklch(0.12 0.004 270);
+  --muted-foreground:     oklch(0.55 0.004 270);   /* #8a8a8f — ink-mute       */
+
+  /* ── PRIMARY (SpaceX: white is the primary CTA color on dark) ──────────── */
+  --primary:              oklch(0.97 0.002 270);   /* white                    */
+  --primary-foreground:   oklch(0.04 0.002 270);   /* black text on white btn  */
+
+  /* ── ACCENT (single restrained purple — used ONLY on focus/active rings) ── */
+  --accent:               oklch(0.68 0.22 305);    /* restrained purple        */
+  --accent-foreground:    oklch(0.97 0.002 270);
+
+  /* ── SEMANTIC ────────────────────────────────────────────────────────────── */
+  --destructive:          oklch(0.55 0.20 25);
+  --destructive-foreground: oklch(0.97 0.002 270);
+
+  /* ── BORDERS (SpaceX hairline: #3a3a3f on dark) ─────────────────────────── */
+  --border: oklch(0.28 0.003 270 / 0.55);   /* hairline-on-dark */
+  --ring:   oklch(0.68 0.22 305 / 0.60);    /* purple focus ring (only use)   */
+
+  /* ── CHARTS (mono grey scale — SpaceX has no brand colors) ──────────────── */
+  --chart-1: oklch(0.97 0.002 270);   /* white  */
+  --chart-2: oklch(0.75 0.003 270);   /* light grey */
+  --chart-3: oklch(0.55 0.004 270);   /* mid grey */
+  --chart-4: oklch(0.35 0.003 270);   /* dark grey */
+  --chart-5: oklch(0.68 0.22 305);    /* single accent touch */
+
+  /* ── SIDEBAR ────────────────────────────────────────────────────────────── */
+  --sidebar:                    oklch(0.04 0.002 270);
+  --sidebar-foreground:         oklch(0.90 0.002 270);
+  --sidebar-primary:            oklch(0.97 0.002 270);
+  --sidebar-primary-foreground: oklch(0.04 0.002 270);
+  --sidebar-accent:             oklch(0.12 0.004 270);
+  --sidebar-accent-foreground:  oklch(0.90 0.002 270);
+  --sidebar-border:             oklch(0.28 0.003 270 / 0.40);
+  --sidebar-ring:               oklch(0.68 0.22 305 / 0.60);
+
+  /* ── BESPOKE DESIGN TOKENS ─────────────────────────────────────────────── */
+  /* SpaceX: no gradient overlays on hero — type sits directly on imagery.
+     We keep a very subtle vignette for readability only. */
+  --gradient-hero: linear-gradient(
+    180deg,
+    oklch(0.04 0.002 270 / 0.20) 0%,
+    transparent 40%,
+    transparent 60%,
+    oklch(0.04 0.002 270 / 0.85) 100%
+  );
+  --gradient-overlay: linear-gradient(
+    180deg,
+    transparent 0%,
+    oklch(0.04 0.002 270 / 0.98) 100%
+  );
+
+  /* Minimal glows — SpaceX never uses decorative glows.
+     We keep them extremely faint for interactive elements only. */
+  --glow-primary: 0 0 24px oklch(0.97 0.002 270 / 0.12);
+  --glow-accent:  0 0 16px oklch(0.68 0.22 305 / 0.25);
+
+  /* SpaceX ghost pill button border */
+  --btn-ghost-border: 1px solid oklch(0.97 0.002 270 / 0.70);
+  --btn-ghost-border-hover: 1px solid oklch(0.97 0.002 270 / 1.0);
+
+  /* Surface tokens */
+  --surface-1:        oklch(0.07 0.003 270);
+  --surface-2:        oklch(0.09 0.004 270);
+  --surface-3:        oklch(0.12 0.004 270);
+  --hairline:         oklch(0.28 0.003 270 / 0.50);
+  --hairline-strong:  oklch(0.40 0.003 270 / 0.70);
+}
+
+/* .dark mirrors :root — SpaceX never leaves the night canvas */
+.dark {
+  --background:           oklch(0.04 0.002 270);
+  --foreground:           oklch(0.97 0.002 270);
+  --card:                 oklch(0.07 0.003 270);
+  --card-foreground:      oklch(0.97 0.002 270);
+  --popover:              oklch(0.09 0.004 270);
+  --popover-foreground:   oklch(0.97 0.002 270);
+  --primary:              oklch(0.97 0.002 270);
+  --primary-foreground:   oklch(0.04 0.002 270);
+  --secondary:            oklch(0.12 0.004 270);
+  --secondary-foreground: oklch(0.75 0.003 270);
+  --muted:                oklch(0.12 0.004 270);
+  --muted-foreground:     oklch(0.55 0.004 270);
+  --accent:               oklch(0.68 0.22 305);
+  --accent-foreground:    oklch(0.97 0.002 270);
+  --destructive:          oklch(0.55 0.20 25);
+  --destructive-foreground: oklch(0.97 0.002 270);
+  --border:               oklch(0.28 0.003 270 / 0.55);
+  --input:                oklch(0.10 0.004 270);
+  --ring:                 oklch(0.68 0.22 305 / 0.60);
+  --chart-1:              oklch(0.97 0.002 270);
+  --chart-2:              oklch(0.75 0.003 270);
+  --chart-3:              oklch(0.55 0.004 270);
+  --chart-4:              oklch(0.35 0.003 270);
+  --chart-5:              oklch(0.68 0.22 305);
+  --sidebar:              oklch(0.04 0.002 270);
+  --sidebar-foreground:   oklch(0.90 0.002 270);
+  --sidebar-primary:      oklch(0.97 0.002 270);
+  --sidebar-primary-foreground: oklch(0.04 0.002 270);
+  --sidebar-accent:       oklch(0.12 0.004 270);
+  --sidebar-accent-foreground: oklch(0.90 0.002 270);
+  --sidebar-border:       oklch(0.28 0.003 270 / 0.40);
+  --sidebar-ring:         oklch(0.68 0.22 305 / 0.60);
+}
+
+/* ─── COMPONENTS ──────────────────────────────────────────────────────────── */
+@layer components {
+  .page-container {
+    @apply container mx-auto px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16;
+  }
+}
+
+/* ─── BASE STYLES ─────────────────────────────────────────────────────────── */
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+
+    /*
+     * SpaceX: pure solid black — no gradient noise.
+     * Any atmospheric effect comes from the full-bleed imagery itself.
+     * We add only an imperceptible top-center purple radial to keep
+     * the site identifiable as vnrscans, not a pure SpaceX clone.
+     */
+    background-image:
+      radial-gradient(ellipse 60% 30% at 50% -5%, oklch(0.68 0.22 305 / 0.06), transparent 50%);
+    background-attachment: fixed;
+
+    /*
+     * SpaceX typography:
+     *   Display → D-DIN-Bold (condensed industrial), fallback: Barlow Condensed
+     *   Body    → D-DIN (regular), fallback: Barlow
+     *   Letters track positively (+0.32px body, +1.17px caps)
+     *   Leading is TIGHT on display (0.95), normal on body (1.5–1.7)
+     */
+    font-family: var(--font-barlow), var(--font-barlow-condensed), "Barlow", "Arial Narrow", Arial, Verdana, sans-serif;
+    letter-spacing: 0.02em;   /* SpaceX body: +0.32px at 16px ≈ 0.02em */
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  html {
+    text-size-adjust: 100%;
+    scroll-behavior: smooth;
+  }
+
+  /*
+   * SpaceX display type: UPPERCASE, D-DIN-Bold, positive tracking,
+   * extremely tight vertical leading (0.95 at largest sizes).
+   * We apply condensed bold + tight leading to all headings.
+   */
+  h1 {
+    font-family: var(--font-barlow-condensed), "Barlow Condensed", "Arial Narrow", Arial, sans-serif;
+    font-weight: 700;
+    line-height: 0.95;
+    letter-spacing: 0.08em;   /* +1.6px at 20px ≈ SpaceX display-xxl tracking */
+    text-transform: uppercase;
+  }
+  h2 {
+    font-family: var(--font-barlow-condensed), "Barlow Condensed", "Arial Narrow", Arial, sans-serif;
+    font-weight: 700;
+    line-height: 1.1;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+  h3, h4 {
+    font-family: var(--font-barlow-condensed), "Barlow Condensed", "Arial Narrow", Arial, sans-serif;
+    font-weight: 600;
+    line-height: 1.2;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+  h5, h6 {
+    font-family: var(--font-barlow-condensed), "Barlow Condensed", "Arial Narrow", Arial, sans-serif;
+    font-weight: 500;
+    line-height: 1.3;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  img, video, canvas, svg {
+    max-width: 100%;
+  }
+
+  input, button, textarea, select {
+    font: inherit;
+  }
+
+  @media (max-width: 640px) {
+    body { background-attachment: scroll; }
+  }
+
+  /* ── Scrollbars (minimal — SpaceX doesn't style chrome) ────────────────── */
+  ::-webkit-scrollbar        { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-track  { background: transparent; }
+  ::-webkit-scrollbar-thumb  {
+    background: oklch(0.28 0.003 270 / 0.60);
+    border-radius: 9999px;
+  }
+  ::-webkit-scrollbar-thumb:hover { background: oklch(0.55 0.003 270 / 0.90); }
+
+  /* ── Utility classes ──────────────────────────────────────────────────────── */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar { display: none; }
+
+  /* Hero carousel shine sweep — used by HomeHeroCarousel */
+  @keyframes shine {
+    0%   { transform: translateX(-100%) skewX(-12deg); }
+    100% { transform: translateX(200%)  skewX(-12deg); }
+  }
+  .animate-shine { animation: shine 1.5s ease-in-out; }
+
+  /* Navbar avatar frame animations — moved here so we don't inject a <style>
+     tag from JS on every component render (was a hidden INP cost). */
+  @keyframes navRotCW  { 0% { transform: rotate(0deg); }   100% { transform: rotate(360deg); } }
+  @keyframes navRotCCW { 0% { transform: rotate(360deg); } 100% { transform: rotate(0deg); } }
+  @keyframes navPulse  { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.06); } }
+  @keyframes navGlitch { 0%, 100% { filter: hue-rotate(0deg); } 50% { filter: hue-rotate(30deg); } }
+  @keyframes fireTongue {
+    0%, 100% { transform: scaleY(1) skewX(0deg) scaleX(1);     opacity: 0.85; filter: blur(1px) brightness(1); }
+    25%      { transform: scaleY(1.25) skewX(3deg) scaleX(0.95); opacity: 1;    filter: blur(0.5px) brightness(1.25); }
+    50%      { transform: scaleY(0.9) skewX(-2deg) scaleX(1.05); opacity: 0.75; filter: blur(1.5px) brightness(0.9); }
+    75%      { transform: scaleY(1.3) skewX(-3deg) scaleX(0.9);  opacity: 0.95; filter: blur(0.5px) brightness(1.35); }
+  }
+
+  .optimize-scroll {
+    content-visibility: auto;
+    contain-intrinsic-size: 100px 500px;
+  }
+
+  .accelerate-gpu {
+    transform: translate3d(0, 0, 0);
+    will-change: transform;
+  }
+
+  /* Glow utilities — used sparingly */
+  .glow-primary { box-shadow: var(--glow-primary); }
+  .glow-accent  { box-shadow: var(--glow-accent); }
+
+  /*
+   * SpaceX text-gradient: white-to-grey only.
+   * No color gradients on text — that would break the monochrome doctrine.
+   */
+  .text-gradient {
+    background: linear-gradient(135deg, oklch(0.97 0.002 270), oklch(0.65 0.003 270));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  /* Surface ladder */
+  .bg-surface-1 { background-color: var(--surface-1); }
+  .bg-surface-2 { background-color: var(--surface-2); }
+  .bg-surface-3 { background-color: var(--surface-3); }
+
+  /* Hairline border */
+  .border-hairline       { border-color: var(--hairline); }
+  .border-hairline-strong { border-color: var(--hairline-strong); }
+
+  /*
+   * SpaceX ghost pill CTA — the ONLY button style.
+   * Outlined pill, transparent fill, uppercase all-caps label.
+   * One per band. Never filled, never accent-colored.
+   */
+  .btn-ghost-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 1.125rem 1.5rem;   /* SpaceX: 18px 24px */
+    border-radius: 2rem;         /* pill: 32px */
+    border: 1px solid oklch(0.97 0.002 270 / 0.65);
+    background: transparent;
+    color: oklch(0.97 0.002 270);
+    font-family: inherit;
+    font-size: 0.8125rem;       /* 13px */
+    font-weight: 700;
+    letter-spacing: 0.09em;     /* +1.17px tracking */
+    text-transform: uppercase;
+    line-height: 0.94;
+    transition: border-color 0.2s ease, background-color 0.2s ease;
+  }
+  .btn-ghost-pill:hover {
+    border-color: oklch(0.97 0.002 270 / 1.0);
+    background: oklch(0.97 0.002 270 / 0.07);
+  }
+
+  /* SpaceX solid white pill CTA */
+  .btn-solid-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 1.125rem 1.75rem;  /* SpaceX: 18px 28px */
+    border-radius: 2rem;         /* pill: 32px */
+    border: 1px solid transparent;
+    background-color: oklch(0.97 0.002 270);
+    color: oklch(0.04 0.002 270);
+    font-family: inherit;
+    font-size: 0.8125rem;       /* 13px */
+    font-weight: 700;
+    letter-spacing: 0.09em;     /* +1.17px tracking */
+    text-transform: uppercase;
+    line-height: 0.94;
+    transition: background-color 0.2s ease, opacity 0.2s ease;
+  }
+  .btn-solid-pill:hover {
+    background-color: oklch(0.97 0.002 270 / 0.90);
+  }
+
+  /*
+   * SpaceX card: photo-band style.
+   * Full bleed, no padding, 1px hairline, xs radius.
+   * Content overlays via absolute positioning.
+   */
+  .card-spacex {
+    background-color: var(--surface-1);
+    border: 1px solid var(--hairline);
+    border-radius: var(--radius); /* 4px */
+    overflow: hidden;
+    transition: border-color 0.2s ease;
+  }
+  .card-spacex:hover {
+    border-color: var(--hairline-strong);
+  }
+
+  /*
+   * All-caps eyebrow microtext — SpaceX uses this for section labels.
+   * D-DIN, 12px, 2.0 leading, +0.96px tracking.
+   */
+  .eyebrow {
+    font-family: var(--font-barlow-condensed), "Barlow Condensed", "Arial Narrow", Arial, sans-serif;
+    font-size: 0.75rem;          /* 12px */
+    font-weight: 400;
+    letter-spacing: 0.08em;      /* +0.96px at 12px */
+    line-height: 2.0;
+    text-transform: uppercase;
+    color: var(--color-muted-foreground);
+  }
+
+  /*
+   * SpaceX nav: fixed overlay on full-bleed photography.
+   * All-caps labels, button-cap size, zero background on dark sections.
+   */
+  .nav-spacex {
+    background-color: oklch(0.04 0.002 270 / 0.70);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--hairline);
+  }
+}
+
+/* Custom Article Typography & Spacing */
+.article-body {
+  font-size: 1.05rem;
+  line-height: 1.85 !important;
+  color: oklch(0.85 0.002 270);
+}
+
+.article-body p {
+  margin-top: 1.5rem !important;
+  margin-bottom: 1.75rem !important;
+  line-height: 1.85 !important;
+}
+
+.article-body h2 {
+  font-size: 1.75rem !important;
+  font-weight: 800 !important;
+  color: oklch(0.98 0.002 270) !important;
+  margin-top: 2.75rem !important;
+  margin-bottom: 1.25rem !important;
+  padding-bottom: 0.5rem !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12) !important;
+  line-height: 1.3 !important;
+  letter-spacing: normal !important;
+  text-transform: none !important;
+}
+
+.article-body h3 {
+  font-size: 1.35rem !important;
+  font-weight: 700 !important;
+  color: oklch(0.75 0.18 290) !important;
+  margin-top: 2.25rem !important;
+  margin-bottom: 1rem !important;
+  line-height: 1.4 !important;
+  letter-spacing: normal !important;
+  text-transform: none !important;
+}
+
+.article-body ul, .article-body ol {
+  margin-top: 1.5rem !important;
+  margin-bottom: 1.75rem !important;
+  padding-left: 1.75rem !important;
+}
+
+.article-body li {
+  margin-bottom: 0.85rem !important;
+  line-height: 1.75 !important;
+  color: oklch(0.80 0.002 270);
+}
+
+.article-body strong {
+  color: #ffffff !important;
+  font-weight: 700 !important;
+}
+

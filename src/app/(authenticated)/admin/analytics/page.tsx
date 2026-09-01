@@ -1,0 +1,443 @@
+"use client";
+
+import { Link, useNavigate } from "@/lib/router-compat";
+import { useQuery } from "@tanstack/react-query";
+import { TrendingUp, Users, BookOpen, Eye, Heart, MessageSquare, Star, Clock, Flame, Circle } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+
+
+type TimeRange = "7d" | "30d" | "90d";
+
+export default function AdminAnalytics() {
+  const today = new Date().toISOString().split("T")[0];
+  
+  // Today's quick stats
+  const todayStats = useQuery({
+    queryKey: ["analytics", "today"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("daily_analytics")
+        .select("*")
+        .eq("date", today)
+        .single();
+      
+      if (error && error.code !== "PGRST116") throw error;
+      
+      // If no data for today, calculate it
+      if (!data) {
+        // Get counts directly
+        const [users, series, chapters, sessions] = await Promise.all([
+          supabase.from("profiles").select("id", { count: "exact", head: true }),
+          supabase.from("series").select("id", { count: "exact", head: true }),
+          supabase.from("chapters").select("id", { count: "exact", head: true }),
+          supabase.from("reading_sessions").select("id", { count: "exact", head: true }).gte("started_at", today),
+        ]);
+        
+        return {
+          total_users: users.count || 0,
+          total_series: series.count || 0,
+          total_chapters: chapters.count || 0,
+          chapters_read: sessions.count || 0,
+          new_users: 0,
+          new_series: 0,
+          new_chapters: 0,
+        };
+      }
+      
+      return data;
+    },
+    staleTime: 2 * 60 * 1000,
+    refetchInterval: 5 * 60 * 1000,
+  });
+
+  // Trending series (last 7 days)
+  const trendingSeries = useQuery({
+    queryKey: ["analytics", "trending-series"],
+    queryFn: async () => {
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+      
+      const { data, error } = await supabase
+        .from("series")
+        .select("id, title, slug, cover_url, type, view_count")
+        .gte("updated_at", sevenDaysAgo.toISOString())
+        .order("view_count", { ascending: false })
+        .limit(10);
+      
+      if (error) throw error;
+      return data || [];
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+
+  // Live users — anyone who opened a chapter in the last 5 minutes.
+  // We dedupe by user_id and surface the most recent session per user so we can
+  // show what they're currently reading + when they started.
+  const liveUsers = useQuery({
+    queryKey: ["analytics", "live-users"],
+    queryFn: async () => {
+      const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+
+      const { data, error } = await supabase
+        .from("reading_sessions")
+        .select(
+          "user_id, started_at, device_type, chapter_id, profiles!inner(username, avatar_url, reading_streak), series:series_id(title, slug), chapter:chapter_id(chapter_number)"
+        )
+        .gte("started_at", fiveMinAgo)
+        .not("user_id", "is", null)
+        .order("started_at", { ascending: false })
+        .limit(1000);
+
+      if (error) throw error;
+
+      // Keep only the most recent session per user (data is already DESC by started_at).
+      const seen = new Map<string, any>();
+      for (const row of data ?? []) {
+        if (!seen.has(row.user_id)) seen.set(row.user_id, row);
+      }
+      return Array.from(seen.values());
+    },
+    staleTime: 15 * 1000,
+    refetchInterval: 30 * 1000, // poll every 30s for a "live" feel
+  });
+
+  // Recent chapters uploaded
+  const recentChapters = useQuery({
+    queryKey: ["analytics", "recent-chapters"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("chapters")
+        .select("id, chapter_number, title, created_at, series!inner(title, slug)")
+        .order("created_at", { ascending: false })
+        .limit(10);
+      
+      if (error) throw error;
+      return data || [];
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+
+  // Genre (tag) popularity
+  const popularTags = useQuery({
+    queryKey: ["analytics", "popular-genres"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("tags")
+        .select("id, name, slug, color, icon, usage_count")
+        .order("usage_count", { ascending: false })
+        .limit(15);
+      
+      if (error) throw error;
+      return data || [];
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const quickStats = [
+    { 
+      label: "Total Users", 
+      value: todayStats.data?.total_users || 0, 
+      change: todayStats.data?.new_users || 0,
+      icon: Users,
+      color: "text-blue-600"
+    },
+    { 
+      label: "Total Titles", 
+      value: todayStats.data?.total_series || 0, 
+      change: todayStats.data?.new_series || 0,
+      icon: BookOpen,
+      color: "text-violet-600"
+    },
+    { 
+      label: "Total Chapters", 
+      value: todayStats.data?.total_chapters || 0, 
+      change: todayStats.data?.new_chapters || 0,
+      icon: BookOpen,
+      color: "text-green-600"
+    },
+    { 
+      label: "Chapters Read Today", 
+      value: todayStats.data?.chapters_read || 0,
+      icon: Eye,
+      color: "text-orange-600"
+    },
+  ];
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold tracking-tight">Analytics Dashboard</h1>
+        <p className="text-sm text-muted-foreground">Platform performance and insights</p>
+      </div>
+
+      {/* Quick Stats */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {quickStats.map((stat) => (
+          <Card key={stat.label}>
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div className="space-y-1">
+                  <p className="text-sm text-muted-foreground">{stat.label}</p>
+                  <p className="text-2xl font-bold">{stat.value.toLocaleString()}</p>
+                  {stat.change !== undefined && stat.change > 0 && (
+                    <p className="text-xs text-green-600 flex items-center gap-1">
+                      <TrendingUp className="h-3 w-3" />
+                      +{stat.change} today
+                    </p>
+                  )}
+                </div>
+                <stat.icon className={`h-8 w-8 ${stat.color}`} />
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      <Tabs defaultValue="trending" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="trending">Trending Content</TabsTrigger>
+          <TabsTrigger value="users">Live Now</TabsTrigger>
+          <TabsTrigger value="tags">Popular Genres</TabsTrigger>
+          <TabsTrigger value="recent">Recent Uploads</TabsTrigger>
+        </TabsList>
+
+        {/* Trending Series */}
+        <TabsContent value="trending" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Flame className="h-5 w-5 text-orange-600" />
+                Trending Titles (Last 7 Days)
+              </CardTitle>
+              <CardDescription>Most viewed titles this week</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {trendingSeries.isLoading && (
+                  <p className="text-sm text-muted-foreground">Loading...</p>
+                )}
+                {(trendingSeries.data || []).map((series, idx) => (
+                  <div key={series.id} className="flex items-center gap-3 rounded-lg border border-border/40 bg-card p-3">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-violet-600 to-purple-600 text-sm font-bold text-white">
+                      {idx + 1}
+                    </div>
+                    {series.cover_url ? (
+                      <img src={series.cover_url} alt="" className="h-14 w-10 rounded object-cover" />
+                    ) : (
+                      <div className="h-14 w-10 rounded bg-secondary" />
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-semibold">{series.title}</p>
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <Badge variant="outline" className="uppercase">{series.type}</Badge>
+                        <span className="flex items-center gap-1">
+                          <Eye className="h-3 w-3" />
+                          {series.view_count.toLocaleString()} views
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Live Users — anyone with a reading session started in the last 5 minutes */}
+        <TabsContent value="users" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between gap-2">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <span className="relative flex h-2.5 w-2.5">
+                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500 opacity-75" />
+                      <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500" />
+                    </span>
+                    Live Now
+                  </CardTitle>
+                  <CardDescription>
+                    Users reading right now (active in the last 5 minutes)
+                  </CardDescription>
+                </div>
+                <Badge variant="outline" className="gap-1">
+                  <Users className="h-3 w-3" />
+                  {(liveUsers.data || []).length} online
+                </Badge>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {liveUsers.isLoading && (
+                <p className="text-sm text-muted-foreground">Loading…</p>
+              )}
+              {!liveUsers.isLoading && (liveUsers.data || []).length === 0 && (
+                <div className="rounded-lg border border-dashed border-border/60 bg-card p-8 text-center">
+                  <Circle className="mx-auto mb-2 h-6 w-6 text-muted-foreground" />
+                  <p className="text-sm text-muted-foreground">
+                    No users are reading right now.
+                  </p>
+                </div>
+              )}
+              <div className="max-h-[70vh] space-y-3 overflow-y-auto pr-1">
+                {(liveUsers.data || []).map((user: any) => {
+                  const startedMs = new Date(user.started_at).getTime();
+                  const minutesAgo = Math.max(0, Math.floor((Date.now() - startedMs) / 60000));
+                  const seriesTitle = user.series?.title;
+                  const seriesSlug = user.series?.slug;
+                  const chapterNum = user.chapter?.chapter_number;
+                  return (
+                    <div
+                      key={user.user_id}
+                      className="flex items-center gap-3 rounded-lg border border-border/40 bg-card p-3"
+                    >
+                      <span
+                        className="relative flex h-2.5 w-2.5 shrink-0"
+                        title="Live"
+                      >
+                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500 opacity-75" />
+                        <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500" />
+                      </span>
+                      {user.profiles?.avatar_url ? (
+                        <img
+                          src={user.profiles.avatar_url}
+                          alt=""
+                          width={40}
+                          height={40}
+                          className="h-10 w-10 rounded-full object-cover"
+                          loading="lazy"
+                          decoding="async"
+                        />
+                      ) : (
+                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-secondary text-sm font-bold">
+                          {user.profiles?.username?.[0]?.toUpperCase() || "?"}
+                        </div>
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <p className="truncate font-semibold">
+                            {user.profiles?.username || "Anonymous"}
+                          </p>
+                          {user.profiles?.reading_streak > 0 && (
+                            <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                              <Flame className="h-3 w-3 text-orange-600" />
+                              {user.profiles.reading_streak}
+                            </span>
+                          )}
+                          {user.device_type && (
+                            <Badge variant="outline" className="h-5 text-[10px] uppercase">
+                              {user.device_type}
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
+                          {seriesTitle ? (
+                            <span className="flex min-w-0 items-center gap-1">
+                              <BookOpen className="h-3 w-3 shrink-0" />
+                              <Link
+                                to="/title/$slug"
+                                params={{ slug: seriesSlug }}
+                                className="truncate hover:text-primary"
+                              >
+                                {seriesTitle}
+                              </Link>
+                              {chapterNum !== undefined && (
+                                <span className="shrink-0">· Ch. {chapterNum}</span>
+                              )}
+                            </span>
+                          ) : (
+                            <span className="flex items-center gap-1">
+                              <BookOpen className="h-3 w-3" />
+                              Reading
+                            </span>
+                          )}
+                          <span className="shrink-0">·</span>
+                          <span className="flex items-center gap-1 shrink-0">
+                            <Clock className="h-3 w-3" />
+                            {minutesAgo === 0 ? "just now" : `${minutesAgo}m ago`}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Popular Genres (Tags) */}
+        <TabsContent value="tags" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Star className="h-5 w-5 text-yellow-600" />
+                Most Used Genres
+              </CardTitle>
+              <CardDescription>Popular genres and categories</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-wrap gap-2">
+                {popularTags.isLoading && (
+                  <p className="text-sm text-muted-foreground">Loading...</p>
+                )}
+                {(popularTags.data || []).map((tag) => (
+                  <Badge
+                    key={tag.id}
+                    variant="outline"
+                    className="gap-1 px-3 py-1.5 text-sm"
+                    style={{ 
+                      borderColor: tag.color || undefined,
+                      color: tag.color || undefined,
+                    }}
+                  >
+                    {tag.icon && <span>{tag.icon}</span>}
+                    {tag.name}
+                    <span className="ml-1 rounded-full bg-secondary px-1.5 py-0.5 text-xs">
+                      {tag.usage_count}
+                    </span>
+                  </Badge>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Recent Uploads */}
+        <TabsContent value="recent" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Clock className="h-5 w-5 text-green-600" />
+                Recently Uploaded Chapters
+              </CardTitle>
+              <CardDescription>Latest content additions</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {recentChapters.isLoading && (
+                  <p className="text-sm text-muted-foreground">Loading...</p>
+                )}
+                {(recentChapters.data || []).map((chapter: any) => (
+                  <div key={chapter.id} className="flex items-center justify-between rounded-lg border border-border/40 bg-card p-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-semibold">{chapter.series?.title}</p>
+                      <p className="text-sm text-muted-foreground">
+                        Chapter {chapter.chapter_number}
+                      </p>
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {new Date(chapter.created_at).toLocaleDateString()}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}

@@ -1,0 +1,39 @@
+# ============================================================
+#  vnrscans.com — robots.txt
+#  Goal: let Google + AdSense fully crawl ALL public content
+#  (series detail + chapter reader pages included), while
+#  keeping private/auth-gated routes out of the index.
+#  DO NOT block chapter reader paths for Google crawlers —
+#  AdSense needs to see real content to approve/serve ads.
+# ============================================================
+
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /auth
+Disallow: /library
+Disallow: /notifications
+Disallow: /profile
+Disallow: /settings
+Disallow: /search
+Disallow: /user/
+Disallow: /api/
+
+# ---- Google / AdSense crawlers: FULL access to public content ----
+User-agent: Mediapartners-Google
+Allow: /
+
+User-agent: AdsBot-Google
+Allow: /
+
+User-agent: AdsBot-Google-Mobile
+Allow: /
+
+User-agent: Googlebot
+Allow: /
+
+User-agent: Googlebot-Image
+Allow: /
+
+# ---- Sitemap index (dynamic — always reflects current DB state) ----
+Sitemap: https://www.vnrscans.com/sitemap.xml
