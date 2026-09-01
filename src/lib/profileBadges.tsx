@@ -1,23 +1,4 @@
-import type { LucideIcon } from "lucide-react";
-import {
-  Flame, Zap, Skull, Swords, Sun, Moon, PawPrint, Scroll, Scale, FlaskConical,
-  Orbit, Crown, Sword, Feather, Compass, ShieldAlert, Shield, User, Ghost,
-  Droplet, Flower, Mountain, Pill, Gem, Sparkles, Sprout, Layers, Circle,
-  Baby, Leaf, PenTool, Grid, CloudLightning, Cloud, Tent, Award, HardHat,
-  Triangle, Dna, Loader, Eye, Wand, Target, Map, Bomb, Magnet, Waves,
-  Snowflake, Wind, Settings, Bird, Dog, Minus, Laugh, AlertTriangle, Stars,
-  CircleDot, Link, Flag
-} from "lucide-react";
-
-const IconMap: Record<string, LucideIcon> = {
-  Flame, Zap, Skull, Swords, Sun, Moon, PawPrint, Scroll, Scale, FlaskConical,
-  Orbit, Crown, Sword, Feather, Compass, ShieldAlert, Shield, User, Ghost,
-  Droplet, Flower, Mountain, Pill, Gem, Sparkles, Sprout, Layers, Circle,
-  Baby, Leaf, PenTool, Grid, CloudLightning, Cloud, Tent, Award, HardHat,
-  Triangle, Dna, Loader, Eye, Wand, Target, Map, Bomb, Magnet, Waves,
-  Snowflake, Wind, Settings, Bird, Dog, Minus, Laugh, AlertTriangle, Stars,
-  CircleDot, Link, Flag
-};
+import { Award } from "lucide-react";
 
 export type BadgeCategory = "Title" | "Badge" | "Tag";
 export type BadgeDifficulty = "Easy" | "Moderate" | "Hard" | "Godly";
@@ -534,10 +515,21 @@ export const emojiToIconName: Record<string, string> = {
   "🏴": "Flag",
 };
 
-export function BadgeIcon({ icon, className }: { icon: string; className?: string }) {
-  const iconName = emojiToIconName[icon] || "Award";
-  const IconComponent = IconMap[iconName] || Award;
-  return <IconComponent className={className} />;
+export function BadgeIcon({ icon, className }: { icon?: string | null; className?: string }) {
+  if (!icon) {
+    return <Award className={className} />;
+  }
+
+  return (
+    <span
+      className={`inline-flex items-center justify-center select-none leading-none ${className || ""}`}
+      style={{ fontSize: "1.1em" }}
+      role="img"
+      aria-label="badge"
+    >
+      {icon}
+    </span>
+  );
 }
 
 export const PROFILE_BADGES_QUERY_KEY = ["profile-badges"] as const;

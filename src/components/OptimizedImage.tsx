@@ -55,7 +55,7 @@ export function OptimizedImage({
         });
       },
       {
-        rootMargin: isVideo ? "150px" : "50px", // Higher margin for video to load smoother
+        rootMargin: isVideo ? "350px" : "250px", // Generous margin for smooth 60fps scrolling
       }
     );
 

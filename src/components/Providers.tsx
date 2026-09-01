@@ -5,9 +5,18 @@ import { useState, useEffect, useRef, type ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { Analytics } from "@vercel/analytics/react";
 
+import dynamic from "next/dynamic";
 import { Navbar } from "@/components/Navbar";
-import { AnnouncementBanner } from "@/components/AnnouncementBanner";
-import { Footer } from "@/components/Footer";
+
+const AnnouncementBanner = dynamic(
+  () => import("@/components/AnnouncementBanner").then((m) => m.AnnouncementBanner),
+  { ssr: false }
+);
+
+const Footer = dynamic(
+  () => import("@/components/Footer").then((m) => m.Footer),
+  { ssr: true }
+);
 import { Toaster } from "@/components/ui/sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { isReaderLayoutPath } from "@/lib/layout";

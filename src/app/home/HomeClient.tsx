@@ -17,7 +17,16 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useDragScroll, DRAG_SCROLL_CONTAINER_CLASS } from "@/hooks/useDragScroll";
 import { TITLE_CARD_WIDTH, TITLE_COVER_CLASS } from "@/components/titleCardStyles";
-import { HomeHeroCarousel } from "@/components/HomeHeroCarousel";
+import dynamic from "next/dynamic";
+const HomeHeroCarousel = dynamic(
+  () => import("@/components/HomeHeroCarousel").then((m) => m.HomeHeroCarousel),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="h-64 sm:h-72 w-full animate-pulse rounded-lg bg-secondary/30" />
+    ),
+  }
+);
 import { OptimizedImage } from "@/components/OptimizedImage";
 import { useReaderSettings } from "@/contexts/ReaderSettingsContext";
 
