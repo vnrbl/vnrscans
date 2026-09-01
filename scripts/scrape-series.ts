@@ -652,11 +652,9 @@ async function main() {
       }
 
       if (images.length === 0) {
-        throw new Error(
-          imageUrlPrefix
-            ? 'No images matching the example URL type were found.'
-            : 'No images found on chapter page.',
-        );
+        console.warn(`  ⚠️ Chapter ${chapter.chapterNumber} has no images or requires unlocking/buying. Skipping to next chapter...`);
+        failCount++;
+        return;
       }
 
       // Step 2: Save chapter to database

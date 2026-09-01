@@ -885,6 +885,20 @@ export function extractChapterLinks(html: string, baseUrl: string): ChapterInfo[
 
     const cleanText = rawText.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
 
+    // Skip chapters that are explicitly locked / coin / buy / unlock / paywalled
+    const lowercaseCleanText = cleanText.toLowerCase();
+    const lowercaseRaw = rawText.toLowerCase();
+    const isLocked =
+      /\b(unlock|locked|buy\s+chapter|coins?|points?|early\s+access|premium\s+only|paywall|vip\s+only|subscribers?\s+only)\b/i.test(lowercaseCleanText) ||
+      /\b(unlock\s+with|coins?\s+required|cost:\s*\d+|price:\s*\d+)\b/i.test(lowercaseCleanText) ||
+      /class=["'][^"']*\b(locked|is-locked|lock-icon|chapter-locked|has-lock|paid-chapter|premium-chapter)\b[^"']*["']/i.test(lowercaseRaw) ||
+      /data-(?:locked|paid|premium)=["']true["']/i.test(lowercaseRaw) ||
+      /fa-lock|icon-lock|lucide-lock|svg[^>]*lock/i.test(lowercaseRaw);
+
+    if (isLocked && !lowercaseCleanText.includes('free') && !lowercaseCleanText.includes('unlocked')) {
+      return;
+    }
+
     if (!isChapterLink(url, cleanText)) {
       return;
     }
@@ -1286,6 +1300,14 @@ async function extractReaderImagesWithSharedBrowser(
                   options.imageUrlExample,
                 );
                 if (htmlImages.length === 0) {
+                  // Check if the page is paywalled / locked
+                  const bodyText = await page.evaluate(() => document.body.innerText.toLowerCase() || '');
+                  const isPaywalled = /unlock|locked|coins?|buy\s+chapter|early\s+access|premium\s+chapter|subscription\s+required/i.test(bodyText);
+                  if (isPaywalled) {
+                    console.warn(`[Scraper] Chapter at ${url} is locked or requires unlocking. Skipping.`);
+                    results.set(url, []);
+                    return;
+                  }
                   throw new Error('No images found on the chapter page.');
                 }
                 results.set(url, htmlImages);
