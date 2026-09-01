@@ -1,0 +1,9 @@
+# Cloudflare Worker local development secrets
+# Copy to .dev.vars (never commit .dev.vars)
+
+RESEND_API_KEY=re_xxxxxxxxxxxxxxxxxxxxxxxx
+OWNER_EMAIL=creator@vnrscans.com
+FROM_EMAIL="VNR Scans <onboarding@resend.dev>"
+
+# These come from wrangler.toml bindings (KV + R2)
+# You don't need to put them here - they are configured in wrangler.toml + dashboard
