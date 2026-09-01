@@ -52,12 +52,12 @@ export function SeriesCard({ s, rank }: { s: Series; rank?: number }) {
           </div>
         ) : null}
       </div>
-      <div className="p-3.5 bg-surface-1/90">
-        <h3 className="line-clamp-1 text-xs font-bold leading-snug text-white uppercase tracking-[0.03em] group-hover:text-purple-300 transition-colors duration-200">
+      <div className="p-3 bg-surface-1/90">
+        <h3 className="line-clamp-1 text-sm font-semibold leading-snug text-white group-hover:text-purple-400 transition-colors duration-200">
           {s.title}
         </h3>
         {s.chapter_count !== undefined && s.chapter_count !== null && s.chapter_count > 0 && (
-          <p className="mt-1 text-3xs text-muted-foreground font-mono font-medium">
+          <p className="mt-1 text-xs text-neutral-400 font-normal">
             {s.chapter_count} {s.chapter_count === 1 ? "Chapter" : "Chapters"}
           </p>
         )}

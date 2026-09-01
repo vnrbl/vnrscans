@@ -311,10 +311,10 @@ export function HomeHeroCarousel() {
                   
                   {/* Title on Hover */}
                   <div className="absolute bottom-0 left-0 right-0 p-4 transform translate-y-full group-hover/card:translate-y-0 transition-transform duration-300">
-                    <div className="inline-block mb-1.5 px-2 py-0.5 rounded border border-white/15 bg-black/70 backdrop-blur-md text-purple-300 text-3xs font-mono font-bold uppercase tracking-wider">
+                    <div className="inline-block mb-1.5 px-2 py-0.5 rounded bg-black/80 border border-white/20 backdrop-blur-md text-purple-300 text-xs font-semibold uppercase tracking-wider">
                       {item.series.type}
                     </div>
-                    <h3 className="text-white text-xs sm:text-sm font-bold uppercase tracking-[0.02em] leading-tight line-clamp-2">
+                    <h3 className="text-white text-sm sm:text-base font-bold leading-snug line-clamp-2">
                       {item.series.title}
                     </h3>
                   </div>

@@ -674,13 +674,13 @@ function SeriesList({ items, loading }: { items?: any[]; loading: boolean }) {
             {/* Title and Rating */}
             <div className="flex items-start justify-between gap-2">
               <div className="flex-1 min-w-0">
-                <h3 className="font-bold text-base sm:text-lg line-clamp-1 uppercase tracking-[0.02em] text-white group-hover:text-purple-300 transition-colors">{s.title}</h3>
+                <h3 className="font-semibold text-base text-white group-hover:text-purple-400 transition-colors line-clamp-1">{s.title}</h3>
                 {s.alternative_titles && (
-                  <p className="text-3xs text-muted-foreground line-clamp-1 mt-0.5 font-light">{s.alternative_titles}</p>
+                  <p className="text-xs text-neutral-400 line-clamp-1 mt-0.5">{s.alternative_titles}</p>
                 )}
               </div>
               {s.rating_average && Number(s.rating_average) > 0 && (
-                <div className="flex items-center gap-1 rounded border border-white/10 bg-black/75 px-2 py-0.5 text-xs backdrop-blur-md text-amber-300 font-mono font-bold">
+                <div className="flex items-center gap-1 rounded border border-white/10 bg-black/75 px-2 py-0.5 text-xs backdrop-blur-md text-amber-300 font-bold">
                   <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
                   <span>{Number(s.rating_average).toFixed(1)}</span>
                 </div>
@@ -689,12 +689,12 @@ function SeriesList({ items, loading }: { items?: any[]; loading: boolean }) {
 
             {/* Badges */}
             <div className="flex flex-wrap items-center gap-1.5">
-              <Badge variant="outline" className="badge-glass text-3xs font-semibold uppercase tracking-[0.06em] py-0.5 px-2">{s.type}</Badge>
-              <Badge variant="outline" className="text-3xs capitalize py-0.5 px-2 bg-surface-1 border-border/40 text-neutral-300">{s.status}</Badge>
+              <Badge variant="outline" className="badge-glass text-xs font-medium uppercase py-0.5 px-2">{s.type}</Badge>
+              <Badge variant="outline" className="text-xs capitalize py-0.5 px-2 bg-surface-1 border-border/40 text-neutral-300">{s.status}</Badge>
               {s.content_rating && (
                 <Badge 
                   variant="outline"
-                  className={`text-3xs uppercase py-0.5 px-2 ${
+                  className={`text-xs uppercase py-0.5 px-2 ${
                     s.content_rating === "safe" ? "bg-emerald-950/30 text-emerald-400 border-emerald-800/40" : "bg-neutral-900 text-neutral-400 border-border/30"
                   }`}
                 >
@@ -702,12 +702,12 @@ function SeriesList({ items, loading }: { items?: any[]; loading: boolean }) {
                 </Badge>
               )}
               {s.release_year && (
-                <Badge variant="outline" className="text-3xs py-0.5 px-2 bg-surface-1 border-border/40 text-neutral-400">{s.release_year}</Badge>
+                <Badge variant="outline" className="text-xs py-0.5 px-2 bg-surface-1 border-border/40 text-neutral-400">{s.release_year}</Badge>
               )}
             </div>
 
             {/* Metadata with icons */}
-            <div className="flex items-center gap-4 text-xs text-muted-foreground font-mono">
+            <div className="flex items-center gap-4 text-xs text-neutral-400">
               {s.chapter_count && s.chapter_count > 0 && (
                 <span className="flex items-center gap-1 text-neutral-300">
                   <BookOpen className="h-3.5 w-3.5 text-purple-400" />
@@ -723,7 +723,7 @@ function SeriesList({ items, loading }: { items?: any[]; loading: boolean }) {
 
             {/* Description */}
             {s.description && (
-              <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed font-light">
+              <p className="text-xs text-neutral-400 line-clamp-2 leading-relaxed font-light">
                 {s.description}
               </p>
             )}

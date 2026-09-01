@@ -1,22 +1,13 @@
 import type { Metadata, Viewport } from "next";
-import { Barlow, Barlow_Condensed } from "next/font/google";
+import { Inter } from "next/font/google";
 import { Providers } from "@/components/Providers";
 import "@/styles.css";
 
-const barlow = Barlow({
-  subsets: ["latin"],
-  weight: ["300", "400", "500"],
-  display: "swap",
-  variable: "--font-barlow",
-  adjustFontFallback: true,
-  preload: true,
-});
-
-const barlowCondensed = Barlow_Condensed({
+const inter = Inter({
   subsets: ["latin"],
   weight: ["300", "400", "500", "600", "700"],
   display: "swap",
-  variable: "--font-barlow-condensed",
+  variable: "--font-inter",
   adjustFontFallback: true,
   preload: true,
 });
@@ -70,7 +61,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`dark ${barlow.variable} ${barlowCondensed.variable}`}
+      className={`dark ${inter.variable}`}
       suppressHydrationWarning
     >
       <body suppressHydrationWarning>

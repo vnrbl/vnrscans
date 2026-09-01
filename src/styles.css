@@ -239,9 +239,9 @@
      *   Letters track positively (+0.32px body, +1.17px caps)
      *   Leading is TIGHT on display (0.95), normal on body (1.5–1.7)
      */
-    font-family: var(--font-barlow), var(--font-barlow-condensed), "Barlow", "Arial Narrow", Arial, Verdana, sans-serif;
-    letter-spacing: 0.02em;   /* SpaceX body: +0.32px at 16px ≈ 0.02em */
-    line-height: 1.6;
+    font-family: var(--font-inter), system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    letter-spacing: -0.01em;
+    line-height: 1.5;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
@@ -251,38 +251,29 @@
     scroll-behavior: smooth;
   }
 
-  /*
-   * SpaceX display type: UPPERCASE, D-DIN-Bold, positive tracking,
-   * extremely tight vertical leading (0.95 at largest sizes).
-   * We apply condensed bold + tight leading to all headings.
-   */
   h1 {
-    font-family: var(--font-barlow-condensed), "Barlow Condensed", "Arial Narrow", Arial, sans-serif;
+    font-family: var(--font-inter), system-ui, -apple-system, sans-serif;
     font-weight: 700;
-    line-height: 0.95;
-    letter-spacing: 0.08em;   /* +1.6px at 20px ≈ SpaceX display-xxl tracking */
-    text-transform: uppercase;
+    line-height: 1.2;
+    letter-spacing: -0.025em;
   }
   h2 {
-    font-family: var(--font-barlow-condensed), "Barlow Condensed", "Arial Narrow", Arial, sans-serif;
+    font-family: var(--font-inter), system-ui, -apple-system, sans-serif;
     font-weight: 700;
-    line-height: 1.1;
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
+    line-height: 1.25;
+    letter-spacing: -0.02em;
   }
   h3, h4 {
-    font-family: var(--font-barlow-condensed), "Barlow Condensed", "Arial Narrow", Arial, sans-serif;
+    font-family: var(--font-inter), system-ui, -apple-system, sans-serif;
     font-weight: 600;
-    line-height: 1.2;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
+    line-height: 1.35;
+    letter-spacing: -0.015em;
   }
   h5, h6 {
-    font-family: var(--font-barlow-condensed), "Barlow Condensed", "Arial Narrow", Arial, sans-serif;
-    font-weight: 500;
-    line-height: 1.3;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
+    font-family: var(--font-inter), system-ui, -apple-system, sans-serif;
+    font-weight: 600;
+    line-height: 1.4;
+    letter-spacing: -0.01em;
   }
 
   img, video, canvas, svg {
@@ -510,10 +501,11 @@
   }
 
   .badge-glass {
-    background-color: oklch(0.04 0.002 270 / 0.70);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-    border: 1px solid oklch(0.97 0.002 270 / 0.12);
+    background-color: rgba(0, 0, 0, 0.75) !important;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.18) !important;
+    color: #ffffff !important;
   }
 
   /* Shimmer effect for loaders */

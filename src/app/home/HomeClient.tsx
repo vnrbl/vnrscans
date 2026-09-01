@@ -1065,7 +1065,7 @@ function FollowedChapterCard({ chapter }: { chapter: RecentChapter }) {
   if (!seriesSlug) return null;
 
   return (
-    <article className="group glass-card rounded-[4px] overflow-hidden hover-lift transition-all">
+    <article className="group glass-card rounded-lg overflow-hidden hover-lift transition-all">
       <Link
         to="/title/$titleSlug/$chapterSlug"
         params={{ titleSlug: seriesSlug, chapterSlug: chapter.slug }}
@@ -1078,27 +1078,27 @@ function FollowedChapterCard({ chapter }: { chapter: RecentChapter }) {
             seriesId={chapter.series?.id}
             className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
           />
-          <Badge className="absolute bottom-2 left-2 gap-1 rounded badge-glass px-1.5 py-0.5 text-3xs font-mono font-bold text-white shadow backdrop-blur-md">
-            <BookOpen className="h-3 w-3 text-purple-400" />
-            Ch.{chapter.chapter_number}
-          </Badge>
+          <div className="absolute bottom-2 left-2 flex items-center gap-1.5 rounded bg-black/80 border border-white/20 px-2 py-0.5 text-xs font-semibold text-white shadow-md backdrop-blur-md">
+            <BookOpen className="h-3.5 w-3.5 text-purple-400" />
+            <span>Ch. {chapter.chapter_number}</span>
+          </div>
         </div>
       </Link>
       <div className="p-3 bg-surface-1/90">
         <Link
-          to="/title/$titleSlug/$chapterSlug"
-          params={{ titleSlug: seriesSlug, chapterSlug: chapter.slug }}
-          className="flex items-center justify-between gap-2 text-3xs font-mono text-muted-foreground hover:text-purple-300"
-        >
-          <span>Ch.{chapter.chapter_number}</span>
-          <span>{formatTimeAgo(chapter.created_at)}</span>
-        </Link>
-        <Link
           to="/title/$slug"
           params={{ slug: seriesSlug }}
-          className="mt-1 line-clamp-1 text-xs font-bold uppercase leading-snug text-white group-hover:text-purple-300 transition-colors"
+          className="block font-semibold text-sm text-white line-clamp-1 leading-snug group-hover:text-purple-400 transition-colors"
         >
           {chapter.series?.title}
+        </Link>
+        <Link
+          to="/title/$titleSlug/$chapterSlug"
+          params={{ titleSlug: seriesSlug, chapterSlug: chapter.slug }}
+          className="mt-1 flex items-center justify-between gap-2 text-xs text-neutral-400 hover:text-purple-300 transition-colors"
+        >
+          <span>Chapter {chapter.chapter_number}</span>
+          <span>{formatTimeAgo(chapter.created_at)}</span>
         </Link>
       </div>
     </article>
@@ -1134,8 +1134,8 @@ function RecentChapterCard({
   );
 
   const timeRow = (
-    <div className="mt-2 flex items-center gap-1 text-3xs font-mono text-muted-foreground">
-      <Clock className="h-3 w-3 shrink-0 text-neutral-400" />
+    <div className="mt-1 flex items-center gap-1.5 text-xs text-neutral-400">
+      <Clock className="h-3.5 w-3.5 shrink-0 text-neutral-400" />
       <span>
         {timeLabel} {formatTimeAgo(chapter.created_at)}
       </span>
@@ -1143,7 +1143,7 @@ function RecentChapterCard({
   );
 
   return (
-    <article className="group glass-card rounded-[4px] overflow-hidden hover-lift transition-all">
+    <article className="group glass-card rounded-lg overflow-hidden hover-lift transition-all">
       <Link to="/title/$slug" params={{ slug: seriesSlug }} className="block">
         {cover}
       </Link>
@@ -1151,13 +1151,13 @@ function RecentChapterCard({
         <Link
           to="/title/$slug"
           params={{ slug: seriesSlug }}
-          className="line-clamp-1 text-xs font-bold uppercase leading-tight text-white group-hover:text-purple-300 transition-colors"
+          className="block font-semibold text-sm text-white line-clamp-1 leading-snug group-hover:text-purple-400 transition-colors"
         >
           {chapter.series?.title}
         </Link>
         {linkVariant === "seriesOnly" ? (
           <>
-            <p className="mt-1 line-clamp-1 text-3xs font-mono text-muted-foreground">{chapterLabel}</p>
+            <p className="mt-1 text-xs text-neutral-400 line-clamp-1 font-medium">{chapterLabel}</p>
             {timeRow}
           </>
         ) : (
@@ -1166,7 +1166,7 @@ function RecentChapterCard({
               asChild
               variant="secondary"
               size="sm"
-              className="mt-2 h-7 w-full text-3xs font-mono font-bold uppercase rounded-[4px] bg-surface-2 hover:bg-purple-950/40 hover:text-purple-200 border border-border/40"
+              className="mt-2 h-8 w-full text-xs font-semibold rounded bg-surface-2 hover:bg-purple-950/40 hover:text-purple-200 border border-border/40"
             >
               <Link
                 to="/title/$titleSlug/$chapterSlug"
