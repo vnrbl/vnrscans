@@ -505,7 +505,10 @@ async function main() {
   }
 
   // Ask for uploader username
-  const uploadedBy = (await askQuestion('Enter Uploader Username (optional, press Enter to skip): ')).trim();
+  const uploaderInput = (await askQuestion('Enter Uploader Username (optional, press Enter to skip): ')).trim();
+  if (uploaderInput) {
+    uploadedBy = uploaderInput;
+  }
 
   rl.close();
 
