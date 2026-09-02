@@ -4,6 +4,7 @@ import React from "react";
 import Link from "next/link";
 import { Star, BookOpen, Trophy, Users } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { LiveSeriesEditor } from "@/components/admin/LiveSeriesEditor";
 
 /* ------------------------------------------------------------------ */
 /*  SeriesHeader — static metadata that never re-renders on           */
@@ -65,15 +66,19 @@ export const SeriesHeader = React.memo(function SeriesHeader({
 
   return (
     <main className="min-w-0 flex-1 text-center sm:text-left">
-      <nav className="mb-3 flex flex-wrap items-center justify-center gap-1.5 text-xs uppercase tracking-wider text-muted-foreground font-semibold sm:justify-start">
-        <Link href="/home" className="hover:text-primary transition-colors">
-          Home
-        </Link>
-        <span>/</span>
-        <Link href={`/browse?type=${s.type}`} className="hover:text-primary transition-colors">
-          {s.type}
-        </Link>
-      </nav>
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <nav className="flex flex-wrap items-center justify-center gap-1.5 text-xs uppercase tracking-wider text-muted-foreground font-semibold sm:justify-start">
+          <Link href="/home" className="hover:text-primary transition-colors">
+            Home
+          </Link>
+          <span>/</span>
+          <Link href={`/browse?type=${s.type}`} className="hover:text-primary transition-colors">
+            {s.type}
+          </Link>
+        </nav>
+
+        <LiveSeriesEditor series={s} slug={slug} />
+      </div>
 
       <div className="mb-3 flex flex-wrap items-center justify-center gap-1.5 sm:justify-start">
         <Badge variant="secondary" className="rounded-md uppercase text-[10px] font-semibold tracking-wider px-2 py-0.5 bg-secondary/50">

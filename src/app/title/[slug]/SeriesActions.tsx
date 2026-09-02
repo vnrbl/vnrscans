@@ -3,12 +3,13 @@
 import React from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowLeft, BookOpen, UserPlus, UserCheck, Star, Bookmark, Bell, BellRing, BellOff, ChevronLeft, ChevronRight, Heart, Trash2 } from "lucide-react";
+import { ArrowLeft, BookOpen, UserPlus, UserCheck, Star, Bookmark, Bell, BellRing, BellOff, ChevronLeft, ChevronRight, Heart, Trash2, Globe } from "lucide-react";
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth, useIsAdmin } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
+import { ScanCoverImporter } from "@/components/admin/ScanCoverImporter";
 import {
   Select,
   SelectContent,
@@ -512,6 +513,27 @@ export const SeriesActions = React.memo(function SeriesActions({
             </Select>
           </div>
         )}
+
+        {/* Admin Scan Cover Import Tool */}
+        {isAdmin && (
+          <div className="pt-2 border-t border-border/20">
+            <ScanCoverImporter
+              seriesId={seriesId}
+              slug={slug}
+              currentCoverUrl={coverUrl}
+              trigger={
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full gap-1.5 border-purple-500/30 bg-purple-950/20 text-purple-300 hover:bg-purple-900/30 text-xs font-semibold"
+                >
+                  <Globe className="h-3.5 w-3.5" />
+                  <span>Import Cover from Scan</span>
+                </Button>
+              }
+            />
+          </div>
+        )}
       </div>
 
       {user && (
@@ -548,9 +570,28 @@ export const SeriesActions = React.memo(function SeriesActions({
                   )}
                   <span>Covers & Illustrations Gallery</span>
                 </div>
-                <span className="text-xs text-muted-foreground font-mono font-normal">
-                  {activeView === "lightbox" ? `${galleryIdx + 1} of ${allCovers.length}` : `${allCovers.length} images`}
-                </span>
+                <div className="flex items-center gap-3 pr-6">
+                  {isAdmin && (
+                    <ScanCoverImporter
+                      seriesId={seriesId}
+                      slug={slug}
+                      currentCoverUrl={coverUrl}
+                      trigger={
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 text-xs gap-1 text-purple-400 hover:text-purple-300 hover:bg-purple-950/40"
+                        >
+                          <Globe className="h-3 w-3" />
+                          <span>Import Scan Cover</span>
+                        </Button>
+                      }
+                    />
+                  )}
+                  <span className="text-xs text-muted-foreground font-mono font-normal">
+                    {activeView === "lightbox" ? `${galleryIdx + 1} of ${allCovers.length}` : `${allCovers.length} images`}
+                  </span>
+                </div>
               </DialogTitle>
             </DialogHeader>
 

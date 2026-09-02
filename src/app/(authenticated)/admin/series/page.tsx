@@ -23,6 +23,14 @@ import {
   Loader2,
   LayoutList,
   LayoutGrid,
+  CheckCircle2,
+  XCircle,
+  AlertTriangle,
+  History,
+  Clock,
+  ChevronDown,
+  ChevronUp,
+  Globe,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { logAdminAction } from "@/lib/adminLog";
@@ -649,6 +657,54 @@ export default function AdminSeries() {
   });
 
   const [isSyncingAll, setIsSyncingAll] = useState(false);
+  const [syncOverlay, setSyncOverlay] = useState<{
+    open: boolean;
+    phase: "syncing" | "complete" | "error";
+    totalSources: number;
+    totalImported: number;
+    results: Array<{
+      sourceId: string;
+      seriesId?: string;
+      seriesTitle?: string;
+      seriesSlug?: string;
+      coverUrl?: string | null;
+      sourceUrl: string;
+      chaptersFound: number;
+      imported: number;
+      skipped: number;
+      failed: number;
+      status?: "success" | "partial" | "failed";
+      error?: string;
+      details?: Array<{ chapter: number; status: string; message?: string; pages?: number }>;
+    }>;
+    errorMessage?: string;
+  }>({ open: false, phase: "syncing", totalSources: 0, totalImported: 0, results: [] });
+
+  const [syncLogsOpen, setSyncLogsOpen] = useState(false);
+  const [logFilter, setLogFilter] = useState<"all" | "success" | "partial" | "failed">("all");
+  const [logSearch, setLogSearch] = useState("");
+  const [expandedLogIds, setExpandedLogIds] = useState<string[]>([]);
+
+  const syncLogs = useQuery({
+    queryKey: ["admin", "sync-logs"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("series_import_logs")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(100);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: syncLogsOpen,
+  });
+
+  const toggleExpandLog = (id: string) => {
+    setExpandedLogIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    );
+  };
+
   const handleSyncAll = async () => {
     try {
       const session = (await supabase.auth.getSession()).data.session;
@@ -657,7 +713,8 @@ export default function AdminSeries() {
         return;
       }
       setIsSyncingAll(true);
-      const toastId = toast.loading("Syncing latest chapters for all series in database...");
+      setSyncOverlay({ open: true, phase: "syncing", totalSources: 0, totalImported: 0, results: [] });
+
       const res = await $syncAllSeriesImportSources({
         data: {
           accessToken: session.access_token,
@@ -666,17 +723,21 @@ export default function AdminSeries() {
       });
 
       if (!res.success) {
-        toast.error(res.error || "Failed to sync all series", { id: toastId });
+        setSyncOverlay((prev) => ({ ...prev, phase: "error", errorMessage: res.error || "Failed to sync all series" }));
       } else {
-        toast.success(
-          `Sync completed! Imported ${res.totalImported} new chapters across ${res.totalSources} series.`,
-          { id: toastId, duration: 6000 }
-        );
+        setSyncOverlay({
+          open: true,
+          phase: "complete",
+          totalSources: res.totalSources ?? 0,
+          totalImported: res.totalImported ?? 0,
+          results: res.results ?? [],
+        });
         qc.invalidateQueries({ queryKey: ["admin", "series"] });
         qc.invalidateQueries({ queryKey: ["series"] });
+        qc.invalidateQueries({ queryKey: ["admin", "sync-logs"] });
       }
     } catch (err: any) {
-      toast.error(err.message || "Sync failed");
+      setSyncOverlay((prev) => ({ ...prev, phase: "error", errorMessage: err.message || "Sync failed" }));
     } finally {
       setIsSyncingAll(false);
     }
@@ -689,12 +750,21 @@ export default function AdminSeries() {
         <div className="flex items-center gap-2">
           <Button
             variant="outline"
+            size="sm"
+            onClick={() => { setSyncLogsOpen(true); }}
+            className="border-border/40"
+          >
+            <History className="mr-1.5 h-4 w-4" />
+            Sync Logs
+          </Button>
+          <Button
+            variant="outline"
             onClick={handleSyncAll}
             disabled={isSyncingAll}
             className="border-purple-500/40 hover:border-purple-500 text-purple-300 hover:text-purple-200 bg-purple-950/20"
           >
             <RefreshCw className={`mr-1.5 h-4 w-4 ${isSyncingAll ? "animate-spin" : ""}`} />
-            {isSyncingAll ? "Syncing All Series..." : "Sync All Series"}
+            {isSyncingAll ? "Syncing..." : "Sync All Series"}
           </Button>
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
@@ -1189,6 +1259,402 @@ export default function AdminSeries() {
               {updateSeries.isPending ? "Saving..." : "Save changes"}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ═══ SYNC OVERLAY ═══ */}
+      {syncOverlay.open && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm animate-in fade-in duration-300">
+          <div className="relative mx-4 w-full max-w-2xl rounded-2xl border border-border/40 bg-card shadow-2xl shadow-primary/10 overflow-hidden animate-in zoom-in-95 duration-300">
+            {/* Header */}
+            <div className="relative px-6 pt-6 pb-4 border-b border-border/30">
+              {syncOverlay.phase === "syncing" && (
+                <div className="flex flex-col items-center gap-4">
+                  {/* Pulsing spinner */}
+                  <div className="relative">
+                    <div className="absolute inset-0 rounded-full bg-purple-500/20 animate-ping" />
+                    <div className="relative grid h-16 w-16 place-items-center rounded-full bg-gradient-to-br from-purple-500 to-violet-600 shadow-lg shadow-purple-500/30">
+                      <RefreshCw className="h-7 w-7 text-white animate-spin" />
+                    </div>
+                  </div>
+                  <div className="text-center">
+                    <h2 className="text-xl font-bold tracking-tight">Syncing All Series</h2>
+                    <p className="mt-1 text-sm text-muted-foreground animate-pulse">
+                      Discovering and importing new chapters from all sources...
+                    </p>
+                  </div>
+                  {/* Animated progress bar */}
+                  <div className="w-full h-1.5 rounded-full bg-secondary overflow-hidden">
+                    <div className="h-full bg-gradient-to-r from-purple-500 via-violet-500 to-purple-500 rounded-full animate-[shimmer_2s_ease-in-out_infinite]"
+                      style={{ width: "60%", backgroundSize: "200% 100%", animation: "shimmer 2s ease-in-out infinite" }}
+                    />
+                  </div>
+                </div>
+              )}
+              {syncOverlay.phase === "complete" && (
+                <div className="flex flex-col items-center gap-3">
+                  <div className="grid h-16 w-16 place-items-center rounded-full bg-gradient-to-br from-emerald-500 to-green-600 shadow-lg shadow-emerald-500/30 animate-in zoom-in duration-500">
+                    <CheckCircle2 className="h-8 w-8 text-white" />
+                  </div>
+                  <div className="text-center">
+                    <h2 className="text-xl font-bold tracking-tight">Sync Complete</h2>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      Processed {syncOverlay.totalSources} source{syncOverlay.totalSources !== 1 ? "s" : ""} · Imported{" "}
+                      <span className="font-semibold text-emerald-400">{syncOverlay.totalImported}</span> new chapter{syncOverlay.totalImported !== 1 ? "s" : ""}
+                    </p>
+                  </div>
+                </div>
+              )}
+              {syncOverlay.phase === "error" && (
+                <div className="flex flex-col items-center gap-3">
+                  <div className="grid h-16 w-16 place-items-center rounded-full bg-gradient-to-br from-red-500 to-rose-600 shadow-lg shadow-red-500/30">
+                    <XCircle className="h-8 w-8 text-white" />
+                  </div>
+                  <div className="text-center">
+                    <h2 className="text-xl font-bold tracking-tight">Sync Failed</h2>
+                    <p className="mt-1 text-sm text-destructive">{syncOverlay.errorMessage}</p>
+                  </div>
+                </div>
+              )}
+              {/* Close button */}
+              {syncOverlay.phase !== "syncing" && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="absolute top-3 right-3 h-8 w-8"
+                  onClick={() => setSyncOverlay((prev) => ({ ...prev, open: false }))}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              )}
+            </div>
+
+            {/* Per-series results */}
+            {syncOverlay.results.length > 0 && (
+              <div className="max-h-[50vh] overflow-y-auto p-4 space-y-2.5">
+                {syncOverlay.results.map((r, i) => {
+                  const status = r.status || (r.error ? "failed" : r.failed > 0 && r.imported > 0 ? "partial" : r.failed > 0 ? "failed" : "success");
+                  return (
+                    <div
+                      key={r.sourceId + i}
+                      className={`flex items-start gap-3 rounded-xl border p-3.5 transition-all animate-in fade-in slide-in-from-bottom-2 ${
+                        status === "success"
+                          ? "border-emerald-500/30 bg-emerald-500/5"
+                          : status === "partial"
+                          ? "border-amber-500/30 bg-amber-500/5"
+                          : "border-red-500/30 bg-red-500/5"
+                      }`}
+                      style={{ animationDelay: `${i * 50}ms` }}
+                    >
+                      {/* Cover Thumbnail */}
+                      <div className="relative aspect-[2/3] w-10 shrink-0 rounded overflow-hidden border border-border/40 bg-secondary">
+                        {r.coverUrl ? (
+                          <img src={r.coverUrl} alt="" className="h-full w-full object-cover" />
+                        ) : (
+                          <div className="flex h-full w-full items-center justify-center text-muted-foreground">
+                            <Layers className="h-4 w-4 opacity-40" />
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="truncate text-sm font-bold text-foreground">
+                            {r.seriesTitle || r.sourceUrl}
+                          </span>
+                          <Badge
+                            variant="outline"
+                            className={`text-[9px] uppercase font-bold px-1.5 py-0.5 ${
+                              status === "success"
+                                ? "border-emerald-500/50 text-emerald-400 bg-emerald-500/10"
+                                : status === "partial"
+                                ? "border-amber-500/50 text-amber-400 bg-amber-500/10"
+                                : "border-red-500/50 text-red-400 bg-red-500/10"
+                            }`}
+                          >
+                            {status}
+                          </Badge>
+                        </div>
+
+                        <p className="text-xs text-muted-foreground truncate font-mono mt-0.5">{r.sourceUrl}</p>
+
+                        <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
+                          <span>Found: <strong className="text-foreground">{r.chaptersFound}</strong></span>
+                          <span className="text-emerald-400">Imported: <strong>{r.imported}</strong></span>
+                          <span>Skipped: <strong className="text-muted-foreground">{r.skipped}</strong></span>
+                          {r.failed > 0 && <span className="text-red-400">Failed: <strong>{r.failed}</strong></span>}
+                        </div>
+
+                        {/* Error Reason */}
+                        {r.error && (
+                          <div className="mt-2 rounded bg-red-950/40 border border-red-500/30 p-2 text-xs text-red-300">
+                            <strong>Reason for failure:</strong> {r.error}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Footer with close button */}
+            {syncOverlay.phase !== "syncing" && (
+              <div className="border-t border-border/30 px-6 py-4 flex justify-end">
+                <Button onClick={() => setSyncOverlay((prev) => ({ ...prev, open: false }))}>
+                  Close
+                </Button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ═══ DETAILED SYNC LOGS DIALOG ═══ */}
+      <Dialog open={syncLogsOpen} onOpenChange={setSyncLogsOpen}>
+        <DialogContent className="max-h-[90vh] max-w-4xl overflow-hidden flex flex-col p-0 bg-[#0d0d12] border-border/40 text-foreground">
+          {/* Header */}
+          <DialogHeader className="p-6 pb-4 border-b border-border/20 bg-card/60 backdrop-blur-sm">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="grid h-9 w-9 place-items-center rounded-lg bg-purple-500/10 border border-purple-500/20 text-purple-400">
+                  <History className="h-5 w-5" />
+                </div>
+                <div>
+                  <DialogTitle className="text-lg font-bold">Detailed Sync History & Logs</DialogTitle>
+                  <DialogDescription className="text-xs text-muted-foreground">
+                    Complete chapter extraction logs, success/failure breakdowns, and error diagnostics
+                  </DialogDescription>
+                </div>
+              </div>
+            </div>
+
+            {/* Summary Metrics Cards */}
+            {syncLogs.data && syncLogs.data.length > 0 && (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-4">
+                <div className="rounded-lg border border-border/30 bg-secondary/30 p-2.5 text-center">
+                  <span className="text-2xs uppercase tracking-wider text-muted-foreground font-semibold">Total Runs</span>
+                  <p className="text-lg font-bold">{syncLogs.data.length}</p>
+                </div>
+                <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-2.5 text-center">
+                  <span className="text-2xs uppercase tracking-wider text-emerald-400 font-semibold">Imported</span>
+                  <p className="text-lg font-bold text-emerald-400">
+                    {syncLogs.data.reduce((acc: number, l: any) => acc + (l.chapters_imported || 0), 0)}
+                  </p>
+                </div>
+                <div className="rounded-lg border border-border/30 bg-secondary/30 p-2.5 text-center">
+                  <span className="text-2xs uppercase tracking-wider text-muted-foreground font-semibold">Skipped</span>
+                  <p className="text-lg font-bold text-foreground">
+                    {syncLogs.data.reduce((acc: number, l: any) => acc + (l.chapters_skipped || 0), 0)}
+                  </p>
+                </div>
+                <div className="rounded-lg border border-red-500/30 bg-red-500/5 p-2.5 text-center">
+                  <span className="text-2xs uppercase tracking-wider text-red-400 font-semibold">Failed</span>
+                  <p className="text-lg font-bold text-red-400">
+                    {syncLogs.data.reduce((acc: number, l: any) => acc + (l.chapters_failed || 0), 0)}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Search and Filters */}
+            <div className="flex flex-col sm:flex-row gap-2 pt-3">
+              <div className="relative flex-1">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                <Input
+                  value={logSearch}
+                  onChange={(e) => setLogSearch(e.target.value)}
+                  placeholder="Search logs by message or source..."
+                  className="pl-8 h-8 text-xs bg-secondary/30"
+                />
+                {logSearch && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-1 top-1/2 -translate-y-1/2 h-6 w-6"
+                    onClick={() => setLogSearch("")}
+                  >
+                    <X className="h-3 w-3" />
+                  </Button>
+                )}
+              </div>
+              <div className="flex gap-1">
+                {(["all", "success", "partial", "failed"] as const).map((f) => (
+                  <Button
+                    key={f}
+                    variant={logFilter === f ? "default" : "outline"}
+                    size="sm"
+                    className="h-8 text-xs capitalize"
+                    onClick={() => setLogFilter(f)}
+                  >
+                    {f}
+                  </Button>
+                ))}
+              </div>
+            </div>
+          </DialogHeader>
+
+          {/* Logs List Body */}
+          <div className="flex-1 overflow-y-auto p-6 space-y-3 max-h-[55vh]">
+            {syncLogs.isLoading && (
+              <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+                <Loader2 className="h-8 w-8 animate-spin text-primary mb-2" />
+                <span className="text-xs">Loading detailed logs...</span>
+              </div>
+            )}
+
+            {!syncLogs.isLoading && (!syncLogs.data || syncLogs.data.length === 0) && (
+              <div className="py-12 text-center text-sm text-muted-foreground">
+                No sync history records found in database.
+              </div>
+            )}
+
+            {!syncLogs.isLoading &&
+              (syncLogs.data || [])
+                .filter((log: any) => {
+                  if (logFilter !== "all" && log.status !== logFilter) return false;
+                  if (logSearch.trim()) {
+                    const q = logSearch.toLowerCase();
+                    const msg = (log.message || "").toLowerCase();
+                    const src = (log.source_id || "").toLowerCase();
+                    return msg.includes(q) || src.includes(q);
+                  }
+                  return true;
+                })
+                .map((log: any) => {
+                  const isExpanded = expandedLogIds.includes(log.id);
+                  const details: Array<{ chapter: number; status: string; message?: string; pages?: number }> = Array.isArray(log.details) ? log.details : [];
+
+                  const statusIcon =
+                    log.status === "success" ? <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" /> :
+                    log.status === "partial" ? <AlertTriangle className="h-4 w-4 text-amber-400 shrink-0" /> :
+                    <XCircle className="h-4 w-4 text-red-400 shrink-0" />;
+
+                  const statusColor =
+                    log.status === "success" ? "border-emerald-500/30 bg-emerald-500/5 hover:border-emerald-500/50" :
+                    log.status === "partial" ? "border-amber-500/30 bg-amber-500/5 hover:border-amber-500/50" :
+                    "border-red-500/30 bg-red-500/5 hover:border-red-500/50";
+
+                  return (
+                    <div key={log.id} className={`rounded-xl border p-4 transition-all shadow-sm ${statusColor}`}>
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-start gap-2.5 min-w-0 flex-1">
+                          {statusIcon}
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <Badge
+                                variant="outline"
+                                className={`text-[10px] uppercase font-bold px-2 py-0.5 ${
+                                  log.status === "success" ? "border-emerald-500/50 text-emerald-400 bg-emerald-500/10" :
+                                  log.status === "partial" ? "border-amber-500/50 text-amber-400 bg-amber-500/10" :
+                                  "border-red-500/50 text-red-400 bg-red-500/10"
+                                }`}
+                              >
+                                {log.status}
+                              </Badge>
+                              <span className="flex items-center gap-1 text-xs text-muted-foreground font-mono">
+                                <Clock className="h-3 w-3" />
+                                {new Date(log.created_at).toLocaleString()}
+                              </span>
+                              {log.duration_seconds && (
+                                <span className="text-2xs text-muted-foreground bg-secondary px-1.5 py-0.5 rounded font-mono">
+                                  {log.duration_seconds}s
+                                </span>
+                              )}
+                            </div>
+
+                            <p className="mt-1.5 text-sm font-medium text-foreground">{log.message}</p>
+
+                            {/* Summary counts pill */}
+                            <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground font-medium">
+                              <span>Found: <strong className="text-foreground">{log.chapters_found ?? 0}</strong></span>
+                              <span>Imported: <strong className="text-emerald-400">{log.chapters_imported ?? 0}</strong></span>
+                              <span>Skipped: <strong className="text-muted-foreground">{log.chapters_skipped ?? 0}</strong></span>
+                              {log.chapters_failed > 0 && (
+                                <span>Failed: <strong className="text-red-400">{log.chapters_failed}</strong></span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Expand Details Button */}
+                        {details.length > 0 && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 gap-1 text-xs text-muted-foreground hover:text-foreground shrink-0"
+                            onClick={() => toggleExpandLog(log.id)}
+                          >
+                            <span>{isExpanded ? "Hide" : "Details"} ({details.length})</span>
+                            {isExpanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+                          </Button>
+                        )}
+                      </div>
+
+                      {/* Expandable Chapter-by-Chapter Details Table */}
+                      {isExpanded && details.length > 0 && (
+                        <div className="mt-3 pt-3 border-t border-border/20 space-y-1.5 animate-in fade-in duration-200">
+                          <span className="text-2xs font-bold uppercase tracking-wider text-muted-foreground block mb-2">
+                            Chapter Execution Breakdown:
+                          </span>
+                          <div className="max-h-52 overflow-y-auto rounded-lg border border-border/30 bg-black/40 p-2 space-y-1.5">
+                            {details.map((item, idx) => {
+                              const isImp = item.status === "imported";
+                              const isPrem = item.status === "premium_skipped";
+                              const isFail = item.status === "failed";
+                              const isSkip = item.status === "skipped";
+
+                              return (
+                                <div
+                                  key={idx}
+                                  className={`flex items-center justify-between gap-2 p-2 rounded text-xs ${
+                                    isImp ? "bg-emerald-950/20 border border-emerald-500/20" :
+                                    isPrem ? "bg-amber-950/20 border border-amber-500/20 text-amber-300" :
+                                    isFail ? "bg-red-950/20 border border-red-500/20 text-red-300" :
+                                    "bg-secondary/30 text-muted-foreground"
+                                  }`}
+                                >
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-bold text-foreground">
+                                      Chapter {item.chapter}
+                                    </span>
+                                    {isImp && (
+                                      <Badge variant="outline" className="text-[9px] border-emerald-500/40 text-emerald-400 bg-emerald-500/10">
+                                        Imported {item.pages ? `(${item.pages} pages)` : ""}
+                                      </Badge>
+                                    )}
+                                    {isPrem && (
+                                      <Badge variant="outline" className="text-[9px] border-amber-500/40 text-amber-400 bg-amber-500/10">
+                                        🔒 Premium / Locked
+                                      </Badge>
+                                    )}
+                                    {isFail && (
+                                      <Badge variant="outline" className="text-[9px] border-red-500/40 text-red-400 bg-red-500/10">
+                                        Failed
+                                      </Badge>
+                                    )}
+                                    {isSkip && (
+                                      <Badge variant="secondary" className="text-[9px]">
+                                        Already exists
+                                      </Badge>
+                                    )}
+                                  </div>
+                                  {item.message && (
+                                    <span className="text-[11px] text-muted-foreground truncate max-w-[280px]">
+                                      {item.message}
+                                    </span>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+          </div>
         </DialogContent>
       </Dialog>
     </div>

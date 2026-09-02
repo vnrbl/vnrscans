@@ -96,6 +96,219 @@ export async function $extractImagesFromUrl(args: {
   }
 }
 
+export async function $extractCoversFromScanUrl(args: {
+  data: {
+    url: string;
+    accessToken: string;
+  };
+}) {
+  try {
+    const { data } = args;
+    const validated = z
+      .object({
+        url: z.string().url(),
+        accessToken: z.string().min(1),
+      })
+      .parse(data);
+
+    await verifyAdmin(validated.accessToken);
+
+    const targetUrl = validated.url.trim();
+    const candidateCovers: string[] = [];
+
+    // 1. QiScans / QiManga special handling
+    if (targetUrl.toLowerCase().includes("qimanga") || targetUrl.toLowerCase().includes("qiscans") || targetUrl.toLowerCase().includes("qimanhwa")) {
+      try {
+        const urlObj = new URL(targetUrl);
+        const parts = urlObj.pathname.split("/").filter(Boolean);
+        const slug = parts[parts.length - 1];
+        if (slug) {
+          const apiRes = await fetch(`https://api.qimanga.com/api/v1/series/${encodeURIComponent(slug)}`, {
+            headers: {
+              "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+              "Accept": "application/json",
+            },
+          });
+          if (apiRes.ok) {
+            const apiData = (await apiRes.json()) as any;
+            if (apiData?.data?.cover) candidateCovers.push(apiData.data.cover);
+            if (apiData?.data?.thumbnail) candidateCovers.push(apiData.data.thumbnail);
+            if (apiData?.data?.banner) candidateCovers.push(apiData.data.banner);
+          }
+        }
+      } catch (err) {
+        console.warn("[CoverExtractor] QiManga API cover fetch failed:", err);
+      }
+    }
+
+    // 2. Fetch HTML to extract OpenGraph, Twitter, meta, and hero image
+    try {
+      const res = await fetch(targetUrl, {
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+          "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        },
+      });
+      if (res.ok) {
+        const html = await res.text();
+
+        // Match og:image
+        const ogMatches = html.matchAll(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/gi);
+        for (const match of ogMatches) {
+          if (match[1]) candidateCovers.push(match[1]);
+        }
+        const ogContentMatches = html.matchAll(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/gi);
+        for (const match of ogContentMatches) {
+          if (match[1]) candidateCovers.push(match[1]);
+        }
+
+        // Match twitter:image
+        const twMatches = html.matchAll(/<meta[^>]+name=["']twitter:image["'][^>]+content=["']([^"']+)["']/gi);
+        for (const match of twMatches) {
+          if (match[1]) candidateCovers.push(match[1]);
+        }
+
+        // Match common cover / thumbnail classes
+        const imgMatches = html.matchAll(/<img[^>]+(?:class=["'][^"']*(?:thumb|cover|poster|series-img|featured)[^"']*["'])[^>]+src=["']([^"']+)["']/gi);
+        for (const match of imgMatches) {
+          if (match[1] && !match[1].endsWith(".svg") && !match[1].includes("logo")) {
+            candidateCovers.push(match[1]);
+          }
+        }
+      }
+    } catch (fetchErr) {
+      console.warn("[CoverExtractor] HTML cover fetch error:", fetchErr);
+    }
+
+    // Clean & normalize URLs
+    const cleanCovers = Array.from(new Set(
+      candidateCovers
+        .map((c) => c.trim())
+        .filter((c) => c.startsWith("http://") || c.startsWith("https://"))
+        .filter((c) => !c.includes("favicon") && !c.includes("logo") && !c.endsWith(".svg"))
+    ));
+
+    return {
+      success: true,
+      covers: cleanCovers,
+    };
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : "Failed to extract cover from URL",
+      covers: [],
+    };
+  }
+}
+
+export async function $autoImportSeriesCover(args: {
+  data: {
+    seriesId: string;
+    accessToken: string;
+    customUrl?: string;
+  };
+}) {
+  try {
+    const { data } = args;
+    const validated = z
+      .object({
+        seriesId: z.string().uuid(),
+        accessToken: z.string().min(1),
+        customUrl: z.string().url().optional().or(z.literal("")),
+      })
+      .parse(data);
+
+    await verifyAdmin(validated.accessToken);
+    const admin = getAdminSupabase();
+
+    let targetScanUrl = validated.customUrl?.trim() || "";
+
+    // If no custom URL provided, look up from series_import_sources
+    if (!targetScanUrl) {
+      const { data: sources, error: srcErr } = await admin
+        .from("series_import_sources")
+        .select("source_url")
+        .eq("series_id", validated.seriesId)
+        .order("created_at", { ascending: false })
+        .limit(1);
+
+      if (srcErr) throw srcErr;
+      if (sources && sources.length > 0 && sources[0].source_url) {
+        targetScanUrl = sources[0].source_url;
+      }
+    }
+
+    if (!targetScanUrl) {
+      const { data: seriesRow } = await admin
+        .from("series")
+        .select("title, slug")
+        .eq("id", validated.seriesId)
+        .single();
+
+      return {
+        success: false,
+        noSource: true,
+        error: `No scan source URL is linked to "${seriesRow?.title || "this series"}". Please paste a scan URL once in the input box to link and import cover.`,
+      };
+    }
+
+    // Extract covers from targetScanUrl
+    const extractRes = await $extractCoversFromScanUrl({
+      data: {
+        url: targetScanUrl,
+        accessToken: validated.accessToken,
+      },
+    });
+
+    if (!extractRes.success || !extractRes.covers || extractRes.covers.length === 0) {
+      return {
+        success: false,
+        error: `Failed to find cover image from scan source: ${targetScanUrl}`,
+      };
+    }
+
+    const bestCover = extractRes.covers[0];
+
+    // Update series cover_url
+    const { error: updateErr } = await admin
+      .from("series")
+      .update({ cover_url: bestCover, updated_at: new Date().toISOString() })
+      .eq("id", validated.seriesId);
+
+    if (updateErr) throw updateErr;
+
+    // Add to series_covers table if not exists
+    const { data: existingCover } = await admin
+      .from("series_covers")
+      .select("id")
+      .eq("series_id", validated.seriesId)
+      .eq("image_url", bestCover)
+      .maybeSingle();
+
+    if (!existingCover) {
+      await admin.from("series_covers").insert({
+        series_id: validated.seriesId,
+        image_url: bestCover,
+        position: 0,
+      });
+    }
+
+    return {
+      success: true,
+      coverUrl: bestCover,
+      totalDiscovered: extractRes.covers.length,
+      allCovers: extractRes.covers,
+      sourceUrl: targetScanUrl,
+      message: `Cover picture imported successfully from scan source!`,
+    };
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : "Failed to auto-import cover",
+    };
+  }
+}
+
 export async function $runCloudScrape(args: {
   data: {
     accessToken: string;
@@ -126,7 +339,14 @@ export async function $runCloudScrape(args: {
   const scanlationGroup = validated.scanlationGroup?.trim() || inferSourceGroup(validated.url);
   const uploadedBy = validated.uploader?.trim() || null;
 
-  const discovered = await extractChaptersFromSeriesUrl(validated.url);
+  const allDiscovered = await extractChaptersFromSeriesUrl(validated.url);
+
+  // Filter out premium/locked/paid chapters
+  const discovered = allDiscovered.filter((ch) => !isPremiumChapter(ch));
+  const premiumSkippedCount = allDiscovered.length - discovered.length;
+  if (premiumSkippedCount > 0) {
+    console.log(`[CloudScrape] Skipped ${premiumSkippedCount} premium/locked chapter(s)`);
+  }
 
   if (!validated.seriesId) {
     return {
@@ -136,6 +356,7 @@ export async function $runCloudScrape(args: {
       imported: 0,
       skipped: 0,
       failed: 0,
+      premiumSkipped: premiumSkippedCount,
       details: discovered.map((chapter) => ({
         chapter: chapter.chapterNumber,
         status: "found",
@@ -157,6 +378,7 @@ export async function $runCloudScrape(args: {
       imported: 0,
       skipped: 0,
       failed: 0,
+      premiumSkipped: premiumSkippedCount,
       details: [],
     };
   }
@@ -391,10 +613,22 @@ export async function $syncImportSource(args: {
   let imported = 0;
   let skipped = 0;
   let failed = 0;
-  const details: Array<{ chapter: number; status: string; message?: string }> = [];
+  const details: Array<{ chapter: number; status: string; message?: string; pages?: number }> = [];
+
+  let premiumSkipped = 0;
 
   try {
-    const discovered = await extractChaptersFromSeriesUrl(source.source_url);
+    const allDiscovered = await extractChaptersFromSeriesUrl(source.source_url);
+
+    // Filter out premium/locked/paid chapters
+    const discovered = allDiscovered.filter((ch) => !isPremiumChapter(ch));
+    premiumSkipped = allDiscovered.length - discovered.length;
+    if (premiumSkipped > 0) {
+      console.log(`[SyncImport] Skipped ${premiumSkipped} premium/locked chapter(s)`);
+      details.push(...allDiscovered
+        .filter((ch) => isPremiumChapter(ch))
+        .map((ch) => ({ chapter: ch.chapterNumber, status: "premium_skipped" as const, message: "Premium/locked chapter" })));
+    }
     chaptersFound = discovered.length;
 
     const { data: existingRows, error: existingError } = await admin
@@ -425,11 +659,17 @@ export async function $syncImportSource(args: {
     // Note: the old "<= maxChapterNumber" guard was removed because it dropped
     // legitimate decimal/re-published chapters. Exact duplicates are already
     // covered by existingKeys. Sort newest-last so we import chronologically.
+    // Track already existing chapters in details
     const seenKeys = new Set<string>();
     const missing = discovered
       .filter((chapter) => {
         const key = chapterScanKey(chapter.chapterNumber, scanlationGroup);
         if (existingKeys.has(key) || seenKeys.has(key)) {
+          details.push({
+            chapter: chapter.chapterNumber,
+            status: "skipped",
+            message: "Already imported",
+          });
           return false;
         }
         seenKeys.add(key);
@@ -540,13 +780,18 @@ export async function $syncImportSource(args: {
           for (const chapter of insertedChapters ?? []) {
             const key = chapterScanKey(Number(chapter.chapter_number), chapter.scanlation_group);
             const images = chapterImages.get(key) ?? [];
-            details.push({ chapter: Number(chapter.chapter_number), status: "imported" });
+            details.push({
+              chapter: Number(chapter.chapter_number),
+              status: "imported",
+              pages: images.length,
+            });
             existingKeys.add(key);
           }
         }
       }
     }
 
+    const durationSeconds = Math.max(1, Math.round((new Date().getTime() - new Date(startedAt).getTime()) / 1000));
     const status = failed > 0 && imported > 0 ? "partial" : failed > 0 ? "failed" : "success";
     const message =
       imported > 0
@@ -561,6 +806,7 @@ export async function $syncImportSource(args: {
       chapters_imported: imported,
       chapters_skipped: skipped,
       chapters_failed: failed,
+      duration_seconds: durationSeconds,
       details,
     });
 
@@ -627,7 +873,7 @@ export async function $syncAllSeriesImportSources(args: {
 
     const { data: sources, error } = await admin
       .from("series_import_sources")
-      .select("id, series_id, source_url, source_site, scanlation_group, auto_publish, image_url_example")
+      .select("id, series_id, source_url, source_site, scanlation_group, auto_publish, image_url_example, series:series(id, title, slug, cover_url)")
       .eq("enabled", true);
 
     if (error) throw error;
@@ -643,17 +889,28 @@ export async function $syncAllSeriesImportSources(args: {
 
     const results: Array<{
       sourceId: string;
+      seriesId: string;
+      seriesTitle: string;
+      seriesSlug?: string;
+      coverUrl?: string | null;
       sourceUrl: string;
       chaptersFound: number;
       imported: number;
       skipped: number;
       failed: number;
+      status: "success" | "partial" | "failed";
       error?: string;
+      details?: Array<{ chapter: number; status: string; message?: string; pages?: number }>;
     }> = [];
 
     let totalImported = 0;
 
     for (const source of sources) {
+      const seriesInfo = (source as any).series;
+      const seriesTitle = seriesInfo?.title || "Unknown Series";
+      const seriesSlug = seriesInfo?.slug;
+      const coverUrl = seriesInfo?.cover_url;
+
       const syncRes = await $syncImportSource({
         data: {
           sourceId: source.id,
@@ -664,23 +921,36 @@ export async function $syncAllSeriesImportSources(args: {
 
       if (syncRes.success) {
         totalImported += syncRes.imported ?? 0;
+        const status = (syncRes.failed ?? 0) > 0 && (syncRes.imported ?? 0) > 0 ? "partial" : (syncRes.failed ?? 0) > 0 ? "failed" : "success";
         results.push({
           sourceId: source.id,
+          seriesId: source.series_id,
+          seriesTitle,
+          seriesSlug,
+          coverUrl,
           sourceUrl: source.source_url,
           chaptersFound: syncRes.chaptersFound ?? 0,
           imported: syncRes.imported ?? 0,
           skipped: syncRes.skipped ?? 0,
           failed: syncRes.failed ?? 0,
+          status,
+          details: syncRes.details,
         });
       } else {
         results.push({
           sourceId: source.id,
+          seriesId: source.series_id,
+          seriesTitle,
+          seriesSlug,
+          coverUrl,
           sourceUrl: source.source_url,
           chaptersFound: 0,
           imported: 0,
           skipped: 0,
           failed: 1,
+          status: "failed",
           error: syncRes.error,
+          details: syncRes.details,
         });
       }
     }
@@ -701,6 +971,34 @@ export async function $syncAllSeriesImportSources(args: {
 
 function chapterScanKey(chapterNumber: number, scanlationGroup: string | null) {
   return `${chapterNumber}::${scanlationGroup?.trim() || ""}`;
+}
+
+const PREMIUM_KEYWORDS = [
+  "premium", "locked", "paid", "coin", "coins", "points",
+  "vip", "paywall", "buy", "purchase", "unlock", "ticket", "tickets",
+  "early-access", "early access", "subscribers-only", "subscriber only",
+  "fastpass", "fast-pass", "kofi", "patreon", "subscribers",
+  "🔒", "🔐", "💰", "💎", "🪙", "🏷️",
+];
+
+function isPremiumChapter(chapter: { chapterNumber: number; title?: string; url: string }): boolean {
+  const titleLower = (chapter.title || "").toLowerCase();
+  const urlLower = chapter.url.toLowerCase();
+
+  // 1. Keyword checks in title and URL
+  if (PREMIUM_KEYWORDS.some((kw) => titleLower.includes(kw) || urlLower.includes(kw))) {
+    return true;
+  }
+
+  // 2. Price / currency / lock patterns in chapter title
+  if (/\b(?:cost|price|buy|\d+\s*(?:coins?|points?|gems?|diamonds?|tickets?))\b/i.test(titleLower)) {
+    return true;
+  }
+  if (/\b(?:locked|unlock\s*with|subscriber\s*only|paid\s*chapter|early\s*access)\b/i.test(titleLower)) {
+    return true;
+  }
+
+  return false;
 }
 
 function inferSourceGroup(sourceUrl: string) {
