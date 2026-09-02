@@ -44,7 +44,7 @@ import { renderCommentMarkdown, COMMENT_TEXT_COLORS } from "@/lib/bbcode";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { POPULAR_MEME_STICKERS, MEME_CATEGORIES, type MemeSticker } from "@/lib/meme-data";
+import { POPULAR_MEME_STICKERS, MEME_CATEGORIES, CHAPTER_BOTTOM_REACTION_MEMES, type MemeSticker } from "@/lib/meme-data";
 import { saveChapterReadingPosition, getChapterReadingPosition } from "@/lib/reading-position";
 import {
   Select,
@@ -2133,6 +2133,60 @@ function ReportButton({
   );
 }
 
+function MemeGridItem({
+  meme,
+  onSelect,
+}: {
+  meme: MemeSticker;
+  onSelect: () => void;
+}) {
+  const [loaded, setLoaded] = useState(false);
+  const [error, setError] = useState(false);
+
+  return (
+    <button
+      key={meme.id}
+      type="button"
+      onClick={onSelect}
+      className="group flex flex-col items-center justify-between p-2 rounded-xl border border-border/40 bg-background/50 hover:bg-primary/10 hover:border-primary/50 transition-all duration-200 hover:scale-[1.03] text-center cursor-pointer shadow-sm relative overflow-hidden"
+    >
+      <div className="relative w-full aspect-square rounded-lg overflow-hidden bg-black/50 flex items-center justify-center">
+        {!loaded && !error && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-secondary/60 animate-pulse text-xs text-muted-foreground">
+            <span className="text-xl">{meme.emoji}</span>
+          </div>
+        )}
+        {error ? (
+          <div className="flex flex-col items-center justify-center p-2 text-center">
+            <span className="text-3xl">{meme.emoji}</span>
+            <span className="text-[10px] font-bold text-primary mt-1">{meme.tag}</span>
+          </div>
+        ) : (
+          <img
+            src={meme.url}
+            alt={meme.alt}
+            referrerPolicy="no-referrer"
+            loading="lazy"
+            decoding="async"
+            className={`w-full h-full object-cover group-hover:scale-105 transition-all duration-300 ${
+              loaded ? "opacity-100" : "opacity-0"
+            }`}
+            onLoad={() => setLoaded(true)}
+            onError={() => {
+              setLoaded(true);
+              setError(true);
+            }}
+          />
+        )}
+      </div>
+      <div className="mt-1.5 flex items-center justify-center gap-1 w-full">
+        <span className="text-xs">{meme.emoji}</span>
+        <span className="text-[11px] font-medium text-foreground truncate">{meme.name}</span>
+      </div>
+    </button>
+  );
+}
+
 function MemePickerModal({
   open,
   onClose,
@@ -2152,25 +2206,31 @@ function MemePickerModal({
     const matchesQuery =
       !searchQuery ||
       meme.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      meme.alt.toLowerCase().includes(searchQuery.toLowerCase());
+      meme.alt.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      meme.tag.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesCategory && matchesQuery;
   });
 
   return (
     <div 
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-in fade-in duration-200"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200"
       onClick={onClose}
     >
       <div 
-        className="w-full max-w-lg rounded-2xl border border-border/60 bg-card p-5 shadow-2xl overflow-hidden flex flex-col max-h-[85vh] animate-in zoom-in-95 duration-200"
+        className="w-full max-w-xl rounded-2xl border border-border/60 bg-card p-5 shadow-2xl overflow-hidden flex flex-col max-h-[85vh] animate-in zoom-in-95 duration-200"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between pb-3 border-b border-border/40">
           <div className="flex items-center gap-2">
-            <span className="text-xl">🔥</span>
+            <span className="text-2xl">🔥</span>
             <div>
-              <h3 className="font-bold text-base text-foreground">Anime Memes & Stickers</h3>
-              <p className="text-xs text-muted-foreground">Click a meme to attach to your comment</p>
+              <h3 className="font-bold text-base text-foreground flex items-center gap-1.5">
+                <span>Anime Memes & Chapter Reaction Stickers</span>
+                <span className="text-[10px] bg-primary/20 text-primary font-bold px-1.5 py-0.5 rounded-full">
+                  {POPULAR_MEME_STICKERS.length}+
+                </span>
+              </h3>
+              <p className="text-xs text-muted-foreground">Select a meme to attach to your comment</p>
             </div>
           </div>
           <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full" onClick={onClose}>
@@ -2182,7 +2242,7 @@ function MemePickerModal({
         <div className="py-3">
           <input
             type="text"
-            placeholder="Search memes (e.g. Peak, Gigachad, Anya)..."
+            placeholder="Search memes (e.g. Peak, Cinema, Gojo, Aura, Guts, Anya)..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full h-9 rounded-lg border border-border/50 bg-background/70 px-3 text-xs focus:outline-none focus:ring-1 focus:ring-primary"
@@ -2209,32 +2269,19 @@ function MemePickerModal({
         {/* Meme Grid */}
         <div className="grid grid-cols-3 sm:grid-cols-4 gap-2.5 overflow-y-auto py-4 flex-1 pr-1">
           {filteredMemes.map((meme) => (
-            <button
+            <MemeGridItem
               key={meme.id}
-              onClick={() => {
+              meme={meme}
+              onSelect={() => {
                 onSelectMeme(meme);
                 onClose();
               }}
-              className="group flex flex-col items-center justify-between p-2 rounded-xl border border-border/40 bg-background/50 hover:bg-primary/10 hover:border-primary/50 transition-all duration-200 hover:scale-[1.03] text-center cursor-pointer shadow-sm"
-            >
-              <div className="relative w-full aspect-square rounded-lg overflow-hidden bg-black/40 flex items-center justify-center">
-                <img
-                  src={meme.url}
-                  alt={meme.alt}
-                  loading="lazy"
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                />
-              </div>
-              <div className="mt-1.5 flex items-center justify-center gap-1 w-full">
-                <span className="text-xs">{meme.emoji}</span>
-                <span className="text-[11px] font-medium text-foreground truncate">{meme.name}</span>
-              </div>
-            </button>
+            />
           ))}
         </div>
 
         <div className="pt-3 border-t border-border/30 flex items-center justify-between text-xs text-muted-foreground">
-          <span>Click any meme to attach</span>
+          <span>Click any meme to attach instantly</span>
           <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={onClose}>
             Close
           </Button>
@@ -2250,7 +2297,7 @@ function ChapterLikeAndMemes({ chapterId, seriesId }: { chapterId: string; serie
   const qc = useQueryClient();
   const [likeBurst, setLikeBurst] = useState(false);
 
-  // Reaction types mapped to meme types in database constraint ('heart', 'thumbs_up', 'laugh', 'star', 'smile')
+  // Reaction types mapped to database check constraint values ('heart', 'thumbs_up', 'laugh', 'star', 'smile')
   const memeReactions = [
     { type: "star", emoji: "🗿", label: "Peak Fiction" },
     { type: "thumbs_up", emoji: "🔥", label: "Nah, I'd Win" },
@@ -2346,24 +2393,24 @@ function ChapterLikeAndMemes({ chapterId, seriesId }: { chapterId: string; serie
   return (
     <div className="mt-12 mb-8 border-t border-border/50 pt-8">
       {/* Primary Like Feature */}
-      <div className="mb-8 rounded-2xl border border-border/50 bg-gradient-to-b from-card/80 via-card/40 to-background/80 p-6 shadow-xl backdrop-blur-md text-center flex flex-col items-center justify-center relative overflow-hidden">
+      <div className="mb-8 rounded-2xl border border-border/50 bg-gradient-to-b from-card/80 via-card/40 to-background/80 p-6 sm:p-8 shadow-xl backdrop-blur-md text-center flex flex-col items-center justify-center relative overflow-hidden">
         {/* Glow effect */}
-        <div className="absolute -top-12 -left-12 w-32 h-32 bg-pink-500/10 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute -bottom-12 -right-12 w-32 h-32 bg-primary/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute -top-12 -left-12 w-36 h-36 bg-pink-500/15 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute -bottom-12 -right-12 w-36 h-36 bg-primary/15 rounded-full blur-3xl pointer-events-none" />
 
         <h3 className="text-xl font-black tracking-tight text-foreground sm:text-2xl flex items-center justify-center gap-2">
           <span>Show Some Love for This Chapter!</span>
         </h3>
-        <p className="text-xs sm:text-sm text-muted-foreground mt-1 max-w-md">
+        <p className="text-xs sm:text-sm text-muted-foreground mt-1.5 max-w-md">
           Enjoyed reading? Drop a like to support the scans and climb the hype ladder.
         </p>
 
         {/* Big Animated Like Button */}
-        <div className="mt-5 flex flex-col items-center">
+        <div className="mt-6 flex flex-col items-center">
           <button
             onClick={() => toggleReaction.mutate("heart")}
             disabled={toggleReaction.isPending}
-            className={`group relative flex items-center gap-3 px-8 py-3.5 rounded-full font-bold text-base transition-all duration-300 transform active:scale-95 cursor-pointer shadow-lg ${
+            className={`group relative flex items-center gap-3 px-9 py-4 rounded-full font-bold text-base transition-all duration-300 transform active:scale-95 cursor-pointer shadow-xl ${
               isLiked
                 ? "bg-gradient-to-r from-pink-600 via-rose-500 to-pink-600 text-white shadow-pink-500/30 ring-2 ring-pink-400/60 scale-105"
                 : "bg-secondary/80 hover:bg-pink-500/10 text-foreground border border-border hover:border-pink-500/40 hover:text-pink-400"
@@ -2376,7 +2423,7 @@ function ChapterLikeAndMemes({ chapterId, seriesId }: { chapterId: string; serie
             />
             <span>{isLiked ? "Liked!" : "Like Chapter"}</span>
             <span
-              className={`ml-1 text-xs font-mono font-bold px-2 py-0.5 rounded-full ${
+              className={`ml-1 text-xs font-mono font-bold px-2.5 py-0.5 rounded-full ${
                 isLiked ? "bg-white/20 text-white" : "bg-background/80 text-muted-foreground"
               }`}
             >
@@ -2393,12 +2440,12 @@ function ChapterLikeAndMemes({ chapterId, seriesId }: { chapterId: string; serie
         </div>
       </div>
 
-      {/* Chapter Memes & Quick Reaction Stickers */}
+      {/* Chapter Memes & Reactions */}
       <div className="mb-8">
         <div className="flex items-center justify-between mb-4">
           <h4 className="text-base font-bold flex items-center gap-2 text-foreground">
-            <span className="text-lg">🔥</span>
-            <span>Chapter Memes & Reactions</span>
+            <span className="text-xl">🔥</span>
+            <span>Chapter Reactions & Hype</span>
           </h4>
           <button
             onClick={scrollToComments}
@@ -2419,15 +2466,15 @@ function ChapterLikeAndMemes({ chapterId, seriesId }: { chapterId: string; serie
                 key={reaction.type}
                 onClick={() => toggleReaction.mutate(reaction.type)}
                 disabled={toggleReaction.isPending}
-                className={`flex items-center justify-between p-3 rounded-xl border transition-all duration-200 transform active:scale-95 cursor-pointer ${
+                className={`flex items-center justify-between p-3.5 rounded-xl border transition-all duration-200 transform active:scale-95 cursor-pointer ${
                   hasReacted
                     ? "bg-primary/20 border-primary text-primary font-bold shadow-md shadow-primary/10 scale-[1.02]"
                     : "bg-card/60 border-border/60 hover:bg-primary/10 hover:border-primary/50 text-foreground"
                 }`}
                 title={reaction.label}
               >
-                <div className="flex items-center gap-2">
-                  <span className="text-xl">{reaction.emoji}</span>
+                <div className="flex items-center gap-2.5">
+                  <span className="text-2xl">{reaction.emoji}</span>
                   <span className="text-xs font-bold">{reaction.label}</span>
                 </div>
                 <span className="text-xs font-mono font-bold bg-secondary/80 px-2 py-0.5 rounded-md text-muted-foreground">
@@ -2492,7 +2539,95 @@ type CommentDraft = {
   attachmentAlt: string | null;
 };
 
-// Comment parsing and markdown rendering imported from @/lib/bbcode
+// Media attachment renderer with guaranteed visibility, loading shimmer, and lightbox
+function CommentAttachmentMedia({
+  url,
+  alt,
+  type,
+}: {
+  url: string;
+  alt?: string | null;
+  type?: "image" | "gif" | null;
+}) {
+  const [error, setError] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [expanded, setExpanded] = useState(false);
+
+  const isGif = type === "gif" || url.toLowerCase().includes(".gif");
+
+  return (
+    <>
+      <div className="mt-3 inline-block max-w-xs sm:max-w-sm">
+        <div
+          onClick={() => setExpanded(true)}
+          className="group relative block overflow-hidden rounded-xl border border-border/60 bg-black/40 hover:border-primary/50 transition-all duration-200 shadow-md cursor-pointer select-none"
+        >
+          {loading && !error && (
+            <div className="h-44 w-60 animate-pulse bg-secondary/80 rounded-xl flex items-center justify-center text-muted-foreground text-xs font-medium">
+              Loading meme...
+            </div>
+          )}
+
+          {error ? (
+            <div className="flex items-center gap-3 p-3.5 bg-secondary/50 rounded-xl border border-border/50">
+              <span className="text-3xl">🔥</span>
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-bold text-foreground truncate">{alt || "Anime Reaction Meme"}</p>
+                <span className="text-[10px] text-primary font-semibold">Click to view image</span>
+              </div>
+            </div>
+          ) : (
+            <img
+              src={url}
+              alt={alt ?? (isGif ? "Comment GIF" : "Comment Meme / Image")}
+              referrerPolicy="no-referrer"
+              loading="lazy"
+              decoding="async"
+              className={`max-h-72 w-full object-contain rounded-xl group-hover:scale-[1.02] transition-transform duration-200 ${
+                loading ? "hidden" : "block"
+              }`}
+              onLoad={() => setLoading(false)}
+              onError={() => {
+                setLoading(false);
+                setError(true);
+              }}
+            />
+          )}
+
+          {!error && !loading && (
+            <div className="absolute top-2 left-2 px-2 py-0.5 rounded-md bg-black/75 backdrop-blur-md text-[10px] font-bold text-primary flex items-center gap-1 border border-primary/30 pointer-events-none">
+              <Flame className="h-3 w-3" />
+              <span>{isGif ? "GIF" : "MEME"}</span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Lightbox Modal */}
+      {expanded && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200 cursor-pointer"
+          onClick={() => setExpanded(false)}
+        >
+          <div className="relative max-w-2xl max-h-[85vh] flex flex-col items-center justify-center" onClick={(e) => e.stopPropagation()}>
+            <div className="absolute -top-10 right-0">
+              <Button variant="ghost" size="icon" className="text-white hover:bg-white/20 rounded-full h-8 w-8" onClick={() => setExpanded(false)}>
+                <X className="h-5 w-5" />
+              </Button>
+            </div>
+            <img
+              src={url}
+              alt={alt || "Meme"}
+              referrerPolicy="no-referrer"
+              className="max-w-full max-h-[80vh] object-contain rounded-2xl shadow-2xl border border-border/50 bg-black/40"
+            />
+            {alt && <p className="mt-3 text-sm font-semibold text-white/90">{alt}</p>}
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
 
 function CommentAvatarFrame({
   avatarUrl,
@@ -3307,28 +3442,11 @@ function ChapterComments({ chapterId, seriesId }: { chapterId: string; seriesId:
             const safeAttachmentUrl = safeUrlOrNull(comment.attachment_url);
             if (!safeAttachmentUrl) return null;
             return (
-              <div className="mt-3 inline-block max-w-xs sm:max-w-sm">
-                <a
-                  href={safeAttachmentUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="group relative block overflow-hidden rounded-xl border border-border/60 bg-black/40 hover:border-primary/50 transition-all duration-200 shadow-md"
-                >
-                  <img
-                    src={safeAttachmentUrl}
-                    alt={
-                      comment.attachment_alt ??
-                      (comment.attachment_type === "gif" ? "Comment GIF" : "Comment Meme / Image")
-                    }
-                    className="max-h-72 w-full object-contain rounded-xl group-hover:scale-[1.02] transition-transform duration-200"
-                    loading="lazy"
-                  />
-                  <div className="absolute top-2 left-2 px-2 py-0.5 rounded-md bg-black/75 backdrop-blur-md text-[10px] font-bold text-primary flex items-center gap-1 border border-primary/30">
-                    <Flame className="h-3 w-3" />
-                    <span>{comment.attachment_type === "gif" ? "GIF" : "MEME"}</span>
-                  </div>
-                </a>
-              </div>
+              <CommentAttachmentMedia
+                url={safeAttachmentUrl}
+                alt={comment.attachment_alt}
+                type={comment.attachment_type}
+              />
             );
           })()}
 
@@ -3411,6 +3529,7 @@ function ChapterComments({ chapterId, seriesId }: { chapterId: string; seriesId:
                   <img
                     src={replyAttachmentUrl}
                     alt={replyAttachmentAlt ?? "Reply attachment preview"}
+                    referrerPolicy="no-referrer"
                     className="h-14 w-16 rounded-md object-cover bg-black/40"
                   />
                   <div className="min-w-0 flex-1">
@@ -3614,6 +3733,7 @@ function ChapterComments({ chapterId, seriesId }: { chapterId: string; seriesId:
             <img
               src={attachmentUrl}
               alt={attachmentAlt ?? "Comment attachment preview"}
+              referrerPolicy="no-referrer"
               className="h-16 w-20 rounded-md object-cover bg-black/40"
             />
             <div className="min-w-0 flex-1">
