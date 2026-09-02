@@ -2148,18 +2148,18 @@ function MemeGridItem({
       key={meme.id}
       type="button"
       onClick={onSelect}
-      className="group flex flex-col items-center justify-between p-2 rounded-xl border border-border/40 bg-background/50 hover:bg-primary/10 hover:border-primary/50 transition-all duration-200 hover:scale-[1.03] text-center cursor-pointer shadow-sm relative overflow-hidden"
+      className="group flex flex-col items-center justify-between p-2 rounded-xl border border-border/40 bg-card/70 hover:bg-primary/15 hover:border-primary/60 transition-all duration-200 hover:scale-[1.03] text-center cursor-pointer shadow-sm relative overflow-hidden active:scale-95"
     >
-      <div className="relative w-full aspect-square rounded-lg overflow-hidden bg-black/50 flex items-center justify-center">
+      <div className={`relative w-full aspect-square rounded-lg overflow-hidden bg-gradient-to-br ${meme.fallbackGradient || 'from-zinc-800 to-zinc-950'} flex items-center justify-center`}>
         {!loaded && !error && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center bg-secondary/60 animate-pulse text-xs text-muted-foreground">
-            <span className="text-xl">{meme.emoji}</span>
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-secondary/70 animate-pulse text-xs text-muted-foreground">
+            <span className="text-2xl">{meme.emoji}</span>
           </div>
         )}
         {error ? (
-          <div className="flex flex-col items-center justify-center p-2 text-center">
-            <span className="text-3xl">{meme.emoji}</span>
-            <span className="text-[10px] font-bold text-primary mt-1">{meme.tag}</span>
+          <div className="flex flex-col items-center justify-center p-2 text-center h-full w-full">
+            <span className="text-3xl filter drop-shadow-md">{meme.emoji}</span>
+            <span className="text-[10px] font-black text-white uppercase tracking-wider mt-1 px-1.5 py-0.5 rounded bg-black/40 border border-white/10">{meme.tag}</span>
           </div>
         ) : (
           <img
@@ -2168,7 +2168,7 @@ function MemeGridItem({
             referrerPolicy="no-referrer"
             loading="lazy"
             decoding="async"
-            className={`w-full h-full object-cover group-hover:scale-105 transition-all duration-300 ${
+            className={`w-full h-full object-cover group-hover:scale-110 transition-all duration-300 ${
               loaded ? "opacity-100" : "opacity-0"
             }`}
             onLoad={() => setLoaded(true)}
@@ -2179,9 +2179,9 @@ function MemeGridItem({
           />
         )}
       </div>
-      <div className="mt-1.5 flex items-center justify-center gap-1 w-full">
-        <span className="text-xs">{meme.emoji}</span>
-        <span className="text-[11px] font-medium text-foreground truncate">{meme.name}</span>
+      <div className="mt-1.5 flex items-center justify-center gap-1 w-full px-1">
+        <span className="text-xs shrink-0">{meme.emoji}</span>
+        <span className="text-[11px] font-semibold text-foreground truncate">{meme.name}</span>
       </div>
     </button>
   );
@@ -2221,16 +2221,18 @@ function MemePickerModal({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between pb-3 border-b border-border/40">
-          <div className="flex items-center gap-2">
-            <span className="text-2xl">🔥</span>
+          <div className="flex items-center gap-2.5">
+            <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-amber-500/20 to-purple-500/20 border border-amber-500/30 flex items-center justify-center text-xl shrink-0">
+              🔥
+            </div>
             <div>
               <h3 className="font-bold text-base text-foreground flex items-center gap-1.5">
-                <span>Anime Memes & Chapter Reaction Stickers</span>
+                <span>Anime Memes & Reaction Stickers</span>
                 <span className="text-[10px] bg-primary/20 text-primary font-bold px-1.5 py-0.5 rounded-full">
                   {POPULAR_MEME_STICKERS.length}+
                 </span>
               </h3>
-              <p className="text-xs text-muted-foreground">Select a meme to attach to your comment</p>
+              <p className="text-xs text-muted-foreground">Click any meme to attach directly to the comments</p>
             </div>
           </div>
           <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full" onClick={onClose}>
@@ -2246,6 +2248,7 @@ function MemePickerModal({
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full h-9 rounded-lg border border-border/50 bg-background/70 px-3 text-xs focus:outline-none focus:ring-1 focus:ring-primary"
+            autoFocus
           />
         </div>
 
@@ -2296,6 +2299,8 @@ function ChapterLikeAndMemes({ chapterId, seriesId }: { chapterId: string; serie
   const { user } = useAuth();
   const qc = useQueryClient();
   const [likeBurst, setLikeBurst] = useState(false);
+  const [isFullMemeModalOpen, setIsFullMemeModalOpen] = useState(false);
+  const [pendingCommentMeme, setPendingCommentMeme] = useState<MemeSticker | null>(null);
 
   // Reaction types mapped to database check constraint values ('heart', 'thumbs_up', 'laugh', 'star', 'smile')
   const memeReactions = [
@@ -2383,21 +2388,6 @@ function ChapterLikeAndMemes({ chapterId, seriesId }: { chapterId: string; serie
   const isLiked = userReactionsQ.data?.includes("heart");
   const likeCount = reactionsQ.data?.["heart"] || 0;
 
-  const [selectedVaultCategory, setSelectedVaultCategory] = useState<string>("all");
-  const [vaultSearch, setVaultSearch] = useState("");
-  const [isFullMemeModalOpen, setIsFullMemeModalOpen] = useState(false);
-  const [pendingCommentMeme, setPendingCommentMeme] = useState<MemeSticker | null>(null);
-
-  const filteredVaultMemes = POPULAR_MEME_STICKERS.filter((meme) => {
-    const matchesCategory = selectedVaultCategory === "all" || meme.category === selectedVaultCategory;
-    const matchesQuery =
-      !vaultSearch ||
-      meme.name.toLowerCase().includes(vaultSearch.toLowerCase()) ||
-      meme.tag.toLowerCase().includes(vaultSearch.toLowerCase()) ||
-      meme.alt.toLowerCase().includes(vaultSearch.toLowerCase());
-    return matchesCategory && matchesQuery;
-  });
-
   const handleSelectMemeFromVault = (meme: MemeSticker) => {
     setPendingCommentMeme(meme);
     toast.success(`Attached "${meme.name}" meme to comment draft!`);
@@ -2416,7 +2406,7 @@ function ChapterLikeAndMemes({ chapterId, seriesId }: { chapterId: string; serie
 
   return (
     <div className="mt-12 mb-8 border-t border-border/50 pt-8">
-      {/* Full Modal Picker for Browse All */}
+      {/* Meme / Sticker Modal Window (Opened on click) */}
       <MemePickerModal
         open={isFullMemeModalOpen}
         onClose={() => setIsFullMemeModalOpen(false)}
@@ -2472,7 +2462,7 @@ function ChapterLikeAndMemes({ chapterId, seriesId }: { chapterId: string; serie
       </div>
 
       {/* Chapter Memes & Reactions Stats Bar */}
-      <div className="mb-8">
+      <div className="mb-6">
         <div className="flex items-center justify-between mb-4">
           <h4 className="text-base font-bold flex items-center gap-2 text-foreground">
             <span className="text-xl">🏆</span>
@@ -2517,92 +2507,32 @@ function ChapterLikeAndMemes({ chapterId, seriesId }: { chapterId: string; serie
         </div>
       </div>
 
-      {/* Standalone Chapter Reaction Memes Showcase (OUTSIDE Comments Section) */}
-      <div className="mb-10 rounded-2xl border border-border/50 bg-gradient-to-b from-card/90 via-card/50 to-background/90 p-5 sm:p-6 shadow-xl backdrop-blur-md">
-        <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-border/40">
-          <div className="flex items-center gap-2.5">
-            <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-amber-500/20 to-orange-500/20 border border-amber-500/30 flex items-center justify-center text-xl">
-              🔥
-            </div>
-            <div>
-              <h4 className="font-bold text-base sm:text-lg text-foreground flex items-center gap-2">
-                <span>Chapter Reaction Memes Vault</span>
-                <span className="text-[10px] bg-primary/20 text-primary font-bold px-2 py-0.5 rounded-full">
-                  {POPULAR_MEME_STICKERS.length} Stickers
-                </span>
-              </h4>
-              <p className="text-xs text-muted-foreground">
-                Click any meme to attach & drop directly into the discussion below
-              </p>
-            </div>
+      {/* Sleek Meme & Sticker Window Feature Button (Opens Modal on Click) */}
+      <div className="mb-8 rounded-2xl border border-border/50 bg-gradient-to-r from-purple-950/25 via-card/80 to-amber-950/25 p-4 sm:p-5 shadow-lg backdrop-blur-md flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-amber-500/20 to-purple-500/20 border border-amber-500/30 flex items-center justify-center text-xl shrink-0">
+            🔥
           </div>
-
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-8 gap-1.5 text-xs font-semibold bg-primary/10 border-primary/30 text-primary hover:bg-primary/20 cursor-pointer"
-              onClick={() => setIsFullMemeModalOpen(true)}
-            >
-              <Sparkles className="h-3.5 w-3.5" />
-              <span>Full Sticker Library</span>
-            </Button>
+          <div>
+            <h4 className="font-bold text-sm sm:text-base text-foreground flex items-center gap-2">
+              <span>Reaction Memes & Stickers</span>
+              <span className="text-[10px] bg-primary/20 text-primary font-bold px-2 py-0.5 rounded-full">
+                {POPULAR_MEME_STICKERS.length}+ Stickers
+              </span>
+            </h4>
+            <p className="text-xs text-muted-foreground">
+              Click to open the meme window and attach reaction stickers to the discussion
+            </p>
           </div>
         </div>
 
-        {/* Category Tabs & Quick Search */}
-        <div className="mt-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
-            {MEME_CATEGORIES.map((cat) => (
-              <button
-                key={cat.id}
-                onClick={() => setSelectedVaultCategory(cat.id)}
-                className={`shrink-0 px-3 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer ${
-                  selectedVaultCategory === cat.id
-                    ? "bg-primary text-primary-foreground shadow-sm shadow-primary/20 scale-105"
-                    : "bg-secondary/70 text-muted-foreground hover:bg-secondary hover:text-foreground"
-                }`}
-              >
-                {cat.label}
-              </button>
-            ))}
-          </div>
-
-          <div className="relative w-full sm:w-56 shrink-0">
-            <input
-              type="text"
-              placeholder="Search memes..."
-              value={vaultSearch}
-              onChange={(e) => setVaultSearch(e.target.value)}
-              className="w-full h-8 rounded-lg border border-border/50 bg-background/80 px-3 text-xs focus:outline-none focus:ring-1 focus:ring-primary"
-            />
-          </div>
-        </div>
-
-        {/* Standalone Meme Grid */}
-        <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-3">
-          {filteredVaultMemes.slice(0, 12).map((meme) => (
-            <MemeGridItem
-              key={meme.id}
-              meme={meme}
-              onSelect={() => handleSelectMemeFromVault(meme)}
-            />
-          ))}
-        </div>
-
-        {filteredVaultMemes.length > 12 && (
-          <div className="mt-4 text-center">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-8 text-xs text-primary hover:bg-primary/10 gap-1.5"
-              onClick={() => setIsFullMemeModalOpen(true)}
-            >
-              <span>View all {filteredVaultMemes.length} memes in {selectedVaultCategory} category</span>
-              <span>→</span>
-            </Button>
-          </div>
-        )}
+        <Button
+          onClick={() => setIsFullMemeModalOpen(true)}
+          className="w-full sm:w-auto shrink-0 bg-gradient-to-r from-amber-500 via-orange-500 to-purple-600 hover:from-amber-600 hover:to-purple-700 text-white font-bold text-xs h-9 px-4 gap-2 shadow-lg shadow-purple-600/20 cursor-pointer"
+        >
+          <Sparkles className="h-3.5 w-3.5" />
+          <span>Open Memes & Stickers Window</span>
+        </Button>
       </div>
 
       {/* Comments section */}

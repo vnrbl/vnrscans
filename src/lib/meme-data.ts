@@ -17,7 +17,8 @@ export const POPULAR_MEME_STICKERS: MemeSticker[] = [
     category: "hype",
     emoji: "🗿",
     tag: "PEAK",
-    url: "https://media.giphy.com/media/VIPfTy8y1Lc5iKEYle/giphy.gif",
+    url: "https://i.giphy.com/media/VIPfTy8y1Lc5iKEYle/giphy.webp",
+    fallbackGradient: "from-amber-600 to-orange-700",
     alt: "Peak Fiction Gunna Writing Fire Meme",
   },
   {
@@ -26,7 +27,8 @@ export const POPULAR_MEME_STICKERS: MemeSticker[] = [
     category: "hype",
     emoji: "🍿",
     tag: "CINEMA",
-    url: "https://media.giphy.com/media/TFIoWBxZwg2ZWn3807/giphy.gif",
+    url: "https://i.giphy.com/media/TFIoWBxZwg2ZWn3807/giphy.webp",
+    fallbackGradient: "from-purple-600 to-indigo-800",
     alt: "Absolute Cinema Scorsese Meme",
   },
   {
@@ -35,7 +37,8 @@ export const POPULAR_MEME_STICKERS: MemeSticker[] = [
     category: "hype",
     emoji: "🔥",
     tag: "GOJO",
-    url: "https://media1.tenor.com/m/aP3F6K4yL08AAAAC/nah-id-win-gojo.gif",
+    url: "https://i.giphy.com/media/fggf056k4P5d0W9Veq/giphy.webp",
+    fallbackGradient: "from-blue-600 to-cyan-600",
     alt: "Nah I'd Win Gojo Satoru Smirk Meme",
   },
   {
@@ -44,7 +47,8 @@ export const POPULAR_MEME_STICKERS: MemeSticker[] = [
     category: "hype",
     emoji: "⚡",
     tag: "AURA",
-    url: "https://media.giphy.com/media/dxld1UBIiGuoh31Fus/giphy.gif",
+    url: "https://i.giphy.com/media/dxld1UBIiGuoh31Fus/giphy.webp",
+    fallbackGradient: "from-yellow-500 to-amber-600",
     alt: "Pure Aura Goku Super Saiyan Hype Meme",
   },
   {
@@ -53,7 +57,8 @@ export const POPULAR_MEME_STICKERS: MemeSticker[] = [
     category: "hype",
     emoji: "👑",
     tag: "CHAD",
-    url: "https://media.giphy.com/media/CAYVZA5NRb529kKQUc/giphy.gif",
+    url: "https://i.giphy.com/media/CAYVZA5NRb529kKQUc/giphy.webp",
+    fallbackGradient: "from-zinc-700 to-zinc-900",
     alt: "Gigachad Meme",
   },
   {
@@ -62,7 +67,8 @@ export const POPULAR_MEME_STICKERS: MemeSticker[] = [
     category: "hype",
     emoji: "🍳",
     tag: "COOKING",
-    url: "https://media.giphy.com/media/M6ONx0ldSEHsTEn8VX/giphy.gif",
+    url: "https://i.giphy.com/media/M6ONx0ldSEHsTEn8VX/giphy.webp",
+    fallbackGradient: "from-emerald-600 to-teal-800",
     alt: "Let Him Cook Meme",
   },
   {
@@ -71,7 +77,8 @@ export const POPULAR_MEME_STICKERS: MemeSticker[] = [
     category: "hype",
     emoji: "🤞",
     tag: "JJK",
-    url: "https://media.giphy.com/media/ug6l63xZaM9ji/giphy.gif",
+    url: "https://i.giphy.com/media/ug6l63xZaM9ji/giphy.webp",
+    fallbackGradient: "from-violet-600 to-purple-900",
     alt: "Domain Expansion Hand Sign Meme",
   },
   {
@@ -80,7 +87,8 @@ export const POPULAR_MEME_STICKERS: MemeSticker[] = [
     category: "hype",
     emoji: "🐐",
     tag: "GOAT",
-    url: "https://media.giphy.com/media/alvlhqWgmpWCdtxUwQ/giphy.gif",
+    url: "https://i.giphy.com/media/alvlhqWgmpWCdtxUwQ/giphy.webp",
+    fallbackGradient: "from-rose-600 to-pink-800",
     alt: "My GOAT LeBron Worshipping Meme",
   },
 
@@ -91,7 +99,8 @@ export const POPULAR_MEME_STICKERS: MemeSticker[] = [
     category: "funny",
     emoji: "😏",
     tag: "SMUG",
-    url: "https://media.giphy.com/media/FWAcpJsFT9mVRv0e7a/giphy.gif",
+    url: "https://i.giphy.com/media/FWAcpJsFT9mVRv0e7a/giphy.webp",
+    fallbackGradient: "from-pink-500 to-rose-600",
     alt: "Anya Smug Heh Face Meme",
   },
   {
@@ -100,7 +109,8 @@ export const POPULAR_MEME_STICKERS: MemeSticker[] = [
     category: "funny",
     emoji: "🤡",
     tag: "FRAUD",
-    url: "https://media.giphy.com/media/rxy55jHaig164/giphy.gif",
+    url: "https://i.giphy.com/media/rxy55jHaig164/giphy.webp",
+    fallbackGradient: "from-red-600 to-orange-700",
     alt: "Fraud Watch Clown Meme",
   },
   {
@@ -109,7 +119,8 @@ export const POPULAR_MEME_STICKERS: MemeSticker[] = [
     category: "funny",
     emoji: "🥊",
     tag: "OK",
-    url: "https://media.giphy.com/media/11ISwbgCxEzMyY/giphy.gif",
+    url: "https://i.giphy.com/media/11ISwbgCxEzMyY/giphy.webp",
+    fallbackGradient: "from-yellow-600 to-red-600",
     alt: "Saitama OK Face Meme",
   },
   {
@@ -118,7 +129,8 @@ export const POPULAR_MEME_STICKERS: MemeSticker[] = [
     category: "funny",
     emoji: "💀",
     tag: "DEAD",
-    url: "https://media.giphy.com/media/vjjCsx3izfRSq4ZeSs/giphy.gif",
+    url: "https://i.giphy.com/media/vjjCsx3izfRSq4ZeSs/giphy.webp",
+    fallbackGradient: "from-zinc-800 to-black",
     alt: "Skull Dying of Laughter Meme",
   },
   {
@@ -127,7 +139,8 @@ export const POPULAR_MEME_STICKERS: MemeSticker[] = [
     category: "funny",
     emoji: "🍿",
     tag: "DRAMA",
-    url: "https://media.giphy.com/media/gl0mkIZOW6Nwc/giphy.gif",
+    url: "https://i.giphy.com/media/gl0mkIZOW6Nwc/giphy.webp",
+    fallbackGradient: "from-amber-500 to-yellow-600",
     alt: "Eating Popcorn Drama Meme",
   },
   {
@@ -136,7 +149,8 @@ export const POPULAR_MEME_STICKERS: MemeSticker[] = [
     category: "funny",
     emoji: "📈",
     tag: "STONKS",
-    url: "https://media.giphy.com/media/YnkMcHgNIMW4Yfmjxr/giphy.gif",
+    url: "https://i.giphy.com/media/YnkMcHgNIMW4Yfmjxr/giphy.webp",
+    fallbackGradient: "from-emerald-600 to-green-700",
     alt: "Stonks Rising Meme",
   },
   {
@@ -145,7 +159,8 @@ export const POPULAR_MEME_STICKERS: MemeSticker[] = [
     category: "funny",
     emoji: "💃",
     tag: "VIBE",
-    url: "https://media.giphy.com/media/GeimqsH0TLDt4tScGw/giphy.gif",
+    url: "https://i.giphy.com/media/GeimqsH0TLDt4tScGw/giphy.webp",
+    fallbackGradient: "from-pink-600 to-purple-600",
     alt: "Cat Jam Vibing Meme",
   },
 
@@ -156,7 +171,8 @@ export const POPULAR_MEME_STICKERS: MemeSticker[] = [
     category: "reaction",
     emoji: "😱",
     tag: "SHOCK",
-    url: "https://media.giphy.com/media/uaJLuMokII24w/giphy.gif",
+    url: "https://i.giphy.com/media/uaJLuMokII24w/giphy.webp",
+    fallbackGradient: "from-blue-500 to-indigo-700",
     alt: "Shocked Face Meme",
   },
   {
@@ -165,7 +181,8 @@ export const POPULAR_MEME_STICKERS: MemeSticker[] = [
     category: "reaction",
     emoji: "🤯",
     tag: "TWIST",
-    url: "https://media.giphy.com/media/26ufdipQqU2lhNA4g/giphy.gif",
+    url: "https://i.giphy.com/media/26ufdipQqU2lhNA4g/giphy.webp",
+    fallbackGradient: "from-indigo-600 to-violet-800",
     alt: "Mind Blown Galaxy Reaction Meme",
   },
   {
@@ -174,7 +191,8 @@ export const POPULAR_MEME_STICKERS: MemeSticker[] = [
     category: "reaction",
     emoji: "🕶️",
     tag: "LITERAL ME",
-    url: "https://media.giphy.com/media/n4oKYFlAcv2AU/giphy.gif",
+    url: "https://i.giphy.com/media/n4oKYFlAcv2AU/giphy.webp",
+    fallbackGradient: "from-slate-700 to-slate-900",
     alt: "He Just Like Me Ryan Gosling Meme",
   },
   {
@@ -183,7 +201,8 @@ export const POPULAR_MEME_STICKERS: MemeSticker[] = [
     category: "reaction",
     emoji: "☕",
     tag: "CHILL",
-    url: "https://media.giphy.com/media/3o85xGocUH8RYoDKKs/giphy.gif",
+    url: "https://i.giphy.com/media/3o85xGocUH8RYoDKKs/giphy.webp",
+    fallbackGradient: "from-amber-700 to-stone-800",
     alt: "Sipping Tea Chill Drama Meme",
   },
   {
@@ -192,7 +211,8 @@ export const POPULAR_MEME_STICKERS: MemeSticker[] = [
     category: "reaction",
     emoji: "🤨",
     tag: "SUS",
-    url: "https://media.giphy.com/media/26ghbWoXv3G6ypo8o/giphy.gif",
+    url: "https://i.giphy.com/media/26ghbWoXv3G6ypo8o/giphy.webp",
+    fallbackGradient: "from-orange-600 to-stone-900",
     alt: "The Rock Eyebrow Raise Sus Meme",
   },
   {
@@ -201,7 +221,8 @@ export const POPULAR_MEME_STICKERS: MemeSticker[] = [
     category: "reaction",
     emoji: "🏃",
     tag: "RUN",
-    url: "https://media.giphy.com/media/731iFlLiqaRk4/giphy.gif",
+    url: "https://i.giphy.com/media/731iFlLiqaRk4/giphy.webp",
+    fallbackGradient: "from-amber-600 to-red-700",
     alt: "Joseph Joestar Running Away Meme",
   },
 
@@ -212,7 +233,8 @@ export const POPULAR_MEME_STICKERS: MemeSticker[] = [
     category: "crying",
     emoji: "😫",
     tag: "NEED NEXT CH",
-    url: "https://media.giphy.com/media/d2lcHJTG5Tscg/giphy.gif",
+    url: "https://i.giphy.com/media/d2lcHJTG5Tscg/giphy.webp",
+    fallbackGradient: "from-blue-700 to-slate-900",
     alt: "Crying In Agony Need Next Chapter Meme",
   },
   {
@@ -221,7 +243,8 @@ export const POPULAR_MEME_STICKERS: MemeSticker[] = [
     category: "crying",
     emoji: "😭",
     tag: "PAIN",
-    url: "https://media.giphy.com/media/ro08ZmQ1MeqZypzgDN/giphy.gif",
+    url: "https://i.giphy.com/media/ro08ZmQ1MeqZypzgDN/giphy.webp",
+    fallbackGradient: "from-rose-700 to-red-900",
     alt: "Emotional Damage Meme",
   },
   {
@@ -230,7 +253,8 @@ export const POPULAR_MEME_STICKERS: MemeSticker[] = [
     category: "crying",
     emoji: "😭",
     tag: "SOB",
-    url: "https://media.giphy.com/media/adOhvwrFJ32psmc5Pb/giphy.gif",
+    url: "https://i.giphy.com/media/adOhvwrFJ32psmc5Pb/giphy.webp",
+    fallbackGradient: "from-cyan-600 to-blue-800",
     alt: "Aqua Konosuba Crying Meme",
   },
   {
@@ -239,7 +263,8 @@ export const POPULAR_MEME_STICKERS: MemeSticker[] = [
     category: "crying",
     emoji: "⚔️",
     tag: "GUTS",
-    url: "https://media.giphy.com/media/pUp9Nb1czvHMY/giphy.gif",
+    url: "https://i.giphy.com/media/pUp9Nb1czvHMY/giphy.webp",
+    fallbackGradient: "from-zinc-800 to-neutral-950",
     alt: "Guts Berserk Suffering Meme",
   },
   {
@@ -248,7 +273,8 @@ export const POPULAR_MEME_STICKERS: MemeSticker[] = [
     category: "crying",
     emoji: "🫡",
     tag: "SALUTE",
-    url: "https://media.giphy.com/media/l4pMattUYTTM7qpIk/giphy.gif",
+    url: "https://i.giphy.com/media/l4pMattUYTTM7qpIk/giphy.webp",
+    fallbackGradient: "from-emerald-700 to-slate-900",
     alt: "Crying Salute Respect Meme",
   },
 
@@ -259,7 +285,8 @@ export const POPULAR_MEME_STICKERS: MemeSticker[] = [
     category: "cute",
     emoji: "✨",
     tag: "EXCITED",
-    url: "https://media.giphy.com/media/zZC2AqB84z7xe/giphy.gif",
+    url: "https://i.giphy.com/media/zZC2AqB84z7xe/giphy.webp",
+    fallbackGradient: "from-pink-500 to-purple-600",
     alt: "Anya Waku Waku Excited Sparkle Meme",
   },
   {
@@ -268,7 +295,8 @@ export const POPULAR_MEME_STICKERS: MemeSticker[] = [
     category: "cute",
     emoji: "💖",
     tag: "LOVE",
-    url: "https://media.giphy.com/media/L4lvBzeGQwpwc/giphy.gif",
+    url: "https://i.giphy.com/media/L4lvBzeGQwpwc/giphy.webp",
+    fallbackGradient: "from-rose-500 to-pink-600",
     alt: "Heart Eyes Anime Meme",
   },
   {
@@ -277,7 +305,8 @@ export const POPULAR_MEME_STICKERS: MemeSticker[] = [
     category: "cute",
     emoji: "👍",
     tag: "GOOD",
-    url: "https://media.giphy.com/media/111ebonMs90YLu/giphy.gif",
+    url: "https://i.giphy.com/media/111ebonMs90YLu/giphy.webp",
+    fallbackGradient: "from-amber-500 to-emerald-600",
     alt: "Thumbs Up Cat Good Job Meme",
   },
 ];
