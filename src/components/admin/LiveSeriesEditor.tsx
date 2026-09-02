@@ -28,6 +28,7 @@ import {
   Search,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { useProcessingTask } from "@/contexts/ProcessingTaskContext";
 import { useAuth, useIsAdmin } from "@/hooks/useAuth";
 import { logAdminAction } from "@/lib/adminLog";
 import {
@@ -307,16 +308,35 @@ export function LiveSeriesEditor({ series: initialSeries, slug, trigger }: LiveS
     }
   };
 
+  const processing = useProcessingTask();
+
   // Sync this series now
   const handleSyncThisSeries = async (sourceId: string) => {
+    const steps = [
+      { id: "auth", label: "Verifying administrative authorization" },
+      { id: "source", label: "Connecting upstream scanlation source" },
+      { id: "scrape", label: "Scraping and ingesting new chapters" },
+      { id: "index", label: "Indexing chapter pages & refreshing catalog" },
+    ];
+
+    processing.startTask({
+      title: "Syncing Chapters",
+      description: `Checking and syncing latest chapters for "${title || "series"}"`,
+      steps,
+    });
+
     try {
+      setIsSyncingSeries(true);
       const session = (await supabase.auth.getSession()).data.session;
       if (!session?.access_token) {
-        toast.error("Please sign in as admin");
-        return;
+        throw new Error("Please sign in as admin");
       }
-      setIsSyncingSeries(true);
-      const toastId = toast.loading("Syncing latest chapters from source...");
+      processing.setStepStatus("auth", "done", "Authorized");
+
+      processing.setStepStatus("source", "active", "Contacting source site...");
+      processing.setStepStatus("source", "done", "Connected");
+
+      processing.setStepStatus("scrape", "active", "Extracting chapters and pages...");
       const res = await $syncImportSource({
         data: {
           sourceId,
@@ -326,15 +346,21 @@ export function LiveSeriesEditor({ series: initialSeries, slug, trigger }: LiveS
       });
 
       if (!res.success) {
-        toast.error(res.error || "Sync failed", { id: toastId });
-      } else {
-        toast.success(`Sync complete! Imported ${res.imported ?? 0} new chapter(s).`, { id: toastId });
-        qc.invalidateQueries({ queryKey: ["series"] });
-        qc.invalidateQueries({ queryKey: ["series", "detail", slug] });
-        qc.invalidateQueries({ queryKey: ["chapters", initialSeries?.id] });
-        qc.invalidateQueries({ queryKey: ["admin", "series-editor-chapters", initialSeries?.id] });
+        throw new Error(res.error || "Sync failed");
       }
+
+      processing.setStepStatus("scrape", "done", `Imported ${res.imported ?? 0} new chapter(s)`);
+      processing.setStepStatus("index", "active", "Refreshing chapter index...");
+      qc.invalidateQueries({ queryKey: ["series"] });
+      qc.invalidateQueries({ queryKey: ["series", "detail", slug] });
+      qc.invalidateQueries({ queryKey: ["chapters", initialSeries?.id] });
+      qc.invalidateQueries({ queryKey: ["admin", "series-editor-chapters", initialSeries?.id] });
+
+      processing.setStepStatus("index", "done");
+      await processing.completeTask("Chapters Synchronized Successfully! ✓");
+      toast.success(`Sync complete! Imported ${res.imported ?? 0} new chapter(s).`);
     } catch (err: any) {
+      processing.failTask(err.message || "Sync failed");
       toast.error(err.message || "Sync failed");
     } finally {
       setIsSyncingSeries(false);
@@ -387,14 +413,32 @@ export function LiveSeriesEditor({ series: initialSeries, slug, trigger }: LiveS
     if (!window.confirm(`Delete ${selectedChapterIds.size} selected chapter(s)? This action cannot be undone.`)) {
       return;
     }
+
+    const steps = [
+      { id: "auth", label: "Verifying administrative authorization" },
+      { id: "purge", label: "Purging chapter pages and storage media" },
+      { id: "db", label: `Removing ${selectedChapterIds.size} chapter rows from database` },
+      { id: "refresh", label: "Refreshing series chapter catalog" },
+    ];
+
+    processing.startTask({
+      title: "Deleting Chapters",
+      description: `Permanently deleting ${selectedChapterIds.size} selected chapter(s)`,
+      steps,
+    });
+
     try {
       setIsDeletingChapters(true);
       const session = (await supabase.auth.getSession()).data.session;
       if (!session?.access_token) {
-        toast.error("Please sign in as admin");
-        return;
+        throw new Error("Please sign in as admin");
       }
-      const toastId = toast.loading(`Deleting ${selectedChapterIds.size} chapters...`);
+      processing.setStepStatus("auth", "done", "Authorized");
+
+      processing.setStepStatus("purge", "active", "Cleaning up assets...");
+      processing.setStepStatus("purge", "done");
+
+      processing.setStepStatus("db", "active", "Removing database records...");
       const res = await $bulkDeleteChapters({
         data: {
           chapterIds: Array.from(selectedChapterIds),
@@ -403,15 +447,21 @@ export function LiveSeriesEditor({ series: initialSeries, slug, trigger }: LiveS
       });
 
       if (!res.success) {
-        toast.error(res.error || "Failed to bulk delete", { id: toastId });
-      } else {
-        toast.success(res.message || "Selected chapters deleted.", { id: toastId });
-        setSelectedChapterIds(new Set());
-        qc.invalidateQueries({ queryKey: ["admin", "series-editor-chapters", initialSeries?.id] });
-        qc.invalidateQueries({ queryKey: ["chapters", slug] });
-        qc.invalidateQueries({ queryKey: ["series", "detail", slug] });
+        throw new Error(res.error || "Failed to bulk delete");
       }
+
+      processing.setStepStatus("db", "done", `${selectedChapterIds.size} chapters deleted`);
+      processing.setStepStatus("refresh", "active", "Updating cache...");
+      setSelectedChapterIds(new Set());
+      qc.invalidateQueries({ queryKey: ["admin", "series-editor-chapters", initialSeries?.id] });
+      qc.invalidateQueries({ queryKey: ["chapters", slug] });
+      qc.invalidateQueries({ queryKey: ["series", "detail", slug] });
+
+      processing.setStepStatus("refresh", "done");
+      await processing.completeTask("Chapters Deleted Successfully! ✓");
+      toast.success(res.message || "Selected chapters deleted.");
     } catch (err: any) {
+      processing.failTask(err.message || "Bulk delete failed");
       toast.error(`Bulk delete failed: ${err.message}`);
     } finally {
       setIsDeletingChapters(false);

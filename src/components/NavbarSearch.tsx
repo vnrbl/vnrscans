@@ -57,7 +57,7 @@ export function NavbarSearch({ open, onOpenChange }: NavbarSearchProps) {
   // In-memory search cache for instant sub-millisecond response on backspace/repeat
   const searchCacheRef = useRef<Map<string, { series: any[]; users: any[]; groups: string[] }>>(new Map());
 
-  // Ultra-fast search with in-memory caching and 120ms debounce
+  // Ultra-fast search with in-memory caching and 220ms debounce
   useEffect(() => {
     const rawQ = searchQuery.trim();
     if (!rawQ || rawQ.length < 2) {
@@ -87,6 +87,9 @@ export function NavbarSearch({ open, onOpenChange }: NavbarSearchProps) {
         setSearching(true);
         try {
           const seriesFilter = buildSeriesSearchOrFilter(prepared.terms);
+          
+          // Execute series and profiles query concurrently
+          // Note: Scanlation groups are fetched from lightweight sources table rather than heavy chapters table
           const [seriesRes, usersRes, groupsRes] = await Promise.all([
             supabase
               .from("series")
@@ -95,18 +98,18 @@ export function NavbarSearch({ open, onOpenChange }: NavbarSearchProps) {
               )
               .eq("is_hidden", false)
               .or(seriesFilter)
-              .limit(50),
+              .limit(40),
             supabase
               .from("profiles")
               .select("username,avatar_url")
               .ilike("username", `%${q}%`)
-              .limit(12),
+              .limit(8),
             supabase
-              .from("chapters")
+              .from("series_import_sources")
               .select("scanlation_group")
               .ilike("scanlation_group", `%${q}%`)
               .not("scanlation_group", "is", null)
-              .limit(30),
+              .limit(10),
           ]);
 
           const ranked = seriesRes.data ? rankSeriesResults(seriesRes.data, prepared).slice(0, 24) : [];
@@ -114,7 +117,7 @@ export function NavbarSearch({ open, onOpenChange }: NavbarSearchProps) {
           const uniqueGroups = groupsRes.data
             ? (Array.from(
                 new Set(groupsRes.data.map((c: any) => c.scanlation_group).filter(Boolean))
-              ) as string[]).slice(0, 12)
+              ) as string[]).slice(0, 10)
             : [];
 
           setSeriesResults(ranked);
@@ -133,7 +136,7 @@ export function NavbarSearch({ open, onOpenChange }: NavbarSearchProps) {
           setSearching(false);
         }
       }
-    }, 120);
+    }, 220);
 
     return () => clearTimeout(timer);
   }, [searchQuery]);

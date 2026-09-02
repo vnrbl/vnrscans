@@ -25,6 +25,8 @@ import { ReaderSettingsProvider } from "@/contexts/ReaderSettingsContext";
 import { AuthProvider } from "@/hooks/useAuth";
 import { NavigationProgress } from "@/components/NavigationProgress";
 
+import { ProcessingTaskProvider } from "@/contexts/ProcessingTaskContext";
+
 export function Providers({ children }: { children: ReactNode }) {
   const [queryClient] = useState(
     () =>
@@ -46,7 +48,9 @@ export function Providers({ children }: { children: ReactNode }) {
       <AuthProvider>
         <ThemeProvider>
           <ReaderSettingsProvider>
-            <AppShell>{children}</AppShell>
+            <ProcessingTaskProvider>
+              <AppShell>{children}</AppShell>
+            </ProcessingTaskProvider>
           </ReaderSettingsProvider>
         </ThemeProvider>
       </AuthProvider>

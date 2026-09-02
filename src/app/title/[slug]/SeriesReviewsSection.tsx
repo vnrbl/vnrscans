@@ -27,7 +27,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth, useIsAdmin } from "@/hooks/useAuth";
 import { safeUrlOrNull } from "@/lib/safe-url";
-import { POPULAR_MEME_STICKERS, type MemeSticker } from "@/lib/meme-data";
+import { LiveWebGifPicker } from "@/components/comments/LiveWebGifPicker";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
@@ -72,8 +72,6 @@ export function SeriesReviewsSection({
   const [attachmentType, setAttachmentType] = useState<"image" | "gif" | null>(null);
   const [attachmentAlt, setAttachmentAlt] = useState<string | null>(null);
   const [showMemeDrawer, setShowMemeDrawer] = useState(false);
-  const [memeCategory, setMemeCategory] = useState<string>("all");
-  const [memeSearch, setMemeSearch] = useState("");
   const [sortBy, setSortBy] = useState<"newest" | "top" | "highest" | "lowest">("top");
   const [revealedSpoilers, setRevealedSpoilers] = useState<Set<string>>(new Set());
 
@@ -393,15 +391,6 @@ export function SeriesReviewsSection({
     return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
   });
 
-  const filteredMemes: MemeSticker[] = POPULAR_MEME_STICKERS.filter((m: MemeSticker) => {
-    const matchCat = memeCategory === "all" || m.category === memeCategory;
-    const matchSearch =
-      !memeSearch.trim() ||
-      m.name.toLowerCase().includes(memeSearch.toLowerCase()) ||
-      m.tag.toLowerCase().includes(memeSearch.toLowerCase());
-    return matchCat && matchSearch;
-  });
-
   const numericAvg = Number(currentRating || 0);
 
   return (
@@ -515,10 +504,14 @@ export function SeriesReviewsSection({
               size="sm"
               onClick={() => setShowMemeDrawer(!showMemeDrawer)}
               disabled={!user}
-              className="h-8 gap-1.5 text-xs font-semibold border-purple-500/30 bg-purple-950/20 text-purple-300 hover:bg-purple-900/30 cursor-pointer"
+              className={`h-8 gap-1.5 text-xs font-semibold cursor-pointer transition-colors ${
+                showMemeDrawer
+                  ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                  : "border-primary/30 bg-primary/10 text-primary hover:bg-primary/20"
+              }`}
             >
-              <Smile className="h-3.5 w-3.5" />
-              <span>Reaction Memes & GIFs</span>
+              <Sparkles className="h-3.5 w-3.5" />
+              <span>{showMemeDrawer ? "Hide GIFs" : "Search Web GIFs"}</span>
             </Button>
 
             {/* Spoiler Checkbox */}
@@ -564,57 +557,18 @@ export function SeriesReviewsSection({
           </Button>
         </div>
 
-        {/* Meme & GIF Picker Drawer */}
+        {/* Live Web GIF Search Drawer */}
         {showMemeDrawer && (
-          <div className="pt-3 border-t border-border/20 space-y-3 animate-in fade-in slide-in-from-top-2 duration-200">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <span className="text-2xs font-bold text-muted-foreground uppercase tracking-wider">
-                Select Anime Reaction GIF
-              </span>
-              <div className="flex gap-1 overflow-x-auto scrollbar-none">
-                {["all", "reaction", "hype", "funny", "cute"].map((cat) => (
-                  <button
-                    key={cat}
-                    type="button"
-                    onClick={() => setMemeCategory(cat)}
-                    className={`px-2 py-0.5 rounded text-2xs font-bold capitalize transition-colors ${
-                      memeCategory === cat
-                        ? "bg-purple-600 text-white"
-                        : "bg-secondary/60 text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    {cat}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="grid grid-cols-3 xs:grid-cols-4 sm:grid-cols-6 gap-2 max-h-48 overflow-y-auto p-1 scrollbar-thin">
-              {filteredMemes.map((meme: MemeSticker) => (
-                <div
-                  key={meme.id}
-                  onClick={() => {
-                    setAttachmentUrl(meme.url);
-                    setAttachmentType("gif");
-                    setAttachmentAlt(meme.name);
-                    setShowMemeDrawer(false);
-                    toast.success(`Attached ${meme.name}!`);
-                  }}
-                  className="group relative aspect-video rounded-lg overflow-hidden border border-border/40 hover:border-primary cursor-pointer transition-all hover:scale-105 bg-black"
-                >
-                  <img
-                    src={meme.url}
-                    alt={meme.name}
-                    className="h-full w-full object-cover group-hover:opacity-90"
-                    loading="lazy"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-1">
-                    <span className="text-[9px] text-white font-medium truncate">{meme.name}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
+          <LiveWebGifPicker
+            onSelectGif={(gif) => {
+              setAttachmentUrl(gif.url);
+              setAttachmentType("gif");
+              setAttachmentAlt(gif.title);
+              setShowMemeDrawer(false);
+              toast.success("Attached GIF!");
+            }}
+            onClose={() => setShowMemeDrawer(false)}
+          />
         )}
       </div>
 

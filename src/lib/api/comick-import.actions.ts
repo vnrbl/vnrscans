@@ -294,14 +294,18 @@ function parseComickItem(item: any): ComickExtractedMetadata {
     coverUrl = item.cover_url;
   }
 
-  // Status
-  let status = "ongoing";
+  // Status: Database enum only allows 'ongoing' | 'completed' | 'hiatus'
+  let status: "ongoing" | "completed" | "hiatus" = "ongoing";
   if (item.status === 2 || String(item.status).toLowerCase().includes("completed")) {
     status = "completed";
-  } else if (item.status === 3 || String(item.status).toLowerCase().includes("hiatus")) {
+  } else if (
+    item.status === 3 ||
+    item.status === 4 ||
+    String(item.status).toLowerCase().includes("hiatus") ||
+    String(item.status).toLowerCase().includes("cancelled") ||
+    String(item.status).toLowerCase().includes("canceled")
+  ) {
     status = "hiatus";
-  } else if (item.status === 4 || String(item.status).toLowerCase().includes("cancelled")) {
-    status = "cancelled";
   }
 
   // Authors & Artists
@@ -342,9 +346,10 @@ function parseComickItem(item: any): ComickExtractedMetadata {
   };
 }
 
-/**
- * Searches Comick API and returns multiple search result matches
- */
+// In-memory cache for fast repeated Comick searches
+const comickSearchCache = new Map<string, { timestamp: number; data: ComickExtractedMetadata[] }>();
+const COMICK_CACHE_TTL = 15 * 60 * 1000;
+
 export async function searchComickComics(query: string): Promise<ComickExtractedMetadata[]> {
   const cleanInput = query.trim();
   if (!cleanInput) return [];
@@ -357,13 +362,17 @@ export async function searchComickComics(query: string): Promise<ComickExtracted
     searchTerm = urlMatch[1].replace(/^\d+-/, "").replace(/-/g, " ").trim();
   }
 
+  const cacheKey = searchTerm.toLowerCase();
+  const cached = comickSearchCache.get(cacheKey);
+  if (cached && Date.now() - cached.timestamp < COMICK_CACHE_TTL) {
+    return cached.data;
+  }
+
   const userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
 
   const searchEndpoints = [
     `https://api.comick.dev/v1.0/search?q=${encodeURIComponent(searchTerm)}&limit=8`,
     `https://api.comick.cc/v1.0/search?q=${encodeURIComponent(searchTerm)}&limit=8`,
-    `https://api.comick.fun/v1.0/search?q=${encodeURIComponent(searchTerm)}&limit=8`,
-    `https://api.comick.io/v1.0/search?q=${encodeURIComponent(searchTerm)}&limit=8`,
   ];
 
   for (const endpoint of searchEndpoints) {
@@ -373,13 +382,15 @@ export async function searchComickComics(query: string): Promise<ComickExtracted
           "User-Agent": userAgent,
           Accept: "application/json",
         },
-        signal: AbortSignal.timeout(6000),
+        signal: AbortSignal.timeout(3500),
       });
 
       if (res.ok) {
         const data = (await res.json()) as any;
         if (Array.isArray(data) && data.length > 0) {
-          return data.map(parseComickItem);
+          const parsed = data.map(parseComickItem);
+          comickSearchCache.set(cacheKey, { timestamp: Date.now(), data: parsed });
+          return parsed;
         }
       }
     } catch {

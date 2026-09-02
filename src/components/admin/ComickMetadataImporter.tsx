@@ -25,6 +25,7 @@ import {
   $importComickMetadataToSeries,
   type ComickExtractedMetadata,
 } from "@/lib/api/comick-import.actions";
+import { useProcessingTask } from "@/contexts/ProcessingTaskContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -59,6 +60,7 @@ export function ComickMetadataImporter({
   const { isAdmin, isMod, isUploader } = useIsAdmin();
   const canEdit = isAdmin || isMod || isUploader;
   const qc = useQueryClient();
+  const processing = useProcessingTask();
 
   const [open, setOpen] = useState(false);
   const [comickQuery, setComickQuery] = useState(seriesTitle || "");
@@ -139,60 +141,84 @@ export function ComickMetadataImporter({
   };
 
   // Direct 1-Click Import of the Selected Comic
-  const handleImportSelected = async (targetComic?: ComickExtractedMetadata) => {
-    const comicToImport = targetComic || selectedComic;
+  const handleImportSelected = async (comicOverride?: ComickExtractedMetadata) => {
+    const comicToImport = comicOverride || selectedComic;
     if (!comicToImport) {
       toast.error("Please select a comic to import");
       return;
     }
 
+    if (!seriesId) {
+      // Form-only preview callback for create series forms
+      if (onMetadataImported) {
+        onMetadataImported(comicToImport);
+      }
+      toast.success(`Populated form with "${comicToImport.title}" metadata!`);
+      setOpen(false);
+      return;
+    }
+
+    const steps = [
+      { id: "auth", label: "Verifying administrative authorization" },
+      { id: "meta", label: `Extracting metadata for "${comicToImport.title}"` },
+      { id: "cover", label: "Synchronizing high-res cover art and synopsis" },
+      { id: "tags", label: "Updating categories, genres and taxonomy tags" },
+      { id: "refresh", label: "Finalizing series and refreshing cache" },
+    ];
+
+    setOpen(false);
+    processing.startTask({
+      title: "Importing Comick Metadata",
+      description: `Updating series with official data from Comick`,
+      steps,
+    });
+
     try {
+      setIsImporting(true);
       const session = (await supabase.auth.getSession()).data.session;
       if (!session?.access_token) {
-        toast.error("Please sign in as admin/uploader");
-        return;
+        throw new Error("Please sign in as admin or uploader");
+      }
+      processing.setStepStatus("auth", "done", "Authorized");
+
+      processing.setStepStatus("meta", "active", "Fetching official data...");
+      processing.setStepStatus("meta", "done");
+
+      processing.setStepStatus("cover", "active", "Applying cover and description...");
+      const res = await $importComickMetadataToSeries({
+        data: {
+          seriesId,
+          accessToken: session.access_token,
+          importCover,
+          importSynopsis,
+          importGenresAndTags,
+          importAlternativeTitles: importAltTitles,
+          overrideMetadata: comicToImport,
+        },
+      });
+
+      if (!res.success || !res.metadata) {
+        throw new Error(res.error || "Import from Comick failed");
       }
 
-      setIsImporting(true);
-      const toastId = toast.loading(`Importing "${comicToImport.title}" from Comick...`);
+      processing.setStepStatus("cover", "done", "Cover and synopsis updated");
+      processing.setStepStatus("tags", "done", `${res.metadata.genres?.length || 0} genres & tags applied`);
 
-      if (seriesId) {
-        // Import directly into DB
-        const res = await $importComickMetadataToSeries({
-          data: {
-            seriesId,
-            accessToken: session.access_token,
-            importCover,
-            importSynopsis,
-            importGenresAndTags,
-            importAlternativeTitles: importAltTitles,
-            overrideMetadata: comicToImport,
-          },
-        });
-
-        if (!res.success || !res.metadata) {
-          toast.error(res.error || "Import from Comick failed", { id: toastId });
-        } else {
-          toast.success(res.message || "Metadata, genres, and synopsis imported!", { id: toastId });
-          if (onMetadataImported) {
-            onMetadataImported(res.metadata);
-          }
-          qc.invalidateQueries({ queryKey: ["series"] });
-          if (slug) qc.invalidateQueries({ queryKey: ["series", "detail", slug] });
-          qc.invalidateQueries({ queryKey: ["admin", "series"] });
-          qc.invalidateQueries({ queryKey: ["admin", "genres"] });
-          qc.invalidateQueries({ queryKey: ["admin", "tags"] });
-          setOpen(false);
-        }
-      } else {
-        // Form-only preview callback for create series forms
-        if (onMetadataImported) {
-          onMetadataImported(comicToImport);
-        }
-        toast.success(`Populated form with "${comicToImport.title}" metadata!`, { id: toastId });
-        setOpen(false);
+      processing.setStepStatus("refresh", "active");
+      if (onMetadataImported) {
+        onMetadataImported(res.metadata);
       }
+      qc.invalidateQueries({ queryKey: ["series"] });
+      if (slug) qc.invalidateQueries({ queryKey: ["series", "detail", slug] });
+      qc.invalidateQueries({ queryKey: ["admin", "series"] });
+      qc.invalidateQueries({ queryKey: ["admin", "genres"] });
+      qc.invalidateQueries({ queryKey: ["admin", "tags"] });
+
+      processing.setStepStatus("refresh", "done");
+      await processing.completeTask("Comick Metadata Imported Successfully! ✓");
+      toast.success(res.message || "Metadata, genres, and synopsis imported!");
     } catch (err: any) {
+      processing.failTask(err.message || "Import failed");
       toast.error(err.message || "Import failed");
     } finally {
       setIsImporting(false);

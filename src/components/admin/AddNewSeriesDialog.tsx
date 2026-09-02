@@ -23,6 +23,7 @@ import {
   $importComickMetadataToSeries,
   type ComickExtractedMetadata,
 } from "@/lib/api/comick-import.actions";
+import { useProcessingTask } from "@/contexts/ProcessingTaskContext";
 import { $syncImportSource } from "@/lib/api/scraper.actions";
 import { detectImportSource } from "@/lib/import-source-utils";
 import { Button } from "@/components/ui/button";
@@ -123,6 +124,8 @@ export function AddNewSeriesDialog({ trigger }: AddNewSeriesDialogProps) {
     }
   };
 
+  const processing = useProcessingTask();
+
   // Hybrid Submit: Create series with Comick metadata & link scan source for chapters
   const handleHybridCreate = async () => {
     if (!selectedComic) {
@@ -130,14 +133,36 @@ export function AddNewSeriesDialog({ trigger }: AddNewSeriesDialogProps) {
       return;
     }
 
+    const hasScanSource = !!scanSourceUrl.trim();
+    const steps = [
+      { id: "auth", label: "Verifying credentials & session authorization" },
+      { id: "series", label: `Creating series "${selectedComic.title}" in database` },
+      { id: "meta", label: "Importing HD cover, synopsis & alternative titles" },
+      { id: "genres", label: "Mapping categories, genres & taxonomy tags" },
+      ...(hasScanSource
+        ? [{ id: "source", label: "Connecting scanlation source & syncing chapters" }]
+        : []),
+      { id: "ready", label: "Finalizing series & routing to reader" },
+    ];
+
+    // Close the input dialog so the centered processing animation takes center stage
+    setOpen(false);
+
+    processing.startTask({
+      title: "Importing Series to VNR Scans",
+      description: `Setting up "${selectedComic.title}" with complete official metadata`,
+      steps,
+    });
+
     try {
       setIsHybridSubmitting(true);
       const session = (await supabase.auth.getSession()).data.session;
       if (!session?.access_token) {
-        toast.error("Please sign in");
-        return;
+        throw new Error("Please sign in to import series");
       }
+      processing.setStepStatus("auth", "done", "Authenticated");
 
+      processing.setStepStatus("series", "active", "Generating slug and writing series record...");
       const generatedSlug = (
         selectedComic.slug?.trim() ||
         selectedComic.title
@@ -147,8 +172,6 @@ export function AddNewSeriesDialog({ trigger }: AddNewSeriesDialogProps) {
           .replace(/^-|-$/g, "")
       );
 
-      const toastId = toast.loading(`Creating "${selectedComic.title}"...`);
-
       // 1. Insert series record into Supabase
       const { data: newSeries, error: insertError } = await (supabase.from("series") as any)
         .insert({
@@ -156,7 +179,12 @@ export function AddNewSeriesDialog({ trigger }: AddNewSeriesDialogProps) {
           slug: generatedSlug,
           alternative_titles: selectedComic.alternativeTitles || null,
           type: selectedType,
-          status: selectedComic.status || "ongoing",
+          status: (() => {
+            const raw = String(selectedComic.status || "").toLowerCase().trim();
+            if (raw === "completed") return "completed";
+            if (raw === "hiatus" || raw === "cancelled" || raw === "canceled" || raw === "dropped") return "hiatus";
+            return "ongoing";
+          })(),
           author: selectedComic.author || null,
           artist: selectedComic.artist || null,
           release_year: selectedComic.releaseYear ? parseInt(String(selectedComic.releaseYear), 10) : null,
@@ -173,8 +201,10 @@ export function AddNewSeriesDialog({ trigger }: AddNewSeriesDialogProps) {
         }
         throw insertError;
       }
+      processing.setStepStatus("series", "done", `Registered with slug /${newSeries.slug}`);
 
       // 2. Attach genres & tags from Comick
+      processing.setStepStatus("meta", "active", "Importing cover art and synopsis...");
       if (selectedComic.genres && selectedComic.genres.length > 0) {
         await $importComickMetadataToSeries({
           data: {
@@ -188,10 +218,12 @@ export function AddNewSeriesDialog({ trigger }: AddNewSeriesDialogProps) {
           },
         });
       }
+      processing.setStepStatus("meta", "done", "Official synopsis & cover synchronized");
+      processing.setStepStatus("genres", "done", `${selectedComic.genres?.length || 0} genres and taxonomy tags linked`);
 
       // 3. If scan source URL provided, register & trigger chapter scraper
-      if (scanSourceUrl.trim()) {
-        toast.loading("Attaching scan source for chapters...", { id: toastId });
+      if (hasScanSource) {
+        processing.setStepStatus("source", "active", "Connecting chapter upstream source...");
         const preset = detectImportSource(scanSourceUrl.trim());
         const { data: newSource, error: srcErr } = await (supabase as any)
           .from("series_import_sources")
@@ -207,21 +239,24 @@ export function AddNewSeriesDialog({ trigger }: AddNewSeriesDialogProps) {
           .single();
 
         if (!srcErr && newSource?.id) {
-          // Trigger initial chapter sync in background
           $syncImportSource({
             data: {
               sourceId: newSource.id,
               accessToken: session.access_token,
             },
           }).catch(console.error);
+          processing.setStepStatus("source", "done", `Linked to ${preset.sourceSite} (${preset.scanlationGroup || "Auto"})`);
+        } else {
+          processing.setStepStatus("source", "done", "Source saved");
         }
       }
 
-      toast.success("Series created successfully!", { id: toastId });
+      processing.setStepStatus("ready", "done", "Series ready! Redirecting...");
       qc.invalidateQueries({ queryKey: ["series"] });
-      setOpen(false);
+      await processing.completeTask("All Tasks Completed Successfully! ✓");
       router.push(`/title/${newSeries.slug}`);
     } catch (err: any) {
+      processing.failTask(err.message || "Failed to create series");
       toast.error(`Creation failed: ${err.message}`);
     } finally {
       setIsHybridSubmitting(false);
@@ -232,6 +267,21 @@ export function AddNewSeriesDialog({ trigger }: AddNewSeriesDialogProps) {
   const manualCreateMutation = useMutation({
     mutationFn: async () => {
       if (!title.trim()) throw new Error("Title is required");
+
+      const steps = [
+        { id: "validate", label: "Validating series details and inputs" },
+        { id: "database", label: `Writing "${title}" to database` },
+        { id: "ready", label: "Finalizing series and routing" },
+      ];
+
+      setOpen(false);
+      processing.startTask({
+        title: "Creating Series",
+        description: `Creating "${title}" on VNR Scans`,
+        steps,
+      });
+
+      processing.setStepStatus("validate", "active");
       const generatedSlug = (
         slug.trim() ||
         title
@@ -240,7 +290,9 @@ export function AddNewSeriesDialog({ trigger }: AddNewSeriesDialogProps) {
           .replace(/[^a-z0-9]+/g, "-")
           .replace(/^-|-$/g, "")
       );
+      processing.setStepStatus("validate", "done", `Slug: ${generatedSlug}`);
 
+      processing.setStepStatus("database", "active");
       const { data: newSeries, error } = await (supabase.from("series") as any)
         .insert({
           title: title.trim(),
@@ -265,15 +317,18 @@ export function AddNewSeriesDialog({ trigger }: AddNewSeriesDialogProps) {
         throw error;
       }
 
+      processing.setStepStatus("database", "done");
+      processing.setStepStatus("ready", "done");
+      await processing.completeTask("Series created successfully! ✓");
+
       return newSeries;
     },
     onSuccess: (newSeries) => {
-      toast.success("Series created successfully!");
       qc.invalidateQueries({ queryKey: ["series"] });
-      setOpen(false);
       router.push(`/title/${newSeries.slug}`);
     },
     onError: (err: any) => {
+      processing.failTask(err.message || "Failed to create series");
       toast.error(err.message || "Failed to create series");
     },
   });

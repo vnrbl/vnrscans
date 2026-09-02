@@ -46,7 +46,7 @@ import { renderCommentMarkdown, COMMENT_TEXT_COLORS } from "@/lib/bbcode";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { POPULAR_MEME_STICKERS, MEME_CATEGORIES, CHAPTER_BOTTOM_REACTION_MEMES, type MemeSticker } from "@/lib/meme-data";
+import { LiveWebGifPicker } from "@/components/comments/LiveWebGifPicker";
 import { saveChapterReadingPosition, getChapterReadingPosition } from "@/lib/reading-position";
 import {
   Select,
@@ -2225,146 +2225,6 @@ function ReportButton({
   );
 }
 
-function MemeGridItem({
-  meme,
-  onSelect,
-}: {
-  meme: MemeSticker;
-  onSelect: () => void;
-}) {
-  const [loaded, setLoaded] = useState(false);
-  const [error, setError] = useState(false);
-
-  return (
-    <button
-      key={meme.id}
-      type="button"
-      onClick={onSelect}
-      className="group flex flex-col items-center justify-between p-2 rounded-xl border border-border/40 bg-card/70 hover:bg-primary/15 hover:border-primary/60 transition-all duration-200 hover:scale-[1.03] text-center cursor-pointer shadow-sm relative overflow-hidden active:scale-95"
-    >
-      <div className={`relative w-full aspect-square rounded-lg overflow-hidden bg-gradient-to-br ${meme.fallbackGradient || 'from-zinc-800 to-zinc-950'} flex items-center justify-center`}>
-        {!loaded && !error && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center bg-secondary/70 animate-pulse text-xs text-muted-foreground">
-            <span className="text-2xl">{meme.emoji}</span>
-          </div>
-        )}
-        {error ? (
-          <div className="flex flex-col items-center justify-center p-2 text-center h-full w-full">
-            <span className="text-3xl filter drop-shadow-md">{meme.emoji}</span>
-            <span className="text-[10px] font-black text-white uppercase tracking-wider mt-1 px-1.5 py-0.5 rounded bg-black/40 border border-white/10">{meme.tag}</span>
-          </div>
-        ) : (
-          <img
-            src={meme.url}
-            alt={meme.alt}
-            referrerPolicy="no-referrer"
-            loading="lazy"
-            decoding="async"
-            className={`w-full h-full object-cover group-hover:scale-110 transition-all duration-300 ${
-              loaded ? "opacity-100" : "opacity-0"
-            }`}
-            onLoad={() => setLoaded(true)}
-            onError={() => {
-              setLoaded(true);
-              setError(true);
-            }}
-          />
-        )}
-      </div>
-      <div className="mt-1.5 flex items-center justify-center gap-1 w-full px-1">
-        <span className="text-xs shrink-0">{meme.emoji}</span>
-        <span className="text-[11px] font-semibold text-foreground truncate">{meme.name}</span>
-      </div>
-    </button>
-  );
-}
-
-function InlineMemePicker({
-  onSelectMeme,
-  onClose,
-  compact = false,
-}: {
-  onSelectMeme: (meme: MemeSticker) => void;
-  onClose?: () => void;
-  compact?: boolean;
-}) {
-  const [selectedCategory, setSelectedCategory] = useState<string>("all");
-  const [searchQuery, setSearchQuery] = useState("");
-
-  const filteredMemes = POPULAR_MEME_STICKERS.filter((meme) => {
-    const matchesCategory = selectedCategory === "all" || meme.category === selectedCategory;
-    const matchesQuery =
-      !searchQuery ||
-      meme.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      meme.alt.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      meme.tag.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesCategory && matchesQuery;
-  });
-
-  return (
-    <div className="mt-3 rounded-2xl border border-border/60 bg-card/95 p-2.5 sm:p-3.5 shadow-xl animate-in fade-in slide-in-from-top-2 duration-200 backdrop-blur-md">
-      {/* Header & Search */}
-      <div className="flex items-center gap-2 mb-2">
-        <div className="relative flex-1">
-          <input
-            type="text"
-            placeholder="Search memes & reaction GIFs (Peak, Cinema, Gojo, Anya)..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full h-8 sm:h-9 rounded-xl border border-border/60 bg-background/80 px-3 text-xs focus:outline-none focus:ring-1 focus:ring-primary text-foreground placeholder:text-muted-foreground"
-          />
-        </div>
-        {onClose && (
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="h-8 sm:h-9 px-2.5 text-xs text-muted-foreground hover:text-foreground shrink-0 cursor-pointer"
-            onClick={onClose}
-          >
-            <ChevronUp className="h-3.5 w-3.5 mr-1" />
-            <span>Hide</span>
-          </Button>
-        )}
-      </div>
-
-      {/* Categories */}
-      <div className="flex items-center gap-1.5 overflow-x-auto pb-2 scrollbar-none border-b border-border/30 mb-2.5 touch-pan-x">
-        {MEME_CATEGORIES.map((cat) => (
-          <button
-            key={cat.id}
-            type="button"
-            onClick={() => setSelectedCategory(cat.id)}
-            className={`shrink-0 px-2.5 py-1 rounded-full text-[10px] sm:text-[11px] font-semibold transition-all cursor-pointer ${
-              selectedCategory === cat.id
-                ? "bg-primary text-primary-foreground shadow-sm shadow-primary/20 scale-105"
-                : "bg-secondary/70 text-muted-foreground hover:bg-secondary hover:text-foreground"
-            }`}
-          >
-            {cat.label}
-          </button>
-        ))}
-      </div>
-
-      {/* Meme Grid - Responsive for mobile & desktop */}
-      <div className={`grid ${compact ? "grid-cols-2 xs:grid-cols-3 sm:grid-cols-4 md:grid-cols-5" : "grid-cols-2 xs:grid-cols-3 sm:grid-cols-4 md:grid-cols-6"} gap-2 max-h-56 sm:max-h-72 overflow-y-auto pr-1 scrollbar-thin`}>
-        {filteredMemes.map((meme) => (
-          <MemeGridItem
-            key={meme.id}
-            meme={meme}
-            onSelect={() => onSelectMeme(meme)}
-          />
-        ))}
-        {filteredMemes.length === 0 && (
-          <div className="col-span-full py-6 text-center text-xs text-muted-foreground">
-            No memes found for &ldquo;{searchQuery}&rdquo;
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
 // Chapter Like and Memes Component
 function ChapterLikeAndMemes({ chapterId, seriesId }: { chapterId: string; seriesId: string }) {
   const { user } = useAuth();
@@ -2934,7 +2794,7 @@ function ChapterComments({
 }: {
   chapterId: string;
   seriesId: string;
-  pendingMeme?: MemeSticker | null;
+  pendingMeme?: { url: string; name: string } | null;
   onClearPendingMeme?: () => void;
 }) {
   const { user } = useAuth();
@@ -3749,21 +3609,19 @@ function ChapterComments({
 
               <div className="mt-3 pt-3 border-t border-border/30 flex flex-wrap items-center justify-between gap-3">
                 <div className="flex flex-wrap items-center gap-2">
-                  {/* Meme Button for Reply */}
                   <Button
                     type="button"
                     variant="outline"
                     size="sm"
-                    className={`h-7 gap-1 text-[10px] font-semibold transition-colors cursor-pointer ${
+                    className={`h-8 gap-1.5 transition-colors text-xs font-semibold cursor-pointer ${
                       replyShowMemePicker
-                        ? "bg-primary text-primary-foreground border-primary"
+                        ? "bg-primary text-primary-foreground border-primary shadow-sm"
                         : "bg-primary/10 border-primary/30 hover:bg-primary/20 text-primary"
                     }`}
-                    disabled={!user}
                     onClick={() => setReplyShowMemePicker((prev) => !prev)}
                   >
-                    <Flame className="h-3 w-3" />
-                    <span>{replyShowMemePicker ? "Hide Memes" : "Show Memes"}</span>
+                    <Sparkles className="h-3.5 w-3.5" />
+                    <span>{replyShowMemePicker ? "Hide GIFs" : "Search Web GIFs"}</span>
                     {replyShowMemePicker ? (
                       <ChevronUp className="h-3 w-3" />
                     ) : (
@@ -3842,15 +3700,16 @@ function ChapterComments({
                 </div>
               </div>
 
-              {/* Inline Reply Meme Picker */}
+              {/* Inline Reply Live Web GIF Picker */}
               {replyShowMemePicker && (
-                <InlineMemePicker
+                <LiveWebGifPicker
                   compact
-                  onSelectMeme={(meme) => {
-                    setReplyAttachmentType(meme.url.endsWith(".gif") ? "gif" : "image");
-                    setReplyAttachmentUrl(meme.url);
-                    setReplyAttachmentAlt(meme.name);
-                    toast.success(`Attached "${meme.name}" meme sticker`);
+                  onSelectGif={(gif) => {
+                    setReplyAttachmentType("gif");
+                    setReplyAttachmentUrl(gif.url);
+                    setReplyAttachmentAlt(gif.title);
+                    toast.success("Attached GIF!");
+                    setReplyShowMemePicker(false);
                   }}
                   onClose={() => setReplyShowMemePicker(false)}
                 />
@@ -3954,7 +3813,7 @@ function ChapterComments({
 
         <div className="mt-4 pt-3 border-t border-border/30 flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-2">
-            {/* Meme Picker Trigger Button */}
+            {/* Live Web GIF Picker Trigger Button */}
             <Button
               type="button"
               variant="outline"
@@ -3967,8 +3826,8 @@ function ChapterComments({
               disabled={!user}
               onClick={() => setShowMemePicker((prev) => !prev)}
             >
-              <Flame className="h-3.5 w-3.5" />
-              <span>{showMemePicker ? "Hide Memes & Stickers" : "Show Memes & Stickers"}</span>
+              <Sparkles className="h-3.5 w-3.5" />
+              <span>{showMemePicker ? "Hide GIFs" : "Search Web GIFs"}</span>
               {showMemePicker ? (
                 <ChevronUp className="h-3.5 w-3.5" />
               ) : (
@@ -4043,14 +3902,15 @@ function ChapterComments({
           </div>
         </div>
 
-        {/* Inline Meme Picker */}
+        {/* Inline Live Web GIF Picker */}
         {showMemePicker && (
-          <InlineMemePicker
-            onSelectMeme={(meme) => {
-              setAttachmentType(meme.url.endsWith(".gif") ? "gif" : "image");
-              setAttachmentUrl(meme.url);
-              setAttachmentAlt(meme.name);
-              toast.success(`Attached "${meme.name}" meme sticker`);
+          <LiveWebGifPicker
+            onSelectGif={(gif) => {
+              setAttachmentType("gif");
+              setAttachmentUrl(gif.url);
+              setAttachmentAlt(gif.title);
+              toast.success("Attached GIF!");
+              setShowMemePicker(false);
             }}
             onClose={() => setShowMemePicker(false)}
           />
