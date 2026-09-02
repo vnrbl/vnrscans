@@ -55,10 +55,7 @@ export function AdminSecurityMonitoringModal({ trigger }: AdminSecurityMonitorin
     setMounted(true);
   }, []);
 
-  // Only render on client for verified admins
-  if (!mounted || !isAdmin) return null;
-
-  // 1. Fetch live metrics
+  // 1. Fetch live metrics (unconditional hook)
   const metricsQ = useQuery({
     queryKey: ["admin-security-metrics"],
     queryFn: async () => {
@@ -81,11 +78,11 @@ export function AdminSecurityMonitoringModal({ trigger }: AdminSecurityMonitorin
         totalLogsCount: totalLogsCount ?? 0,
       };
     },
-    enabled: open,
+    enabled: Boolean(mounted && isAdmin && open),
     staleTime: 1000 * 30,
   });
 
-  // 2. Fetch recent activity audit logs
+  // 2. Fetch recent activity audit logs (unconditional hook)
   const logsQ = useQuery({
     queryKey: ["admin-security-logs-feed"],
     queryFn: async () => {
@@ -98,7 +95,7 @@ export function AdminSecurityMonitoringModal({ trigger }: AdminSecurityMonitorin
       if (error) throw error;
       return data ?? [];
     },
-    enabled: open,
+    enabled: Boolean(mounted && isAdmin && open),
     staleTime: 1000 * 15,
   });
 
@@ -124,6 +121,9 @@ export function AdminSecurityMonitoringModal({ trigger }: AdminSecurityMonitorin
     setOpen(false);
     router.push(path);
   };
+
+  // Only render on client for verified admins
+  if (!mounted || !isAdmin) return null;
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
