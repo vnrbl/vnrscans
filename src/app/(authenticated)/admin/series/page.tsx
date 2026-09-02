@@ -31,6 +31,7 @@ import {
   ChevronDown,
   ChevronUp,
   Globe,
+  BookOpen,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { logAdminAction } from "@/lib/adminLog";
@@ -688,13 +689,39 @@ export default function AdminSeries() {
   const syncLogs = useQuery({
     queryKey: ["admin", "sync-logs"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("series_import_logs")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(100);
-      if (error) throw error;
-      return data || [];
+      try {
+        const { data, error } = await (supabase as any)
+          .from("series_import_logs")
+          .select(`
+            *,
+            source:series_import_sources(
+              id,
+              source_url,
+              source_site,
+              scanlation_group,
+              series:series(
+                id,
+                title,
+                slug,
+                cover_url,
+                type
+              )
+            )
+          `)
+          .order("created_at", { ascending: false })
+          .limit(100);
+        if (error) throw error;
+        return data || [];
+      } catch (err) {
+        console.warn("Retrying sync logs query without deep joins:", err);
+        const { data, error } = await supabase
+          .from("series_import_logs")
+          .select("*")
+          .order("created_at", { ascending: false })
+          .limit(100);
+        if (error) throw error;
+        return data || [];
+      }
     },
     enabled: syncLogsOpen,
   });
@@ -1391,6 +1418,32 @@ export default function AdminSeries() {
                             <strong>Reason for failure:</strong> {r.error}
                           </div>
                         )}
+
+                        {/* Chapter Breakdown with Series Name */}
+                        {r.details && r.details.length > 0 && (
+                          <div className="mt-2.5 pt-2 border-t border-border/20 space-y-1">
+                            <div className="flex items-center justify-between text-[10px] text-muted-foreground uppercase tracking-wider mb-1 font-semibold">
+                              <span>Chapters ({r.details.length})</span>
+                              <span>Series: <strong className="text-violet-400">{r.seriesTitle || "Series"}</strong></span>
+                            </div>
+                            <div className="max-h-36 overflow-y-auto rounded bg-black/40 p-1.5 space-y-1">
+                              {r.details.map((d, dIdx) => (
+                                <div key={dIdx} className="flex items-center justify-between text-[11px] px-2 py-1 rounded bg-secondary/30">
+                                  <div className="flex items-center gap-1.5">
+                                    <Badge variant="outline" className="text-[9px] px-1.5 py-0 bg-violet-500/10 text-violet-300 border-violet-500/20">
+                                      {r.seriesTitle || "Series"}
+                                    </Badge>
+                                    <span className="font-semibold text-foreground">Chapter {d.chapter}</span>
+                                    <span className={`text-[10px] font-medium ${d.status === "imported" ? "text-emerald-400" : d.status === "failed" ? "text-red-400" : "text-muted-foreground"}`}>
+                                      ({d.status}{d.pages ? ` · ${d.pages} pages` : ""})
+                                    </span>
+                                  </div>
+                                  {d.message && <span className="text-[10px] text-muted-foreground truncate max-w-[200px] font-mono">{d.message}</span>}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
                   );
@@ -1464,7 +1517,7 @@ export default function AdminSeries() {
                 <Input
                   value={logSearch}
                   onChange={(e) => setLogSearch(e.target.value)}
-                  placeholder="Search logs by message or source..."
+                  placeholder="Search logs by series, chapter, message, or source..."
                   className="pl-8 h-8 text-xs bg-secondary/30"
                 />
                 {logSearch && (
@@ -1516,14 +1569,27 @@ export default function AdminSeries() {
                   if (logSearch.trim()) {
                     const q = logSearch.toLowerCase();
                     const msg = (log.message || "").toLowerCase();
-                    const src = (log.source_id || "").toLowerCase();
-                    return msg.includes(q) || src.includes(q);
+                    const src = (log.source?.source_url || log.source_id || "").toLowerCase();
+                    const sTitle = (log.source?.series?.title || "").toLowerCase();
+                    const detailsArr: Array<any> = Array.isArray(log.details) ? log.details : [];
+                    const matchesChapter = detailsArr.some((d: any) =>
+                      String(d.chapter).toLowerCase().includes(q) ||
+                      (d.series_title && d.series_title.toLowerCase().includes(q)) ||
+                      (d.message && d.message.toLowerCase().includes(q))
+                    );
+                    return msg.includes(q) || src.includes(q) || sTitle.includes(q) || matchesChapter;
                   }
                   return true;
                 })
                 .map((log: any) => {
                   const isExpanded = expandedLogIds.includes(log.id);
-                  const details: Array<{ chapter: number; status: string; message?: string; pages?: number }> = Array.isArray(log.details) ? log.details : [];
+                  const details: Array<{ chapter: number; status: string; message?: string; pages?: number; series_title?: string }> = Array.isArray(log.details) ? log.details : [];
+                  const series = log.source?.series;
+                  const seriesTitle = series?.title || details.find((d) => d.series_title)?.series_title || "Unknown Series";
+                  const seriesCover = series?.cover_url;
+                  const seriesId = series?.id;
+                  const scanlationGroup = log.source?.scanlation_group;
+                  const sourceUrl = log.source?.source_url;
 
                   const statusIcon =
                     log.status === "success" ? <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" /> :
@@ -1538,32 +1604,84 @@ export default function AdminSeries() {
                   return (
                     <div key={log.id} className={`rounded-xl border p-4 transition-all shadow-sm ${statusColor}`}>
                       <div className="flex items-start justify-between gap-3">
-                        <div className="flex items-start gap-2.5 min-w-0 flex-1">
-                          {statusIcon}
+                        <div className="flex items-start gap-3 min-w-0 flex-1">
+                          {/* Series Cover Thumbnail */}
+                          <div className="relative aspect-[2/3] w-12 shrink-0 rounded-lg overflow-hidden border border-border/40 bg-secondary shadow-sm">
+                            {seriesCover ? (
+                              <img src={seriesCover} alt={seriesTitle} className="h-full w-full object-cover" />
+                            ) : (
+                              <div className="flex h-full w-full items-center justify-center text-muted-foreground bg-secondary/60">
+                                <BookOpen className="h-5 w-5 opacity-40" />
+                              </div>
+                            )}
+                          </div>
+
                           <div className="min-w-0 flex-1">
+                            {/* Series Header & Badges */}
                             <div className="flex flex-wrap items-center gap-2">
-                              <Badge
-                                variant="outline"
-                                className={`text-[10px] uppercase font-bold px-2 py-0.5 ${
-                                  log.status === "success" ? "border-emerald-500/50 text-emerald-400 bg-emerald-500/10" :
-                                  log.status === "partial" ? "border-amber-500/50 text-amber-400 bg-amber-500/10" :
-                                  "border-red-500/50 text-red-400 bg-red-500/10"
-                                }`}
-                              >
-                                {log.status}
-                              </Badge>
-                              <span className="flex items-center gap-1 text-xs text-muted-foreground font-mono">
+                              {seriesId ? (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setSyncLogsOpen(false);
+                                    navigate({ to: "/admin/series-chapters/$seriesId", params: { seriesId } });
+                                  }}
+                                  className="font-bold text-sm text-foreground hover:text-primary transition-colors cursor-pointer text-left truncate max-w-[280px]"
+                                  title={`Go to ${seriesTitle} chapters`}
+                                >
+                                  {seriesTitle}
+                                </button>
+                              ) : (
+                                <span className="font-bold text-sm text-foreground truncate max-w-[280px]">
+                                  {seriesTitle}
+                                </span>
+                              )}
+
+                              {series?.type && (
+                                <Badge variant="outline" className="text-[9px] uppercase px-1.5 py-0 font-medium">
+                                  {series.type}
+                                </Badge>
+                              )}
+
+                              {scanlationGroup && (
+                                <Badge variant="secondary" className="text-[9px] px-1.5 py-0 font-normal">
+                                  {scanlationGroup}
+                                </Badge>
+                              )}
+
+                              <div className="ml-auto flex items-center gap-1.5">
+                                <Badge
+                                  variant="outline"
+                                  className={`text-[10px] uppercase font-bold px-2 py-0.5 ${
+                                    log.status === "success" ? "border-emerald-500/50 text-emerald-400 bg-emerald-500/10" :
+                                    log.status === "partial" ? "border-amber-500/50 text-amber-400 bg-amber-500/10" :
+                                    "border-red-500/50 text-red-400 bg-red-500/10"
+                                  }`}
+                                >
+                                  {log.status}
+                                </Badge>
+                              </div>
+                            </div>
+
+                            {/* Source URL & Timestamps */}
+                            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground mt-1">
+                              {sourceUrl && (
+                                <span className="font-mono text-2xs truncate max-w-[320px] text-muted-foreground/80" title={sourceUrl}>
+                                  {sourceUrl}
+                                </span>
+                              )}
+                              <span className="flex items-center gap-1 font-mono text-2xs">
                                 <Clock className="h-3 w-3" />
                                 {new Date(log.created_at).toLocaleString()}
                               </span>
                               {log.duration_seconds && (
-                                <span className="text-2xs text-muted-foreground bg-secondary px-1.5 py-0.5 rounded font-mono">
+                                <span className="text-2xs text-muted-foreground bg-secondary px-1.5 py-0.2 rounded font-mono">
                                   {log.duration_seconds}s
                                 </span>
                               )}
                             </div>
 
-                            <p className="mt-1.5 text-sm font-medium text-foreground">{log.message}</p>
+                            <p className="mt-1.5 text-xs text-foreground/90 font-medium">{log.message}</p>
 
                             {/* Summary counts pill */}
                             <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground font-medium">
@@ -1595,15 +1713,21 @@ export default function AdminSeries() {
                       {/* Expandable Chapter-by-Chapter Details Table */}
                       {isExpanded && details.length > 0 && (
                         <div className="mt-3 pt-3 border-t border-border/20 space-y-1.5 animate-in fade-in duration-200">
-                          <span className="text-2xs font-bold uppercase tracking-wider text-muted-foreground block mb-2">
-                            Chapter Execution Breakdown:
-                          </span>
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-2xs font-bold uppercase tracking-wider text-muted-foreground">
+                              Chapter Execution Breakdown ({details.length} chapters):
+                            </span>
+                            <span className="text-2xs text-muted-foreground font-medium">
+                              Series: <strong className="text-violet-400">{seriesTitle}</strong>
+                            </span>
+                          </div>
                           <div className="max-h-52 overflow-y-auto rounded-lg border border-border/30 bg-black/40 p-2 space-y-1.5">
                             {details.map((item, idx) => {
                               const isImp = item.status === "imported";
                               const isPrem = item.status === "premium_skipped";
                               const isFail = item.status === "failed";
                               const isSkip = item.status === "skipped";
+                              const chSeriesTitle = item.series_title || seriesTitle;
 
                               return (
                                 <div
@@ -1615,33 +1739,42 @@ export default function AdminSeries() {
                                     "bg-secondary/30 text-muted-foreground"
                                   }`}
                                 >
-                                  <div className="flex items-center gap-2">
-                                    <span className="font-bold text-foreground">
+                                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                                    {/* Prominently show which series on EVERY chapter log */}
+                                    <Badge
+                                      variant="outline"
+                                      className="text-[10px] shrink-0 font-semibold bg-violet-500/10 text-violet-300 border-violet-500/30 max-w-[200px] truncate"
+                                      title={chSeriesTitle}
+                                    >
+                                      {chSeriesTitle}
+                                    </Badge>
+
+                                    <span className="font-bold text-foreground shrink-0">
                                       Chapter {item.chapter}
                                     </span>
                                     {isImp && (
-                                      <Badge variant="outline" className="text-[9px] border-emerald-500/40 text-emerald-400 bg-emerald-500/10">
+                                      <Badge variant="outline" className="text-[9px] border-emerald-500/40 text-emerald-400 bg-emerald-500/10 shrink-0">
                                         Imported {item.pages ? `(${item.pages} pages)` : ""}
                                       </Badge>
                                     )}
                                     {isPrem && (
-                                      <Badge variant="outline" className="text-[9px] border-amber-500/40 text-amber-400 bg-amber-500/10">
+                                      <Badge variant="outline" className="text-[9px] border-amber-500/40 text-amber-400 bg-amber-500/10 shrink-0">
                                         🔒 Premium / Locked
                                       </Badge>
                                     )}
                                     {isFail && (
-                                      <Badge variant="outline" className="text-[9px] border-red-500/40 text-red-400 bg-red-500/10">
+                                      <Badge variant="outline" className="text-[9px] border-red-500/40 text-red-400 bg-red-500/10 shrink-0">
                                         Failed
                                       </Badge>
                                     )}
                                     {isSkip && (
-                                      <Badge variant="secondary" className="text-[9px]">
+                                      <Badge variant="secondary" className="text-[9px] shrink-0">
                                         Already exists
                                       </Badge>
                                     )}
                                   </div>
                                   {item.message && (
-                                    <span className="text-[11px] text-muted-foreground truncate max-w-[280px]">
+                                    <span className="text-[11px] text-muted-foreground truncate max-w-[280px] font-mono text-right shrink-0">
                                       {item.message}
                                     </span>
                                   )}

@@ -598,7 +598,7 @@ export async function $syncImportSource(args: {
 
   const { data: source, error: sourceError } = await admin
     .from("series_import_sources")
-    .select("*")
+    .select("*, series:series(id, title, slug, cover_url)")
     .eq("id", validated.sourceId)
     .single();
 
@@ -606,6 +606,7 @@ export async function $syncImportSource(args: {
     return { success: false, error: sourceError?.message || "Import source not found" };
   }
 
+  const seriesTitle = (source as any)?.series?.title || "";
   const sourcePreset = detectImportSource(source.source_url);
   const scanlationGroup = source.scanlation_group || sourcePreset.scanlationGroup || null;
   const imageUrlExample = source.image_url_example || sourcePreset.imageUrlExample || null;
@@ -613,7 +614,7 @@ export async function $syncImportSource(args: {
   let imported = 0;
   let skipped = 0;
   let failed = 0;
-  const details: Array<{ chapter: number; status: string; message?: string; pages?: number }> = [];
+  const details: Array<{ chapter: number; status: string; message?: string; pages?: number; series_title?: string }> = [];
 
   let premiumSkipped = 0;
 
@@ -627,7 +628,12 @@ export async function $syncImportSource(args: {
       console.log(`[SyncImport] Skipped ${premiumSkipped} premium/locked chapter(s)`);
       details.push(...allDiscovered
         .filter((ch) => isPremiumChapter(ch))
-        .map((ch) => ({ chapter: ch.chapterNumber, status: "premium_skipped" as const, message: "Premium/locked chapter" })));
+        .map((ch) => ({
+          chapter: ch.chapterNumber,
+          status: "premium_skipped" as const,
+          message: "Premium/locked chapter",
+          series_title: seriesTitle || undefined,
+        })));
     }
     chaptersFound = discovered.length;
 
@@ -669,6 +675,7 @@ export async function $syncImportSource(args: {
             chapter: chapter.chapterNumber,
             status: "skipped",
             message: "Already imported",
+            series_title: seriesTitle || undefined,
           });
           return false;
         }
@@ -732,6 +739,7 @@ export async function $syncImportSource(args: {
           chapter: chapter.chapterNumber,
           status: "failed",
           message: chapterError instanceof Error ? chapterError.message : "Unknown error",
+          series_title: seriesTitle || undefined,
         });
       }
     }
@@ -751,6 +759,7 @@ export async function $syncImportSource(args: {
             chapter: row.chapter_number,
             status: "failed",
             message: chapterInsertError.message,
+            series_title: seriesTitle || undefined,
           });
         }
       } else {
@@ -773,6 +782,7 @@ export async function $syncImportSource(args: {
               chapter: Number(chapter.chapter_number),
               status: "failed",
               message: pagesError.message,
+              series_title: seriesTitle || undefined,
             });
           }
         } else {
@@ -784,6 +794,7 @@ export async function $syncImportSource(args: {
               chapter: Number(chapter.chapter_number),
               status: "imported",
               pages: images.length,
+              series_title: seriesTitle || undefined,
             });
             existingKeys.add(key);
           }
@@ -795,8 +806,8 @@ export async function $syncImportSource(args: {
     const status = failed > 0 && imported > 0 ? "partial" : failed > 0 ? "failed" : "success";
     const message =
       imported > 0
-        ? `Imported ${imported} new chapter${imported !== 1 ? "s" : ""}.`
-        : "No new chapters were imported.";
+        ? `Imported ${imported} new chapter${imported !== 1 ? "s" : ""}${seriesTitle ? ` for ${seriesTitle}` : ""}.`
+        : `No new chapters were imported${seriesTitle ? ` for ${seriesTitle}` : ""}.`;
 
     await admin.from("series_import_logs").insert({
       source_id: source.id,
@@ -828,7 +839,8 @@ export async function $syncImportSource(args: {
       details,
     };
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Sync failed";
+    const rawError = error instanceof Error ? error.message : "Sync failed";
+    const message = seriesTitle ? `${rawError} (${seriesTitle})` : rawError;
     await admin.from("series_import_logs").insert({
       source_id: source.id,
       status: "failed",
