@@ -1,8 +1,9 @@
 import { Link, useNavigate } from "@/lib/router-compat";
 import { useState, useEffect, lazy, Suspense } from "react";
-import { Menu, X, Search, BookOpen, User as UserIcon, LogOut, ShieldCheck, Library, Home, Sparkles, Trophy, Dice1, Dice2, Dice3, Dice4, Dice5, Dice6, Loader2, Users, Settings as SettingsIcon } from "lucide-react";
+import { Menu, X, Search, BookOpen, User as UserIcon, LogOut, ShieldCheck, Library, Home, Sparkles, Trophy, Dice1, Dice2, Dice3, Dice4, Dice5, Dice6, Loader2, Users, Settings as SettingsIcon, Plus } from "lucide-react";
 import type { DiceSeries } from "@/components/DiceRollOverlay";
 import { useReaderSettings } from "@/contexts/ReaderSettingsContext";
+import { AddNewSeriesDialog } from "@/components/admin/AddNewSeriesDialog";
 
 const DiceRollOverlay = lazy(() => import("@/components/DiceRollOverlay").then(m => ({ default: m.DiceRollOverlay })));
 const NavbarSearch = lazy(() => import("@/components/NavbarSearch").then(m => ({ default: m.NavbarSearch })));
@@ -274,6 +275,22 @@ export function Navbar() {
                 VNR SCANS
               </span>
             </Link>
+
+            {/* + SVG Icon Button for Add New Series on the right side of Logo */}
+            {showPanel && (
+              <AddNewSeriesDialog
+                trigger={
+                  <button
+                    type="button"
+                    title="Add New Series"
+                    aria-label="Add New Series"
+                    className="grid h-7 w-7 place-items-center rounded-lg border border-purple-500/40 bg-purple-950/30 text-purple-300 hover:bg-purple-900/60 hover:text-white hover:border-purple-400 transition-all duration-200 hover:scale-110 shadow-sm cursor-pointer shrink-0"
+                  >
+                    <Plus className="h-4 w-4 stroke-[2.5]" />
+                  </button>
+                }
+              />
+            )}
           </div>
 
           {/* Centralized Search Bar (desktop) */}

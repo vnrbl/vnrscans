@@ -349,7 +349,6 @@ function BrowsePageContent({ initialData }: { initialData?: BrowseInitialData })
             </div>
             <p className="mt-1.5 text-xs text-muted-foreground font-light">Explore indexed series by genre, tags, status, and community ratings</p>
           </div>
-          <AddNewSeriesDialog />
         </div>
 
         {/* Search Bar */}

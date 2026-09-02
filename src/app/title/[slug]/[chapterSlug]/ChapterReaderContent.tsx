@@ -221,61 +221,107 @@ export default function Reader({ slug, chapterSlug }: { slug: string; chapterSlu
     gcTime: 1000 * 60 * 20,
   });
 
+  // Top-level Scroll Management on Chapter Change:
+  // - New/Unvisited chapters: start cleanly from top (0)
+  // - Previously visited chapters: resume from where the reader left off
+  const activeChapterIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!chapterQ.data?.id) return;
+    const chId = chapterQ.data.id;
+
+    if (activeChapterIdRef.current !== chId) {
+      activeChapterIdRef.current = chId;
+
+      const savedPos = getChapterReadingPosition(chId);
+      const hasProgress = savedPos && (savedPos.scrollTop > 80 || (savedPos.scrollRatio && savedPos.scrollRatio > 0.04));
+
+      if (!hasProgress) {
+        // Immediate clean start from top
+        window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+        if (typeof document !== "undefined") {
+          document.documentElement.scrollTop = 0;
+          document.body.scrollTop = 0;
+        }
+      }
+    }
+  }, [chapterQ.data?.id, chapterSlug]);
+
   // Save reading history with scroll progress
   useEffect(() => {
-    if (!user || !chapterQ.data) return;
+    if (!chapterQ.data) return;
+    const ch = chapterQ.data;
 
-    // Save initial reading history entry
-    supabase
-      .from("reading_history")
-      .upsert(
-        {
-          user_id: user.id,
-          series_id: chapterQ.data.series_id,
-          chapter_id: chapterQ.data.id,
-          progress: 0,
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: "user_id,chapter_id" } as any,
-      )
-      .then(() => {});
+    // Save initial reading history entry for auth users
+    if (user) {
+      supabase
+        .from("reading_history")
+        .upsert(
+          {
+            user_id: user.id,
+            series_id: ch.series_id,
+            chapter_id: ch.id,
+            progress: 0,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "user_id,chapter_id" } as any,
+        )
+        .then(() => {});
+    }
 
     // Update reading progress based on scroll position
     const updateProgress = () => {
       const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
       const scrollHeight = document.documentElement.scrollHeight - window.innerHeight;
+      const scrollRatio = scrollHeight > 0 ? scrollTop / scrollHeight : 0;
       const progress =
-        scrollHeight > 0 ? Math.min(Math.round((scrollTop / scrollHeight) * 100), 100) : 0;
+        scrollHeight > 0 ? Math.min(Math.round(scrollRatio * 100), 100) : 0;
 
-      // Only update if progress has changed significantly (every 5%)
-      const lastProgress = parseInt(
-        localStorage.getItem(`chapter-progress-${chapterQ.data.id}`) || "0",
-      );
-      if (Math.abs(progress - lastProgress) >= 5) {
-        localStorage.setItem(`chapter-progress-${chapterQ.data.id}`, progress.toString());
-        supabase
-          .from("reading_history")
-          .upsert(
-            {
-              user_id: user.id,
-              series_id: chapterQ.data.series_id,
-              chapter_id: chapterQ.data.id,
-              progress: progress,
-              updated_at: new Date().toISOString(),
-            },
-            { onConflict: "user_id,chapter_id" } as any,
-          )
-          .then(() => {});
+      // Save reading position locally
+      if (scrollTop > 50 || progress > 5) {
+        saveChapterReadingPosition({
+          chapterId: ch.id,
+          chapterSlug: ch.slug,
+          chapterNumber: Number(ch.chapter_number),
+          seriesSlug: seriesSlug,
+          seriesId: ch.series_id,
+          pageIndex: 0,
+          scrollRatio,
+          scrollTop,
+        });
+      }
+
+      if (user) {
+        // Only update database if progress has changed significantly (every 5%)
+        const lastProgress = parseInt(
+          localStorage.getItem(`chapter-progress-${ch.id}`) || "0",
+        );
+        if (Math.abs(progress - lastProgress) >= 5) {
+          localStorage.setItem(`chapter-progress-${ch.id}`, progress.toString());
+          supabase
+            .from("reading_history")
+            .upsert(
+              {
+                user_id: user.id,
+                series_id: ch.series_id,
+                chapter_id: ch.id,
+                progress: progress,
+                updated_at: new Date().toISOString(),
+              },
+              { onConflict: "user_id,chapter_id" } as any,
+            )
+            .then(() => {});
+        }
       }
     };
 
     let progressTimeout: NodeJS.Timeout;
     const handleProgressUpdate = () => {
       clearTimeout(progressTimeout);
-      progressTimeout = setTimeout(updateProgress, 500);
+      progressTimeout = setTimeout(updateProgress, 300);
     };
 
-    window.addEventListener("scroll", handleProgressUpdate);
+    window.addEventListener("scroll", handleProgressUpdate, { passive: true });
 
     return () => {
       clearTimeout(progressTimeout);
@@ -283,7 +329,7 @@ export default function Reader({ slug, chapterSlug }: { slug: string; chapterSlu
       // Final progress update when leaving
       updateProgress();
     };
-  }, [user, chapterQ.data]);
+  }, [user, chapterQ.data, seriesSlug]);
 
   // Award XP once per chapter completion (>= 90% scroll, or chapters that fit
   // entirely on screen). The RPC itself is idempotent per (user, chapter).
@@ -1033,7 +1079,7 @@ function ImageView({
 
   // Exact reading position tracking & restoration
   const [restoredBanner, setRestoredBanner] = useState<{ page: number; total: number; percent: number } | null>(null);
-  const restoredRef = useRef(false);
+  const restoredChapterRef = useRef<string | null>(null);
   const activePageRef = useRef(0);
 
   // Track scroll position and visible page element
@@ -1085,47 +1131,71 @@ function ImageView({
     };
   }, [chapterId, seriesSlug, chapterNumber, loading, pages?.length]);
 
-  // Restore exact left-off place
+  // Restore exact left-off place for visited chapters OR start from top for new chapters
   useEffect(() => {
-    if (!chapterId || loading || !pages?.length || restoredRef.current) return;
+    if (!chapterId || loading || !pages?.length) return;
 
-    const savedPos = getChapterReadingPosition(chapterId);
-    if (!savedPos) {
-      restoredRef.current = true;
-      return;
-    }
+    if (restoredChapterRef.current !== chapterId) {
+      restoredChapterRef.current = chapterId;
 
-    const targetPage = Math.min(Math.max(0, savedPos.pageIndex || 0), pages.length - 1);
-    const hasProgress = targetPage > 0 || (savedPos.scrollRatio && savedPos.scrollRatio > 0.05);
-
-    if (!hasProgress) {
-      restoredRef.current = true;
-      return;
-    }
-
-    const attemptRestore = () => {
-      if (restoredRef.current) return;
-      const targetEl = document.getElementById(`chapter-page-${targetPage}`);
-      if (targetEl) {
-        targetEl.scrollIntoView({ block: "start", behavior: "instant" });
-        restoredRef.current = true;
-        setRestoredBanner({
-          page: targetPage + 1,
-          total: pages.length,
-          percent: Math.round((savedPos.scrollRatio || (targetPage / pages.length)) * 100),
-        });
-        setTimeout(() => setRestoredBanner(null), 4500);
+      const savedPos = getChapterReadingPosition(chapterId);
+      if (!savedPos) {
+        // Brand new chapter: scroll instantly to the very top
+        window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+        if (typeof document !== "undefined") {
+          document.documentElement.scrollTop = 0;
+          document.body.scrollTop = 0;
+        }
+        return;
       }
-    };
 
-    attemptRestore();
-    const t1 = setTimeout(attemptRestore, 120);
-    const t2 = setTimeout(attemptRestore, 450);
+      const targetPage = Math.min(Math.max(0, savedPos.pageIndex || 0), pages.length - 1);
+      const hasProgress = targetPage > 0 || (savedPos.scrollRatio && savedPos.scrollRatio > 0.04) || (savedPos.scrollTop && savedPos.scrollTop > 80);
 
-    return () => {
-      clearTimeout(t1);
-      clearTimeout(t2);
-    };
+      if (!hasProgress) {
+        window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+        if (typeof document !== "undefined") {
+          document.documentElement.scrollTop = 0;
+          document.body.scrollTop = 0;
+        }
+        return;
+      }
+
+      // Visited chapter with recorded progress: resume from saved position
+      const attemptRestore = () => {
+        if (targetPage > 0) {
+          const targetEl = document.getElementById(`chapter-page-${targetPage}`);
+          if (targetEl) {
+            targetEl.scrollIntoView({ block: "start", behavior: "instant" });
+            setRestoredBanner({
+              page: targetPage + 1,
+              total: pages.length,
+              percent: Math.round((savedPos.scrollRatio || (targetPage / pages.length)) * 100),
+            });
+            setTimeout(() => setRestoredBanner(null), 4500);
+            return;
+          }
+        }
+        if (savedPos.scrollTop > 0) {
+          window.scrollTo({ top: savedPos.scrollTop, behavior: "instant" });
+          setRestoredBanner({
+            page: 1,
+            total: pages.length,
+            percent: Math.round((savedPos.scrollRatio || 0) * 100),
+          });
+          setTimeout(() => setRestoredBanner(null), 4500);
+        }
+      };
+
+      attemptRestore();
+      const t1 = setTimeout(attemptRestore, 100);
+      const t2 = setTimeout(attemptRestore, 350);
+
+      return () => {
+        clearTimeout(t1);
+        clearTimeout(t2);
+      };
+    }
   }, [chapterId, loading, pages]);
 
   // Clean up old scroll positions (keep only last 10 chapters per user)
@@ -1364,7 +1434,7 @@ function NovelView({
 
   // Exact reading position tracking & restoration for novels
   const [restoredBanner, setRestoredBanner] = useState<{ percent: number } | null>(null);
-  const restoredRef = useRef(false);
+  const restoredNovelChapterRef = useRef<string | null>(null);
 
   // Track page scroll progress for the top progress bar & position saving
   useEffect(() => {
@@ -1403,25 +1473,44 @@ function NovelView({
     };
   }, [chapterId, content, seriesSlug, chapterNumber]);
 
-  // Restore exact scroll position
+  // Restore exact scroll position on visited chapters OR start from top on new chapters
   useEffect(() => {
-    if (!chapterId || !content || restoredRef.current) return;
+    if (!chapterId || !content) return;
 
-    const savedPos = getChapterReadingPosition(chapterId);
-    if (savedPos && (savedPos.scrollTop > 60 || (savedPos.scrollRatio && savedPos.scrollRatio > 0.05))) {
-      const restoreTimer = setTimeout(() => {
-        if (!restoredRef.current) {
-          window.scrollTo({ top: savedPos.scrollTop, behavior: "instant" });
-          restoredRef.current = true;
-          setRestoredBanner({
-            percent: Math.round(savedPos.scrollRatio * 100),
-          });
-          setTimeout(() => setRestoredBanner(null), 4500);
+    if (restoredNovelChapterRef.current !== chapterId) {
+      restoredNovelChapterRef.current = chapterId;
+
+      const savedPos = getChapterReadingPosition(chapterId);
+      if (!savedPos) {
+        window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+        if (typeof document !== "undefined") {
+          document.documentElement.scrollTop = 0;
+          document.body.scrollTop = 0;
         }
-      }, 150);
+        return;
+      }
+
+      const hasProgress = savedPos && (savedPos.scrollTop > 60 || (savedPos.scrollRatio && savedPos.scrollRatio > 0.04));
+      if (!hasProgress) {
+        window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+        if (typeof document !== "undefined") {
+          document.documentElement.scrollTop = 0;
+          document.body.scrollTop = 0;
+        }
+        return;
+      }
+
+      const restoreTimer = setTimeout(() => {
+        if (savedPos.scrollTop > 0) {
+          window.scrollTo({ top: savedPos.scrollTop, behavior: "instant" });
+        }
+        setRestoredBanner({
+          percent: Math.round((savedPos.scrollRatio || 0) * 100),
+        });
+        setTimeout(() => setRestoredBanner(null), 4500);
+      }, 100);
+
       return () => clearTimeout(restoreTimer);
-    } else {
-      restoredRef.current = true;
     }
   }, [chapterId, content]);
 

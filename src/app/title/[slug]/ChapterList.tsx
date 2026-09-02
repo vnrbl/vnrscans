@@ -254,7 +254,6 @@ export const ChapterList = React.memo(function ChapterList({
             <h2 className="text-xl font-bold">
               Chapters {uniqueChapterCount > 0 && <span className="text-muted-foreground">({uniqueChapterCount})</span>}
             </h2>
-            {canManage && <AddNewSeriesDialog />}
           </div>
 
           <div className="grid grid-cols-1 gap-2 min-[420px]:grid-cols-2 sm:flex sm:flex-wrap">
