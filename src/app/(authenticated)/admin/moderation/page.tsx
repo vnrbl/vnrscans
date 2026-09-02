@@ -6,6 +6,7 @@ import { useState } from "react";
 import { CheckCircle2, XCircle, AlertTriangle, ExternalLink, Flag } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { $setUserBan } from "@/lib/api/admin.actions";
 import { logAdminAction } from "@/lib/adminLog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -296,7 +297,18 @@ async function applyModerationAction(item: Record<string, unknown>, action: stri
   if (action === "user_banned" && contentType === "comment") {
     const { data: comment } = await supabase.from("comments").select("user_id").eq("id", contentId).single();
     if (comment?.user_id) {
-      await supabase.from("profiles").update({ is_banned: true }).eq("user_id", comment.user_id);
+      const { data: session } = await supabase.auth.getSession();
+      const token = session?.session?.access_token;
+      if (token) {
+        await $setUserBan({
+          data: {
+            targetUserId: comment.user_id,
+            banned: true,
+            reason: "Banned via moderation queue",
+            accessToken: token,
+          },
+        });
+      }
     }
   }
 }

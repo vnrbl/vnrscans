@@ -3,6 +3,7 @@
  * Chapter URL scraper - extracts image URLs from manga/manhwa chapter pages
  */
 import chromium from '@sparticuz/chromium';
+import { assertSafePublicUrl } from './ssrf-guard';
 
 /**
  * Retry an async operation with exponential backoff and jitter.
@@ -47,6 +48,7 @@ export interface ExtractChapterImagesOptions {
 const LIVE_READER_IMAGES_PREFIX = '__LIVE_READER_IMAGES__';
 
 export async function extractChaptersFromSeriesUrl(seriesUrl: string): Promise<ChapterInfo[]> {
+  assertSafePublicUrl(seriesUrl);
   try {
     // Custom endpoint/API extraction for Qi Scans / Qi Manga
     if (isQimanhwaLikeUrl(seriesUrl)) {
@@ -208,6 +210,7 @@ function isProtectedPage(html: string): boolean {
 }
 
 async function scrapeWithPuppeteer(url: string, isChapterPage: boolean = false): Promise<string> {
+  assertSafePublicUrl(url);
   console.log(`[Scraper] Launching Puppeteer browser to bypass Cloudflare protection for: ${url}`);
   const puppeteer = await import('puppeteer');
   const chrome = await resolveChromeExecutable(puppeteer.default);
@@ -1100,6 +1103,7 @@ export async function extractImagesFromChapterUrl(
   chapterUrl: string,
   options: ExtractChapterImagesOptions = {},
 ): Promise<string[]> {
+  assertSafePublicUrl(chapterUrl);
   try {
     let html = '';
     let usePuppeteerFallback = false;

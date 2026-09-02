@@ -156,3 +156,47 @@ export async function $generateResetPasswordLink(args: {
     actionLink: linkData.properties.action_link,
   };
 }
+
+export async function $setUserBan(args: {
+  data: {
+    targetUserId: string;
+    banned: boolean;
+    reason?: string;
+    accessToken: string;
+  };
+}) {
+  const { data } = args;
+  const validated = z
+    .object({
+      targetUserId: z.string().uuid(),
+      banned: z.boolean(),
+      reason: z.string().max(1000).optional(),
+      accessToken: z.string().min(1),
+    })
+    .parse(data);
+
+  // 1. Verify caller has admin/moderator privileges
+  const adminUser = await verifyAdmin(validated.accessToken);
+
+  // Prevent self-ban
+  if (adminUser.id === validated.targetUserId && validated.banned) {
+    return { success: false, error: "You cannot ban your own account" };
+  }
+
+  // 2. Perform authoritative update via service role
+  const supabaseAdmin = getAdminSupabase();
+  const { error } = await supabaseAdmin
+    .from("profiles")
+    .update({
+      is_banned: validated.banned,
+      ban_reason: validated.banned ? validated.reason || null : null,
+      banned_at: validated.banned ? new Date().toISOString() : null,
+    })
+    .eq("user_id", validated.targetUserId);
+
+  if (error) {
+    return { success: false, error: error.message };
+  }
+
+  return { success: true };
+}

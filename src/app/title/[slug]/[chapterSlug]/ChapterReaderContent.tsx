@@ -59,6 +59,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { safeUrlOrNull } from "@/lib/safe-url";
+import { sanitizeHtml } from "@/lib/html-sanitizer";
 import NovelSettingsPanel from "@/components/NovelSettingsPanel";
 
 const isVideoUrl = (url: string) => {
@@ -1641,7 +1642,7 @@ function NovelView({
           {isHtml ? (
             <div 
               className="novel-body-text whitespace-pre-wrap"
-              dangerouslySetInnerHTML={{ __html: content }}
+              dangerouslySetInnerHTML={{ __html: sanitizeHtml(content) }}
             />
           ) : (
             <div className="novel-body-text space-y-6">

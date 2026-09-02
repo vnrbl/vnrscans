@@ -19,7 +19,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { $deleteUser, $listUserEmails, $generateResetPasswordLink } from "@/lib/api/admin.actions";
+import { $deleteUser, $listUserEmails, $generateResetPasswordLink, $setUserBan } from "@/lib/api/admin.actions";
 import { logAdminAction } from "@/lib/adminLog";
 import { Button } from "@/components/ui/button";
 import {
@@ -227,15 +227,23 @@ export default function AdminUsers() {
   // Ban (with reason) or unban a user via the is_banned flag.
   const setBan = useMutation({
     mutationFn: async ({ user, banned, reason }: { user: ProfileRow; banned: boolean; reason?: string }) => {
-      const { error } = await supabase
-        .from("profiles")
-        .update({
-          is_banned: banned,
-          ban_reason: banned ? reason || null : null,
-          banned_at: banned ? new Date().toISOString() : null,
-        })
-        .eq("id", user.id);
-      if (error) throw error;
+      const { data: session } = await supabase.auth.getSession();
+      const token = session?.session?.access_token;
+      if (!token) throw new Error("No active session");
+
+      const res = await $setUserBan({
+        data: {
+          targetUserId: user.user_id,
+          banned,
+          reason: banned ? reason : undefined,
+          accessToken: token,
+        },
+      });
+
+      if (!res.success) {
+        throw new Error(res.error || "Failed to update user ban status");
+      }
+
       await logAdminAction(banned ? "ban_user" : "unban_user", "profile", user.user_id, {
         reason: banned ? reason : undefined,
       });

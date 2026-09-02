@@ -4,6 +4,7 @@ import { Menu, X, Search, BookOpen, User as UserIcon, LogOut, ShieldCheck, Libra
 import type { DiceSeries } from "@/components/DiceRollOverlay";
 import { useReaderSettings } from "@/contexts/ReaderSettingsContext";
 import { AddNewSeriesDialog } from "@/components/admin/AddNewSeriesDialog";
+import { AdminSecurityMonitoringModal } from "@/components/admin/AdminSecurityMonitoringModal";
 
 const DiceRollOverlay = lazy(() => import("@/components/DiceRollOverlay").then(m => ({ default: m.DiceRollOverlay })));
 const NavbarSearch = lazy(() => import("@/components/NavbarSearch").then(m => ({ default: m.NavbarSearch })));
@@ -238,6 +239,21 @@ export function Navbar() {
                         <span>{panelLabel}</span>
                       </Link>
                     )}
+
+                    {isAdmin && (
+                      <AdminSecurityMonitoringModal
+                        trigger={
+                          <button
+                            type="button"
+                            onClick={() => setMenuDrawerOpen(false)}
+                            className="flex items-center gap-4 w-full px-3 py-2.5 rounded-xl text-sm font-medium text-emerald-400 hover:bg-emerald-950/40 transition-colors cursor-pointer text-left"
+                          >
+                            <ShieldCheck className="h-5 w-5 stroke-[1.8] text-emerald-400" />
+                            <span>Security & Threats</span>
+                          </button>
+                        }
+                      />
+                    )}
                   </div>
                 </div>
 
@@ -291,6 +307,9 @@ export function Navbar() {
                 }
               />
             )}
+
+            {/* Security Monitoring Shield on left panel beside Logo (Admin only) */}
+            {isAdmin && <AdminSecurityMonitoringModal />}
           </div>
 
           {/* Centralized Search Bar (desktop) */}

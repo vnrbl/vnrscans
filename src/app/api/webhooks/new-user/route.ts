@@ -23,7 +23,7 @@ const NewUserPayloadSchema = z.object({
 
 export async function POST(req: NextRequest) {
   try {
-    // Optional: verify secret when called from Supabase DB Webhook
+    // Enforce secret verification when configured
     if (WEBHOOK_SECRET) {
       const incomingSecret =
         req.headers.get("x-webhook-secret") ||
@@ -31,9 +31,7 @@ export async function POST(req: NextRequest) {
         "";
 
       if (incomingSecret !== WEBHOOK_SECRET) {
-        // Still allow if no secret was provided in header (for direct calls)
-        // but log for awareness
-        console.warn("[webhook/new-user] Missing or invalid webhook secret header");
+        return NextResponse.json({ error: "Unauthorized: Invalid or missing webhook secret" }, { status: 401 });
       }
     }
 
