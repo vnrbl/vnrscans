@@ -1,10 +1,9 @@
 import { Link, useNavigate } from "@/lib/router-compat";
 import { useState, useEffect, lazy, Suspense } from "react";
-import { Menu, X, Search, BookOpen, User as UserIcon, LogOut, ShieldCheck, Library, Home, Sparkles, Trophy, Dice1, Dice2, Dice3, Dice4, Dice5, Dice6, Loader2, Users, Settings as SettingsIcon, Plus } from "lucide-react";
+import { Menu, X, Search, BookOpen, User as UserIcon, LogOut, ShieldCheck, ShieldAlert, Library, Home, Sparkles, Trophy, Dice1, Dice2, Dice3, Dice4, Dice5, Dice6, Loader2, Users, Settings as SettingsIcon, Plus } from "lucide-react";
 import type { DiceSeries } from "@/components/DiceRollOverlay";
 import { useReaderSettings } from "@/contexts/ReaderSettingsContext";
 import { AddNewSeriesDialog } from "@/components/admin/AddNewSeriesDialog";
-import { AdminSecurityMonitoringModal } from "@/components/admin/AdminSecurityMonitoringModal";
 
 const DiceRollOverlay = lazy(() => import("@/components/DiceRollOverlay").then(m => ({ default: m.DiceRollOverlay })));
 const NavbarSearch = lazy(() => import("@/components/NavbarSearch").then(m => ({ default: m.NavbarSearch })));
@@ -239,6 +238,23 @@ export function Navbar() {
                         <span>{panelLabel}</span>
                       </Link>
                     )}
+
+                    {isAdmin && (
+                      <Link
+                        to="/admin/security"
+                        onClick={() => setMenuDrawerOpen(false)}
+                        className="flex items-center gap-4 w-full px-3 py-2.5 rounded-xl text-sm font-semibold text-emerald-400 hover:text-emerald-300 hover:bg-emerald-950/40 border border-emerald-500/20 transition-all duration-200"
+                      >
+                        <ShieldAlert className="h-5 w-5 text-emerald-400 stroke-[2]" />
+                        <div className="flex items-center justify-between flex-1">
+                          <span>Cyber Security SOC</span>
+                          <span className="flex h-2 w-2 relative">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+                          </span>
+                        </div>
+                      </Link>
+                    )}
                   </div>
                 </div>
 
@@ -292,9 +308,6 @@ export function Navbar() {
                 }
               />
             )}
-
-            {/* Security Monitoring Shield on left panel beside Logo (Admin only) */}
-            {isAdmin && <AdminSecurityMonitoringModal />}
           </div>
 
           {/* Centralized Search Bar (desktop) */}

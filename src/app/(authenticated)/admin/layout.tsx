@@ -63,7 +63,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         const isAdmin = roles.includes("admin");
         const isModerator = roles.includes("moderator");
 
-        const adminOnlyPaths = ["/admin/analytics", "/admin/logs"];
+        const adminOnlyPaths = ["/admin/analytics", "/admin/logs", "/admin/security"];
         const staffOnlyPaths = [
           "/admin/announcements",
           "/admin/banners",
@@ -107,6 +107,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   const items = [
     { to: "/admin", label: "Dashboard", icon: LayoutDashboard, exact: true, roles: ["admin", "moderator", "uploader"] },
+    { to: "/admin/security", label: "Cyber Security SOC", icon: ShieldCheck, roles: ["admin"] },
     { to: "/admin/analytics", label: "Analytics", icon: TrendingUp, roles: ["admin"] },
     { to: "/admin/scrape-terminal", label: "Scrape Terminal", icon: TerminalSquare, roles: ["admin", "moderator", "uploader"] },
     { to: "/admin/site-import", label: "Site Import", icon: Globe2, roles: ["admin"] },
@@ -119,9 +120,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { to: "/admin/comments", label: "Comments", icon: MessageSquare, roles: ["admin", "moderator"] },
     { to: "/admin/reports", label: "Reports", icon: Flag, roles: ["admin", "moderator"] },
     { to: "/admin/users", label: "Users", icon: Users, roles: ["admin", "moderator"] },
-    { to: "/admin/permissions", label: "Roles", icon: ShieldCheck, roles: ["admin", "moderator", "uploader"] },
+    { to: "/admin/permissions", label: "Roles", icon: Shield, roles: ["admin", "moderator", "uploader"] },
     { to: "/admin/badges", label: "Realms & Badges", icon: Award, roles: ["admin", "moderator"] },
-    { to: "/admin/logs", label: "Security Logs", icon: Shield, roles: ["admin"] },
   ];
 
   const visibleItems = items.filter((item) =>
