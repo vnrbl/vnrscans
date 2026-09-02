@@ -3053,10 +3053,10 @@ function ChapterComments({
 
       const { error } = await (supabase.from("comments") as any).insert({
         user_id: user.id,
-        series_id: seriesId,
-        chapter_id: chapterId,
-        parent_id: parentId,
-        content: cleanBody || "",
+        series_id: seriesId || null,
+        chapter_id: chapterId || null,
+        parent_id: parentId || null,
+        content: cleanBody || (attachmentType === "gif" ? "[GIF]" : "[Meme]"),
         attachment_type: attachmentType,
         attachment_url: attachmentUrl,
         attachment_alt: attachmentAlt,
@@ -3444,7 +3444,7 @@ function ChapterComments({
 
           {Boolean(
             comment.content &&
-            !["shared a meme/image", "shared a gif", "shared a meme", "shared an image", "shared a sticker"].includes(comment.content.trim().toLowerCase())
+            !["[gif]", "[meme]", "[media]", "[attachment]", "shared a meme/image", "shared a gif", "shared a meme", "shared an image", "shared a sticker"].includes(comment.content.trim().toLowerCase())
           ) && (
             <div
               className={`mt-2.5 whitespace-pre-wrap text-xs sm:text-sm leading-relaxed text-foreground/90 ${spoilerHidden ? "select-none rounded bg-secondary p-2.5 sm:p-3 text-transparent blur-sm" : ""}`}
