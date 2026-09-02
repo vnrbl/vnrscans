@@ -296,16 +296,16 @@ export function AddNewSeriesDialog({ trigger }: AddNewSeriesDialogProps) {
       </DialogTrigger>
 
       <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto bg-background/95 border-purple-500/30 backdrop-blur-xl">
-        <DialogHeader>
-          <div className="flex items-center gap-2">
-            <div className="p-2 rounded-xl bg-purple-500/10 text-purple-400 border border-purple-500/20">
+        <DialogHeader className="pb-2">
+          <div className="flex items-center gap-3">
+            <div className="grid h-10 w-10 place-items-center rounded-xl bg-purple-500/10 text-purple-400 border border-purple-500/20 shrink-0 shadow-sm">
               <Sparkles className="h-5 w-5" />
             </div>
             <div>
-              <DialogTitle className="text-lg font-black text-foreground">
+              <DialogTitle className="text-xl font-bold tracking-tight text-white">
                 Add New Series
               </DialogTitle>
-              <DialogDescription className="text-xs text-muted-foreground">
+              <DialogDescription className="text-xs text-muted-foreground/90 font-normal">
                 Import complete official metadata from Comick & attach scan sources for chapters
               </DialogDescription>
             </div>
@@ -313,44 +313,44 @@ export function AddNewSeriesDialog({ trigger }: AddNewSeriesDialogProps) {
         </DialogHeader>
 
         {/* Tab Selector */}
-        <div className="flex gap-2 border-b border-border/30 pb-2">
+        <div className="flex gap-2 border-b border-border/30 pb-3">
           <button
             type="button"
             onClick={() => setActiveTab("smart")}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+            className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-semibold tracking-wide transition-all cursor-pointer ${
               activeTab === "smart"
-                ? "bg-purple-600/20 text-purple-300 border border-purple-500/40"
-                : "text-muted-foreground hover:text-foreground hover:bg-secondary/40 border border-transparent"
+                ? "bg-purple-600/20 text-purple-200 border border-purple-500/40 shadow-sm"
+                : "text-neutral-400 hover:text-white hover:bg-neutral-800/50 border border-transparent"
             }`}
           >
-            <Zap className="h-3.5 w-3.5" />
-            <span>⚡ 1-Click Comick & Scans Importer</span>
+            <Zap className="h-3.5 w-3.5 text-purple-400" />
+            <span>1-Click Comick & Scans Importer</span>
           </button>
 
           <button
             type="button"
             onClick={() => setActiveTab("manual")}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+            className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-semibold tracking-wide transition-all cursor-pointer ${
               activeTab === "manual"
-                ? "bg-purple-600/20 text-purple-300 border border-purple-500/40"
-                : "text-muted-foreground hover:text-foreground hover:bg-secondary/40 border border-transparent"
+                ? "bg-purple-600/20 text-purple-200 border border-purple-500/40 shadow-sm"
+                : "text-neutral-400 hover:text-white hover:bg-neutral-800/50 border border-transparent"
             }`}
           >
-            <Layers className="h-3.5 w-3.5" />
-            <span>✍️ Manual Creation</span>
+            <Layers className="h-3.5 w-3.5 text-purple-400" />
+            <span>Manual Creation</span>
           </button>
         </div>
 
         {/* ── TAB 1: SMART HYBRID IMPORTER ───────────────────────────── */}
         {activeTab === "smart" && (
-          <div className="space-y-4 pt-2">
+          <div className="space-y-4 pt-1">
             {/* Step 1: Comick Metadata Search */}
-            <div className="p-4 rounded-xl bg-purple-950/20 border border-purple-500/30 space-y-3">
-              <div className="flex items-center justify-between">
-                <Label className="text-xs font-bold text-purple-300 flex items-center gap-1.5">
-                  <Search className="h-3.5 w-3.5" /> Step 1: Search Series on Comick.dev (for Metadata & Cover)
+            <div className="p-4 rounded-xl bg-purple-950/20 border border-purple-500/25 space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                <Label className="text-xs font-bold text-purple-200 flex items-center gap-1.5">
+                  <Search className="h-3.5 w-3.5 text-purple-400" /> Step 1: Search Series on Comick.dev
                 </Label>
-                <span className="text-2xs text-muted-foreground">Fetches genres, tags, synopsis & HD cover</span>
+                <span className="text-[11px] text-muted-foreground font-normal">Fetches genres, tags, synopsis & HD cover</span>
               </div>
 
               <div className="flex gap-2">
