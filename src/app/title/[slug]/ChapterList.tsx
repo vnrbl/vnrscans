@@ -2,11 +2,21 @@
 
 import React from "react";
 import Link from "next/link";
-import { ArrowUpDown, Search, ChevronLeft, ChevronRight, RefreshCw, Sparkles, Eye, Heart } from "lucide-react";
+import {
+  ArrowUpDown,
+  Search,
+  ChevronLeft,
+  ChevronRight,
+  RefreshCw,
+  Sparkles,
+  Eye,
+  Heart,
+  Trash2,
+} from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth, useIsAdmin } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -39,6 +49,11 @@ export const ChapterList = React.memo(function ChapterList({
   initialChaptersData,
 }: ChapterListProps) {
   const { user } = useAuth();
+  const { isAdmin, isMod, isUploader } = useIsAdmin();
+  const canManage = isAdmin || isMod || isUploader;
+  const qc = useQueryClient();
+
+  const [deletingChapterId, setDeletingChapterId] = React.useState<string | null>(null);
 
   // Chapter filtering and ordering state — scoped to this component only
   const [selectedGroup, setSelectedGroup] = React.useState<string>("all");
@@ -46,6 +61,28 @@ export const ChapterList = React.memo(function ChapterList({
   const [searchQuery, setSearchQuery] = React.useState<string>("");
   const [currentPage, setCurrentPage] = React.useState<number>(1);
   const ITEMS_PER_PAGE = 15;
+
+  const handleDeleteChapter = async (chapterId: string, chapterNumber: number) => {
+    if (!window.confirm(`Are you sure you want to delete Chapter ${chapterNumber}? This action cannot be undone.`)) {
+      return;
+    }
+    try {
+      setDeletingChapterId(chapterId);
+      const toastId = toast.loading(`Deleting Chapter ${chapterNumber}...`);
+
+      const { error } = await supabase.from("chapters").delete().eq("id", chapterId);
+      if (error) throw error;
+
+      toast.success(`Chapter ${chapterNumber} deleted successfully!`, { id: toastId });
+      qc.invalidateQueries({ queryKey: ["chapters", slug] });
+      qc.invalidateQueries({ queryKey: ["series", "detail", slug] });
+      qc.invalidateQueries({ queryKey: ["series"] });
+    } catch (err: any) {
+      toast.error(`Failed to delete chapter: ${err.message}`);
+    } finally {
+      setDeletingChapterId(null);
+    }
+  };
 
   React.useEffect(() => {
     setCurrentPage(1);
@@ -337,6 +374,21 @@ export const ChapterList = React.memo(function ChapterList({
                         <Eye className="h-3 w-3 text-neutral-400" />
                         {formatReaderCount(readerCount)}
                       </Badge>
+                      {canManage && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleDeleteChapter(c.id, c.chapter_number);
+                          }}
+                          disabled={deletingChapterId === c.id}
+                          className="p-1 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                          title={`Delete Chapter ${c.chapter_number}`}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      )}
                     </div>
                   </div>
                   <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-neutral-400">
@@ -362,6 +414,9 @@ export const ChapterList = React.memo(function ChapterList({
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-neutral-400">XP</th>
                 <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-neutral-400">Likes</th>
                 <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-neutral-400">Readers</th>
+                {canManage && (
+                  <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-red-400">Action</th>
+                )}
               </tr>
             </thead>
             <tbody className="divide-y divide-border/20">
@@ -436,6 +491,29 @@ export const ChapterList = React.memo(function ChapterList({
                     <td className="px-4 py-3 text-right">
                       <ReaderCount count={readerCount} loading={readerCounts.isLoading} />
                     </td>
+                    {canManage && (
+                      <td className="px-4 py-3 text-right">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleDeleteChapter(c.id, c.chapter_number);
+                          }}
+                          disabled={deletingChapterId === c.id}
+                          className="h-7 w-7 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer"
+                          title={`Delete Chapter ${c.chapter_number}`}
+                        >
+                          {deletingChapterId === c.id ? (
+                            <RefreshCw className="h-3.5 w-3.5 animate-spin text-destructive" />
+                          ) : (
+                            <Trash2 className="h-3.5 w-3.5" />
+                          )}
+                        </Button>
+                      </td>
+                    )}
                   </tr>
                 );
               })}

@@ -371,19 +371,21 @@ function ExpandableSynopsis({ text }: { text: string }) {
   const [expanded, setExpanded] = React.useState(false);
   const isLong = text.length > 320;
 
+  const displayText = expanded || !isLong ? text : `${text.slice(0, 320).trim()}…`;
+
   return (
-    <p className="text-sm leading-relaxed text-muted-foreground">
-      {expanded || !isLong ? text : `${text.slice(0, 320).trim()}…`}
+    <div className="text-sm leading-relaxed text-muted-foreground whitespace-pre-line space-y-2">
+      <span>{displayText}</span>
       {isLong && (
         <button
           type="button"
           onClick={() => setExpanded((prev) => !prev)}
-          className="ml-1 font-medium text-violet-400 hover:text-violet-300 hover:underline"
+          className="ml-1.5 inline-block font-semibold text-primary hover:underline cursor-pointer"
         >
           [{expanded ? "view less" : "view more"}]
         </button>
       )}
-    </p>
+    </div>
   );
 }
 

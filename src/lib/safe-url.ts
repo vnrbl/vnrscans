@@ -24,6 +24,10 @@ export function isSafeUrl(value: string | null | undefined): value is string {
   if (!value) return false;
   const trimmed = value.trim();
   if (!trimmed) return false;
+  // Allow root-relative safe paths (e.g. /memes/..., /images/...)
+  if (trimmed.startsWith("/") && !trimmed.startsWith("//") && !trimmed.startsWith("/\\")) {
+    return true;
+  }
   try {
     const url = new URL(trimmed);
     return SAFE_URL_SCHEMES.has(url.protocol.toLowerCase());

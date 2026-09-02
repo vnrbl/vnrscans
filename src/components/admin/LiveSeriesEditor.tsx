@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
@@ -20,11 +21,22 @@ import {
   Zap,
   RefreshCw,
   Link2,
+  Trash2,
+  PlusCircle,
+  Eye,
+  Check,
+  Search,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth, useIsAdmin } from "@/hooks/useAuth";
 import { logAdminAction } from "@/lib/adminLog";
-import { $extractCoversFromScanUrl, $autoImportSeriesCover, $syncImportSource } from "@/lib/api/scraper.actions";
+import {
+  $extractCoversFromScanUrl,
+  $autoImportSeriesCover,
+  $syncImportSource,
+  $deleteChapter,
+  $bulkDeleteChapters,
+} from "@/lib/api/scraper.actions";
 import { detectImportSource } from "@/lib/import-source-utils";
 import { ComickMetadataImporter } from "@/components/admin/ComickMetadataImporter";
 import { Button } from "@/components/ui/button";
@@ -69,16 +81,19 @@ interface LiveSeriesEditorProps {
 }
 
 export function LiveSeriesEditor({ series: initialSeries, slug, trigger }: LiveSeriesEditorProps) {
+  const router = useRouter();
   const { user } = useAuth();
   const { isAdmin, isMod, isUploader } = useIsAdmin();
   const canEdit = isAdmin || isMod || isUploader;
   const qc = useQueryClient();
 
   const [open, setOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<"general" | "synopsis" | "cover" | "sources">("general");
+  const [isCreatingNew, setIsCreatingNew] = useState(false);
+  const [activeTab, setActiveTab] = useState<"general" | "synopsis" | "cover" | "chapters" | "sources">("general");
 
   // Form state
   const [title, setTitle] = useState(initialSeries?.title || "");
+  const [newSlug, setNewSlug] = useState(initialSeries?.slug || "");
   const [alternativeTitles, setAlternativeTitles] = useState(initialSeries?.alternative_titles || "");
   const [type, setType] = useState<string>(initialSeries?.type || "manhwa");
   const [status, setStatus] = useState<string>(initialSeries?.status || "ongoing");
@@ -92,6 +107,11 @@ export function LiveSeriesEditor({ series: initialSeries, slug, trigger }: LiveS
   const [isHidden, setIsHidden] = useState(Boolean(initialSeries?.is_hidden));
   const [coverUrl, setCoverUrl] = useState(initialSeries?.cover_url || "");
 
+  // Chapter Management in Modal
+  const [chapterSearch, setChapterSearch] = useState("");
+  const [selectedChapterIds, setSelectedChapterIds] = useState<Set<string>>(new Set());
+  const [isDeletingChapters, setIsDeletingChapters] = useState(false);
+
   // Cover Import state
   const [scanUrl, setScanUrl] = useState("");
   const [isExtractingCovers, setIsExtractingCovers] = useState(false);
@@ -104,7 +124,7 @@ export function LiveSeriesEditor({ series: initialSeries, slug, trigger }: LiveS
   const [isAddingSource, setIsAddingSource] = useState(false);
   const [isSyncingSeries, setIsSyncingSeries] = useState(false);
 
-  // Query existing import source
+  // Query existing import sources
   const importSourcesQ = useQuery({
     queryKey: ["admin", "series-import-sources", initialSeries?.id],
     queryFn: async () => {
@@ -116,13 +136,69 @@ export function LiveSeriesEditor({ series: initialSeries, slug, trigger }: LiveS
       if (error) throw error;
       return (data || []) as any[];
     },
-    enabled: open && !!initialSeries?.id,
+    enabled: open && !isCreatingNew && !!initialSeries?.id,
+  });
+
+  // Query all chapters for chapter table
+  const chaptersQ = useQuery({
+    queryKey: ["admin", "series-editor-chapters", initialSeries?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("chapters")
+        .select("id, slug, chapter_number, title, created_at, status, scanlation_group")
+        .eq("series_id", initialSeries?.id)
+        .order("chapter_number", { ascending: false });
+      if (error) throw error;
+      return (data || []) as any[];
+    },
+    enabled: open && !isCreatingNew && !!initialSeries?.id,
   });
 
   // Sync state with props when modal opens
   useEffect(() => {
-    if (open && initialSeries) {
+    if (open && initialSeries && !isCreatingNew) {
       setTitle(initialSeries.title || "");
+      setNewSlug(initialSeries.slug || "");
+      setAlternativeTitles(initialSeries.alternative_titles || "");
+      setType(initialSeries.type || "manhwa");
+      setStatus(initialSeries.status || "ongoing");
+      setAuthor(initialSeries.author || "");
+      setArtist(initialSeries.artist || "");
+      setReleaseYear(initialSeries.release_year ? String(initialSeries.release_year) : "");
+      setDescription(initialSeries.description || "");
+      setContentRating((initialSeries.content_rating as ContentRating) || "safe");
+      setIsFeatured(Boolean(initialSeries.is_featured));
+      setIsTrending(Boolean(initialSeries.is_trending));
+      setIsHidden(Boolean(initialSeries.is_hidden));
+      setCoverUrl(initialSeries.cover_url || "");
+      setSelectedChapterIds(new Set());
+    }
+  }, [open, initialSeries, isCreatingNew]);
+
+  const resetForNewSeries = () => {
+    setIsCreatingNew(true);
+    setTitle("");
+    setNewSlug("");
+    setAlternativeTitles("");
+    setType("manhwa");
+    setStatus("ongoing");
+    setAuthor("");
+    setArtist("");
+    setReleaseYear(new Date().getFullYear().toString());
+    setDescription("");
+    setContentRating("safe");
+    setIsFeatured(false);
+    setIsTrending(false);
+    setIsHidden(false);
+    setCoverUrl("");
+    setActiveTab("general");
+  };
+
+  const resetForCurrentSeries = () => {
+    setIsCreatingNew(false);
+    if (initialSeries) {
+      setTitle(initialSeries.title || "");
+      setNewSlug(initialSeries.slug || "");
       setAlternativeTitles(initialSeries.alternative_titles || "");
       setType(initialSeries.type || "manhwa");
       setStatus(initialSeries.status || "ongoing");
@@ -136,10 +212,11 @@ export function LiveSeriesEditor({ series: initialSeries, slug, trigger }: LiveS
       setIsHidden(Boolean(initialSeries.is_hidden));
       setCoverUrl(initialSeries.cover_url || "");
     }
-  }, [open, initialSeries]);
+  };
 
-  // 1-Click Auto-Import Cover (Zero URL input needed)
+  // 1-Click Auto-Import Cover
   const handleAutoImportCover = async () => {
+    if (!initialSeries?.id) return;
     try {
       const session = (await supabase.auth.getSession()).data.session;
       if (!session?.access_token) {
@@ -255,6 +332,7 @@ export function LiveSeriesEditor({ series: initialSeries, slug, trigger }: LiveS
         qc.invalidateQueries({ queryKey: ["series"] });
         qc.invalidateQueries({ queryKey: ["series", "detail", slug] });
         qc.invalidateQueries({ queryKey: ["chapters", initialSeries?.id] });
+        qc.invalidateQueries({ queryKey: ["admin", "series-editor-chapters", initialSeries?.id] });
       }
     } catch (err: any) {
       toast.error(err.message || "Sync failed");
@@ -265,7 +343,7 @@ export function LiveSeriesEditor({ series: initialSeries, slug, trigger }: LiveS
 
   // Add new scan source
   const handleAddSource = async () => {
-    if (!newSourceUrl.trim()) return;
+    if (!newSourceUrl.trim() || !initialSeries?.id) return;
     try {
       setIsAddingSource(true);
       const preset = detectImportSource(newSourceUrl.trim());
@@ -288,7 +366,123 @@ export function LiveSeriesEditor({ series: initialSeries, slug, trigger }: LiveS
     }
   };
 
-  // Save Mutation
+  // Delete Individual Chapter
+  const handleDeleteSingleChapter = async (chapterId: string, chapterNumber: number) => {
+    if (!window.confirm(`Delete Chapter ${chapterNumber}? This action cannot be undone.`)) return;
+    try {
+      const { error } = await supabase.from("chapters").delete().eq("id", chapterId);
+      if (error) throw error;
+      toast.success(`Chapter ${chapterNumber} deleted.`);
+      qc.invalidateQueries({ queryKey: ["admin", "series-editor-chapters", initialSeries?.id] });
+      qc.invalidateQueries({ queryKey: ["chapters", slug] });
+      qc.invalidateQueries({ queryKey: ["series", "detail", slug] });
+    } catch (err: any) {
+      toast.error(`Delete failed: ${err.message}`);
+    }
+  };
+
+  // Bulk Delete Chapters
+  const handleBulkDelete = async () => {
+    if (selectedChapterIds.size === 0) return;
+    if (!window.confirm(`Delete ${selectedChapterIds.size} selected chapter(s)? This action cannot be undone.`)) {
+      return;
+    }
+    try {
+      setIsDeletingChapters(true);
+      const session = (await supabase.auth.getSession()).data.session;
+      if (!session?.access_token) {
+        toast.error("Please sign in as admin");
+        return;
+      }
+      const toastId = toast.loading(`Deleting ${selectedChapterIds.size} chapters...`);
+      const res = await $bulkDeleteChapters({
+        data: {
+          chapterIds: Array.from(selectedChapterIds),
+          accessToken: session.access_token,
+        },
+      });
+
+      if (!res.success) {
+        toast.error(res.error || "Failed to bulk delete", { id: toastId });
+      } else {
+        toast.success(res.message || "Selected chapters deleted.", { id: toastId });
+        setSelectedChapterIds(new Set());
+        qc.invalidateQueries({ queryKey: ["admin", "series-editor-chapters", initialSeries?.id] });
+        qc.invalidateQueries({ queryKey: ["chapters", slug] });
+        qc.invalidateQueries({ queryKey: ["series", "detail", slug] });
+      }
+    } catch (err: any) {
+      toast.error(`Bulk delete failed: ${err.message}`);
+    } finally {
+      setIsDeletingChapters(false);
+    }
+  };
+
+  // Create New Series Mutation
+  const createSeriesMutation = useMutation({
+    mutationFn: async () => {
+      if (!title.trim()) throw new Error("Title is required");
+      const generatedSlug = (
+        newSlug.trim() ||
+        title
+          .trim()
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, "-")
+          .replace(/^-|-$/g, "")
+      );
+
+      const payload: any = {
+        title: title.trim(),
+        slug: generatedSlug,
+        alternative_titles: alternativeTitles.trim() || null,
+        type,
+        status,
+        author: author.trim() || null,
+        artist: artist.trim() || null,
+        release_year: releaseYear ? parseInt(releaseYear, 10) : null,
+        description: description.trim() || null,
+        content_rating: contentRating,
+        is_featured: isFeatured,
+        is_trending: isTrending,
+        is_hidden: isHidden,
+        cover_url: coverUrl.trim() || null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+
+      const { data: newRow, error: insertErr } = await supabase
+        .from("series")
+        .insert(payload)
+        .select("id, slug")
+        .single();
+
+      if (insertErr) throw insertErr;
+
+      if (coverUrl.trim() && newRow?.id) {
+        await supabase.from("series_covers").insert({
+          series_id: newRow.id,
+          image_url: coverUrl.trim(),
+          position: 0,
+        });
+      }
+
+      await logAdminAction("create", "series", newRow.id, { title });
+      return newRow;
+    },
+    onSuccess: (newRow) => {
+      toast.success("New series created successfully!");
+      qc.invalidateQueries({ queryKey: ["series"] });
+      setOpen(false);
+      if (newRow?.slug) {
+        router.push(`/title/${newRow.slug}`);
+      }
+    },
+    onError: (err: any) => {
+      toast.error(`Creation failed: ${err.message}`);
+    },
+  });
+
+  // Save Existing Series Mutation
   const saveMutation = useMutation({
     mutationFn: async () => {
       if (!initialSeries?.id) throw new Error("Series ID is missing");
@@ -319,18 +513,18 @@ export function LiveSeriesEditor({ series: initialSeries, slug, trigger }: LiveS
       if (updateErr) throw updateErr;
 
       // 2. Record in series_covers if new cover
-      if (coverUrl) {
+      if (coverUrl.trim()) {
         const { data: existingCover } = await supabase
           .from("series_covers")
           .select("id")
           .eq("series_id", initialSeries.id)
-          .eq("image_url", coverUrl)
+          .eq("image_url", coverUrl.trim())
           .maybeSingle();
 
         if (!existingCover) {
           await supabase.from("series_covers").insert({
             series_id: initialSeries.id,
-            image_url: coverUrl,
+            image_url: coverUrl.trim(),
             position: 0,
           });
         }
@@ -350,6 +544,16 @@ export function LiveSeriesEditor({ series: initialSeries, slug, trigger }: LiveS
     },
   });
 
+  const filteredChapters = (chaptersQ.data || []).filter((ch: any) => {
+    if (!chapterSearch.trim()) return true;
+    const q = chapterSearch.toLowerCase();
+    return (
+      String(ch.chapter_number).includes(q) ||
+      (ch.title && ch.title.toLowerCase().includes(q)) ||
+      (ch.scanlation_group && ch.scanlation_group.toLowerCase().includes(q))
+    );
+  });
+
   if (!canEdit) return null;
 
   return (
@@ -362,7 +566,7 @@ export function LiveSeriesEditor({ series: initialSeries, slug, trigger }: LiveS
             <Button
               variant="outline"
               size="sm"
-              className="gap-1.5 border-purple-500/40 bg-purple-950/20 text-purple-300 hover:bg-purple-900/30 hover:text-purple-200 shadow-sm"
+              className="gap-1.5 border-purple-500/40 bg-purple-950/20 text-purple-300 hover:bg-purple-900/30 hover:text-purple-200 shadow-sm cursor-pointer"
             >
               <Edit3 className="h-3.5 w-3.5" />
               <span>Live Edit</span>
@@ -370,7 +574,7 @@ export function LiveSeriesEditor({ series: initialSeries, slug, trigger }: LiveS
           )}
         </DialogTrigger>
 
-        <DialogContent className="max-h-[90vh] max-w-3xl overflow-hidden flex flex-col p-0 bg-[#0d0d12] border-border/40 text-foreground">
+        <DialogContent className="max-h-[92vh] max-w-4xl overflow-hidden flex flex-col p-0 bg-[#0d0d12] border-border/40 text-foreground">
           {/* Top Header Bar */}
           <DialogHeader className="p-6 pb-4 border-b border-border/20 bg-card/60 backdrop-blur-sm">
             <div className="flex items-center justify-between">
@@ -379,33 +583,55 @@ export function LiveSeriesEditor({ series: initialSeries, slug, trigger }: LiveS
                   <Sparkles className="h-5 w-5" />
                 </div>
                 <div>
-                  <DialogTitle className="text-lg font-bold">Real-Time Series Editor</DialogTitle>
+                  <DialogTitle className="text-lg font-bold flex items-center gap-2">
+                    {isCreatingNew ? "Add New Series" : "Real-Time Series Editor"}
+                    <Badge variant="outline" className="text-2xs uppercase tracking-wider font-mono">
+                      {isCreatingNew ? "New Entry" : type}
+                    </Badge>
+                  </DialogTitle>
                   <DialogDescription className="text-xs text-muted-foreground">
-                    Edit series metadata, taxonomy, covers, and sync sources live on site
+                    {isCreatingNew
+                      ? "Create a new manga, manhwa, manhua, or novel with 1-click Comick auto-fill"
+                      : "Edit series metadata, taxonomy, covers, chapters, and scan sources live"}
                   </DialogDescription>
                 </div>
               </div>
+
+              {/* Mode Switcher */}
               <div className="flex items-center gap-2 pr-6">
-                <a
-                  href={`/admin/series-chapters/${initialSeries?.id}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors font-mono"
-                >
-                  <Layers className="h-3.5 w-3.5" />
-                  Manage Chapters
-                  <ExternalLink className="h-3 w-3" />
-                </a>
+                {!isCreatingNew ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={resetForNewSeries}
+                    className="h-8 gap-1.5 text-xs font-semibold border-emerald-500/40 bg-emerald-950/20 text-emerald-300 hover:bg-emerald-900/30 cursor-pointer"
+                  >
+                    <PlusCircle className="h-3.5 w-3.5" />
+                    <span>+ Add New Series</span>
+                  </Button>
+                ) : (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={resetForCurrentSeries}
+                    className="h-8 gap-1.5 text-xs font-semibold cursor-pointer"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                    <span>Back to Edit Current</span>
+                  </Button>
+                )}
               </div>
             </div>
 
             {/* Navigation Tabs */}
-            <div className="flex gap-2 pt-4 border-t border-border/10 mt-4 overflow-x-auto">
+            <div className="flex gap-2 pt-4 border-t border-border/10 mt-4 overflow-x-auto scrollbar-none">
               <Button
                 type="button"
                 variant={activeTab === "general" ? "default" : "ghost"}
                 size="sm"
-                className="h-8 text-xs font-semibold"
+                className="h-8 text-xs font-semibold cursor-pointer"
                 onClick={() => setActiveTab("general")}
               >
                 Basic Info
@@ -414,7 +640,7 @@ export function LiveSeriesEditor({ series: initialSeries, slug, trigger }: LiveS
                 type="button"
                 variant={activeTab === "synopsis" ? "default" : "ghost"}
                 size="sm"
-                className="h-8 text-xs font-semibold gap-1.5"
+                className="h-8 text-xs font-semibold gap-1.5 cursor-pointer"
                 onClick={() => setActiveTab("synopsis")}
               >
                 <Globe className="h-3 w-3 text-emerald-400" />
@@ -424,58 +650,84 @@ export function LiveSeriesEditor({ series: initialSeries, slug, trigger }: LiveS
                 type="button"
                 variant={activeTab === "cover" ? "default" : "ghost"}
                 size="sm"
-                className="h-8 text-xs font-semibold"
+                className="h-8 text-xs font-semibold cursor-pointer"
                 onClick={() => setActiveTab("cover")}
               >
                 Cover & Scan Import
               </Button>
-              <Button
-                type="button"
-                variant={activeTab === "sources" ? "default" : "ghost"}
-                size="sm"
-                className="h-8 text-xs font-semibold"
-                onClick={() => setActiveTab("sources")}
-              >
-                Scan Sources ({(importSourcesQ.data || []).length})
-              </Button>
+              {!isCreatingNew && (
+                <>
+                  <Button
+                    type="button"
+                    variant={activeTab === "chapters" ? "default" : "ghost"}
+                    size="sm"
+                    className="h-8 text-xs font-semibold gap-1.5 cursor-pointer"
+                    onClick={() => setActiveTab("chapters")}
+                  >
+                    <Layers className="h-3 w-3 text-purple-400" />
+                    <span>Chapters ({(chaptersQ.data || []).length})</span>
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={activeTab === "sources" ? "default" : "ghost"}
+                    size="sm"
+                    className="h-8 text-xs font-semibold cursor-pointer"
+                    onClick={() => setActiveTab("sources")}
+                  >
+                    Scan Sources ({(importSourcesQ.data || []).length})
+                  </Button>
+                </>
+              )}
             </div>
           </DialogHeader>
 
           {/* Tab Body */}
-          <div className="flex-1 overflow-y-auto p-6 space-y-5 max-h-[60vh]">
+          <div className="flex-1 overflow-y-auto p-6 space-y-5 max-h-[62vh]">
             {/* ═══ 1. GENERAL TAB ═══ */}
             {activeTab === "general" && (
               <div className="space-y-4">
-                <div>
-                  <Label className="text-xs font-semibold">Title *</Label>
-                  <Input
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                    placeholder="Series title"
-                    className="mt-1"
-                  />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-semibold">Title *</Label>
+                    <Input
+                      value={title}
+                      onChange={(e) => {
+                        setTitle(e.target.value);
+                        if (isCreatingNew && !newSlug) {
+                          setNewSlug(
+                            e.target.value
+                              .toLowerCase()
+                              .replace(/[^a-z0-9]+/g, "-")
+                              .replace(/^-|-$/g, "")
+                          );
+                        }
+                      }}
+                      placeholder="e.g. Solo Leveling"
+                      className="text-xs font-medium"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-semibold">URL Slug</Label>
+                    <Input
+                      value={newSlug}
+                      onChange={(e) => setNewSlug(e.target.value)}
+                      placeholder="e.g. solo-leveling"
+                      disabled={!isCreatingNew}
+                      className="text-xs font-mono bg-secondary/30"
+                    />
+                  </div>
                 </div>
 
-                <div>
-                  <Label className="text-xs font-semibold">Alternative Titles</Label>
-                  <Input
-                    value={alternativeTitles}
-                    onChange={(e) => setAlternativeTitles(e.target.value)}
-                    placeholder="Korean / Japanese names, synonyms (comma separated)"
-                    className="mt-1"
-                  />
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div>
-                    <Label className="text-xs font-semibold">Type</Label>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-semibold">Format / Type</Label>
                     <Select value={type} onValueChange={setType}>
-                      <SelectTrigger className="mt-1">
+                      <SelectTrigger className="text-xs">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
                         {seriesTypes.map((t) => (
-                          <SelectItem key={t} value={t} className="uppercase">
+                          <SelectItem key={t} value={t} className="text-xs capitalize">
                             {t}
                           </SelectItem>
                         ))}
@@ -483,15 +735,15 @@ export function LiveSeriesEditor({ series: initialSeries, slug, trigger }: LiveS
                     </Select>
                   </div>
 
-                  <div>
+                  <div className="space-y-1.5">
                     <Label className="text-xs font-semibold">Status</Label>
                     <Select value={status} onValueChange={setStatus}>
-                      <SelectTrigger className="mt-1">
+                      <SelectTrigger className="text-xs">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
                         {seriesStatuses.map((s) => (
-                          <SelectItem key={s} value={s} className="capitalize">
+                          <SelectItem key={s} value={s} className="text-xs capitalize">
                             {s}
                           </SelectItem>
                         ))}
@@ -499,15 +751,15 @@ export function LiveSeriesEditor({ series: initialSeries, slug, trigger }: LiveS
                     </Select>
                   </div>
 
-                  <div>
+                  <div className="space-y-1.5">
                     <Label className="text-xs font-semibold">Content Rating</Label>
                     <Select value={contentRating} onValueChange={(v) => setContentRating(v as ContentRating)}>
-                      <SelectTrigger className="mt-1">
+                      <SelectTrigger className="text-xs">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
                         {contentRatings.map((r) => (
-                          <SelectItem key={r} value={r}>
+                          <SelectItem key={r} value={r} className="text-xs">
                             {contentRatingLabels[r]}
                           </SelectItem>
                         ))}
@@ -516,87 +768,88 @@ export function LiveSeriesEditor({ series: initialSeries, slug, trigger }: LiveS
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold">Alternative Titles (1 per line)</Label>
+                  <Textarea
+                    rows={2}
+                    value={alternativeTitles}
+                    onChange={(e) => setAlternativeTitles(e.target.value)}
+                    placeholder="Solo Leveling&#10;Na Honjaman Level Up"
+                    className="text-xs font-mono"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="space-y-1.5">
                     <Label className="text-xs font-semibold">Author</Label>
                     <Input
                       value={author}
                       onChange={(e) => setAuthor(e.target.value)}
                       placeholder="Author name"
-                      className="mt-1"
+                      className="text-xs"
                     />
                   </div>
-                  <div>
+                  <div className="space-y-1.5">
                     <Label className="text-xs font-semibold">Artist</Label>
                     <Input
                       value={artist}
                       onChange={(e) => setArtist(e.target.value)}
                       placeholder="Artist name"
-                      className="mt-1"
+                      className="text-xs"
                     />
                   </div>
-                  <div>
+                  <div className="space-y-1.5">
                     <Label className="text-xs font-semibold">Release Year</Label>
                     <Input
                       type="number"
                       value={releaseYear}
                       onChange={(e) => setReleaseYear(e.target.value)}
                       placeholder="e.g. 2024"
-                      className="mt-1"
+                      className="text-xs"
                     />
                   </div>
                 </div>
 
-                {/* Flags / Visibility */}
-                <div className="pt-2 border-t border-border/20 flex flex-wrap gap-6">
-                  <label className="flex items-center gap-2 cursor-pointer text-sm">
-                    <Checkbox
-                      checked={isFeatured}
-                      onCheckedChange={(c) => setIsFeatured(Boolean(c))}
-                    />
-                    <span>Featured Series</span>
-                  </label>
-                  <label className="flex items-center gap-2 cursor-pointer text-sm">
-                    <Checkbox
-                      checked={isTrending}
-                      onCheckedChange={(c) => setIsTrending(Boolean(c))}
-                    />
-                    <span>Trending Series</span>
-                  </label>
-                  <label className="flex items-center gap-2 cursor-pointer text-sm">
-                    <Checkbox
-                      checked={isHidden}
-                      onCheckedChange={(c) => setIsHidden(Boolean(c))}
-                    />
-                    <span className="text-orange-400">Hidden from Public</span>
-                  </label>
+                {/* Flags and Visibility */}
+                <div className="rounded-xl border border-border/30 bg-card/40 p-4 space-y-3">
+                  <span className="text-xs font-bold text-foreground block">Visibility & Discovery Toggles</span>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <label className="flex items-center gap-2 text-xs font-medium cursor-pointer select-none">
+                      <Checkbox checked={isFeatured} onCheckedChange={(c) => setIsFeatured(Boolean(c))} />
+                      <span>🌟 Featured Series</span>
+                    </label>
+                    <label className="flex items-center gap-2 text-xs font-medium cursor-pointer select-none">
+                      <Checkbox checked={isTrending} onCheckedChange={(c) => setIsTrending(Boolean(c))} />
+                      <span>🔥 Trending Now</span>
+                    </label>
+                    <label className="flex items-center gap-2 text-xs font-medium cursor-pointer select-none text-red-400">
+                      <Checkbox checked={isHidden} onCheckedChange={(c) => setIsHidden(Boolean(c))} />
+                      <span>👁️ Hidden from Public</span>
+                    </label>
+                  </div>
                 </div>
               </div>
             )}
 
             {/* ═══ 2. SYNOPSIS & COMICK IMPORT TAB ═══ */}
             {activeTab === "synopsis" && (
-              <div className="space-y-4">
-                {/* Comick.dev 1-Click Import Feature Banner */}
-                <div className="rounded-xl border border-emerald-500/40 bg-emerald-950/20 p-4 space-y-3">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="space-y-5">
+                <div className="rounded-xl border border-emerald-500/30 bg-emerald-950/20 p-4 space-y-3">
+                  <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <div className="grid h-7 w-7 place-items-center rounded-lg bg-emerald-500/20 text-emerald-400">
-                        <Globe className="h-4 w-4" />
-                      </div>
-                      <div>
-                        <h4 className="text-xs font-bold text-emerald-200">Import from Comick.dev</h4>
-                        <p className="text-[11px] text-muted-foreground">
-                          Auto-imports genres, tags, description/synopsis, and alternative titles
-                        </p>
-                      </div>
+                      <Globe className="h-4 w-4 text-emerald-400" />
+                      <h3 className="text-sm font-bold text-emerald-200">1-Click Comick.dev Auto-Fill</h3>
                     </div>
-
+                  </div>
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    Search by series title to automatically fill description with paragraph breaks intact, alternative titles, genres, and cover art.
+                  </p>
+                  <div className="pt-1">
                     <ComickMetadataImporter
                       seriesId={initialSeries?.id}
-                      seriesTitle={title}
-                      slug={slug}
-                      onMetadataImported={(meta) => {
+                      seriesTitle={title || initialSeries?.title}
+                      onMetadataImported={(meta: any) => {
+                        if (meta.title && (!title || isCreatingNew)) setTitle(meta.title);
                         if (meta.description) setDescription(meta.description);
                         if (meta.alternativeTitles) setAlternativeTitles(meta.alternativeTitles);
                         if (meta.coverUrl) setCoverUrl(meta.coverUrl);
@@ -608,51 +861,50 @@ export function LiveSeriesEditor({ series: initialSeries, slug, trigger }: LiveS
                 </div>
 
                 <div className="space-y-2">
-                  <Label className="text-xs font-semibold">Description / Synopsis</Label>
+                  <Label className="text-xs font-semibold">Description / Synopsis (Preserves Paragraphs)</Label>
                   <Textarea
                     rows={10}
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
                     placeholder="Enter full synopsis for this series..."
-                    className="font-normal leading-relaxed text-xs"
+                    className="font-normal leading-relaxed text-xs whitespace-pre-line"
                   />
                 </div>
               </div>
             )}
 
-            {/* ═══ 4. COVER & SCAN IMPORT TAB ═══ */}
+            {/* ═══ 3. COVER & SCAN IMPORT TAB ═══ */}
             {activeTab === "cover" && (
               <div className="space-y-5">
-                {/* 1-Click Auto Import Banner */}
-                <div className="rounded-xl border border-purple-500/40 bg-purple-950/20 p-4 space-y-2.5">
-                  <div className="flex items-center justify-between">
+                {!isCreatingNew && (
+                  <div className="rounded-xl border border-purple-500/40 bg-purple-950/20 p-4 space-y-2.5">
                     <div className="flex items-center gap-2">
                       <Zap className="h-4 w-4 text-purple-400" />
                       <h3 className="text-sm font-bold text-purple-200">1-Click Auto-Import Cover</h3>
                     </div>
+                    <p className="text-xs text-muted-foreground">
+                      Automatically scans the linked source URL for this series and sets the high-resolution cover image.
+                    </p>
+                    <Button
+                      type="button"
+                      onClick={handleAutoImportCover}
+                      disabled={isAutoImportingCover}
+                      className="w-full bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-500 hover:to-violet-500 text-white font-bold text-xs h-9 shadow-lg shadow-purple-600/20 gap-1.5 cursor-pointer"
+                    >
+                      {isAutoImportingCover ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Auto-Importing Cover...
+                        </>
+                      ) : (
+                        <>
+                          <Zap className="h-3.5 w-3.5" />
+                          <span>Auto-Scan & Set Cover (1-Click)</span>
+                        </>
+                      )}
+                    </Button>
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    Automatically scans the linked source URL for this series and sets the high-resolution cover image with zero typing needed.
-                  </p>
-                  <Button
-                    type="button"
-                    onClick={handleAutoImportCover}
-                    disabled={isAutoImportingCover}
-                    className="w-full bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-500 hover:to-violet-500 text-white font-bold text-xs h-9 shadow-lg shadow-purple-600/20 gap-1.5"
-                  >
-                    {isAutoImportingCover ? (
-                      <>
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        Auto-Importing Cover...
-                      </>
-                    ) : (
-                      <>
-                        <Zap className="h-3.5 w-3.5" />
-                        <span>Auto-Scan & Set Cover (1-Click)</span>
-                      </>
-                    )}
-                  </Button>
-                </div>
+                )}
 
                 {/* Current Cover Preview */}
                 <div className="flex items-start gap-4 p-4 rounded-xl border border-border/30 bg-card/40">
@@ -666,7 +918,7 @@ export function LiveSeriesEditor({ series: initialSeries, slug, trigger }: LiveS
                     )}
                   </div>
                   <div className="flex-1 space-y-2">
-                    <Label className="text-xs font-semibold">Current Cover URL</Label>
+                    <Label className="text-xs font-semibold">Cover Image URL</Label>
                     <Input
                       value={coverUrl}
                       onChange={(e) => setCoverUrl(e.target.value)}
@@ -688,7 +940,7 @@ export function LiveSeriesEditor({ series: initialSeries, slug, trigger }: LiveS
                             {isUploadingCover ? "Uploading..." : "Upload File"}
                             <input
                               type="file"
-                              accept="image/*,video/mp4"
+                              accept="image/*"
                               onChange={handleCoverFileUpload}
                               className="hidden"
                             />
@@ -700,7 +952,7 @@ export function LiveSeriesEditor({ series: initialSeries, slug, trigger }: LiveS
                           type="button"
                           variant="ghost"
                           size="sm"
-                          className="h-8 text-xs text-destructive hover:text-destructive"
+                          className="h-8 text-xs text-destructive hover:text-destructive cursor-pointer"
                           onClick={() => setCoverUrl("")}
                         >
                           Clear
@@ -710,11 +962,11 @@ export function LiveSeriesEditor({ series: initialSeries, slug, trigger }: LiveS
                   </div>
                 </div>
 
-                {/* Import Cover from Scan URL Tool */}
+                {/* Scan URL Cover Extractor */}
                 <div className="rounded-xl border border-border/30 bg-card/30 p-4 space-y-3">
                   <div className="flex items-center gap-2">
                     <Globe className="h-4 w-4 text-muted-foreground" />
-                    <h3 className="text-sm font-semibold">Custom Scan Source / Chapter URL</h3>
+                    <h3 className="text-sm font-semibold">Preview & Select from Scan Source</h3>
                   </div>
                   <div className="flex gap-2">
                     <Input
@@ -728,7 +980,7 @@ export function LiveSeriesEditor({ series: initialSeries, slug, trigger }: LiveS
                       onClick={handleExtractCovers}
                       disabled={isExtractingCovers || !scanUrl.trim()}
                       variant="outline"
-                      className="shrink-0 text-xs h-9"
+                      className="shrink-0 text-xs h-9 cursor-pointer"
                     >
                       {isExtractingCovers ? (
                         <>
@@ -741,11 +993,10 @@ export function LiveSeriesEditor({ series: initialSeries, slug, trigger }: LiveS
                     </Button>
                   </div>
 
-                  {/* Discovered Covers Grid */}
                   {extractedCovers.length > 0 && (
                     <div className="pt-3 border-t border-border/20 space-y-2">
                       <Label className="text-xs font-semibold text-purple-300">
-                        Discovered Covers ({extractedCovers.length}) — Click any to set as Main Cover:
+                        Discovered Covers ({extractedCovers.length}) — Click to set as Main Cover:
                       </Label>
                       <div className="grid grid-cols-3 sm:grid-cols-4 gap-3 max-h-48 overflow-y-auto p-1">
                         {extractedCovers.map((url, idx) => {
@@ -777,8 +1028,136 @@ export function LiveSeriesEditor({ series: initialSeries, slug, trigger }: LiveS
               </div>
             )}
 
-            {/* ═══ 5. SCAN SOURCES & AUTO-SYNC TAB ═══ */}
-            {activeTab === "sources" && (
+            {/* ═══ 4. CHAPTERS MANAGEMENT TAB ═══ */}
+            {activeTab === "chapters" && !isCreatingNew && (
+              <div className="space-y-4">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                  <div className="relative w-full sm:w-64">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                    <Input
+                      value={chapterSearch}
+                      onChange={(e) => setChapterSearch(e.target.value)}
+                      placeholder="Search chapters..."
+                      className="pl-9 h-8 text-xs bg-secondary/30"
+                    />
+                  </div>
+
+                  <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                    {selectedChapterIds.size > 0 && (
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        size="sm"
+                        onClick={handleBulkDelete}
+                        disabled={isDeletingChapters}
+                        className="h-8 text-xs font-bold gap-1.5 cursor-pointer shadow-sm"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                        <span>Delete Selected ({selectedChapterIds.size})</span>
+                      </Button>
+                    )}
+                    <a
+                      href={`/admin/series-chapters/${initialSeries?.id}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border/40 bg-secondary/30 hover:bg-secondary/60 text-xs font-semibold text-foreground transition-colors"
+                    >
+                      <Layers className="h-3.5 w-3.5" />
+                      <span>Full Chapter Manager</span>
+                      <ExternalLink className="h-3 w-3 text-muted-foreground" />
+                    </a>
+                  </div>
+                </div>
+
+                {chaptersQ.isLoading ? (
+                  <div className="py-12 flex justify-center items-center">
+                    <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                  </div>
+                ) : filteredChapters.length === 0 ? (
+                  <div className="p-8 text-center rounded-xl border border-border/20 bg-secondary/10 text-muted-foreground text-xs">
+                    No chapters found.
+                  </div>
+                ) : (
+                  <div className="rounded-xl border border-border/30 bg-card/30 overflow-hidden">
+                    <div className="max-h-72 overflow-y-auto">
+                      <table className="w-full text-xs">
+                        <thead className="bg-secondary/40 border-b border-border/30 sticky top-0 backdrop-blur">
+                          <tr>
+                            <th className="p-2.5 text-left w-8">
+                              <Checkbox
+                                checked={
+                                  filteredChapters.length > 0 &&
+                                  filteredChapters.every((c: any) => selectedChapterIds.has(c.id))
+                                }
+                                onCheckedChange={(checked) => {
+                                  if (checked) {
+                                    setSelectedChapterIds(new Set(filteredChapters.map((c: any) => c.id)));
+                                  } else {
+                                    setSelectedChapterIds(new Set());
+                                  }
+                                }}
+                              />
+                            </th>
+                            <th className="p-2.5 text-left font-bold">Chapter</th>
+                            <th className="p-2.5 text-left font-bold">Title</th>
+                            <th className="p-2.5 text-left font-bold">Group</th>
+                            <th className="p-2.5 text-left font-bold">Date</th>
+                            <th className="p-2.5 text-right font-bold text-red-400">Action</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-border/20">
+                          {filteredChapters.map((ch: any) => {
+                            const isSelected = selectedChapterIds.has(ch.id);
+                            return (
+                              <tr key={ch.id} className="hover:bg-secondary/30 transition-colors">
+                                <td className="p-2.5">
+                                  <Checkbox
+                                    checked={isSelected}
+                                    onCheckedChange={(checked) => {
+                                      const next = new Set(selectedChapterIds);
+                                      if (checked) next.add(ch.id);
+                                      else next.delete(ch.id);
+                                      setSelectedChapterIds(next);
+                                    }}
+                                  />
+                                </td>
+                                <td className="p-2.5 font-bold text-foreground font-mono">
+                                  Ch. {ch.chapter_number}
+                                </td>
+                                <td className="p-2.5 text-muted-foreground truncate max-w-[160px]">
+                                  {ch.title || "—"}
+                                </td>
+                                <td className="p-2.5 text-purple-400 font-mono">
+                                  {ch.scanlation_group || "—"}
+                                </td>
+                                <td className="p-2.5 text-muted-foreground">
+                                  {new Date(ch.created_at).toLocaleDateString()}
+                                </td>
+                                <td className="p-2.5 text-right">
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => handleDeleteSingleChapter(ch.id, ch.chapter_number)}
+                                    className="h-7 w-7 text-muted-foreground hover:text-destructive hover:bg-destructive/10 cursor-pointer"
+                                    title={`Delete Chapter ${ch.chapter_number}`}
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </Button>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ═══ 5. SCAN SOURCES TAB ═══ */}
+            {activeTab === "sources" && !isCreatingNew && (
               <div className="space-y-4">
                 <div className="rounded-xl border border-border/30 bg-card/40 p-4 space-y-3">
                   <div className="flex items-center justify-between">
@@ -812,7 +1191,7 @@ export function LiveSeriesEditor({ series: initialSeries, slug, trigger }: LiveS
                             size="sm"
                             onClick={() => handleSyncThisSeries(src.id)}
                             disabled={isSyncingSeries}
-                            className="shrink-0 h-8 text-xs font-bold bg-purple-600 hover:bg-purple-500 gap-1.5"
+                            className="shrink-0 h-8 text-xs font-bold bg-purple-600 hover:bg-purple-500 gap-1.5 cursor-pointer"
                           >
                             <RefreshCw className={`h-3 w-3 ${isSyncingSeries ? "animate-spin" : ""}`} />
                             {isSyncingSeries ? "Syncing..." : "Sync Chapters"}
@@ -836,7 +1215,7 @@ export function LiveSeriesEditor({ series: initialSeries, slug, trigger }: LiveS
                         type="button"
                         onClick={handleAddSource}
                         disabled={isAddingSource || !newSourceUrl.trim()}
-                        className="shrink-0 text-xs h-9 font-semibold"
+                        className="shrink-0 text-xs h-9 font-semibold cursor-pointer"
                       >
                         {isAddingSource ? "Linking..." : "Link Source"}
                       </Button>
@@ -850,35 +1229,63 @@ export function LiveSeriesEditor({ series: initialSeries, slug, trigger }: LiveS
           {/* Footer Bar */}
           <DialogFooter className="p-4 border-t border-border/20 bg-card/60 backdrop-blur-sm flex justify-between items-center sm:justify-between">
             <div className="text-xs text-muted-foreground">
-              Slug: <span className="font-mono text-foreground font-semibold">{slug}</span>
+              {isCreatingNew ? (
+                <span>Creating new series entry</span>
+              ) : (
+                <span>
+                  Slug: <span className="font-mono text-foreground font-semibold">{slug}</span>
+                </span>
+              )}
             </div>
             <div className="flex gap-2">
               <Button
                 type="button"
                 variant="ghost"
                 onClick={() => setOpen(false)}
-                disabled={saveMutation.isPending}
+                disabled={saveMutation.isPending || createSeriesMutation.isPending}
               >
                 Cancel
               </Button>
-              <Button
-                type="button"
-                onClick={() => saveMutation.mutate()}
-                disabled={!title.trim() || saveMutation.isPending}
-                className="gap-1.5 font-bold"
-              >
-                {saveMutation.isPending ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Saving...
-                  </>
-                ) : (
-                  <>
-                    <Save className="h-4 w-4" />
-                    Save Live Changes
-                  </>
-                )}
-              </Button>
+
+              {isCreatingNew ? (
+                <Button
+                  type="button"
+                  onClick={() => createSeriesMutation.mutate()}
+                  disabled={!title.trim() || createSeriesMutation.isPending}
+                  className="gap-1.5 font-bold bg-emerald-600 hover:bg-emerald-500 text-white cursor-pointer"
+                >
+                  {createSeriesMutation.isPending ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Creating Series...
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="h-4 w-4" />
+                      Publish New Series
+                    </>
+                  )}
+                </Button>
+              ) : (
+                <Button
+                  type="button"
+                  onClick={() => saveMutation.mutate()}
+                  disabled={!title.trim() || saveMutation.isPending}
+                  className="gap-1.5 font-bold cursor-pointer"
+                >
+                  {saveMutation.isPending ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Saving Changes...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="h-4 w-4" />
+                      Save Live Changes
+                    </>
+                  )}
+                </Button>
+              )}
             </div>
           </DialogFooter>
         </DialogContent>

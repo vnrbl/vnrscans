@@ -50,9 +50,147 @@ function slugify(text: string) {
     .replace(/^-|-$/g, "");
 }
 
+// ── COMICK GENRE & TAG ID DICTIONARY ──────────────────────────────
+const COMICK_GENRE_MAP: Record<number | string, string> = {
+  1: "Gender Bender",
+  2: "Adult",
+  3: "Mature",
+  244: "Action",
+  245: "Adventure",
+  247: "Comedy",
+  250: "Drama",
+  252: "Fantasy",
+  255: "Historical",
+  256: "Horror",
+  258: "Mecha",
+  259: "Medical",
+  261: "Mystery",
+  263: "Psychological",
+  264: "Romance",
+  266: "Sci-Fi",
+  267: "Shoujo Ai",
+  268: "Shounen Ai",
+  269: "Slice of Life",
+  271: "Sports",
+  273: "Tragedy",
+  275: "Yaoi",
+  276: "Yuri",
+  278: "Isekai",
+  288: "Crime",
+  289: "Magical Girls",
+  290: "Philosophical",
+  291: "Superhero",
+  292: "Thriller",
+  293: "Wuxia",
+};
+
+const COMICK_TAG_MAP: Record<number | string, string> = {
+  4: "Mahjong",
+  5: "Adult Cast",
+  6: "Space",
+  7: "Shounen",
+  8: "Detective",
+  9: "Team Sports",
+  10: "Love Polygon",
+  11: "Visual Arts",
+  12: "Josei",
+  13: "Racing",
+  14: "Seinen",
+  15: "Suspense",
+  16: "School",
+  17: "Combat Sports",
+  18: "Gag Humor",
+  19: "Avant Garde",
+  20: "Organized Crime",
+  21: "Vampire",
+  22: "Gourmet",
+  23: "Super Power",
+  24: "Video Game",
+  25: "Shoujo",
+  26: "Strategy Game",
+  27: "Mythology",
+  28: "CGDCT",
+  29: "Mahou Shoujo",
+  30: "Urban Fantasy",
+  31: "Girls Love",
+  32: "Childcare",
+  33: "Parody",
+  34: "Showbiz",
+  35: "Boys Love",
+  36: "Hentai",
+  37: "Magical Sex Shift",
+  38: "Otaku Culture",
+  39: "Workplace",
+  40: "Iyashikei",
+  41: "Kids",
+  42: "Performing Arts",
+  43: "High Stakes Game",
+  44: "Anthropomorphic",
+  45: "Idols (Female)",
+  46: "Erotica",
+  47: "Pets",
+  48: "Educational",
+  49: "Idols (Male)",
+  50: "Love Status Quo",
+  243: "4-Koma",
+  246: "Award Winning",
+  248: "Cooking",
+  249: "Doujinshi",
+  251: "Ecchi",
+  253: "Gyaru",
+  254: "Harem",
+  257: "Martial Arts",
+  260: "Music",
+  262: "Oneshot",
+  265: "School Life",
+  270: "Smut",
+  272: "Supernatural",
+  274: "Long Strip",
+  277: "Video Games",
+  279: "Adaptation",
+  280: "Anthology",
+  281: "Web Comic",
+  282: "Full Color",
+  283: "User Created",
+  284: "Official Colored",
+  285: "Fan Colored",
+  286: "Gore",
+  287: "Sexual Violence",
+  294: "Aliens",
+  295: "Animals",
+  296: "Crossdressing",
+  297: "Demons",
+  298: "Delinquents",
+  299: "Genderswap",
+  300: "Ghosts",
+  301: "Monster Girls",
+  302: "Loli",
+  303: "Magic",
+  304: "Military",
+  305: "Monsters",
+  306: "Ninja",
+  307: "Office Workers",
+  308: "Police",
+  309: "Post-Apocalyptic",
+  310: "Reincarnation",
+  311: "Reverse Harem",
+  312: "Samurai",
+  313: "Shota",
+  314: "Survival",
+  315: "Time Travel",
+  316: "Vampires",
+  317: "Traditional Games",
+  318: "Virtual Reality",
+  319: "Zombies",
+  320: "Incest",
+  321: "Mafia",
+  322: "Villainess",
+};
+
 export interface ComickExtractedMetadata {
   title: string;
   slug: string;
+  hid?: string;
   description: string;
   alternativeTitles: string;
   genres: string[];
@@ -63,172 +201,73 @@ export interface ComickExtractedMetadata {
   rating?: string;
   author?: string;
   artist?: string;
+  country?: string;
+  comickUrl?: string;
+}
+
+export interface ComickSearchResultItem {
+  id: number | string;
+  hid: string;
+  slug: string;
+  title: string;
+  description?: string;
+  coverUrl?: string;
+  rating?: string;
+  userFollowCount?: number;
+  status?: string;
+  year?: number;
+  country?: string;
 }
 
 /**
- * Fetch and parse comic metadata from comick.dev / comick APIs
+ * Parses a search item from Comick API v1.0
  */
-export async function fetchComickData(urlOrQuery: string): Promise<ComickExtractedMetadata | null> {
-  const cleanInput = urlOrQuery.trim();
-  if (!cleanInput) return null;
-
-  let comickSlug = "";
-
-  // 1. Check if input is a direct comick URL
-  const urlMatch = cleanInput.match(/(?:comick\.(?:dev|io|app|fun|cc|ink))\/(?:comic|title)\/([^/?#]+)/i);
-  if (urlMatch && urlMatch[1]) {
-    comickSlug = urlMatch[1];
-  } else if (!cleanInput.startsWith("http://") && !cleanInput.startsWith("https://") && /^[a-z0-9_-]+$/i.test(cleanInput)) {
-    comickSlug = cleanInput;
-  }
-
-  const userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
-
-  // 2. If no slug extracted yet, search Comick API
-  if (!comickSlug) {
-    const searchEndpoints = [
-      `https://api.comick.fun/v1.0/search?q=${encodeURIComponent(cleanInput)}&limit=5`,
-      `https://api.comick.dev/v1.0/search?q=${encodeURIComponent(cleanInput)}&limit=5`,
-      `https://api.comick.io/v1.0/search?q=${encodeURIComponent(cleanInput)}&limit=5`,
-    ];
-
-    for (const endpoint of searchEndpoints) {
-      try {
-        const res = await fetch(endpoint, {
-          headers: {
-            "User-Agent": userAgent,
-            Accept: "application/json",
-          },
-          signal: AbortSignal.timeout(6000),
-        });
-
-        if (res.ok) {
-          const data = (await res.json()) as any;
-          if (Array.isArray(data) && data.length > 0) {
-            comickSlug = data[0].hid || data[0].slug;
-            break;
-          }
-        }
-      } catch {
-        // Try next endpoint
-      }
-    }
-  }
-
-  // If still no slug, try using slugified input directly
-  if (!comickSlug) {
-    comickSlug = slugify(cleanInput);
-  }
-
-  // 3. Fetch comic detail JSON from API endpoints
-  const detailEndpoints = [
-    `https://api.comick.fun/comic/${comickSlug}`,
-    `https://api.comick.dev/comic/${comickSlug}`,
-    `https://api.comick.io/comic/${comickSlug}`,
-  ];
-
-  for (const endpoint of detailEndpoints) {
-    try {
-      const res = await fetch(endpoint, {
-        headers: {
-          "User-Agent": userAgent,
-          Accept: "application/json",
-        },
-        signal: AbortSignal.timeout(7000),
-      });
-
-      if (res.ok) {
-        const json = (await res.json()) as any;
-        const comic = json.comic || json;
-        if (comic && (comic.title || comic.desc)) {
-          return parseComickJsonObject(comic);
-        }
-      }
-    } catch {
-      // Continue to next endpoint
-    }
-  }
-
-  // 4. Fallback: Scrape comick.dev/comic/{slug} directly with Next.js __NEXT_DATA__
-  try {
-    const webUrls = [
-      `https://comick.dev/comic/${comickSlug}`,
-      `https://comick.io/comic/${comickSlug}`,
-    ];
-
-    for (const webUrl of webUrls) {
-      const res = await fetch(webUrl, {
-        headers: { "User-Agent": userAgent },
-        signal: AbortSignal.timeout(8000),
-      });
-
-      if (res.ok) {
-        const html = await res.text();
-        const nextDataMatch = html.match(/<script\s+id="__NEXT_DATA__"\s+type="application\/json">([\s\S]*?)<\/script>/i);
-
-        if (nextDataMatch && nextDataMatch[1]) {
-          try {
-            const nextData = JSON.parse(nextDataMatch[1]);
-            const comic = nextData?.props?.pageProps?.comic;
-            if (comic) {
-              return parseComickJsonObject(comic);
-            }
-          } catch {
-            // Next data parse error
-          }
-        }
-
-        // HTML RegExp extraction fallback
-        const titleMatch = html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i) || html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
-        const rawTitle = titleMatch ? titleMatch[1].replace(/<[^>]+>/g, "").split("|")[0].trim() : "";
-
-        const descMatch = html.match(/<meta\s+name="description"\s+content="([^"]*)"/i) || html.match(/<meta\s+property="og:description"\s+content="([^"]*)"/i);
-        const description = descMatch ? descMatch[1].trim() : "";
-
-        if (rawTitle || description) {
-          return {
-            title: rawTitle || cleanInput,
-            slug: slugify(rawTitle || cleanInput),
-            description: description || "",
-            alternativeTitles: "",
-            genres: [],
-            tags: [],
-          };
-        }
-      }
-    }
-  } catch (err) {
-    console.warn("[ComickScrape] Fallback error:", err);
-  }
-
-  return null;
-}
-
-function parseComickJsonObject(comic: any): ComickExtractedMetadata {
-  const title = comic.title || "";
-  const description = (comic.desc || comic.parsed || comic.description || "")
-    .replace(/\[\/?(b|i|u|s|color|spoiler)[^\]]*\]/gi, "")
+function parseComickItem(item: any): ComickExtractedMetadata {
+  const title = item.title || "";
+  const rawDesc = item.desc || item.description || item.parsed || "";
+  const description = rawDesc
+    .replace(/\r\n/g, "\n")
+    .replace(/\r/g, "\n")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/\[url=[^\]]+\]([\s\S]*?)\[\/url\]/gi, "$1")
+    .replace(/\[\/?(b|i|u|s|color|spoiler|quote)[^\]]*\]/gi, "")
+    .replace(/\n*---\s*\*\*Links:\*\*[\s\S]*$/i, "")
+    .replace(/\n*---\s*Links:[\s\S]*$/i, "")
+    .replace(/<[^>]+>/g, "")
     .trim();
 
   // Alternative titles
   const altTitles: string[] = [];
-  if (Array.isArray(comic.md_titles)) {
-    comic.md_titles.forEach((t: any) => {
-      if (t?.title) altTitles.push(t.title);
+  if (Array.isArray(item.md_titles)) {
+    item.md_titles.forEach((t: any) => {
+      if (t?.title && typeof t.title === "string") altTitles.push(t.title);
     });
-  } else if (Array.isArray(comic.alt_titles)) {
-    comic.alt_titles.forEach((t: string) => altTitles.push(t));
-  } else if (typeof comic.alt_titles === "string") {
-    altTitles.push(comic.alt_titles);
+  } else if (Array.isArray(item.alt_titles)) {
+    item.alt_titles.forEach((t: string) => altTitles.push(t));
+  } else if (typeof item.alt_titles === "string") {
+    altTitles.push(item.alt_titles);
   }
 
-  // Genres & Tags
+  // Genres & Tags resolution via dictionary
   const genres: string[] = [];
   const tags: string[] = [];
 
-  if (Array.isArray(comic.md_comic_md_genres)) {
-    comic.md_comic_md_genres.forEach((item: any) => {
-      const g = item.md_genres || item;
+  if (Array.isArray(item.genres)) {
+    item.genres.forEach((gId: any) => {
+      const numId = Number(gId);
+      if (COMICK_GENRE_MAP[numId]) {
+        genres.push(COMICK_GENRE_MAP[numId]);
+      } else if (COMICK_TAG_MAP[numId]) {
+        tags.push(COMICK_TAG_MAP[numId]);
+      } else if (typeof gId === "string") {
+        genres.push(gId);
+      }
+    });
+  }
+
+  if (Array.isArray(item.md_comic_md_genres)) {
+    item.md_comic_md_genres.forEach((entry: any) => {
+      const g = entry.md_genres || entry;
       const name = g?.name?.trim();
       if (name) {
         if (g.type === "genre" || !g.type) {
@@ -238,93 +277,227 @@ function parseComickJsonObject(comic: any): ComickExtractedMetadata {
         }
       }
     });
-  } else if (Array.isArray(comic.genres)) {
-    comic.genres.forEach((g: any) => {
-      const name = typeof g === "string" ? g : g?.name;
-      if (name) genres.push(name.trim());
-    });
   }
 
-  // Demographic / Demographic tags
-  if (comic.demographic) {
-    tags.push(comic.demographic);
-  }
+  // Demographic
+  if (item.demographic === 1) tags.push("Shounen");
+  else if (item.demographic === 2) tags.push("Shoujo");
+  else if (item.demographic === 3) tags.push("Seinen");
+  else if (item.demographic === 4) tags.push("Josei");
+  else if (typeof item.demographic === "string") tags.push(item.demographic);
 
   // Cover URL
   let coverUrl = "";
-  if (comic.md_covers && Array.isArray(comic.md_covers) && comic.md_covers.length > 0) {
-    const b2key = comic.md_covers[0].b2key;
-    if (b2key) {
-      coverUrl = `https://meo.comick.pictures/${b2key}`;
-    }
-  } else if (comic.cover_url) {
-    coverUrl = comic.cover_url;
+  if (Array.isArray(item.md_covers) && item.md_covers.length > 0 && item.md_covers[0].b2key) {
+    coverUrl = `https://meo.comick.pictures/${item.md_covers[0].b2key}`;
+  } else if (item.cover_url) {
+    coverUrl = item.cover_url;
   }
 
-  // Status mapping
+  // Status
   let status = "ongoing";
-  if (comic.status === 2 || String(comic.status).toLowerCase().includes("completed")) {
+  if (item.status === 2 || String(item.status).toLowerCase().includes("completed")) {
     status = "completed";
-  } else if (comic.status === 3 || String(comic.status).toLowerCase().includes("hiatus")) {
+  } else if (item.status === 3 || String(item.status).toLowerCase().includes("hiatus")) {
     status = "hiatus";
+  } else if (item.status === 4 || String(item.status).toLowerCase().includes("cancelled")) {
+    status = "cancelled";
   }
 
   // Authors & Artists
   const authors: string[] = [];
   const artists: string[] = [];
-  if (Array.isArray(comic.authors)) {
-    comic.authors.forEach((a: any) => {
+  if (Array.isArray(item.authors)) {
+    item.authors.forEach((a: any) => {
       const name = typeof a === "string" ? a : a?.name;
       if (name) authors.push(name);
     });
   }
-  if (Array.isArray(comic.artists)) {
-    comic.artists.forEach((a: any) => {
+  if (Array.isArray(item.artists)) {
+    item.artists.forEach((a: any) => {
       const name = typeof a === "string" ? a : a?.name;
       if (name) artists.push(name);
     });
   }
 
+  const slug = item.slug || slugify(title);
+  const hid = item.hid || "";
+
   return {
     title,
-    slug: comic.slug || slugify(title),
+    slug,
+    hid,
     description,
-    alternativeTitles: altTitles.join(", "),
+    alternativeTitles: altTitles.slice(0, 10).join(", "),
     genres: Array.from(new Set(genres)),
     tags: Array.from(new Set(tags)),
     status,
-    releaseYear: comic.year ? parseInt(String(comic.year), 10) : undefined,
+    releaseYear: item.year ? parseInt(String(item.year), 10) : undefined,
     coverUrl: coverUrl || undefined,
+    rating: item.rating ? String(item.rating) : undefined,
     author: authors.join(", ") || undefined,
     artist: artists.join(", ") || undefined,
+    country: item.country || undefined,
+    comickUrl: slug ? `https://comick.dev/comic/${slug}` : undefined,
   };
+}
+
+/**
+ * Searches Comick API and returns multiple search result matches
+ */
+export async function searchComickComics(query: string): Promise<ComickExtractedMetadata[]> {
+  const cleanInput = query.trim();
+  if (!cleanInput) return [];
+
+  // Extract clean search term if user pasted a URL
+  let searchTerm = cleanInput;
+  const urlMatch = cleanInput.match(/(?:comick\.(?:dev|io|app|fun|cc|ink))\/(?:comic|title)\/([^/?#]+)/i);
+  if (urlMatch && urlMatch[1]) {
+    // If slug like "00-solo-leveling" or "04-eleceed", clean up digits
+    searchTerm = urlMatch[1].replace(/^\d+-/, "").replace(/-/g, " ").trim();
+  }
+
+  const userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
+
+  const searchEndpoints = [
+    `https://api.comick.dev/v1.0/search?q=${encodeURIComponent(searchTerm)}&limit=8`,
+    `https://api.comick.cc/v1.0/search?q=${encodeURIComponent(searchTerm)}&limit=8`,
+    `https://api.comick.fun/v1.0/search?q=${encodeURIComponent(searchTerm)}&limit=8`,
+    `https://api.comick.io/v1.0/search?q=${encodeURIComponent(searchTerm)}&limit=8`,
+  ];
+
+  for (const endpoint of searchEndpoints) {
+    try {
+      const res = await fetch(endpoint, {
+        headers: {
+          "User-Agent": userAgent,
+          Accept: "application/json",
+        },
+        signal: AbortSignal.timeout(6000),
+      });
+
+      if (res.ok) {
+        const data = (await res.json()) as any;
+        if (Array.isArray(data) && data.length > 0) {
+          return data.map(parseComickItem);
+        }
+      }
+    } catch {
+      // Try next endpoint
+    }
+  }
+
+  // MangaDex fallback if Comick mirrors are temporarily rate-limiting
+  try {
+    const mdRes = await fetch(
+      `https://api.mangadex.org/manga?title=${encodeURIComponent(searchTerm)}&limit=5&includes[]=cover_art&includes[]=author&includes[]=artist`,
+      {
+        headers: { "User-Agent": userAgent },
+        signal: AbortSignal.timeout(5000),
+      }
+    );
+    if (mdRes.ok) {
+      const mdJson = (await mdRes.json()) as any;
+      if (Array.isArray(mdJson?.data) && mdJson.data.length > 0) {
+        return mdJson.data.map((m: any) => {
+          const title = m.attributes?.title?.en || Object.values(m.attributes?.title || {})[0] || searchTerm;
+          const desc = m.attributes?.description?.en || Object.values(m.attributes?.description || {})[0] || "";
+          const genres = (m.attributes?.tags || [])
+            .filter((t: any) => t.attributes?.group === "genre")
+            .map((t: any) => t.attributes?.name?.en)
+            .filter(Boolean);
+          const tags = (m.attributes?.tags || [])
+            .filter((t: any) => t.attributes?.group !== "genre")
+            .map((t: any) => t.attributes?.name?.en)
+            .filter(Boolean);
+
+          const coverRel = (m.relationships || []).find((r: any) => r.type === "cover_art");
+          const coverFile = coverRel?.attributes?.fileName;
+          const coverUrl = coverFile ? `https://uploads.mangadex.org/covers/${m.id}/${coverFile}` : undefined;
+
+          return {
+            title,
+            slug: slugify(title),
+            description: desc,
+            alternativeTitles: "",
+            genres,
+            tags,
+            status: m.attributes?.status,
+            releaseYear: m.attributes?.year,
+            coverUrl,
+          };
+        });
+      }
+    }
+  } catch {
+    // Continue
+  }
+
+  return [];
+}
+
+/**
+ * Fetch and parse comic metadata from Comick by title name or direct URL
+ */
+export async function fetchComickData(urlOrQuery: string): Promise<ComickExtractedMetadata | null> {
+  const results = await searchComickComics(urlOrQuery);
+  if (results.length === 0) return null;
+
+  const cleanQuery = urlOrQuery.trim().toLowerCase();
+
+  // Pick exact match or closest title match if available, otherwise 1st result
+  const exactMatch = results.find(
+    (r) => r.title.toLowerCase() === cleanQuery || r.slug.toLowerCase() === cleanQuery
+  );
+
+  return exactMatch || results[0];
+}
+
+// ── SERVER ACTIONS ────────────────────────────────────────────────
+
+const PreviewComickSchema = z.object({
+  query: z.string().min(1, "Enter a series title or URL"),
+  accessToken: z.string(),
+});
+
+/**
+ * Search Comick & return list of matching series cards
+ */
+export async function $searchComickList(args: { data: z.infer<typeof PreviewComickSchema> }) {
+  try {
+    const validated = PreviewComickSchema.parse(args.data);
+    await verifyAdmin(validated.accessToken);
+
+    const results = await searchComickComics(validated.query);
+    return {
+      success: true,
+      results,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      results: [],
+      error: error instanceof Error ? error.message : "Search failed",
+    };
+  }
 }
 
 /**
  * Preview Comick Metadata without writing to DB
  */
 export async function $previewComickMetadata(args: {
-  data: {
-    query: string;
-    accessToken: string;
-  };
+  data: z.infer<typeof PreviewComickSchema>;
 }) {
   try {
-    const { data } = args;
-    const validated = z
-      .object({
-        query: z.string().min(1),
-        accessToken: z.string().min(1),
-      })
-      .parse(data);
-
+    const validated = PreviewComickSchema.parse(args.data);
     await verifyAdmin(validated.accessToken);
 
     const metadata = await fetchComickData(validated.query);
+
     if (!metadata) {
       return {
         success: false,
-        error: `Could not find comic on comick.dev for query: "${validated.query}". Try providing the exact Comick URL.`,
+        error: `Could not find comic on Comick for: "${validated.query}". Please check the spelling or try searching another title keyword.`,
       };
     }
 
@@ -340,193 +513,255 @@ export async function $previewComickMetadata(args: {
   }
 }
 
+const ImportComickToSeriesSchema = z.object({
+  seriesId: z.string().uuid("Invalid series ID"),
+  query: z.string().optional(),
+  accessToken: z.string(),
+  importCover: z.boolean().default(true),
+  importSynopsis: z.boolean().default(true),
+  importGenresAndTags: z.boolean().default(true),
+  importAlternativeTitles: z.boolean().default(true),
+  overrideMetadata: z.any().optional(), // Can pass selected metadata directly
+});
+
 /**
  * Import Comick Metadata & Automatically Attach Genres, Tags, and Synopsis to a Series
  */
 export async function $importComickMetadataToSeries(args: {
-  data: {
-    seriesId: string;
-    query?: string;
-    accessToken: string;
-    importCover?: boolean;
-    importSynopsis?: boolean;
-    importGenresAndTags?: boolean;
-    importAlternativeTitles?: boolean;
-  };
+  data: z.infer<typeof ImportComickToSeriesSchema>;
 }) {
   try {
-    const { data } = args;
-    const validated = z
-      .object({
-        seriesId: z.string().uuid(),
-        query: z.string().optional(),
-        accessToken: z.string().min(1),
-        importCover: z.boolean().default(true),
-        importSynopsis: z.boolean().default(true),
-        importGenresAndTags: z.boolean().default(true),
-        importAlternativeTitles: z.boolean().default(true),
-      })
-      .parse(data);
+    const validated = ImportComickToSeriesSchema.parse(args.data);
+    await verifyAdmin(validated.accessToken);
 
-    const user = await verifyAdmin(validated.accessToken);
     const admin = getAdminSupabase();
 
-    // 1. Get the current series info
+    // 1. Get existing series info
     const { data: series, error: seriesError } = await admin
       .from("series")
-      .select("id, title, slug, description, cover_url, alternative_titles, status, release_year")
+      .select("id, title, description, cover_url, alternative_titles, slug, type")
       .eq("id", validated.seriesId)
       .single();
 
     if (seriesError || !series) {
-      throw new Error("Series not found in database");
+      throw new Error(`Series not found in database: ${validated.seriesId}`);
     }
 
-    const searchQuery = validated.query?.trim() || series.title;
-    const metadata = await fetchComickData(searchQuery);
+    // 2. Fetch or use provided metadata
+    let metadata: ComickExtractedMetadata | null = validated.overrideMetadata || null;
+
+    if (!metadata) {
+      const searchQuery = validated.query?.trim() || series.title;
+      metadata = await fetchComickData(searchQuery);
+    }
 
     if (!metadata) {
       return {
         success: false,
-        error: `Could not find comic on comick.dev for "${searchQuery}". Please enter the direct comick.dev URL.`,
+        error: `Could not find comic on Comick for "${validated.query || series.title}". Please try entering a different search title.`,
       };
     }
 
-    // 2. Update Series Fields (Description, Alternative Titles, Year, Cover)
-    const updatePayload: Record<string, any> = {
-      updated_at: new Date().toISOString(),
-    };
+    // 3. Update Series Table Columns (Synopsis, Cover, Alt Titles, Status)
+    const updatePayload: Record<string, any> = {};
 
     if (validated.importSynopsis && metadata.description) {
       updatePayload.description = metadata.description;
     }
 
+    if (validated.importCover && metadata.coverUrl) {
+      const newCoverUrl = metadata.coverUrl;
+      const oldCoverUrl = series.cover_url;
+
+      // 1. If there is an existing old cover, preserve it in series_covers so it is never lost
+      if (oldCoverUrl && oldCoverUrl !== newCoverUrl) {
+        const { data: oldCoverExists } = await admin
+          .from("series_covers")
+          .select("id")
+          .eq("series_id", validated.seriesId)
+          .eq("image_url", oldCoverUrl)
+          .maybeSingle();
+
+        if (!oldCoverExists) {
+          await admin.from("series_covers").insert({
+            series_id: validated.seriesId,
+            image_url: oldCoverUrl,
+            position: 1,
+          });
+        }
+      }
+
+      // 2. Also register the new recent cover in series_covers
+      const { data: newCoverExists } = await admin
+        .from("series_covers")
+        .select("id")
+        .eq("series_id", validated.seriesId)
+        .eq("image_url", newCoverUrl)
+        .maybeSingle();
+
+      if (!newCoverExists) {
+        await admin.from("series_covers").insert({
+          series_id: validated.seriesId,
+          image_url: newCoverUrl,
+          position: 0,
+        });
+      }
+
+      // 3. Set the new recent cover as the default primary cover
+      updatePayload.cover_url = newCoverUrl;
+    }
+
     if (validated.importAlternativeTitles && metadata.alternativeTitles) {
-      updatePayload.alternative_titles = metadata.alternativeTitles;
+      // Merge with existing alt titles if present
+      const existingAlt = series.alternative_titles ? series.alternative_titles.split(",").map((s: string) => s.trim()) : [];
+      const newAlt = metadata.alternativeTitles.split(",").map((s: string) => s.trim());
+      const combinedAlt = Array.from(new Set([...existingAlt, ...newAlt])).filter(Boolean).join(", ");
+      updatePayload.alternative_titles = combinedAlt;
     }
 
-    if (metadata.releaseYear && !series.release_year) {
-      updatePayload.release_year = metadata.releaseYear;
-    }
-
-    if (metadata.status && !series.status) {
+    if (metadata.status && !series.type) {
       updatePayload.status = metadata.status;
     }
 
-    if (validated.importCover && metadata.coverUrl) {
-      updatePayload.cover_url = metadata.coverUrl;
+    if (Object.keys(updatePayload).length > 0) {
+      const { error: updateError } = await admin
+        .from("series")
+        .update(updatePayload)
+        .eq("id", validated.seriesId);
 
-      // Add to series_covers table if not exists
-      const { data: existingCover } = await admin
-        .from("series_covers")
-        .select("id")
-        .eq("series_id", series.id)
-        .eq("image_url", metadata.coverUrl)
-        .maybeSingle();
-
-      if (!existingCover) {
-        await admin.from("series_covers").insert({
-          series_id: series.id,
-          image_url: metadata.coverUrl,
-          is_main: true,
-        });
+      if (updateError) {
+        console.error("[ComickImport] Series update error:", updateError);
       }
     }
 
-    const { error: updateError } = await admin
-      .from("series")
-      .update(updatePayload)
-      .eq("id", series.id);
-
-    if (updateError) throw updateError;
-
-    // 3. Process & Attach Genres from comick.dev
+    // 4. Process & Attach Genres from Comick
     const attachedGenres: string[] = [];
     if (validated.importGenresAndTags && metadata.genres && metadata.genres.length > 0) {
       for (const genreName of metadata.genres) {
         const cleanName = genreName.trim();
+        if (!cleanName) continue;
         const genreSlug = slugify(cleanName);
-        if (!cleanName || !genreSlug) continue;
 
-        // Find or create genre
+        // Ensure genre exists in genres table
         let { data: genreRow } = await admin
           .from("genres")
-          .select("id, name")
+          .select("id")
           .or(`slug.eq.${genreSlug},name.ilike.${cleanName}`)
           .maybeSingle();
 
         if (!genreRow) {
-          const { data: newGenre, error: createGenreErr } = await admin
+          const { data: newGenre, error: genreInsertError } = await admin
             .from("genres")
             .insert({ name: cleanName, slug: genreSlug })
-            .select("id, name")
+            .select("id")
             .single();
 
-          if (!createGenreErr && newGenre) {
+          if (!genreInsertError && newGenre) {
             genreRow = newGenre;
           }
         }
 
-        if (genreRow?.id) {
+        if (genreRow) {
           // Link series_genres
-          const { error: linkErr } = await admin.from("series_genres").upsert(
-            { series_id: series.id, genre_id: genreRow.id },
-            { onConflict: "series_id,genre_id", ignoreDuplicates: true }
-          );
-          if (!linkErr) {
-            attachedGenres.push(genreRow.name);
-          }
+          await admin
+            .from("series_genres")
+            .upsert({ series_id: validated.seriesId, genre_id: genreRow.id }, { onConflict: "series_id,genre_id" });
+          attachedGenres.push(cleanName);
         }
       }
     }
 
-    // 4. Process & Attach Tags from comick.dev
+    // 5. Process & Attach Tags from Comick
     const attachedTags: string[] = [];
     if (validated.importGenresAndTags && metadata.tags && metadata.tags.length > 0) {
       for (const tagName of metadata.tags) {
         const cleanName = tagName.trim();
+        if (!cleanName) continue;
         const tagSlug = slugify(cleanName);
-        if (!cleanName || !tagSlug) continue;
 
+        // Ensure tag exists in tags table
         let { data: tagRow } = await admin
           .from("tags")
-          .select("id, name")
+          .select("id")
           .or(`slug.eq.${tagSlug},name.ilike.${cleanName}`)
           .maybeSingle();
 
         if (!tagRow) {
-          const { data: newTag, error: createTagErr } = await admin
+          const { data: newTag, error: tagInsertError } = await admin
             .from("tags")
-            .insert({ name: cleanName, slug: tagSlug, color: "#8B5CF6" })
-            .select("id, name")
+            .insert({ name: cleanName, slug: tagSlug })
+            .select("id")
             .single();
 
-          if (!createTagErr && newTag) {
+          if (!tagInsertError && newTag) {
             tagRow = newTag;
           }
         }
 
-        if (tagRow?.id) {
-          await admin.from("series_tags").upsert(
-            { series_id: series.id, tag_id: tagRow.id },
-            { onConflict: "series_id,tag_id", ignoreDuplicates: true }
-          );
-          attachedTags.push(tagRow.name);
+        if (tagRow) {
+          // Link series_tags
+          await admin
+            .from("series_tags")
+            .upsert({ series_id: validated.seriesId, tag_id: tagRow.id }, { onConflict: "series_id,tag_id" });
+          attachedTags.push(cleanName);
         }
       }
     }
 
     return {
       success: true,
-      message: `Imported from Comick.dev: ${attachedGenres.length} genres, ${attachedTags.length} tags${metadata.description ? ", synopsis" : ""}${metadata.coverUrl ? ", cover" : ""}!`,
       metadata,
-      attachedGenres,
-      attachedTags,
+      message: `Imported from Comick: ${attachedGenres.length} genres, ${attachedTags.length} tags${metadata.description ? ", synopsis" : ""}${metadata.coverUrl ? ", cover" : ""}!`,
+    };
+  } catch (error) {
+    console.error("[ComickImport] Critical error:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to import from Comick",
+    };
+  }
+}
+
+/**
+ * Extract multiple cover images from Comick by title name or URL
+ */
+export async function $extractCoversFromComick(args: {
+  data: { query: string; accessToken: string };
+}) {
+  try {
+    const validated = PreviewComickSchema.parse(args.data);
+    await verifyAdmin(validated.accessToken);
+
+    const results = await searchComickComics(validated.query);
+    if (!results || results.length === 0) {
+      return {
+        success: false,
+        covers: [],
+        error: `No comics found on Comick for "${validated.query}"`,
+      };
+    }
+
+    const covers: string[] = [];
+    const seen = new Set<string>();
+
+    for (const item of results) {
+      if (item.coverUrl && !seen.has(item.coverUrl)) {
+        seen.add(item.coverUrl);
+        covers.push(item.coverUrl);
+      }
+    }
+
+    return {
+      success: true,
+      covers,
+      comicTitle: results[0]?.title,
     };
   } catch (error) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Failed to import from comick.dev",
+      covers: [],
+      error: error instanceof Error ? error.message : "Failed to extract Comick covers",
     };
   }
 }
+

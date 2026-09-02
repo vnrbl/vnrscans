@@ -269,7 +269,33 @@ export async function $autoImportSeriesCover(args: {
 
     const bestCover = extractRes.covers[0];
 
-    // Update series cover_url
+    const { data: currentSeries } = await admin
+      .from("series")
+      .select("cover_url")
+      .eq("id", validated.seriesId)
+      .single();
+
+    const oldCoverUrl = currentSeries?.cover_url;
+
+    // 1. Preserve existing old cover in series_covers so it is never lost from cover selection
+    if (oldCoverUrl && oldCoverUrl !== bestCover) {
+      const { data: oldCoverExists } = await admin
+        .from("series_covers")
+        .select("id")
+        .eq("series_id", validated.seriesId)
+        .eq("image_url", oldCoverUrl)
+        .maybeSingle();
+
+      if (!oldCoverExists) {
+        await admin.from("series_covers").insert({
+          series_id: validated.seriesId,
+          image_url: oldCoverUrl,
+          position: 1,
+        });
+      }
+    }
+
+    // 2. Update series cover_url to use recent cover by default
     const { error: updateErr } = await admin
       .from("series")
       .update({ cover_url: bestCover, updated_at: new Date().toISOString() })
@@ -277,7 +303,7 @@ export async function $autoImportSeriesCover(args: {
 
     if (updateErr) throw updateErr;
 
-    // Add to series_covers table if not exists
+    // 3. Add to series_covers table if not exists
     const { data: existingCover } = await admin
       .from("series_covers")
       .select("id")
@@ -1091,3 +1117,72 @@ function isQimanhwaReaderPath(url: string) {
     lowercaseUrl.includes("/upload/upload/series/")
   );
 }
+
+/**
+ * Delete a single chapter with admin authentication
+ */
+export async function $deleteChapter(args: {
+  data: { chapterId: string; accessToken: string };
+}) {
+  try {
+    await verifyAdmin(args.data.accessToken);
+    const admin = getAdminSupabase();
+
+    const { data: chapter } = await admin
+      .from("chapters")
+      .select("id, series_id, chapter_number, title")
+      .eq("id", args.data.chapterId)
+      .single();
+
+    const { error } = await admin
+      .from("chapters")
+      .delete()
+      .eq("id", args.data.chapterId);
+
+    if (error) throw error;
+
+    return {
+      success: true,
+      message: `Chapter ${chapter?.chapter_number ?? ""} deleted successfully.`,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to delete chapter",
+    };
+  }
+}
+
+/**
+ * Bulk delete multiple chapters with admin authentication
+ */
+export async function $bulkDeleteChapters(args: {
+  data: { chapterIds: string[]; accessToken: string };
+}) {
+  try {
+    await verifyAdmin(args.data.accessToken);
+    const admin = getAdminSupabase();
+
+    if (!args.data.chapterIds || args.data.chapterIds.length === 0) {
+      return { success: false, error: "No chapters selected" };
+    }
+
+    const { error } = await admin
+      .from("chapters")
+      .delete()
+      .in("id", args.data.chapterIds);
+
+    if (error) throw error;
+
+    return {
+      success: true,
+      message: `Deleted ${args.data.chapterIds.length} chapter(s) successfully.`,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to bulk delete chapters",
+    };
+  }
+}
+

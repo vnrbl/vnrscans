@@ -684,44 +684,47 @@ async function ensureSeriesAndSource(
       .maybeSingle();
 
     if (!fetchError && existingSeries && existingSeries.cover_url) {
-      // 2. Keep the existing cover_url as the main cover
-      finalCoverUrl = existingSeries.cover_url;
+      const oldCoverUrl = existingSeries.cover_url;
 
-      // 3. If the incoming cover is different and not null, store it as an alternate cover in series_covers
-      if (newCoverUrl && newCoverUrl !== existingSeries.cover_url) {
+      // 1. If the incoming cover is different and not null, preserve the old cover in series_covers
+      if (newCoverUrl && newCoverUrl !== oldCoverUrl) {
         try {
-          // Check if this cover URL already exists in series_covers
-          const { data: existingCover, error: coverCheckErr } = await admin
+          // Check if old cover exists in series_covers
+          const { data: oldCoverExists } = await admin
+            .from("series_covers")
+            .select("id")
+            .eq("series_id", seriesId)
+            .eq("image_url", oldCoverUrl)
+            .maybeSingle();
+
+          if (!oldCoverExists) {
+            await admin.from("series_covers").insert({
+              series_id: seriesId,
+              image_url: oldCoverUrl,
+              position: 1,
+            });
+          }
+
+          // Check if new cover exists in series_covers
+          const { data: newCoverExists } = await admin
             .from("series_covers")
             .select("id")
             .eq("series_id", seriesId)
             .eq("image_url", newCoverUrl)
             .maybeSingle();
-          if (coverCheckErr) throw coverCheckErr;
 
-          if (!existingCover) {
-            // Get next position
-            const { data: lastCover, error: posErr } = await admin
-              .from("series_covers")
-              .select("position")
-              .eq("series_id", seriesId)
-              .order("position", { ascending: false })
-              .limit(1);
-            if (posErr) throw posErr;
-
-            const nextPos = lastCover && lastCover.length > 0 ? lastCover[0].position + 1 : 0;
-            const { error: insertErr } = await admin
-              .from("series_covers")
-              .insert({
-                series_id: seriesId,
-                image_url: newCoverUrl,
-                position: nextPos,
-              });
-            if (insertErr) throw insertErr;
-            console.log(`[Import] Saved new alternate cover ${newCoverUrl} in series_covers.`);
+          if (!newCoverExists) {
+            await admin.from("series_covers").insert({
+              series_id: seriesId,
+              image_url: newCoverUrl,
+              position: 0,
+            });
           }
+
+          // By default, use recent new cover as main cover
+          finalCoverUrl = newCoverUrl;
         } catch (coverSaveError: any) {
-          console.error(`Failed to save alternate cover to series_covers: ${coverSaveError.message}`);
+          console.error(`Failed to save covers to series_covers: ${coverSaveError.message}`);
         }
       }
     }
