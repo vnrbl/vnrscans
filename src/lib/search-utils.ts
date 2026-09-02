@@ -87,6 +87,58 @@ export function buildSeriesSearchOrFilter(terms: string[]): string {
   return Array.from(new Set(clauses)).join(",");
 }
 
+export function isGenuineSeriesMatch(
+  item: SearchSeriesLike,
+  terms: string[],
+  tokens: string[]
+): boolean {
+  const title = normalizeSearchText(item.title ?? "");
+  const slug = normalizeSearchText((item.slug ?? "").replace(/-/g, " "));
+  const alternativeTitles = normalizeSearchText(item.alternative_titles ?? "");
+  const author = normalizeSearchText(item.author ?? "");
+  const artist = normalizeSearchText(item.artist ?? "");
+
+  // 1. Direct phrase or prefix match in any main field
+  for (const term of terms) {
+    if (!term || term.length < 2) continue;
+    if (
+      title.includes(term) ||
+      slug.includes(term) ||
+      alternativeTitles.includes(term) ||
+      author.includes(term) ||
+      artist.includes(term)
+    ) {
+      return true;
+    }
+  }
+
+  // 2. Multi-token relevance check:
+  // If the query has multiple words (e.g. "Genius Archer's Streaming"):
+  // A candidate must contain a significant portion of the query words.
+  // - 2 words: BOTH words must be present in (title + slug + alternativeTitles).
+  // - 3+ words: at least 65% of words must be present.
+  // Matching ONLY 1 common word out of 3+ (e.g. "Genius" in "Drug-Eating Genius Mage")
+  // is a false positive and must be rejected.
+  const significantTokens = tokens.filter((t) => t.length >= 3 && !STOP_WORDS.has(t));
+  if (significantTokens.length >= 2) {
+    const searchTarget = `${title} ${slug} ${alternativeTitles} ${author} ${artist}`;
+    const matchedTokens = significantTokens.filter((tok) => searchTarget.includes(tok));
+    const minRequired = significantTokens.length === 2 ? 2 : Math.ceil(significantTokens.length * 0.65);
+
+    if (matchedTokens.length >= minRequired) {
+      return true;
+    }
+  } else if (significantTokens.length === 1) {
+    // Single word query: title, slug, or alt titles must contain it
+    const tok = significantTokens[0];
+    if (title.includes(tok) || slug.includes(tok) || alternativeTitles.includes(tok)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 export function rankSeriesResults<T extends SearchSeriesLike>(
   items: T[],
   prepared: PreparedSearch
@@ -94,7 +146,10 @@ export function rankSeriesResults<T extends SearchSeriesLike>(
   const terms = prepared.terms.length > 0 ? prepared.terms : [prepared.normalized].filter(Boolean);
   if (terms.length === 0) return items;
 
-  return [...items]
+  // Filter out false positives so unrelated series are NEVER returned
+  const filtered = items.filter((item) => isGenuineSeriesMatch(item, terms, prepared.tokens));
+
+  return filtered
     .map((item) => ({ item, score: scoreSeriesResult(item, terms, prepared.tokens) }))
     .sort((a, b) => {
       if (b.score !== a.score) return b.score - a.score;

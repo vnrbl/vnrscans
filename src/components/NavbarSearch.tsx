@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Search, BookOpen, User as UserIcon, Users, Loader2, X } from "lucide-react";
-import { useNavigate } from "@/lib/router-compat";
+import { useNavigate, Link } from "@/lib/router-compat";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
@@ -291,17 +291,43 @@ function SeriesSearchPanel({
   onSelect: (slug: string) => void;
 }) {
   const displayQuery = getSearchDisplayTerm(query);
+  const isSearching = query.trim().length >= 2;
+
   const grouped = readingTypeOrder
     .map((type) => ({
       type,
-      items: items.filter((item) => item.type === type).slice(0, 6),
+      items: items.filter((item) => item.type === type).slice(0, 12),
     }))
     .filter((group) => group.items.length > 0);
 
   if (loading) return <SearchLoading />;
 
-  if (query.trim().length >= 2 && items.length === 0) {
-    return <SearchEmpty message={`No comics found for "${displayQuery}".`} />;
+  if (isSearching && items.length === 0) {
+    return (
+      <div className="rounded-xl border border-dashed border-neutral-800 bg-neutral-900/40 p-8 text-center animate-in fade-in duration-200">
+        <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-neutral-900 border border-neutral-800 text-neutral-400">
+          <BookOpen className="h-6 w-6 opacity-30" />
+        </div>
+        <h4 className="text-sm font-bold text-white">This series does not exist</h4>
+        <p className="mt-1 text-xs text-neutral-400 max-w-sm mx-auto leading-relaxed">
+          No series matching &ldquo;<span className="text-purple-300 font-semibold">{displayQuery}</span>&rdquo; was found in our library.
+        </p>
+        <div className="mt-5 flex items-center justify-center gap-2.5">
+          <Link
+            to="/request-series"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-purple-500/40 bg-purple-500/10 px-3.5 py-1.5 text-xs font-semibold text-purple-300 hover:bg-purple-500/20 hover:border-purple-500/60 transition cursor-pointer"
+          >
+            <span>Request This Series</span>
+          </Link>
+          <Link
+            to="/browse"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-neutral-800 bg-neutral-900 px-3.5 py-1.5 text-xs font-semibold text-neutral-300 hover:text-white hover:border-neutral-700 transition cursor-pointer"
+          >
+            <span>Browse All</span>
+          </Link>
+        </div>
+      </div>
+    );
   }
 
   if (!loading && items.length === 0) {
@@ -313,12 +339,23 @@ function SeriesSearchPanel({
       {grouped.map((group) => (
         <section key={group.type} className="space-y-2">
           <div className="flex items-center gap-2">
-            <Badge className="h-5 rounded bg-zinc-600 px-1.5 text-[10px] font-bold uppercase text-white hover:bg-zinc-600">
-              Hot
-            </Badge>
+            {isSearching ? (
+              <Badge className="h-5 rounded bg-purple-600/30 border border-purple-500/40 px-1.5 text-[10px] font-bold uppercase text-purple-300 hover:bg-purple-600/30">
+                Matching
+              </Badge>
+            ) : (
+              <Badge className="h-5 rounded bg-zinc-600 px-1.5 text-[10px] font-bold uppercase text-white hover:bg-zinc-600">
+                Hot
+              </Badge>
+            )}
             <h3 className="text-xs font-bold text-zinc-200">
               {seriesTypeLabels[group.type] ?? group.type}
             </h3>
+            {isSearching && (
+              <span className="text-[10px] text-muted-foreground font-mono">
+                ({group.items.length})
+              </span>
+            )}
           </div>
           <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
             {group.items.map((series) => (
@@ -326,9 +363,10 @@ function SeriesSearchPanel({
                 key={series.id}
                 type="button"
                 onClick={() => onSelect(series.slug)}
-                className="group min-w-0 text-left"
+                title={series.title}
+                className="group relative min-w-0 text-left cursor-pointer"
               >
-                <div className="relative aspect-[2/3] overflow-hidden rounded bg-neutral-950 ring-1 ring-neutral-800 transition group-hover:ring-neutral-500">
+                <div className="relative aspect-[2/3] overflow-hidden rounded bg-neutral-950 ring-1 ring-neutral-800 transition duration-200 group-hover:ring-purple-500/70 group-hover:shadow-lg group-hover:shadow-purple-500/10">
                   {series.cover_url ? (
                     series.cover_url.toLowerCase().split("?")[0].endsWith(".mp4") ? (
                       <video
@@ -356,10 +394,25 @@ function SeriesSearchPanel({
                       <BookOpen className="h-6 w-6" />
                     </div>
                   )}
-                  <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/55 to-transparent p-1.5">
+
+                  {/* Default bottom title banner */}
+                  <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/55 to-transparent p-1.5 transition-opacity group-hover:opacity-0 pointer-events-none">
                     <p className="line-clamp-2 text-[10px] font-bold leading-tight text-white">
                       {series.title}
                     </p>
+                  </div>
+
+                  {/* Full Series Name Reveal On Hover */}
+                  <div className="absolute inset-0 z-20 flex flex-col justify-end bg-gradient-to-t from-black via-black/95 to-black/30 p-2 opacity-0 group-hover:opacity-100 transition-all duration-200 pointer-events-none">
+                    <p className="text-[11px] font-bold leading-tight text-white break-words drop-shadow-md">
+                      {series.title}
+                    </p>
+                    <div className="mt-1 flex items-center gap-1 text-[9px] text-purple-300 font-semibold uppercase">
+                      <span>{series.type}</span>
+                      {series.rating_average && Number(series.rating_average) > 0 && (
+                        <span>• ★{Number(series.rating_average).toFixed(1)}</span>
+                      )}
+                    </div>
                   </div>
                 </div>
               </button>

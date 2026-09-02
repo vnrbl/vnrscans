@@ -1070,10 +1070,11 @@ function FollowedChapterCard({ chapter }: { chapter: RecentChapter }) {
   if (!seriesSlug) return null;
 
   return (
-    <article className="group glass-card flex flex-col h-full rounded-lg overflow-hidden hover-lift transition-all">
+    <article className="group glass-card flex flex-col h-full rounded-lg overflow-hidden hover-lift transition-all relative">
       <Link
         to="/title/$titleSlug/$chapterSlug"
         params={{ titleSlug: seriesSlug, chapterSlug: chapter.slug }}
+        title={chapter.series?.title || ""}
         className="block shrink-0"
       >
         <div className={`${TITLE_COVER_CLASS} relative overflow-hidden bg-neutral-950`}>
@@ -1083,9 +1084,21 @@ function FollowedChapterCard({ chapter }: { chapter: RecentChapter }) {
             seriesId={chapter.series?.id}
             className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
           />
-          <div className="absolute bottom-2 left-2 flex items-center gap-1.5 rounded bg-black/80 border border-white/20 px-2 py-0.5 text-xs font-semibold text-white shadow-md backdrop-blur-md">
+          <div className="absolute bottom-2 left-2 flex items-center gap-1.5 rounded bg-black/80 border border-white/20 px-2 py-0.5 text-xs font-semibold text-white shadow-md backdrop-blur-md transition-opacity group-hover:opacity-0">
             <BookOpen className="h-3.5 w-3.5 text-purple-400" />
             <span>Ch. {chapter.chapter_number}</span>
+          </div>
+
+          {/* Full Series Name Reveal On Hover */}
+          <div className="absolute inset-0 z-20 flex flex-col justify-end bg-gradient-to-t from-black via-black/95 to-black/30 p-2.5 opacity-0 group-hover:opacity-100 transition-all duration-200 pointer-events-none">
+            <p className="text-xs font-bold leading-tight text-white drop-shadow-md break-words">
+              {chapter.series?.title}
+            </p>
+            {(chapter.series as any)?.type && (
+              <span className="mt-1 text-[9px] uppercase font-semibold text-purple-400">
+                {(chapter.series as any).type}
+              </span>
+            )}
           </div>
         </div>
       </Link>
@@ -1136,6 +1149,18 @@ function RecentChapterCard({
         seriesId={chapter.series?.id}
         className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
       />
+
+      {/* Full Series Name Reveal On Hover */}
+      <div className="absolute inset-0 z-20 flex flex-col justify-end bg-gradient-to-t from-black via-black/95 to-black/30 p-2.5 opacity-0 group-hover:opacity-100 transition-all duration-200 pointer-events-none">
+        <p className="text-xs font-bold leading-tight text-white drop-shadow-md break-words">
+          {chapter.series?.title}
+        </p>
+        {(chapter.series as any)?.type && (
+          <span className="mt-1 text-[9px] uppercase font-semibold text-purple-400">
+            {(chapter.series as any).type}
+          </span>
+        )}
+      </div>
     </div>
   );
 

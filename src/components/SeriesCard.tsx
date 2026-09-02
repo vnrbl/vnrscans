@@ -20,7 +20,8 @@ export function SeriesCard({ s, rank }: { s: Series; rank?: number }) {
     <Link
       to="/title/$slug"
       params={{ slug: s.slug }}
-      className="glass-card group block rounded-[4px] overflow-hidden hover-lift"
+      title={s.title}
+      className="glass-card group block rounded-[4px] overflow-hidden hover-lift relative"
     >
       <div className={`${TITLE_COVER_CLASS} relative overflow-hidden bg-neutral-950`}>
         <OptimizedImage
@@ -46,14 +47,28 @@ export function SeriesCard({ s, rank }: { s: Series; rank?: number }) {
         </div>
 
         {s.rating_average && Number(s.rating_average) > 0 ? (
-          <div className="absolute right-2.5 bottom-2.5 flex items-center gap-1 rounded border border-white/10 bg-black/75 px-2 py-0.5 text-3xs backdrop-blur-md text-amber-300 font-mono font-bold shadow-sm">
+          <div className="absolute right-2.5 bottom-2.5 flex items-center gap-1 rounded border border-white/10 bg-black/75 px-2 py-0.5 text-3xs backdrop-blur-md text-amber-300 font-mono font-bold shadow-sm transition-opacity group-hover:opacity-0">
             <Star className="h-3 w-3 fill-amber-400 text-amber-400 stroke-[1.5]" />
             {Number(s.rating_average).toFixed(1)}
           </div>
         ) : null}
+
+        {/* Full Series Name Reveal On Hover */}
+        <div className="absolute inset-x-0 bottom-0 z-20 flex flex-col justify-end bg-gradient-to-t from-black via-black/95 to-black/30 p-2.5 opacity-0 group-hover:opacity-100 transition-all duration-200 pointer-events-none max-h-full overflow-y-auto">
+          <p className="text-xs font-bold leading-snug text-white break-words drop-shadow-md">
+            {s.title}
+          </p>
+          <div className="mt-1 flex items-center gap-1.5 text-[10px] text-neutral-300 font-medium">
+            <span className="uppercase font-semibold text-purple-400">{s.type}</span>
+            {s.status && <span>• {s.status}</span>}
+          </div>
+        </div>
       </div>
       <div className="p-3 bg-surface-1/90">
-        <h3 className="line-clamp-1 text-sm font-semibold leading-snug text-white group-hover:text-purple-400 transition-colors duration-200">
+        <h3
+          title={s.title}
+          className="line-clamp-1 text-sm font-semibold leading-snug text-white group-hover:text-purple-400 transition-colors duration-200"
+        >
           {s.title}
         </h3>
         {s.chapter_count !== undefined && s.chapter_count !== null && s.chapter_count > 0 && (

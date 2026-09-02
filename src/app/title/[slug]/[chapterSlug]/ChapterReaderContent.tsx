@@ -3621,7 +3621,7 @@ function ChapterComments({
                     onClick={() => setReplyShowMemePicker((prev) => !prev)}
                   >
                     <Sparkles className="h-3.5 w-3.5" />
-                    <span>{replyShowMemePicker ? "Hide GIFs" : "Search Web GIFs"}</span>
+                    <span>{replyShowMemePicker ? "Hide Memes & GIFs" : "Search Memes & GIFs"}</span>
                     {replyShowMemePicker ? (
                       <ChevronUp className="h-3 w-3" />
                     ) : (
@@ -3813,7 +3813,7 @@ function ChapterComments({
 
         <div className="mt-4 pt-3 border-t border-border/30 flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-2">
-            {/* Live Web GIF Picker Trigger Button */}
+            {/* Live Web Meme & GIF Search Trigger Button */}
             <Button
               type="button"
               variant="outline"
@@ -3827,7 +3827,7 @@ function ChapterComments({
               onClick={() => setShowMemePicker((prev) => !prev)}
             >
               <Sparkles className="h-3.5 w-3.5" />
-              <span>{showMemePicker ? "Hide GIFs" : "Search Web GIFs"}</span>
+              <span>{showMemePicker ? "Hide Memes & GIFs" : "Search Memes & GIFs"}</span>
               {showMemePicker ? (
                 <ChevronUp className="h-3.5 w-3.5" />
               ) : (

@@ -23,14 +23,16 @@ interface LiveWebGifPickerProps {
 const PRESET_TOPICS = [
   { label: "🔥 Hype", query: "anime hype" },
   { label: "🍿 Cinema", query: "absolute cinema" },
-  { label: "🗿 Peak", query: "peak fiction" },
+  { label: "🗿 Peak", query: "peak fiction meme" },
   { label: "💀 Cooked", query: "anime bro is cooked" },
-  { label: "😂 Laugh", query: "anime laughing" },
-  { label: "😭 Crying", query: "anime crying emotional" },
-  { label: "🤯 Shocked", query: "anime shocked" },
+  { label: "😂 Laugh", query: "anime laughing meme" },
+  { label: "😭 Crying", query: "anime crying meme" },
+  { label: "🤯 Shocked", query: "anime shocked meme" },
   { label: "🐐 Gojo / HIM", query: "gojo nah id win" },
   { label: "✨ Sukuna", query: "sukuna malevolent shrine" },
-  { label: "🐱 Cats", query: "cat meme" },
+  { label: "🐱 Cat Meme", query: "cat meme" },
+  { label: "🐸 Pepe", query: "pepe reaction meme" },
+  { label: "🐶 Doge", query: "doge meme" },
 ];
 
 export function LiveWebGifPicker({
@@ -78,7 +80,7 @@ export function LiveWebGifPicker({
 
     searchTimeoutRef.current = setTimeout(() => {
       fetchGifs(val.trim() || "anime reaction");
-    }, 400);
+    }, 300);
   };
 
   const handleSelectTopic = (topic: typeof PRESET_TOPICS[number]) => {
@@ -104,6 +106,12 @@ export function LiveWebGifPicker({
             placeholder="Search live web GIFs & memes (Gojo, Cinema, Hype, Cats)..."
             value={query}
             onChange={handleQueryChange}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+                fetchGifs(query.trim() || activeTopic || "anime meme");
+              }
+            }}
             autoFocus
             className="w-full h-9 sm:h-10 rounded-xl border border-border/60 bg-background/80 pl-9 pr-8 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary text-foreground placeholder:text-muted-foreground transition-all"
           />
