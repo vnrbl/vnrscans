@@ -20,6 +20,7 @@ import {
   Search,
   RefreshCw,
   Power,
+  Heart,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { logAdminAction } from "@/lib/adminLog";
@@ -511,6 +512,35 @@ export default function ChapterManager({ seriesId, onBack }: { seriesId: string;
     enabled: !!importSources.data,
     retry: 1,
     staleTime: 2 * 60 * 1000,
+  });
+
+  const chapterLikeCounts = useQuery({
+    queryKey: ["admin", "chapter-like-counts", seriesId],
+    queryFn: async () => {
+      const { data: chs } = await supabase
+        .from("chapters")
+        .select("id")
+        .eq("series_id", seriesId);
+
+      if (!chs || chs.length === 0) return new Map<string, number>();
+      const ids = chs.map((c) => c.id);
+
+      const { data, error } = await supabase
+        .from("chapter_reactions")
+        .select("chapter_id")
+        .in("chapter_id", ids)
+        .eq("reaction_type", "heart");
+
+      if (error) return new Map<string, number>();
+      const countMap = new Map<string, number>();
+      (data ?? []).forEach((row) => {
+        if (row.chapter_id) {
+          countMap.set(row.chapter_id, (countMap.get(row.chapter_id) || 0) + 1);
+        }
+      });
+      return countMap;
+    },
+    staleTime: 1000 * 60 * 2,
   });
 
   const [open, setOpen] = useState(false);
@@ -2259,6 +2289,10 @@ export default function ChapterManager({ seriesId, onBack }: { seriesId: string;
                   Chapter {ch.chapter_number}
                 </Link>
                 <ExternalLink className="h-3 w-3" />
+                <Badge variant="outline" className="text-[10px] gap-1 text-pink-400 border-pink-500/30 bg-pink-500/10 font-bold px-1.5 py-0">
+                  <Heart className="h-2.5 w-2.5 fill-pink-500 text-pink-500" />
+                  {chapterLikeCounts.data?.get(ch.id) || 0}
+                </Badge>
               </div>
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 <span>{new Date(ch.created_at).toLocaleDateString()}</span>

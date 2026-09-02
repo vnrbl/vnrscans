@@ -2,7 +2,7 @@
 
 import React from "react";
 import Link from "next/link";
-import { ArrowUpDown, Search, ChevronLeft, ChevronRight, RefreshCw, Sparkles, Eye } from "lucide-react";
+import { ArrowUpDown, Search, ChevronLeft, ChevronRight, RefreshCw, Sparkles, Eye, Heart } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -169,6 +169,37 @@ export const ChapterList = React.memo(function ChapterList({
     gcTime: 1000 * 60 * 10,
   });
 
+  // Per-chapter like counts
+  const chapterLikeCounts = useQuery({
+    queryKey: ["chapter-like-counts", seriesId],
+    queryFn: async () => {
+      const { data: chapters } = await supabase
+        .from("chapters")
+        .select("id")
+        .eq("series_id", seriesId);
+
+      if (!chapters || chapters.length === 0) return new Map<string, number>();
+      const chapterIds = chapters.map((c) => c.id);
+
+      const { data, error } = await supabase
+        .from("chapter_reactions")
+        .select("chapter_id")
+        .in("chapter_id", chapterIds)
+        .eq("reaction_type", "heart");
+
+      if (error) return new Map<string, number>();
+      const countMap = new Map<string, number>();
+      (data ?? []).forEach((row) => {
+        if (row.chapter_id) {
+          countMap.set(row.chapter_id, (countMap.get(row.chapter_id) || 0) + 1);
+        }
+      });
+      return countMap;
+    },
+    staleTime: 1000 * 60 * 2,
+    gcTime: 1000 * 60 * 10,
+  });
+
   const refreshChapterTable = React.useCallback(async () => {
     await Promise.all([
       chaptersQ.refetch(),
@@ -265,6 +296,7 @@ export const ChapterList = React.memo(function ChapterList({
               const scanlationGroup = (c as { scanlation_group?: string }).scanlation_group;
               const isLatest = latestChapterId === c.id;
               const readerCount = readerCounts.data?.get(c.id) ?? 0;
+              const chapterLikes = chapterLikeCounts.data?.get(c.id) ?? 0;
 
               return (
                 <Link
@@ -296,10 +328,16 @@ export const ChapterList = React.memo(function ChapterList({
                         <p className="mt-1 line-clamp-1 text-xs text-neutral-400">{c.title}</p>
                       )}
                     </div>
-                    <Badge variant="outline" className="shrink-0 gap-1 text-xs badge-glass">
-                      <Eye className="h-3 w-3 text-neutral-400" />
-                      {formatReaderCount(readerCount)}
-                    </Badge>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <Badge variant="outline" className="gap-1 text-xs badge-glass text-pink-400 border-pink-500/30">
+                        <Heart className="h-3 w-3 fill-pink-500 text-pink-500" />
+                        {chapterLikes}
+                      </Badge>
+                      <Badge variant="outline" className="gap-1 text-xs badge-glass">
+                        <Eye className="h-3 w-3 text-neutral-400" />
+                        {formatReaderCount(readerCount)}
+                      </Badge>
+                    </div>
                   </div>
                   <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-neutral-400">
                     {scanlationGroup && <span className="font-semibold text-purple-400">{scanlationGroup}</span>}
@@ -314,7 +352,7 @@ export const ChapterList = React.memo(function ChapterList({
 
           {/* Desktop table layout */}
           <div className="hidden overflow-x-auto rounded-lg border border-hairline glass-panel md:block shadow-lg">
-            <table className="w-full min-w-[820px]">
+            <table className="w-full min-w-[860px]">
             <thead className="border-b border-border/40 bg-surface-1/90">
               <tr>
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-neutral-400">Chapter</th>
@@ -322,6 +360,7 @@ export const ChapterList = React.memo(function ChapterList({
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-neutral-400">Group</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-neutral-400">Upload Date</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-neutral-400">XP</th>
+                <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-neutral-400">Likes</th>
                 <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-neutral-400">Readers</th>
               </tr>
             </thead>
@@ -332,6 +371,7 @@ export const ChapterList = React.memo(function ChapterList({
                 const showNewBadge = isNew && !isRead;
                 const isLatest = latestChapterId === c.id;
                 const readerCount = readerCounts.data?.get(c.id) ?? 0;
+                const chapterLikes = chapterLikeCounts.data?.get(c.id) ?? 0;
 
                 return (
                   <tr key={c.id} className="transition-colors hover:bg-surface-2/60 group">
@@ -386,6 +426,12 @@ export const ChapterList = React.memo(function ChapterList({
                         isLatest={isLatest}
                         isSeriesCompleted={isSeriesCompleted}
                       />
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <span className="inline-flex items-center gap-1 text-xs font-semibold text-pink-400">
+                        <Heart className="h-3.5 w-3.5 fill-pink-500 text-pink-500" />
+                        {chapterLikes.toLocaleString()}
+                      </span>
                     </td>
                     <td className="px-4 py-3 text-right">
                       <ReaderCount count={readerCount} loading={readerCounts.isLoading} />

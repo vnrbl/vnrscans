@@ -149,6 +149,29 @@ export default function TitleDetailPageContent({
     staleTime: 1000 * 60 * 2,
   });
 
+  const totalLikesCount = useQuery({
+    queryKey: ["series-total-likes", seriesQ.data?.id],
+    queryFn: async () => {
+      if (!seriesQ.data?.id) return 0;
+      const { data: chapters, error: chErr } = await supabase
+        .from("chapters")
+        .select("id")
+        .eq("series_id", seriesQ.data.id);
+      if (chErr || !chapters || chapters.length === 0) return 0;
+
+      const chapterIds = chapters.map((c) => c.id);
+      const { count, error } = await supabase
+        .from("chapter_reactions")
+        .select("*", { count: "exact", head: true })
+        .in("chapter_id", chapterIds)
+        .eq("reaction_type", "heart");
+      if (error) throw error;
+      return count ?? 0;
+    },
+    enabled: !!seriesQ.data?.id,
+    staleTime: 1000 * 60 * 2,
+  });
+
   const seriesRank = useQuery({
     queryKey: ["series-rank", slug],
     queryFn: async () => {
@@ -339,6 +362,7 @@ export default function TitleDetailPageContent({
             ratingsCount={ratingsCount.data ?? 0}
             followersCount={followersCount.data ?? 0}
             uniqueChapterCount={uniqueChapterCount}
+            totalLikesCount={totalLikesCount.data ?? 0}
           />
         </div>
 

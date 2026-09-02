@@ -73,6 +73,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { ScanlationGroupPicker } from "@/components/admin/ScanlationGroupPicker";
+import { ComickMetadataImporter } from "@/components/admin/ComickMetadataImporter";
 import {
   buildChapterSlug,
   resolveScanlationGroup,
@@ -1014,6 +1015,16 @@ export default function AdminSeries() {
                   <ExternalLink className="h-4 w-4 text-blue-500" />
                 </Button>
               </a>
+              <ComickMetadataImporter
+                seriesId={s.id}
+                seriesTitle={s.title}
+                slug={s.slug}
+                trigger={
+                  <Button variant="ghost" size="icon" title="Import from Comick.dev">
+                    <Globe className="h-4 w-4 text-emerald-400" />
+                  </Button>
+                }
+              />
               <Button
                 variant="ghost"
                 size="icon"
@@ -1109,6 +1120,21 @@ export default function AdminSeries() {
                       <ExternalLink className="h-3.5 w-3.5" />
                     </Button>
                   </a>
+                  <ComickMetadataImporter
+                    seriesId={s.id}
+                    seriesTitle={s.title}
+                    slug={s.slug}
+                    trigger={
+                      <Button
+                        variant="secondary"
+                        size="icon"
+                        className="h-8 w-8 rounded-full text-emerald-400 hover:text-emerald-300"
+                        title="Import from Comick.dev"
+                      >
+                        <Globe className="h-3.5 w-3.5" />
+                      </Button>
+                    }
+                  />
                   <Button
                     variant="secondary"
                     size="icon"
@@ -2106,153 +2132,37 @@ function SeriesFormFields({
         />
       </div>
 
-      <div className="grid gap-3 rounded-md border border-border/40 p-3">
-        <div className="flex items-center gap-2 text-sm font-semibold">
-          <Sparkles className="h-4 w-4 text-violet-500" />
-          Genres
-        </div>
-        <div className="flex max-h-36 flex-wrap gap-2 overflow-y-auto">
-          {genres.length === 0 && (
-            <p className="text-xs text-muted-foreground">No genres yet. Add one below.</p>
-          )}
-          {genres.map((genre) => {
-            const selected = form.genre_ids.includes(genre.id);
-            return (
-              <button
-                key={genre.id}
-                type="button"
-                onClick={() =>
-                  setForm({ ...form, genre_ids: toggleSelection(form.genre_ids, genre.id) })
-                }
-                className={`rounded-full border px-3 py-1 text-xs font-medium transition ${
-                  selected
-                    ? "border-violet-600 bg-violet-600 text-white"
-                    : "border-border/60 bg-secondary/40 hover:border-violet-500"
-                }`}
-              >
-                {genre.name}
-              </button>
-            );
-          })}
-        </div>
-        <Input
-          value={form.new_genres}
-          onChange={(e) => setForm({ ...form, new_genres: e.target.value })}
-          placeholder="Add new genres, comma separated"
-        />
-      </div>
+      {/* ═══ COMICK.DEV METADATA & TAXONOMY IMPORT ═══ */}
+      <div className="rounded-xl border border-emerald-500/40 bg-emerald-950/20 p-4 space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <div className="grid h-8 w-8 place-items-center rounded-lg bg-emerald-500/20 text-emerald-400">
+              <Globe className="h-4 w-4" />
+            </div>
+            <div>
+              <Label className="text-xs font-bold text-emerald-200 block">
+                Auto-Import Metadata & Taxonomy from Comick.dev
+              </Label>
+              <p className="text-[11px] text-muted-foreground">
+                Automatically fetches and links genres, tags, description/synopsis, and high-res cover
+              </p>
+            </div>
+          </div>
 
-      <div className="grid gap-3 rounded-md border border-border/40 p-3">
-        <div className="flex items-center gap-2 text-sm font-semibold">
-          <Tag className="h-4 w-4 text-violet-500" />
-          Tags
-        </div>
-        <div className="relative">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            value={tagSearch}
-            onChange={(e) => setTagSearch(e.target.value)}
-            placeholder="Search existing tags..."
-            className="pl-9"
+          <ComickMetadataImporter
+            seriesTitle={form.title}
+            onMetadataImported={(meta) => {
+              setForm({
+                ...form,
+                description: meta.description || form.description,
+                alternative_titles: meta.alternativeTitles || form.alternative_titles,
+                cover_url: meta.coverUrl || form.cover_url,
+                release_year: meta.releaseYear ? String(meta.releaseYear) : form.release_year,
+                status: meta.status || form.status,
+              });
+            }}
           />
         </div>
-        <div className="hidden max-h-36 flex-wrap gap-2 overflow-y-auto sm:flex">
-          {tags.length === 0 && (
-            <p className="text-xs text-muted-foreground">No tags yet. Add one below.</p>
-          )}
-          {tags.length > 0 && filteredTags.length === 0 && (
-            <p className="text-xs text-muted-foreground">No tags match your search.</p>
-          )}
-          {visibleTags.map((tag) => {
-            const selected = form.tag_ids.includes(tag.id);
-            return (
-              <div key={tag.id} className="group relative flex items-center">
-                <button
-                  type="button"
-                  onClick={() =>
-                    updateWithAutoRating({
-                      ...form,
-                      tag_ids: toggleSelection(form.tag_ids, tag.id),
-                    })
-                  }
-                  className={`rounded-full border px-3 py-1 text-xs font-medium transition ${
-                    selected
-                      ? "border-violet-600 bg-violet-600 text-white"
-                      : "border-border/60 bg-secondary/40 hover:border-violet-500"
-                  }`}
-                  style={
-                    !selected && tag.color ? { borderColor: tag.color, color: tag.color } : undefined
-                  }
-                >
-                  {tag.icon && <span className="mr-1">{tag.icon}</span>}
-                  {tag.name}
-                </button>
-
-              </div>
-            );
-          })}
-        </div>
-        <div className="flex max-h-36 flex-wrap gap-2 overflow-y-auto sm:hidden">
-          {tags.length === 0 && (
-            <p className="text-xs text-muted-foreground">No tags yet. Add one below.</p>
-          )}
-          {tags.length > 0 && filteredTags.length === 0 && (
-            <p className="text-xs text-muted-foreground">No tags match your search.</p>
-          )}
-          {visibleMobileTags.map((tag) => {
-            const selected = form.tag_ids.includes(tag.id);
-            return (
-              <div key={tag.id} className="group relative flex items-center">
-                <button
-                  type="button"
-                  onClick={() =>
-                    updateWithAutoRating({
-                      ...form,
-                      tag_ids: toggleSelection(form.tag_ids, tag.id),
-                    })
-                  }
-                  className={`rounded-full border px-3 py-1 text-xs font-medium transition ${
-                    selected
-                      ? "border-violet-600 bg-violet-600 text-white"
-                      : "border-border/60 bg-secondary/40 hover:border-violet-500"
-                  }`}
-                  style={
-                    !selected && tag.color ? { borderColor: tag.color, color: tag.color } : undefined
-                  }
-                >
-                  {tag.icon && <span className="mr-1">{tag.icon}</span>}
-                  {tag.name}
-                </button>
-
-              </div>
-            );
-          })}
-        </div>
-        {(hiddenTagCount > 0 || hiddenMobileTagCount > 0 || showAllTags) && (
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => setShowAllTags((value) => !value)}
-            className="justify-self-start"
-          >
-            {showAllTags ? (
-              "Show less"
-            ) : (
-              <>
-                <span className="hidden sm:inline">Show all {filteredTags.length} tags</span>
-                <span className="sm:hidden">Show all {filteredTags.length} tags</span>
-              </>
-            )}
-          </Button>
-        )}
-        <Textarea
-          rows={3}
-          value={form.new_tags}
-          onChange={(e) => updateWithAutoRating({ ...form, new_tags: e.target.value })}
-          placeholder="Add new tags, comma separated"
-          className="min-h-20 resize-y"
-        />
       </div>
 
       <div className="grid gap-2 rounded-md border border-border/40 p-3 text-sm">

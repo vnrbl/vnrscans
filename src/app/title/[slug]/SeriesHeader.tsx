@@ -2,7 +2,7 @@
 
 import React from "react";
 import Link from "next/link";
-import { Star, BookOpen, Trophy, Users } from "lucide-react";
+import { Star, BookOpen, Trophy, Users, Heart } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { LiveSeriesEditor } from "@/components/admin/LiveSeriesEditor";
 
@@ -23,6 +23,7 @@ interface SeriesHeaderProps {
   ratingsCount: number;
   followersCount: number;
   uniqueChapterCount: number;
+  totalLikesCount?: number;
 }
 
 export const SeriesHeader = React.memo(function SeriesHeader({
@@ -37,6 +38,7 @@ export const SeriesHeader = React.memo(function SeriesHeader({
   ratingsCount,
   followersCount,
   uniqueChapterCount,
+  totalLikesCount = 0,
 }: SeriesHeaderProps) {
   const CORE_GENRES_SET = React.useMemo(
     () =>
@@ -131,6 +133,13 @@ export const SeriesHeader = React.memo(function SeriesHeader({
             {Number(s.rating_average || 0).toFixed(1)}
           </span>
           by {ratingsCount?.toLocaleString() ?? 0} users
+        </span>
+        <span className="inline-flex items-center gap-1.5 text-pink-400 font-medium">
+          <Heart className="h-4 w-4 fill-pink-500 text-pink-500" />
+          <span className="font-bold text-foreground">
+            {(totalLikesCount ?? 0).toLocaleString()}
+          </span>{" "}
+          likes
         </span>
         <span className="inline-flex items-center gap-1.5 text-muted-foreground">
           <Users className="h-4 w-4" />

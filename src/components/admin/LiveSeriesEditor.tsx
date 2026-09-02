@@ -26,6 +26,7 @@ import { useAuth, useIsAdmin } from "@/hooks/useAuth";
 import { logAdminAction } from "@/lib/adminLog";
 import { $extractCoversFromScanUrl, $autoImportSeriesCover, $syncImportSource } from "@/lib/api/scraper.actions";
 import { detectImportSource } from "@/lib/import-source-utils";
+import { ComickMetadataImporter } from "@/components/admin/ComickMetadataImporter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -74,7 +75,7 @@ export function LiveSeriesEditor({ series: initialSeries, slug, trigger }: LiveS
   const qc = useQueryClient();
 
   const [open, setOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<"general" | "synopsis" | "taxonomy" | "cover" | "sources">("general");
+  const [activeTab, setActiveTab] = useState<"general" | "synopsis" | "cover" | "sources">("general");
 
   // Form state
   const [title, setTitle] = useState(initialSeries?.title || "");
@@ -90,14 +91,6 @@ export function LiveSeriesEditor({ series: initialSeries, slug, trigger }: LiveS
   const [isTrending, setIsTrending] = useState(Boolean(initialSeries?.is_trending));
   const [isHidden, setIsHidden] = useState(Boolean(initialSeries?.is_hidden));
   const [coverUrl, setCoverUrl] = useState(initialSeries?.cover_url || "");
-
-  // Taxonomy state
-  const [selectedGenreIds, setSelectedGenreIds] = useState<string[]>(
-    ((initialSeries?.series_genres as any[]) ?? []).map((sg) => sg.genre_id || sg.genre?.id).filter(Boolean)
-  );
-  const [selectedTagIds, setSelectedTagIds] = useState<string[]>(
-    ((initialSeries?.series_tags as any[]) ?? []).map((st) => st.tag_id || st.tag?.id).filter(Boolean)
-  );
 
   // Cover Import state
   const [scanUrl, setScanUrl] = useState("");
@@ -142,34 +135,8 @@ export function LiveSeriesEditor({ series: initialSeries, slug, trigger }: LiveS
       setIsTrending(Boolean(initialSeries.is_trending));
       setIsHidden(Boolean(initialSeries.is_hidden));
       setCoverUrl(initialSeries.cover_url || "");
-
-      const gIds = ((initialSeries.series_genres as any[]) ?? []).map((sg) => sg.genre_id || sg.genre?.id).filter(Boolean);
-      const tIds = ((initialSeries.series_tags as any[]) ?? []).map((st) => st.tag_id || st.tag?.id).filter(Boolean);
-      setSelectedGenreIds(gIds);
-      setSelectedTagIds(tIds);
     }
   }, [open, initialSeries]);
-
-  // Query genres and tags
-  const genresQuery = useQuery({
-    queryKey: ["admin", "genres", "options"],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("genres").select("id,name,slug").order("name");
-      if (error) throw error;
-      return data || [];
-    },
-    staleTime: 1000 * 60 * 5,
-  });
-
-  const tagsQuery = useQuery({
-    queryKey: ["admin", "tags", "options"],
-    queryFn: async () => {
-      const { data, error } = await (supabase as any).from("tags").select("id,name,slug,color,icon").order("name");
-      if (error) throw error;
-      return data || [];
-    },
-    staleTime: 1000 * 60 * 5,
-  });
 
   // 1-Click Auto-Import Cover (Zero URL input needed)
   const handleAutoImportCover = async () => {
@@ -351,35 +318,7 @@ export function LiveSeriesEditor({ series: initialSeries, slug, trigger }: LiveS
 
       if (updateErr) throw updateErr;
 
-      // 2. Sync taxonomy (genres)
-      const { error: delGenErr } = await supabase
-        .from("series_genres")
-        .delete()
-        .eq("series_id", initialSeries.id);
-      if (delGenErr) throw delGenErr;
-
-      if (selectedGenreIds.length > 0) {
-        const { error: insGenErr } = await supabase
-          .from("series_genres")
-          .insert(selectedGenreIds.map((genre_id) => ({ series_id: initialSeries.id, genre_id })));
-        if (insGenErr) throw insGenErr;
-      }
-
-      // 3. Sync taxonomy (tags)
-      const { error: delTagErr } = await (supabase as any)
-        .from("series_tags")
-        .delete()
-        .eq("series_id", initialSeries.id);
-      if (delTagErr) throw delTagErr;
-
-      if (selectedTagIds.length > 0) {
-        const { error: insTagErr } = await (supabase as any)
-          .from("series_tags")
-          .insert(selectedTagIds.map((tag_id) => ({ series_id: initialSeries.id, tag_id })));
-        if (insTagErr) throw insTagErr;
-      }
-
-      // 4. Record in series_covers if new cover
+      // 2. Record in series_covers if new cover
       if (coverUrl) {
         const { data: existingCover } = await supabase
           .from("series_covers")
@@ -475,19 +414,11 @@ export function LiveSeriesEditor({ series: initialSeries, slug, trigger }: LiveS
                 type="button"
                 variant={activeTab === "synopsis" ? "default" : "ghost"}
                 size="sm"
-                className="h-8 text-xs font-semibold"
+                className="h-8 text-xs font-semibold gap-1.5"
                 onClick={() => setActiveTab("synopsis")}
               >
-                Synopsis
-              </Button>
-              <Button
-                type="button"
-                variant={activeTab === "taxonomy" ? "default" : "ghost"}
-                size="sm"
-                className="h-8 text-xs font-semibold"
-                onClick={() => setActiveTab("taxonomy")}
-              >
-                Genres & Tags ({selectedGenreIds.length + selectedTagIds.length})
+                <Globe className="h-3 w-3 text-emerald-400" />
+                <span>Synopsis & Comick Import</span>
               </Button>
               <Button
                 type="button"
@@ -643,87 +574,48 @@ export function LiveSeriesEditor({ series: initialSeries, slug, trigger }: LiveS
               </div>
             )}
 
-            {/* ═══ 2. SYNOPSIS TAB ═══ */}
+            {/* ═══ 2. SYNOPSIS & COMICK IMPORT TAB ═══ */}
             {activeTab === "synopsis" && (
-              <div className="space-y-3">
-                <Label className="text-xs font-semibold">Description / Synopsis</Label>
-                <Textarea
-                  rows={10}
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Enter full synopsis for this series..."
-                  className="font-normal leading-relaxed"
-                />
-              </div>
-            )}
+              <div className="space-y-4">
+                {/* Comick.dev 1-Click Import Feature Banner */}
+                <div className="rounded-xl border border-emerald-500/40 bg-emerald-950/20 p-4 space-y-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <div className="grid h-7 w-7 place-items-center rounded-lg bg-emerald-500/20 text-emerald-400">
+                        <Globe className="h-4 w-4" />
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-bold text-emerald-200">Import from Comick.dev</h4>
+                        <p className="text-[11px] text-muted-foreground">
+                          Auto-imports genres, tags, description/synopsis, and alternative titles
+                        </p>
+                      </div>
+                    </div>
 
-            {/* ═══ 3. TAXONOMY TAB ═══ */}
-            {activeTab === "taxonomy" && (
-              <div className="space-y-6">
-                <div>
-                  <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2 block">
-                    Story Genres ({selectedGenreIds.length} selected)
-                  </Label>
-                  <div className="flex flex-wrap gap-1.5 max-h-48 overflow-y-auto p-2 border border-border/30 rounded-lg bg-card/30">
-                    {(genresQuery.data || []).map((genre) => {
-                      const isSelected = selectedGenreIds.includes(genre.id);
-                      return (
-                        <Badge
-                          key={genre.id}
-                          variant={isSelected ? "default" : "outline"}
-                          className={`cursor-pointer transition-all ${
-                            isSelected
-                              ? "bg-primary text-primary-foreground font-semibold"
-                              : "hover:border-primary/50 text-muted-foreground"
-                          }`}
-                          onClick={() => {
-                            setSelectedGenreIds((prev) =>
-                              prev.includes(genre.id) ? prev.filter((id) => id !== genre.id) : [...prev, genre.id]
-                            );
-                          }}
-                        >
-                          {genre.name}
-                        </Badge>
-                      );
-                    })}
+                    <ComickMetadataImporter
+                      seriesId={initialSeries?.id}
+                      seriesTitle={title}
+                      slug={slug}
+                      onMetadataImported={(meta) => {
+                        if (meta.description) setDescription(meta.description);
+                        if (meta.alternativeTitles) setAlternativeTitles(meta.alternativeTitles);
+                        if (meta.coverUrl) setCoverUrl(meta.coverUrl);
+                        if (meta.status) setStatus(meta.status);
+                        if (meta.releaseYear) setReleaseYear(String(meta.releaseYear));
+                      }}
+                    />
                   </div>
                 </div>
 
-                <div>
-                  <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2 block">
-                    Descriptive Tags ({selectedTagIds.length} selected)
-                  </Label>
-                  <div className="flex flex-wrap gap-1.5 max-h-48 overflow-y-auto p-2 border border-border/30 rounded-lg bg-card/30">
-                    {(tagsQuery.data || []).map((tag: any) => {
-                      const isSelected = selectedTagIds.includes(tag.id);
-                      return (
-                        <Badge
-                          key={tag.id}
-                          variant={isSelected ? "default" : "outline"}
-                          className={`cursor-pointer transition-all ${
-                            isSelected
-                              ? "bg-purple-600 text-white font-semibold"
-                              : "hover:border-primary/50 text-muted-foreground"
-                          }`}
-                          style={
-                            isSelected
-                              ? undefined
-                              : tag.color
-                              ? { borderColor: `${tag.color}40`, color: tag.color }
-                              : undefined
-                          }
-                          onClick={() => {
-                            setSelectedTagIds((prev) =>
-                              prev.includes(tag.id) ? prev.filter((id) => id !== tag.id) : [...prev, tag.id]
-                            );
-                          }}
-                        >
-                          {tag.icon && <span className="mr-1">{tag.icon}</span>}
-                          {tag.name}
-                        </Badge>
-                      );
-                    })}
-                  </div>
+                <div className="space-y-2">
+                  <Label className="text-xs font-semibold">Description / Synopsis</Label>
+                  <Textarea
+                    rows={10}
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    placeholder="Enter full synopsis for this series..."
+                    className="font-normal leading-relaxed text-xs"
+                  />
                 </div>
               </div>
             )}
