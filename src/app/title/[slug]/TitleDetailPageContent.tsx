@@ -238,13 +238,36 @@ export default function TitleDetailPageContent({
   const artists = splitNames(s.artist);
   const contentRating = (s as { content_rating?: string }).content_rating;
 
+  const [localLastRead, setLocalLastRead] = React.useState<{ slug: string; chapter_number: number } | null>(null);
+
+  React.useEffect(() => {
+    try {
+      const modern = localStorage.getItem(`vnr-last-read-${slug}`);
+      if (modern) {
+        const parsed = JSON.parse(modern);
+        if (parsed?.slug) {
+          setLocalLastRead(parsed);
+          return;
+        }
+      }
+      const legacy = localStorage.getItem(`last-read-${slug}`);
+      if (legacy) {
+        const parsed = JSON.parse(legacy);
+        if (parsed?.slug) {
+          setLocalLastRead(parsed);
+        }
+      }
+    } catch {}
+  }, [slug]);
+
   // Compute read button props
-  const lastReadChapter = readingHistory.data?.chapters as
+  const dbLastRead = readingHistory.data?.chapters as
     | { slug: string; chapter_number: number }
     | null
     | undefined;
+  const lastReadChapter = dbLastRead || localLastRead;
   const firstChapter = initialChaptersData?.[initialChaptersData.length - 1];
-  const isContinue = libraryStatus.data === "reading" && lastReadChapter;
+  const isContinue = !!lastReadChapter;
   const readChapterSlug = isContinue
     ? lastReadChapter.slug
     : firstChapter?.slug;

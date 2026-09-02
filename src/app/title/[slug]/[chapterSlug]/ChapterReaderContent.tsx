@@ -36,12 +36,16 @@ import {
   Palette,
   Film,
   X,
+  Sparkles,
+  Flame,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { renderCommentMarkdown, COMMENT_TEXT_COLORS } from "@/lib/bbcode";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { POPULAR_MEME_STICKERS, MEME_CATEGORIES, type MemeSticker } from "@/lib/meme-data";
+import { saveChapterReadingPosition, getChapterReadingPosition } from "@/lib/reading-position";
 import {
   Select,
   SelectContent,
@@ -1025,64 +1029,111 @@ function ImageView({
   const [imageRetries, setImageRetries] = useState<Record<string, number>>({});
   const [imageLoading, setImageLoading] = useState<Record<string, boolean>>({});
 
-  // Scroll position restoration
+  // Exact reading position tracking & restoration
+  const [restoredBanner, setRestoredBanner] = useState<{ page: number; total: number; percent: number } | null>(null);
+  const restoredRef = useRef(false);
+  const activePageRef = useRef(0);
+
+  // Track scroll position and visible page element
   useEffect(() => {
     if (!chapterId || loading || !pages?.length) return;
 
-    const scrollKey = `chapter-scroll-${chapterId}`;
-
-    // Restore scroll position after pages load
-    const restoreScroll = () => {
-      const savedPosition = localStorage.getItem(scrollKey);
-      if (savedPosition) {
-        const position = parseInt(savedPosition, 10);
-        setTimeout(() => {
-          window.scrollTo({ top: position, behavior: "instant" });
-        }, 100); // Small delay to ensure images are rendered
-      }
-    };
-
-    // Save scroll position periodically
-    const saveScrollPosition = () => {
-      const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
-      localStorage.setItem(scrollKey, scrollTop.toString());
-    };
-
-    // Throttled scroll handler
-    let scrollTimeout: NodeJS.Timeout;
     const handleScroll = () => {
+      const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+      const scrollHeight = document.documentElement.scrollHeight - window.innerHeight;
+      const scrollRatio = scrollHeight > 0 ? scrollTop / scrollHeight : 0;
+
+      // Find which page is currently centered/visible in the viewport
+      const viewportMid = window.innerHeight / 2;
+      let visibleIdx = 0;
+      for (let i = 0; i < pages.length; i++) {
+        const el = document.getElementById(`chapter-page-${i}`);
+        if (el) {
+          const rect = el.getBoundingClientRect();
+          if (rect.top <= viewportMid && rect.bottom >= 0) {
+            visibleIdx = i;
+          }
+        }
+      }
+      activePageRef.current = visibleIdx;
+
+      saveChapterReadingPosition({
+        chapterId,
+        seriesSlug,
+        chapterSlug: chapterNumber.toString(),
+        chapterNumber,
+        pageIndex: visibleIdx,
+        scrollRatio,
+        scrollTop,
+      });
+    };
+
+    let scrollTimeout: NodeJS.Timeout;
+    const throttledScroll = () => {
       clearTimeout(scrollTimeout);
-      scrollTimeout = setTimeout(saveScrollPosition, 150);
+      scrollTimeout = setTimeout(handleScroll, 120);
     };
 
-    // Restore scroll position when pages are loaded
-    restoreScroll();
-
-    // Add scroll listener
-    window.addEventListener("scroll", handleScroll);
-
-    // Save scroll position when leaving the page
-    const handleBeforeUnload = () => {
-      saveScrollPosition();
-    };
-    window.addEventListener("beforeunload", handleBeforeUnload);
+    window.addEventListener("scroll", throttledScroll, { passive: true });
 
     return () => {
       clearTimeout(scrollTimeout);
-      window.removeEventListener("scroll", handleScroll);
-      window.removeEventListener("beforeunload", handleBeforeUnload);
+      window.removeEventListener("scroll", throttledScroll);
+      handleScroll();
     };
-  }, [chapterId, loading, pages?.length]);
+  }, [chapterId, seriesSlug, chapterNumber, loading, pages?.length]);
+
+  // Restore exact left-off place
+  useEffect(() => {
+    if (!chapterId || loading || !pages?.length || restoredRef.current) return;
+
+    const savedPos = getChapterReadingPosition(chapterId);
+    if (!savedPos) {
+      restoredRef.current = true;
+      return;
+    }
+
+    const targetPage = Math.min(Math.max(0, savedPos.pageIndex || 0), pages.length - 1);
+    const hasProgress = targetPage > 0 || (savedPos.scrollRatio && savedPos.scrollRatio > 0.05);
+
+    if (!hasProgress) {
+      restoredRef.current = true;
+      return;
+    }
+
+    const attemptRestore = () => {
+      if (restoredRef.current) return;
+      const targetEl = document.getElementById(`chapter-page-${targetPage}`);
+      if (targetEl) {
+        targetEl.scrollIntoView({ block: "start", behavior: "instant" });
+        restoredRef.current = true;
+        setRestoredBanner({
+          page: targetPage + 1,
+          total: pages.length,
+          percent: Math.round((savedPos.scrollRatio || (targetPage / pages.length)) * 100),
+        });
+        setTimeout(() => setRestoredBanner(null), 4500);
+      }
+    };
+
+    attemptRestore();
+    const t1 = setTimeout(attemptRestore, 120);
+    const t2 = setTimeout(attemptRestore, 450);
+
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+    };
+  }, [chapterId, loading, pages]);
 
   // Clean up old scroll positions (keep only last 10 chapters per user)
   useEffect(() => {
     const cleanupOldScrollPositions = () => {
-      const keys = Object.keys(localStorage).filter((key) => key.startsWith("chapter-scroll-"));
-      if (keys.length > 10) {
-        // Sort by timestamp (assuming newer items were added later)
+      const keys = Object.keys(localStorage).filter((key) => key.startsWith("vnr-reading-pos-"));
+      if (keys.length > 20) {
         keys
           .sort()
-          .slice(0, keys.length - 10)
+          .slice(0, keys.length - 20)
           .forEach((key) => {
             localStorage.removeItem(key);
           });
@@ -1143,10 +1194,26 @@ function ImageView({
 
   return (
     <>
+      {/* Floating Exact Resume Notification Banner */}
+      {restoredBanner && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 flex items-center gap-3 px-4 py-2.5 rounded-full bg-black/85 text-white border border-primary/40 shadow-2xl backdrop-blur-md animate-in fade-in slide-in-from-bottom-4 duration-300">
+          <span className="text-sm font-semibold text-primary-foreground flex items-center gap-1.5">
+            <span>📍 Resumed at Page {restoredBanner.page} of {restoredBanner.total}</span>
+            <span className="text-xs text-primary/80">({restoredBanner.percent}%)</span>
+          </span>
+          <button
+            onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+            className="text-xs bg-primary/30 hover:bg-primary text-white px-2.5 py-1 rounded-full font-bold transition-colors cursor-pointer"
+          >
+            Top ⬆
+          </button>
+        </div>
+      )}
+
       {/* Pages */}
       <div className="mx-auto max-w-3xl px-2 py-4">
         {pages.map((p, idx) => (
-          <div key={p.id} className="relative">
+          <div key={p.id} id={`chapter-page-${idx}`} data-page-index={idx} className="relative scroll-mt-14">
             {imageErrors[p.id] ? (
               // Error fallback UI
               <div className="mx-auto flex aspect-[2/3] w-full flex-col items-center justify-center rounded-lg border-2 border-dashed border-border bg-secondary/50 text-center">
@@ -1237,8 +1304,8 @@ function ImageView({
           seriesSlug={seriesSlug}
         />
 
-        {/* Reactions & Comments Section */}
-        <ChapterReactions chapterId={chapterId} seriesId={seriesId} />
+        {/* Like & Memes Section */}
+        <ChapterLikeAndMemes chapterId={chapterId} seriesId={seriesId} />
       </div>
     </>
   );
@@ -1293,59 +1360,67 @@ function NovelView({
     }
   }, []);
 
-  // Track page scroll progress for the top progress bar
-  useEffect(() => {
-    const handleScroll = () => {
-      const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
-      const scrollHeight = document.documentElement.scrollHeight - window.innerHeight;
-      const progress = scrollHeight > 0 ? (scrollTop / scrollHeight) * 100 : 0;
-      setScrollProgress(progress);
-    };
+  // Exact reading position tracking & restoration for novels
+  const [restoredBanner, setRestoredBanner] = useState<{ percent: number } | null>(null);
+  const restoredRef = useRef(false);
 
-    window.addEventListener("scroll", handleScroll, { passive: true });
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, []);
-
-  // Scroll position restoration for novels
+  // Track page scroll progress for the top progress bar & position saving
   useEffect(() => {
     if (!chapterId || !content) return;
 
-    const scrollKey = `chapter-scroll-${chapterId}`;
-
-    const restoreScroll = () => {
-      const savedPosition = localStorage.getItem(scrollKey);
-      if (savedPosition) {
-        const position = parseInt(savedPosition, 10);
-        setTimeout(() => {
-          window.scrollTo({ top: position, behavior: "instant" });
-        }, 100);
-      }
-    };
-
-    const saveScrollPosition = () => {
+    const handleScroll = () => {
       const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
-      localStorage.setItem(scrollKey, scrollTop.toString());
+      const scrollHeight = document.documentElement.scrollHeight - window.innerHeight;
+      const scrollRatio = scrollHeight > 0 ? scrollTop / scrollHeight : 0;
+      const progress = scrollHeight > 0 ? (scrollTop / scrollHeight) * 100 : 0;
+      setScrollProgress(progress);
+
+      saveChapterReadingPosition({
+        chapterId,
+        seriesSlug,
+        chapterSlug: chapterNumber.toString(),
+        chapterNumber,
+        pageIndex: 0,
+        scrollRatio,
+        scrollTop,
+      });
     };
 
     let scrollTimeout: NodeJS.Timeout;
-    const handleScroll = () => {
+    const throttledScroll = () => {
       clearTimeout(scrollTimeout);
-      scrollTimeout = setTimeout(saveScrollPosition, 150);
+      scrollTimeout = setTimeout(handleScroll, 120);
     };
 
-    restoreScroll();
-    window.addEventListener("scroll", handleScroll);
-
-    const handleBeforeUnload = () => {
-      saveScrollPosition();
-    };
-    window.addEventListener("beforeunload", handleBeforeUnload);
+    window.addEventListener("scroll", throttledScroll, { passive: true });
 
     return () => {
       clearTimeout(scrollTimeout);
-      window.removeEventListener("scroll", handleScroll);
-      window.removeEventListener("beforeunload", handleBeforeUnload);
+      window.removeEventListener("scroll", throttledScroll);
+      handleScroll();
     };
+  }, [chapterId, content, seriesSlug, chapterNumber]);
+
+  // Restore exact scroll position
+  useEffect(() => {
+    if (!chapterId || !content || restoredRef.current) return;
+
+    const savedPos = getChapterReadingPosition(chapterId);
+    if (savedPos && (savedPos.scrollTop > 60 || (savedPos.scrollRatio && savedPos.scrollRatio > 0.05))) {
+      const restoreTimer = setTimeout(() => {
+        if (!restoredRef.current) {
+          window.scrollTo({ top: savedPos.scrollTop, behavior: "instant" });
+          restoredRef.current = true;
+          setRestoredBanner({
+            percent: Math.round(savedPos.scrollRatio * 100),
+          });
+          setTimeout(() => setRestoredBanner(null), 4500);
+        }
+      }, 150);
+      return () => clearTimeout(restoreTimer);
+    } else {
+      restoredRef.current = true;
+    }
   }, [chapterId, content]);
 
   // Determine content mode (HTML vs Plain Text split)
@@ -1358,93 +1433,100 @@ function NovelView({
       .filter(Boolean);
   }, [content, isHtml]);
 
-  // Map theme styles for background, text and borders
-  const themeStyles = useMemo(() => {
-    switch (theme) {
-      case "charcoal":
-        return {
-          bg: "bg-[#0f0f10]",
-          text: "text-[#d0d0d0]",
-          border: "border-neutral-800",
-        };
-      case "sepia":
-        return {
-          bg: "bg-[#f4ecd8]",
-          text: "text-[#3c2a21]",
-          border: "border-[#e4dcbf]",
-        };
-      case "slate":
-        return {
-          bg: "bg-[#0f172a]",
-          text: "text-[#cbd5e1]",
-          border: "border-slate-800",
-        };
-      case "dark":
-      default:
-        return {
-          bg: "bg-black",
-          text: "text-[#e5e5e5]",
-          border: "border-neutral-900",
-        };
-    }
-  }, [theme]);
+  // Theme color definitions
+  const themeStyles = {
+    dark: {
+      bg: "bg-[#121212]",
+      text: "text-[#e0e0e0]",
+      border: "border-neutral-800",
+      accent: "text-primary",
+      meta: "text-neutral-400",
+      card: "bg-neutral-900/50",
+    },
+    light: {
+      bg: "bg-[#fcfbf9]",
+      text: "text-[#242424]",
+      border: "border-neutral-200",
+      accent: "text-primary",
+      meta: "text-neutral-500",
+      card: "bg-neutral-100/50",
+    },
+    sepia: {
+      bg: "bg-[#f4ecd8]",
+      text: "text-[#5b4636]",
+      border: "border-[#e0d6be]",
+      accent: "text-[#8c6b4f]",
+      meta: "text-[#8c7a6b]",
+      card: "bg-[#ede2c8]/60",
+    },
+    midnight: {
+      bg: "bg-[#0b0e14]",
+      text: "text-[#b0b8c4]",
+      border: "border-[#1e2638]",
+      accent: "text-blue-400",
+      meta: "text-[#62728d]",
+      card: "bg-[#121722]",
+    },
+  }[theme as "dark" | "light" | "sepia" | "midnight"] || {
+    bg: "bg-background",
+    text: "text-foreground",
+    border: "border-border",
+    accent: "text-primary",
+    meta: "text-muted-foreground",
+    card: "bg-card",
+  };
 
   return (
-    <div className={`min-h-screen w-full transition-colors duration-300 pb-16 ${themeStyles.bg} ${themeStyles.text}`}>
-      {/* Top Scroll Progress Indicator */}
-      <div
-        className="fixed top-0 left-0 right-0 z-[100] h-[3px] bg-violet-600 transition-all duration-75 origin-left"
-        style={{ transform: `scaleX(${scrollProgress / 100})` }}
-      />
+    <div className={`relative min-h-screen ${themeStyles.bg} ${themeStyles.text} transition-colors duration-300`}>
+      {/* Floating Exact Resume Notification Banner */}
+      {restoredBanner && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 flex items-center gap-3 px-4 py-2.5 rounded-full bg-black/85 text-white border border-primary/40 shadow-2xl backdrop-blur-md animate-in fade-in slide-in-from-bottom-4 duration-300">
+          <span className="text-sm font-semibold text-primary-foreground flex items-center gap-1.5">
+            <span>📍 Resumed at {restoredBanner.percent}%</span>
+          </span>
+          <button
+            onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+            className="text-xs bg-primary/30 hover:bg-primary text-white px-2.5 py-1 rounded-full font-bold transition-colors cursor-pointer"
+          >
+            Top ⬆
+          </button>
+        </div>
+      )}
 
-      <div className="mx-auto max-w-4xl px-4 sm:px-6 md:px-8 py-10">
-        <style dangerouslySetInnerHTML={{ __html: `
-          .novel-body-text p {
-            margin-bottom: 2rem !important;
-            line-height: inherit !important;
-            font-family: inherit !important;
-            font-size: inherit !important;
-            letter-spacing: -0.012em !important;
-            word-spacing: -0.02em !important;
-            text-align: justify !important;
-            text-justify: inter-word !important;
-          }
-          .novel-body-text {
-            line-height: inherit !important;
-            font-family: inherit !important;
-            font-size: inherit !important;
-            letter-spacing: -0.012em !important;
-            word-spacing: -0.02em !important;
-            text-align: justify !important;
-            text-justify: inter-word !important;
-          }
-        `}} />
+      {/* Top Reading Progress Bar */}
+      <div className="fixed top-0 left-0 w-full h-1 bg-transparent z-40">
+        <div
+          className="h-full bg-primary transition-all duration-150 ease-out"
+          style={{ width: `${scrollProgress}%` }}
+        />
+      </div>
+
+      <div className="mx-auto max-w-3xl px-4 sm:px-6 py-10">
+        {/* Title Header */}
+        <div className={`mb-8 border-b ${themeStyles.border} pb-6 text-center`}>
+          <p className={`text-xs uppercase tracking-widest ${themeStyles.meta} mb-1 font-semibold`}>
+            {seriesTitle}
+          </p>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight mb-2">
+            Chapter {chapterNumber}
+          </h1>
+        </div>
+
+        {/* Content Body */}
         <article
+          className="font-novel leading-relaxed select-text"
           style={{
             fontSize: `${fontSize}px`,
+            fontFamily: fontFamily,
             lineHeight: lineHeight,
-            fontFamily:
-              fontFamily === "serif"
-                ? "Georgia, Cambria, 'Times New Roman', Times, serif"
-                : fontFamily === "mono"
-                ? "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace"
-                : "var(--font-barlow), system-ui, sans-serif",
           }}
         >
-          <header className={`mb-8 border-b ${themeStyles.border} pb-6`}>
-            <h1 className="text-3xl font-bold tracking-tight mb-2">
-              {seriesTitle || "Novel"} — Chapter {chapterNumber}
-            </h1>
-            <p className="text-muted-foreground text-sm">
-              Read the full chapter online at vnrscans.
-            </p>
-          </header>
-
+          {/* Illustrations if any exist */}
           {illustrations && illustrations.length > 0 && (
             <div className="mb-8 space-y-4">
               {illustrations.map((url, idx) => (
-                <div key={idx} className="relative w-full max-h-[600px] overflow-hidden rounded-lg border border-border/40 bg-card/10 shadow-lg">
-                  {url.toLowerCase().split("?")[0].endsWith(".mp4") ? (
+                <div key={idx} className="rounded-lg overflow-hidden border border-border/40 shadow-md">
+                  {isVideoUrl(url) ? (
                     <video
                       src={url}
                       autoPlay
@@ -1493,7 +1575,7 @@ function NovelView({
         </div>
 
         <div className={`mt-8 border-t ${themeStyles.border} pt-6`}>
-          <ChapterReactions chapterId={chapterId} seriesId={seriesId} />
+          <ChapterLikeAndMemes chapterId={chapterId} seriesId={seriesId} />
         </div>
       </div>
 
@@ -2051,18 +2133,129 @@ function ReportButton({
   );
 }
 
-// Chapter Reactions Component
-function ChapterReactions({ chapterId, seriesId }: { chapterId: string; seriesId: string }) {
+function MemePickerModal({
+  open,
+  onClose,
+  onSelectMeme,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onSelectMeme: (meme: MemeSticker) => void;
+}) {
+  const [selectedCategory, setSelectedCategory] = useState<string>("all");
+  const [searchQuery, setSearchQuery] = useState("");
+
+  if (!open) return null;
+
+  const filteredMemes = POPULAR_MEME_STICKERS.filter((meme) => {
+    const matchesCategory = selectedCategory === "all" || meme.category === selectedCategory;
+    const matchesQuery =
+      !searchQuery ||
+      meme.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      meme.alt.toLowerCase().includes(searchQuery.toLowerCase());
+    return matchesCategory && matchesQuery;
+  });
+
+  return (
+    <div 
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-in fade-in duration-200"
+      onClick={onClose}
+    >
+      <div 
+        className="w-full max-w-lg rounded-2xl border border-border/60 bg-card p-5 shadow-2xl overflow-hidden flex flex-col max-h-[85vh] animate-in zoom-in-95 duration-200"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between pb-3 border-b border-border/40">
+          <div className="flex items-center gap-2">
+            <span className="text-xl">🔥</span>
+            <div>
+              <h3 className="font-bold text-base text-foreground">Anime Memes & Stickers</h3>
+              <p className="text-xs text-muted-foreground">Click a meme to attach to your comment</p>
+            </div>
+          </div>
+          <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full" onClick={onClose}>
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
+
+        {/* Search */}
+        <div className="py-3">
+          <input
+            type="text"
+            placeholder="Search memes (e.g. Peak, Gigachad, Anya)..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full h-9 rounded-lg border border-border/50 bg-background/70 px-3 text-xs focus:outline-none focus:ring-1 focus:ring-primary"
+          />
+        </div>
+
+        {/* Categories */}
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-3 scrollbar-none border-b border-border/30">
+          {MEME_CATEGORIES.map((cat) => (
+            <button
+              key={cat.id}
+              onClick={() => setSelectedCategory(cat.id)}
+              className={`shrink-0 px-2.5 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer ${
+                selectedCategory === cat.id
+                  ? "bg-primary text-primary-foreground shadow-sm shadow-primary/20 scale-105"
+                  : "bg-secondary/60 text-muted-foreground hover:bg-secondary hover:text-foreground"
+              }`}
+            >
+              {cat.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Meme Grid */}
+        <div className="grid grid-cols-3 sm:grid-cols-4 gap-2.5 overflow-y-auto py-4 flex-1 pr-1">
+          {filteredMemes.map((meme) => (
+            <button
+              key={meme.id}
+              onClick={() => {
+                onSelectMeme(meme);
+                onClose();
+              }}
+              className="group flex flex-col items-center justify-between p-2 rounded-xl border border-border/40 bg-background/50 hover:bg-primary/10 hover:border-primary/50 transition-all duration-200 hover:scale-[1.03] text-center cursor-pointer shadow-sm"
+            >
+              <div className="relative w-full aspect-square rounded-lg overflow-hidden bg-black/40 flex items-center justify-center">
+                <img
+                  src={meme.url}
+                  alt={meme.alt}
+                  loading="lazy"
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                />
+              </div>
+              <div className="mt-1.5 flex items-center justify-center gap-1 w-full">
+                <span className="text-xs">{meme.emoji}</span>
+                <span className="text-[11px] font-medium text-foreground truncate">{meme.name}</span>
+              </div>
+            </button>
+          ))}
+        </div>
+
+        <div className="pt-3 border-t border-border/30 flex items-center justify-between text-xs text-muted-foreground">
+          <span>Click any meme to attach</span>
+          <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={onClose}>
+            Close
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Chapter Like and Memes Component
+function ChapterLikeAndMemes({ chapterId, seriesId }: { chapterId: string; seriesId: string }) {
   const { user } = useAuth();
   const qc = useQueryClient();
+  const [likeBurst, setLikeBurst] = useState(false);
 
-  // Reaction emojis mapped to database check constraint values
-  const reactions = [
-    { type: "star", emoji: "👑", label: "GOAT" },
-    { type: "thumbs_up", emoji: "🔥", label: "Hype" },
-    { type: "laugh", emoji: "😱", label: "Plot Twist" },
-    { type: "smile", emoji: "🤡", label: "Fraud" },
-    { type: "heart", emoji: "😭", label: "Peak Fiction" },
+  // Reaction types mapped to meme types in database constraint ('heart', 'thumbs_up', 'laugh', 'star', 'smile')
+  const memeReactions = [
+    { type: "star", emoji: "🗿", label: "Peak Fiction" },
+    { type: "thumbs_up", emoji: "🔥", label: "Nah, I'd Win" },
+    { type: "smile", emoji: "🍿", label: "Absolute Cinema" },
+    { type: "laugh", emoji: "😭", label: "Emotional Damage" },
   ];
 
   // Fetch reaction counts
@@ -2076,7 +2269,6 @@ function ChapterReactions({ chapterId, seriesId }: { chapterId: string; seriesId
 
       if (error) throw error;
 
-      // Count reactions by type
       const counts: Record<string, number> = {};
       data?.forEach((r) => {
         counts[r.reaction_type] = (counts[r.reaction_type] || 0) + 1;
@@ -2104,7 +2296,6 @@ function ChapterReactions({ chapterId, seriesId }: { chapterId: string; seriesId
     staleTime: 1000 * 60 * 2,
   });
 
-  // Toggle reaction
   const toggleReaction = useMutation({
     mutationFn: async (reactionType: string) => {
       if (!user) {
@@ -2115,24 +2306,24 @@ function ChapterReactions({ chapterId, seriesId }: { chapterId: string; seriesId
       const hasReacted = userReactionsQ.data?.includes(reactionType);
 
       if (hasReacted) {
-        // Remove reaction
         const { error } = await supabase
           .from("chapter_reactions")
           .delete()
           .eq("chapter_id", chapterId)
           .eq("user_id", user.id)
           .eq("reaction_type", reactionType);
-
         if (error) throw error;
       } else {
-        // Add reaction
         const { error } = await supabase.from("chapter_reactions").insert({
           chapter_id: chapterId,
           user_id: user.id,
           reaction_type: reactionType,
         });
-
         if (error) throw error;
+        if (reactionType === "heart") {
+          setLikeBurst(true);
+          setTimeout(() => setLikeBurst(false), 1200);
+        }
       }
     },
     onSuccess: () => {
@@ -2142,15 +2333,84 @@ function ChapterReactions({ chapterId, seriesId }: { chapterId: string; seriesId
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const isLiked = userReactionsQ.data?.includes("heart");
+  const likeCount = reactionsQ.data?.["heart"] || 0;
+
+  const scrollToComments = () => {
+    const el = document.getElementById("comments-section");
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  };
+
   return (
-    <div className="mt-12 mb-8 border-t border-border pt-8">
-      {/* Reactions */}
-      <div className="mb-8">
-        <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
-          <span>🏆 Chapter Hype & Reactions</span>
+    <div className="mt-12 mb-8 border-t border-border/50 pt-8">
+      {/* Primary Like Feature */}
+      <div className="mb-8 rounded-2xl border border-border/50 bg-gradient-to-b from-card/80 via-card/40 to-background/80 p-6 shadow-xl backdrop-blur-md text-center flex flex-col items-center justify-center relative overflow-hidden">
+        {/* Glow effect */}
+        <div className="absolute -top-12 -left-12 w-32 h-32 bg-pink-500/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute -bottom-12 -right-12 w-32 h-32 bg-primary/10 rounded-full blur-3xl pointer-events-none" />
+
+        <h3 className="text-xl font-black tracking-tight text-foreground sm:text-2xl flex items-center justify-center gap-2">
+          <span>Show Some Love for This Chapter!</span>
         </h3>
-        <div className="flex flex-wrap gap-3">
-          {reactions.map((reaction) => {
+        <p className="text-xs sm:text-sm text-muted-foreground mt-1 max-w-md">
+          Enjoyed reading? Drop a like to support the scans and climb the hype ladder.
+        </p>
+
+        {/* Big Animated Like Button */}
+        <div className="mt-5 flex flex-col items-center">
+          <button
+            onClick={() => toggleReaction.mutate("heart")}
+            disabled={toggleReaction.isPending}
+            className={`group relative flex items-center gap-3 px-8 py-3.5 rounded-full font-bold text-base transition-all duration-300 transform active:scale-95 cursor-pointer shadow-lg ${
+              isLiked
+                ? "bg-gradient-to-r from-pink-600 via-rose-500 to-pink-600 text-white shadow-pink-500/30 ring-2 ring-pink-400/60 scale-105"
+                : "bg-secondary/80 hover:bg-pink-500/10 text-foreground border border-border hover:border-pink-500/40 hover:text-pink-400"
+            }`}
+          >
+            <Heart
+              className={`h-6 w-6 transition-all duration-300 ${
+                isLiked ? "fill-current scale-110 animate-bounce" : "group-hover:scale-110 text-pink-400"
+              }`}
+            />
+            <span>{isLiked ? "Liked!" : "Like Chapter"}</span>
+            <span
+              className={`ml-1 text-xs font-mono font-bold px-2 py-0.5 rounded-full ${
+                isLiked ? "bg-white/20 text-white" : "bg-background/80 text-muted-foreground"
+              }`}
+            >
+              {likeCount.toLocaleString()}
+            </span>
+
+            {/* Like burst floating hearts */}
+            {likeBurst && (
+              <span className="absolute -top-6 text-2xl animate-ping pointer-events-none">
+                💖
+              </span>
+            )}
+          </button>
+        </div>
+      </div>
+
+      {/* Chapter Memes & Quick Reaction Stickers */}
+      <div className="mb-8">
+        <div className="flex items-center justify-between mb-4">
+          <h4 className="text-base font-bold flex items-center gap-2 text-foreground">
+            <span className="text-lg">🔥</span>
+            <span>Chapter Memes & Reactions</span>
+          </h4>
+          <button
+            onClick={scrollToComments}
+            className="text-xs text-primary font-semibold hover:underline flex items-center gap-1 cursor-pointer"
+          >
+            <span>Drop a meme in comments</span>
+            <span>⬇</span>
+          </button>
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {memeReactions.map((reaction) => {
             const count = reactionsQ.data?.[reaction.type] || 0;
             const hasReacted = userReactionsQ.data?.includes(reaction.type);
 
@@ -2159,23 +2419,30 @@ function ChapterReactions({ chapterId, seriesId }: { chapterId: string; seriesId
                 key={reaction.type}
                 onClick={() => toggleReaction.mutate(reaction.type)}
                 disabled={toggleReaction.isPending}
-                className={`flex items-center gap-2 px-4 py-2 rounded-xl border transition-all duration-300 transform active:scale-95 cursor-pointer ${
+                className={`flex items-center justify-between p-3 rounded-xl border transition-all duration-200 transform active:scale-95 cursor-pointer ${
                   hasReacted
-                    ? "bg-primary/20 border-primary text-primary font-bold shadow-md scale-105"
+                    ? "bg-primary/20 border-primary text-primary font-bold shadow-md shadow-primary/10 scale-[1.02]"
                     : "bg-card/60 border-border/60 hover:bg-primary/10 hover:border-primary/50 text-foreground"
                 }`}
                 title={reaction.label}
               >
-                <span className="text-lg">{reaction.emoji}</span>
-                <span className="text-xs font-bold uppercase tracking-wide">{reaction.label}</span>
-                <span className="text-xs font-mono font-bold bg-secondary/80 px-1.5 py-0.5 rounded-md text-muted-foreground">{count}</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-xl">{reaction.emoji}</span>
+                  <span className="text-xs font-bold">{reaction.label}</span>
+                </div>
+                <span className="text-xs font-mono font-bold bg-secondary/80 px-2 py-0.5 rounded-md text-muted-foreground">
+                  {count}
+                </span>
               </button>
             );
           })}
         </div>
       </div>
 
-      <ChapterComments chapterId={chapterId} seriesId={seriesId} />
+      {/* Comments section */}
+      <div id="comments-section">
+        <ChapterComments chapterId={chapterId} seriesId={seriesId} />
+      </div>
     </div>
   );
 }
@@ -2440,6 +2707,8 @@ function ChapterComments({ chapterId, seriesId }: { chapterId: string; seriesId:
   const [revealedSpoilers, setRevealedSpoilers] = useState<Set<string>>(new Set());
   const contentRef = useRef<HTMLTextAreaElement | null>(null);
   const replyContentRef = useRef<HTMLTextAreaElement | null>(null);
+  const [isMemePickerOpen, setIsMemePickerOpen] = useState(false);
+  const [replyMemePickerOpen, setReplyMemePickerOpen] = useState(false);
 
   const commentsQ = useQuery({
     queryKey: ["chapter-comments", chapterId],
@@ -2642,7 +2911,7 @@ function ChapterComments({ chapterId, seriesId }: { chapterId: string; seriesId:
         series_id: seriesId,
         chapter_id: chapterId,
         parent_id: parentId,
-        content: cleanBody || (attachmentType === "gif" ? "Shared a GIF" : "Shared an image"),
+        content: cleanBody || (attachmentType === "gif" ? "Shared a GIF" : "Shared a Meme/Image"),
         attachment_type: attachmentType,
         attachment_url: attachmentUrl,
         attachment_alt: attachmentAlt,
@@ -3035,28 +3304,31 @@ function ChapterComments({ chapterId, seriesId }: { chapterId: string; seriesId:
           </div>
 
           {comment.attachment_url && !spoilerHidden && (() => {
-            // Only render as a clickable link when the URL has a safe scheme.
-            // This prevents stored XSS via javascript: URIs injected into
-            // attachment_url.
             const safeAttachmentUrl = safeUrlOrNull(comment.attachment_url);
             if (!safeAttachmentUrl) return null;
             return (
-            <a
-              href={safeAttachmentUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="mt-3 block max-w-sm overflow-hidden rounded-lg border border-border/50 bg-background"
-            >
-              <img
-                src={safeAttachmentUrl}
-                alt={
-                  comment.attachment_alt ??
-                  (comment.attachment_type === "gif" ? "Comment GIF" : "Comment image")
-                }
-                className="max-h-72 w-full object-contain"
-                loading="lazy"
-              />
-            </a>
+              <div className="mt-3 inline-block max-w-xs sm:max-w-sm">
+                <a
+                  href={safeAttachmentUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="group relative block overflow-hidden rounded-xl border border-border/60 bg-black/40 hover:border-primary/50 transition-all duration-200 shadow-md"
+                >
+                  <img
+                    src={safeAttachmentUrl}
+                    alt={
+                      comment.attachment_alt ??
+                      (comment.attachment_type === "gif" ? "Comment GIF" : "Comment Meme / Image")
+                    }
+                    className="max-h-72 w-full object-contain rounded-xl group-hover:scale-[1.02] transition-transform duration-200"
+                    loading="lazy"
+                  />
+                  <div className="absolute top-2 left-2 px-2 py-0.5 rounded-md bg-black/75 backdrop-blur-md text-[10px] font-bold text-primary flex items-center gap-1 border border-primary/30">
+                    <Flame className="h-3 w-3" />
+                    <span>{comment.attachment_type === "gif" ? "GIF" : "MEME"}</span>
+                  </div>
+                </a>
+              </div>
             );
           })()}
 
@@ -3139,24 +3411,24 @@ function ChapterComments({ chapterId, seriesId }: { chapterId: string; seriesId:
                   <img
                     src={replyAttachmentUrl}
                     alt={replyAttachmentAlt ?? "Reply attachment preview"}
-                    className="h-14 w-16 rounded-md object-cover"
+                    className="h-14 w-16 rounded-md object-cover bg-black/40"
                   />
                   <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-primary">
+                    <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-primary">
                       {replyAttachmentType === "gif" ? (
                         <Film className="h-3.5 w-3.5" />
                       ) : (
-                        <ImageIcon className="h-3.5 w-3.5" />
+                        <Flame className="h-3.5 w-3.5" />
                       )}
-                      {replyAttachmentType === "gif" ? "GIF attached" : "Image attached"}
+                      {replyAttachmentType === "gif" ? "GIF attached" : "Meme / Image attached"}
                     </div>
-                    <p className="mt-1 truncate text-xs text-muted-foreground">
+                    <p className="mt-1 truncate text-xs text-muted-foreground font-medium">
                       {replyAttachmentAlt ?? replyAttachmentUrl}
                     </p>
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="mt-1 h-6 px-2 text-xs"
+                      className="mt-1 h-6 px-2 text-xs text-destructive hover:bg-destructive/10"
                       onClick={clearReplyAttachment}
                     >
                       <X className="mr-1 h-3 w-3" />
@@ -3168,6 +3440,19 @@ function ChapterComments({ chapterId, seriesId }: { chapterId: string; seriesId:
 
               <div className="mt-3 pt-3 border-t border-border/30 flex flex-wrap items-center justify-between gap-3">
                 <div className="flex flex-wrap items-center gap-2">
+                  {/* Meme Button for Reply */}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-7 gap-1 bg-primary/10 border-primary/30 hover:bg-primary/20 text-primary transition-colors text-[10px] font-semibold cursor-pointer"
+                    disabled={!user}
+                    onClick={() => setReplyMemePickerOpen(true)}
+                  >
+                    <Flame className="h-3 w-3 text-primary" />
+                    <span>Memes</span>
+                  </Button>
+
                   <Button
                     asChild
                     variant="outline"
@@ -3255,6 +3540,29 @@ function ChapterComments({ chapterId, seriesId }: { chapterId: string; seriesId:
 
   return (
     <section className="rounded-2xl border border-border/40 bg-background/35 backdrop-blur-md p-5 sm:p-6 shadow-xl relative overflow-hidden">
+      {/* Meme Modals */}
+      <MemePickerModal
+        open={isMemePickerOpen}
+        onClose={() => setIsMemePickerOpen(false)}
+        onSelectMeme={(meme) => {
+          setAttachmentType(meme.url.endsWith(".gif") ? "gif" : "image");
+          setAttachmentUrl(meme.url);
+          setAttachmentAlt(meme.name);
+          toast.success(`Attached "${meme.name}" meme sticker`);
+        }}
+      />
+
+      <MemePickerModal
+        open={replyMemePickerOpen}
+        onClose={() => setReplyMemePickerOpen(false)}
+        onSelectMeme={(meme) => {
+          setReplyAttachmentType(meme.url.endsWith(".gif") ? "gif" : "image");
+          setReplyAttachmentUrl(meme.url);
+          setReplyAttachmentAlt(meme.name);
+          toast.success(`Attached "${meme.name}" meme sticker`);
+        }}
+      />
+
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3 relative z-10">
         <div>
           <h3 className="flex items-center gap-2 text-lg font-bold tracking-tight">
@@ -3293,7 +3601,7 @@ function ChapterComments({ chapterId, seriesId }: { chapterId: string; seriesId:
               ref={contentRef}
               value={content}
               onChange={(event) => setContent(event.target.value)}
-              placeholder={user ? "Share your thoughts..." : "Sign in to comment"}
+              placeholder={user ? "Share your thoughts or drop a meme..." : "Sign in to comment"}
               disabled={!user}
               className="min-h-20 resize-none border-0 bg-transparent p-0 focus-visible:ring-0 focus-visible:ring-offset-0 text-sm leading-relaxed"
             />
@@ -3306,24 +3614,24 @@ function ChapterComments({ chapterId, seriesId }: { chapterId: string; seriesId:
             <img
               src={attachmentUrl}
               alt={attachmentAlt ?? "Comment attachment preview"}
-              className="h-16 w-20 rounded-md object-cover"
+              className="h-16 w-20 rounded-md object-cover bg-black/40"
             />
             <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-primary">
+              <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-primary">
                 {attachmentType === "gif" ? (
                   <Film className="h-3.5 w-3.5" />
                 ) : (
-                  <ImageIcon className="h-3.5 w-3.5" />
+                  <Flame className="h-3.5 w-3.5" />
                 )}
-                {attachmentType === "gif" ? "GIF attached" : "Image attached"}
+                {attachmentType === "gif" ? "GIF attached" : "Meme / Image attached"}
               </div>
-              <p className="mt-1 truncate text-xs text-muted-foreground">
+              <p className="mt-1 truncate text-xs text-muted-foreground font-medium">
                 {attachmentAlt ?? attachmentUrl}
               </p>
               <Button
                 variant="ghost"
                 size="sm"
-                className="mt-1.5 h-6 px-2 text-xs"
+                className="mt-1.5 h-6 px-2 text-xs text-destructive hover:bg-destructive/10"
                 onClick={clearAttachment}
               >
                 <X className="mr-1 h-3 w-3" />
@@ -3335,6 +3643,19 @@ function ChapterComments({ chapterId, seriesId }: { chapterId: string; seriesId:
 
         <div className="mt-4 pt-3 border-t border-border/30 flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-2">
+            {/* Meme Picker Trigger Button */}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-8 gap-1.5 bg-primary/10 border-primary/30 hover:bg-primary/20 text-primary transition-colors text-xs font-semibold cursor-pointer"
+              disabled={!user}
+              onClick={() => setIsMemePickerOpen(true)}
+            >
+              <Flame className="h-3.5 w-3.5 text-primary" />
+              <span>Memes & Stickers</span>
+            </Button>
+
             <Button
               asChild
               variant="outline"
