@@ -2383,6 +2383,30 @@ function ChapterLikeAndMemes({ chapterId, seriesId }: { chapterId: string; serie
   const isLiked = userReactionsQ.data?.includes("heart");
   const likeCount = reactionsQ.data?.["heart"] || 0;
 
+  const [selectedVaultCategory, setSelectedVaultCategory] = useState<string>("all");
+  const [vaultSearch, setVaultSearch] = useState("");
+  const [isFullMemeModalOpen, setIsFullMemeModalOpen] = useState(false);
+  const [pendingCommentMeme, setPendingCommentMeme] = useState<MemeSticker | null>(null);
+
+  const filteredVaultMemes = POPULAR_MEME_STICKERS.filter((meme) => {
+    const matchesCategory = selectedVaultCategory === "all" || meme.category === selectedVaultCategory;
+    const matchesQuery =
+      !vaultSearch ||
+      meme.name.toLowerCase().includes(vaultSearch.toLowerCase()) ||
+      meme.tag.toLowerCase().includes(vaultSearch.toLowerCase()) ||
+      meme.alt.toLowerCase().includes(vaultSearch.toLowerCase());
+    return matchesCategory && matchesQuery;
+  });
+
+  const handleSelectMemeFromVault = (meme: MemeSticker) => {
+    setPendingCommentMeme(meme);
+    toast.success(`Attached "${meme.name}" meme to comment draft!`);
+    const el = document.getElementById("comments-section");
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  };
+
   const scrollToComments = () => {
     const el = document.getElementById("comments-section");
     if (el) {
@@ -2392,6 +2416,13 @@ function ChapterLikeAndMemes({ chapterId, seriesId }: { chapterId: string; serie
 
   return (
     <div className="mt-12 mb-8 border-t border-border/50 pt-8">
+      {/* Full Modal Picker for Browse All */}
+      <MemePickerModal
+        open={isFullMemeModalOpen}
+        onClose={() => setIsFullMemeModalOpen(false)}
+        onSelectMeme={(meme) => handleSelectMemeFromVault(meme)}
+      />
+
       {/* Primary Like Feature */}
       <div className="mb-8 rounded-2xl border border-border/50 bg-gradient-to-b from-card/80 via-card/40 to-background/80 p-6 sm:p-8 shadow-xl backdrop-blur-md text-center flex flex-col items-center justify-center relative overflow-hidden">
         {/* Glow effect */}
@@ -2440,18 +2471,18 @@ function ChapterLikeAndMemes({ chapterId, seriesId }: { chapterId: string; serie
         </div>
       </div>
 
-      {/* Chapter Memes & Reactions */}
+      {/* Chapter Memes & Reactions Stats Bar */}
       <div className="mb-8">
         <div className="flex items-center justify-between mb-4">
           <h4 className="text-base font-bold flex items-center gap-2 text-foreground">
-            <span className="text-xl">🔥</span>
-            <span>Chapter Reactions & Hype</span>
+            <span className="text-xl">🏆</span>
+            <span>Quick Chapter Hype & Reactions</span>
           </h4>
           <button
             onClick={scrollToComments}
             className="text-xs text-primary font-semibold hover:underline flex items-center gap-1 cursor-pointer"
           >
-            <span>Drop a meme in comments</span>
+            <span>Jump to comments</span>
             <span>⬇</span>
           </button>
         </div>
@@ -2486,9 +2517,102 @@ function ChapterLikeAndMemes({ chapterId, seriesId }: { chapterId: string; serie
         </div>
       </div>
 
+      {/* Standalone Chapter Reaction Memes Showcase (OUTSIDE Comments Section) */}
+      <div className="mb-10 rounded-2xl border border-border/50 bg-gradient-to-b from-card/90 via-card/50 to-background/90 p-5 sm:p-6 shadow-xl backdrop-blur-md">
+        <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-border/40">
+          <div className="flex items-center gap-2.5">
+            <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-amber-500/20 to-orange-500/20 border border-amber-500/30 flex items-center justify-center text-xl">
+              🔥
+            </div>
+            <div>
+              <h4 className="font-bold text-base sm:text-lg text-foreground flex items-center gap-2">
+                <span>Chapter Reaction Memes Vault</span>
+                <span className="text-[10px] bg-primary/20 text-primary font-bold px-2 py-0.5 rounded-full">
+                  {POPULAR_MEME_STICKERS.length} Stickers
+                </span>
+              </h4>
+              <p className="text-xs text-muted-foreground">
+                Click any meme to attach & drop directly into the discussion below
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 gap-1.5 text-xs font-semibold bg-primary/10 border-primary/30 text-primary hover:bg-primary/20 cursor-pointer"
+              onClick={() => setIsFullMemeModalOpen(true)}
+            >
+              <Sparkles className="h-3.5 w-3.5" />
+              <span>Full Sticker Library</span>
+            </Button>
+          </div>
+        </div>
+
+        {/* Category Tabs & Quick Search */}
+        <div className="mt-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+            {MEME_CATEGORIES.map((cat) => (
+              <button
+                key={cat.id}
+                onClick={() => setSelectedVaultCategory(cat.id)}
+                className={`shrink-0 px-3 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer ${
+                  selectedVaultCategory === cat.id
+                    ? "bg-primary text-primary-foreground shadow-sm shadow-primary/20 scale-105"
+                    : "bg-secondary/70 text-muted-foreground hover:bg-secondary hover:text-foreground"
+                }`}
+              >
+                {cat.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="relative w-full sm:w-56 shrink-0">
+            <input
+              type="text"
+              placeholder="Search memes..."
+              value={vaultSearch}
+              onChange={(e) => setVaultSearch(e.target.value)}
+              className="w-full h-8 rounded-lg border border-border/50 bg-background/80 px-3 text-xs focus:outline-none focus:ring-1 focus:ring-primary"
+            />
+          </div>
+        </div>
+
+        {/* Standalone Meme Grid */}
+        <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-3">
+          {filteredVaultMemes.slice(0, 12).map((meme) => (
+            <MemeGridItem
+              key={meme.id}
+              meme={meme}
+              onSelect={() => handleSelectMemeFromVault(meme)}
+            />
+          ))}
+        </div>
+
+        {filteredVaultMemes.length > 12 && (
+          <div className="mt-4 text-center">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 text-xs text-primary hover:bg-primary/10 gap-1.5"
+              onClick={() => setIsFullMemeModalOpen(true)}
+            >
+              <span>View all {filteredVaultMemes.length} memes in {selectedVaultCategory} category</span>
+              <span>→</span>
+            </Button>
+          </div>
+        )}
+      </div>
+
       {/* Comments section */}
       <div id="comments-section">
-        <ChapterComments chapterId={chapterId} seriesId={seriesId} />
+        <ChapterComments 
+          chapterId={chapterId} 
+          seriesId={seriesId} 
+          pendingMeme={pendingCommentMeme}
+          onClearPendingMeme={() => setPendingCommentMeme(null)}
+        />
       </div>
     </div>
   );
@@ -2805,7 +2929,17 @@ function CommentAvatarFrame({
   );
 }
 
-function ChapterComments({ chapterId, seriesId }: { chapterId: string; seriesId: string }) {
+function ChapterComments({
+  chapterId,
+  seriesId,
+  pendingMeme,
+  onClearPendingMeme,
+}: {
+  chapterId: string;
+  seriesId: string;
+  pendingMeme?: MemeSticker | null;
+  onClearPendingMeme?: () => void;
+}) {
   const { user } = useAuth();
   const qc = useQueryClient();
   const navigate = useNavigate();
@@ -2844,6 +2978,19 @@ function ChapterComments({ chapterId, seriesId }: { chapterId: string; seriesId:
   const replyContentRef = useRef<HTMLTextAreaElement | null>(null);
   const [isMemePickerOpen, setIsMemePickerOpen] = useState(false);
   const [replyMemePickerOpen, setReplyMemePickerOpen] = useState(false);
+
+  // Sync incoming meme from external Chapter Meme Vault
+  useEffect(() => {
+    if (pendingMeme) {
+      setAttachmentType(pendingMeme.url.endsWith(".gif") ? "gif" : "image");
+      setAttachmentUrl(pendingMeme.url);
+      setAttachmentAlt(pendingMeme.name);
+      onClearPendingMeme?.();
+      requestAnimationFrame(() => {
+        contentRef.current?.focus();
+      });
+    }
+  }, [pendingMeme, onClearPendingMeme]);
 
   const commentsQ = useQuery({
     queryKey: ["chapter-comments", chapterId],
