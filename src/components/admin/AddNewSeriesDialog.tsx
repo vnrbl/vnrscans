@@ -15,6 +15,7 @@ import {
   Zap,
   Layers,
   ArrowRight,
+  ExternalLink,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth, useIsAdmin } from "@/hooks/useAuth";
@@ -54,6 +55,87 @@ interface AddNewSeriesDialogProps {
 const seriesTypes = ["manhwa", "manga", "manhua", "novel"] as const;
 const seriesStatuses = ["ongoing", "completed", "hiatus"] as const;
 
+function toCleanSlug(text: string) {
+  return text
+    .toLowerCase()
+    .trim()
+    .replace(/^\d+-/, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+}
+
+interface ScanProviderOption {
+  id: string;
+  name: string;
+  icon: string;
+  badge?: string;
+  domain: string;
+  getUrl: (slug: string) => string;
+  getSearchUrl: (title: string) => string;
+}
+
+const WORKABLE_SCAN_PROVIDERS: ScanProviderOption[] = [
+  {
+    id: "asura",
+    name: "Asura Scans",
+    icon: "⚔️",
+    badge: "Recommended",
+    domain: "asuracomic.net",
+    getUrl: (slug) => `https://asuracomic.net/series/${slug}`,
+    getSearchUrl: (title) => `https://asuracomic.net/series?name=${encodeURIComponent(title)}`,
+  },
+  {
+    id: "flame",
+    name: "Flame Comics",
+    icon: "🔥",
+    badge: "HQ Scans",
+    domain: "flamecomics.me",
+    getUrl: (slug) => `https://flamecomics.me/series/${slug}`,
+    getSearchUrl: (title) => `https://flamecomics.me/series?search=${encodeURIComponent(title)}`,
+  },
+  {
+    id: "reaper",
+    name: "Reaper Scans",
+    icon: "💀",
+    domain: "reaperscans.com",
+    getUrl: (slug) => `https://reaperscans.com/series/${slug}`,
+    getSearchUrl: (title) => `https://reaperscans.com/series?query=${encodeURIComponent(title)}`,
+  },
+  {
+    id: "hivetoon",
+    name: "Hive / Void",
+    icon: "⚡",
+    domain: "hivetoon.com",
+    getUrl: (slug) => `https://hivetoon.com/series/${slug}`,
+    getSearchUrl: (title) => `https://hivetoon.com/?s=${encodeURIComponent(title)}`,
+  },
+  {
+    id: "qi",
+    name: "Qi Scans",
+    icon: "📖",
+    badge: "Direct API",
+    domain: "qimanga.com",
+    getUrl: (slug) => `https://qimanga.com/series/${slug}`,
+    getSearchUrl: (title) => `https://qimanga.com/search?q=${encodeURIComponent(title)}`,
+  },
+  {
+    id: "custom",
+    name: "Custom URL",
+    icon: "🌐",
+    domain: "Custom",
+    getUrl: () => "",
+    getSearchUrl: () => "",
+  },
+  {
+    id: "none",
+    name: "No Scan Source",
+    icon: "🚫",
+    domain: "Metadata Only",
+    getUrl: () => "",
+    getSearchUrl: () => "",
+  },
+];
+
 export function AddNewSeriesDialog({ trigger }: AddNewSeriesDialogProps) {
   const router = useRouter();
   const { user } = useAuth();
@@ -70,7 +152,10 @@ export function AddNewSeriesDialog({ trigger }: AddNewSeriesDialogProps) {
   const [comickResults, setComickResults] = useState<ComickExtractedMetadata[]>([]);
   const [selectedComic, setSelectedComic] = useState<ComickExtractedMetadata | null>(null);
   const [selectedType, setSelectedType] = useState<"manhwa" | "manga" | "manhua" | "novel">("manhwa");
+  const [selectedScanProvider, setSelectedScanProvider] = useState<string>("asura");
   const [scanSourceUrl, setScanSourceUrl] = useState("");
+  const [autoSyncChapters, setAutoSyncChapters] = useState(true);
+  const [syncMaxChapters, setSyncMaxChapters] = useState<number>(50);
   const [isHybridSubmitting, setIsHybridSubmitting] = useState(false);
 
   // Manual Form State
@@ -84,6 +169,30 @@ export function AddNewSeriesDialog({ trigger }: AddNewSeriesDialogProps) {
   const [releaseYear, setReleaseYear] = useState(new Date().getFullYear().toString());
   const [description, setDescription] = useState("");
   const [coverUrl, setCoverUrl] = useState("");
+
+  const handleSelectComic = (comic: ComickExtractedMetadata) => {
+    setSelectedComic(comic);
+    const cleanSlug = toCleanSlug(comic.slug || comic.title);
+    const provider = WORKABLE_SCAN_PROVIDERS.find((p) => p.id === selectedScanProvider);
+    if (provider && provider.id !== "none" && provider.id !== "custom") {
+      setScanSourceUrl(provider.getUrl(cleanSlug));
+    }
+  };
+
+  const handleProviderSelect = (providerId: string) => {
+    setSelectedScanProvider(providerId);
+    const provider = WORKABLE_SCAN_PROVIDERS.find((p) => p.id === providerId);
+    if (!provider) return;
+
+    if (provider.id === "none") {
+      setScanSourceUrl("");
+    } else if (provider.id === "custom") {
+      // Keep existing URL or leave open for manual pasting
+    } else if (selectedComic) {
+      const cleanSlug = toCleanSlug(selectedComic.slug || selectedComic.title);
+      setScanSourceUrl(provider.getUrl(cleanSlug));
+    }
+  };
 
   // Search Comick for official metadata
   const handleSearchComick = async () => {
@@ -114,7 +223,7 @@ export function AddNewSeriesDialog({ trigger }: AddNewSeriesDialogProps) {
         toast.error(res.error || `No titles found on Comick for "${q}"`);
       } else {
         setComickResults(res.results);
-        setSelectedComic(res.results[0]);
+        handleSelectComic(res.results[0]);
         toast.success(`Found ${res.results.length} comic(s) on Comick!`);
       }
     } catch (err: any) {
@@ -239,13 +348,31 @@ export function AddNewSeriesDialog({ trigger }: AddNewSeriesDialogProps) {
           .single();
 
         if (!srcErr && newSource?.id) {
-          $syncImportSource({
-            data: {
-              sourceId: newSource.id,
-              accessToken: session.access_token,
-            },
-          }).catch(console.error);
-          processing.setStepStatus("source", "done", `Linked to ${preset.sourceSite} (${preset.scanlationGroup || "Auto"})`);
+          if (autoSyncChapters) {
+            processing.setStepStatus("source", "active", `Syncing chapters from ${preset.sourceSite}...`);
+            try {
+              const syncRes = await $syncImportSource({
+                data: {
+                  sourceId: newSource.id,
+                  accessToken: session.access_token,
+                  maxChapters: syncMaxChapters,
+                },
+              });
+              if (syncRes.success) {
+                processing.setStepStatus(
+                  "source",
+                  "done",
+                  `Imported ${syncRes.imported ?? 0} chapter(s) from ${preset.sourceSite}`
+                );
+              } else {
+                processing.setStepStatus("source", "done", `Linked to ${preset.sourceSite}`);
+              }
+            } catch {
+              processing.setStepStatus("source", "done", `Linked to ${preset.sourceSite}`);
+            }
+          } else {
+            processing.setStepStatus("source", "done", `Linked to ${preset.sourceSite} (${preset.scanlationGroup || "Auto"})`);
+          }
         } else {
           processing.setStepStatus("source", "done", "Source saved");
         }
@@ -443,7 +570,7 @@ export function AddNewSeriesDialog({ trigger }: AddNewSeriesDialogProps) {
                       return (
                         <div
                           key={comic.slug}
-                          onClick={() => setSelectedComic(comic)}
+                          onClick={() => handleSelectComic(comic)}
                           className={`flex items-center gap-3 p-2.5 rounded-xl border cursor-pointer transition-all ${
                             isSelected
                               ? "bg-purple-600/20 border-purple-500 ring-1 ring-purple-500"
@@ -488,27 +615,137 @@ export function AddNewSeriesDialog({ trigger }: AddNewSeriesDialogProps) {
               )}
             </div>
 
-            {/* Step 2: Scan Chapter Source */}
-            <div className="p-4 rounded-xl bg-neutral-900/40 border border-neutral-800/80 space-y-3">
+            {/* Step 2: Workable Scan Chapter Source */}
+            <div className="p-4 rounded-xl bg-neutral-900/40 border border-neutral-800/80 space-y-4">
               <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-neutral-800 text-[11px] font-bold text-neutral-300">2</span>
-                  <span className="text-sm font-semibold tracking-tight text-neutral-100">
-                    Attach Scan Source for Chapters <span className="text-xs font-normal text-neutral-400">(Optional)</span>
-                  </span>
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-neutral-800 text-[11px] font-bold text-neutral-300">2</span>
+                    <span className="text-sm font-semibold tracking-tight text-neutral-100">
+                      Select Chapter Scan Source
+                    </span>
+                  </div>
+                  <Badge variant="outline" className="text-[10px] text-purple-300 border-purple-500/30">
+                    Workable Scrapers
+                  </Badge>
                 </div>
                 <p className="text-xs text-neutral-400 font-normal leading-relaxed pl-7">
-                  Paste the series URL from Asura, Reaper, FlameScans, Realm, Void, etc. Chapters will be synced directly from this source!
+                  Choose a verified scanlation provider to import chapters from, or paste a custom URL.
                 </p>
               </div>
 
-              <div className="pl-7">
-                <Input
-                  value={scanSourceUrl}
-                  onChange={(e) => setScanSourceUrl(e.target.value)}
-                  placeholder="e.g. https://asuracomic.net/series/solo-leveling"
-                  className="h-10 text-sm bg-neutral-900/90 border-neutral-800 focus:border-purple-500 text-white placeholder:text-neutral-500 rounded-lg font-normal"
-                />
+              {/* Workable Provider Selection Grid */}
+              <div className="pl-7 space-y-3">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {WORKABLE_SCAN_PROVIDERS.map((provider) => {
+                    const isSelected = selectedScanProvider === provider.id;
+                    return (
+                      <button
+                        key={provider.id}
+                        type="button"
+                        onClick={() => handleProviderSelect(provider.id)}
+                        className={`flex flex-col items-start p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                          isSelected
+                            ? "bg-purple-600/20 border-purple-500 ring-1 ring-purple-500 shadow-sm"
+                            : "bg-neutral-900/60 border-neutral-800 hover:bg-neutral-900 hover:border-neutral-700"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between w-full mb-1">
+                          <span className="text-base">{provider.icon}</span>
+                          {provider.badge && (
+                            <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.2 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                              {provider.badge}
+                            </span>
+                          )}
+                          {isSelected && !provider.badge && (
+                            <Check className="h-3.5 w-3.5 text-purple-400" />
+                          )}
+                        </div>
+                        <span className="text-xs font-bold text-white truncate w-full">{provider.name}</span>
+                        <span className="text-[10px] text-neutral-400 truncate w-full">{provider.domain}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Scan Source Input & Test Link Helper */}
+                {selectedScanProvider !== "none" && (
+                  <div className="space-y-2 pt-1">
+                    <div className="flex items-center justify-between text-xs">
+                      <Label className="text-xs font-medium text-neutral-300">
+                        Scan Source URL:
+                      </Label>
+                      {selectedComic && selectedScanProvider !== "custom" && (
+                        <div className="flex items-center gap-2 text-[11px]">
+                          {scanSourceUrl && (
+                            <a
+                              href={scanSourceUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-purple-400 hover:text-purple-300 flex items-center gap-1 font-medium hover:underline"
+                            >
+                              <span>Test Link</span>
+                              <ExternalLink className="h-3 w-3" />
+                            </a>
+                          )}
+                          <span className="text-neutral-600">•</span>
+                          <a
+                            href={
+                              WORKABLE_SCAN_PROVIDERS.find((p) => p.id === selectedScanProvider)?.getSearchUrl(
+                                selectedComic.title
+                              ) || "#"
+                            }
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-neutral-400 hover:text-white flex items-center gap-1 font-medium hover:underline"
+                          >
+                            <span>Search on Site</span>
+                            <ExternalLink className="h-3 w-3" />
+                          </a>
+                        </div>
+                      )}
+                    </div>
+
+                    <Input
+                      value={scanSourceUrl}
+                      onChange={(e) => setScanSourceUrl(e.target.value)}
+                      placeholder="e.g. https://asuracomic.net/series/solo-leveling"
+                      className="h-10 text-xs sm:text-sm bg-neutral-900/90 border-neutral-800 focus:border-purple-500 text-white placeholder:text-neutral-500 rounded-lg font-normal"
+                    />
+
+                    {/* Chapter Sync Options */}
+                    <div className="flex flex-wrap items-center justify-between gap-3 pt-1 text-xs">
+                      <label className="flex items-center gap-2 cursor-pointer text-neutral-300 select-none">
+                        <input
+                          type="checkbox"
+                          checked={autoSyncChapters}
+                          onChange={(e) => setAutoSyncChapters(e.target.checked)}
+                          className="rounded border-neutral-700 bg-neutral-900 text-purple-500 focus:ring-purple-500"
+                        />
+                        <span>Auto-sync chapters immediately upon import</span>
+                      </label>
+
+                      {autoSyncChapters && (
+                        <div className="flex items-center gap-2">
+                          <span className="text-[11px] text-neutral-400">Chapters to fetch:</span>
+                          <Select
+                            value={String(syncMaxChapters)}
+                            onValueChange={(v) => setSyncMaxChapters(Number(v))}
+                          >
+                            <SelectTrigger className="h-7 w-32 text-[11px] bg-neutral-900 border-neutral-800 text-neutral-200">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="20">Latest 20</SelectItem>
+                              <SelectItem value="50">First 50 (Std)</SelectItem>
+                              <SelectItem value="150">All Available</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 

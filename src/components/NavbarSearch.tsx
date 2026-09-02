@@ -178,8 +178,17 @@ export function NavbarSearch({ open, onOpenChange }: NavbarSearchProps) {
               <input
                 value={searchQuery}
                 onChange={(event) => setSearchQuery(event.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    const q = searchQuery.trim();
+                    if (!q) return;
+                    onOpenChange(false);
+                    navigate({ to: "/browse", search: { search: q } });
+                  }
+                }}
                 autoFocus
-                placeholder="Search manga by title, author or synopsis..."
+                placeholder="Search manga by title, author or synopsis (Press Enter to Browse)..."
                 className="h-10 min-w-0 flex-1 bg-transparent font-sans text-sm font-normal tracking-normal text-white outline-none placeholder:text-neutral-500 placeholder:opacity-100"
               />
               {searching && <Loader2 className="h-4 w-4 animate-spin text-neutral-400" />}
