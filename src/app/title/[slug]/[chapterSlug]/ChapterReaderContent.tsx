@@ -7,6 +7,8 @@ import { useEffect, useState, useRef, useMemo, type ReactNode } from "react";
 import {
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
+  ChevronUp,
   ArrowLeft,
   BookOpen,
   Home,
@@ -2187,19 +2189,17 @@ function MemeGridItem({
   );
 }
 
-function MemePickerModal({
-  open,
-  onClose,
+function InlineMemePicker({
   onSelectMeme,
+  onClose,
+  compact = false,
 }: {
-  open: boolean;
-  onClose: () => void;
   onSelectMeme: (meme: MemeSticker) => void;
+  onClose?: () => void;
+  compact?: boolean;
 }) {
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
-
-  if (!open) return null;
 
   const filteredMemes = POPULAR_MEME_STICKERS.filter((meme) => {
     const matchesCategory = selectedCategory === "all" || meme.category === selectedCategory;
@@ -2212,83 +2212,64 @@ function MemePickerModal({
   });
 
   return (
-    <div 
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200"
-      onClick={onClose}
-    >
-      <div 
-        className="w-full max-w-xl rounded-2xl border border-border/60 bg-card p-5 shadow-2xl overflow-hidden flex flex-col max-h-[85vh] animate-in zoom-in-95 duration-200"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between pb-3 border-b border-border/40">
-          <div className="flex items-center gap-2.5">
-            <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-amber-500/20 to-purple-500/20 border border-amber-500/30 flex items-center justify-center text-xl shrink-0">
-              🔥
-            </div>
-            <div>
-              <h3 className="font-bold text-base text-foreground flex items-center gap-1.5">
-                <span>Anime Memes & Reaction Stickers</span>
-                <span className="text-[10px] bg-primary/20 text-primary font-bold px-1.5 py-0.5 rounded-full">
-                  {POPULAR_MEME_STICKERS.length}+
-                </span>
-              </h3>
-              <p className="text-xs text-muted-foreground">Click any meme to attach directly to the comments</p>
-            </div>
-          </div>
-          <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full" onClick={onClose}>
-            <X className="h-4 w-4" />
-          </Button>
-        </div>
-
-        {/* Search */}
-        <div className="py-3">
+    <div className="mt-3 rounded-xl border border-border/60 bg-card/95 p-3.5 shadow-lg animate-in fade-in slide-in-from-top-2 duration-200">
+      {/* Header & Search */}
+      <div className="flex items-center gap-2 mb-2.5">
+        <div className="relative flex-1">
           <input
             type="text"
-            placeholder="Search memes (e.g. Peak, Cinema, Gojo, Aura, Guts, Anya)..."
+            placeholder="Search memes & reaction stickers (Peak, Cinema, Gojo, Anya)..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full h-9 rounded-lg border border-border/50 bg-background/70 px-3 text-xs focus:outline-none focus:ring-1 focus:ring-primary"
-            autoFocus
+            className="w-full h-8 rounded-lg border border-border/60 bg-background/80 px-3 text-xs focus:outline-none focus:ring-1 focus:ring-primary text-foreground placeholder:text-muted-foreground"
           />
         </div>
-
-        {/* Categories */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-3 scrollbar-none border-b border-border/30">
-          {MEME_CATEGORIES.map((cat) => (
-            <button
-              key={cat.id}
-              onClick={() => setSelectedCategory(cat.id)}
-              className={`shrink-0 px-2.5 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer ${
-                selectedCategory === cat.id
-                  ? "bg-primary text-primary-foreground shadow-sm shadow-primary/20 scale-105"
-                  : "bg-secondary/60 text-muted-foreground hover:bg-secondary hover:text-foreground"
-              }`}
-            >
-              {cat.label}
-            </button>
-          ))}
-        </div>
-
-        {/* Meme Grid */}
-        <div className="grid grid-cols-3 sm:grid-cols-4 gap-2.5 overflow-y-auto py-4 flex-1 pr-1">
-          {filteredMemes.map((meme) => (
-            <MemeGridItem
-              key={meme.id}
-              meme={meme}
-              onSelect={() => {
-                onSelectMeme(meme);
-                onClose();
-              }}
-            />
-          ))}
-        </div>
-
-        <div className="pt-3 border-t border-border/30 flex items-center justify-between text-xs text-muted-foreground">
-          <span>Click any meme to attach instantly</span>
-          <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={onClose}>
-            Close
+        {onClose && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-8 px-2.5 text-xs text-muted-foreground hover:text-foreground shrink-0 cursor-pointer"
+            onClick={onClose}
+          >
+            <ChevronUp className="h-3.5 w-3.5 mr-1" />
+            Hide
           </Button>
-        </div>
+        )}
+      </div>
+
+      {/* Categories */}
+      <div className="flex items-center gap-1.5 overflow-x-auto pb-2 scrollbar-none border-b border-border/30 mb-2.5">
+        {MEME_CATEGORIES.map((cat) => (
+          <button
+            key={cat.id}
+            type="button"
+            onClick={() => setSelectedCategory(cat.id)}
+            className={`shrink-0 px-2.5 py-1 rounded-full text-[11px] font-semibold transition-all cursor-pointer ${
+              selectedCategory === cat.id
+                ? "bg-primary text-primary-foreground shadow-sm shadow-primary/20 scale-105"
+                : "bg-secondary/60 text-muted-foreground hover:bg-secondary hover:text-foreground"
+            }`}
+          >
+            {cat.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Meme Grid */}
+      <div className={`grid ${compact ? "grid-cols-3 sm:grid-cols-4 md:grid-cols-5" : "grid-cols-3 sm:grid-cols-4 md:grid-cols-6"} gap-2 max-h-60 overflow-y-auto pr-1`}>
+        {filteredMemes.map((meme) => (
+          <MemeGridItem
+            key={meme.id}
+            meme={meme}
+            onSelect={() => onSelectMeme(meme)}
+          />
+        ))}
+        {filteredMemes.length === 0 && (
+          <div className="col-span-full py-6 text-center text-xs text-muted-foreground">
+            No memes found for &ldquo;{searchQuery}&rdquo;
+          </div>
+        )}
       </div>
     </div>
   );
@@ -2299,8 +2280,6 @@ function ChapterLikeAndMemes({ chapterId, seriesId }: { chapterId: string; serie
   const { user } = useAuth();
   const qc = useQueryClient();
   const [likeBurst, setLikeBurst] = useState(false);
-  const [isFullMemeModalOpen, setIsFullMemeModalOpen] = useState(false);
-  const [pendingCommentMeme, setPendingCommentMeme] = useState<MemeSticker | null>(null);
 
   // Reaction types mapped to database check constraint values ('heart', 'thumbs_up', 'laugh', 'star', 'smile')
   const memeReactions = [
@@ -2388,15 +2367,6 @@ function ChapterLikeAndMemes({ chapterId, seriesId }: { chapterId: string; serie
   const isLiked = userReactionsQ.data?.includes("heart");
   const likeCount = reactionsQ.data?.["heart"] || 0;
 
-  const handleSelectMemeFromVault = (meme: MemeSticker) => {
-    setPendingCommentMeme(meme);
-    toast.success(`Attached "${meme.name}" meme to comment draft!`);
-    const el = document.getElementById("comments-section");
-    if (el) {
-      el.scrollIntoView({ behavior: "smooth", block: "start" });
-    }
-  };
-
   const scrollToComments = () => {
     const el = document.getElementById("comments-section");
     if (el) {
@@ -2406,13 +2376,6 @@ function ChapterLikeAndMemes({ chapterId, seriesId }: { chapterId: string; serie
 
   return (
     <div className="mt-12 mb-8 border-t border-border/50 pt-8">
-      {/* Meme / Sticker Modal Window (Opened on click) */}
-      <MemePickerModal
-        open={isFullMemeModalOpen}
-        onClose={() => setIsFullMemeModalOpen(false)}
-        onSelectMeme={(meme) => handleSelectMemeFromVault(meme)}
-      />
-
       {/* Primary Like Feature */}
       <div className="mb-8 rounded-2xl border border-border/50 bg-gradient-to-b from-card/80 via-card/40 to-background/80 p-6 sm:p-8 shadow-xl backdrop-blur-md text-center flex flex-col items-center justify-center relative overflow-hidden">
         {/* Glow effect */}
@@ -2507,41 +2470,11 @@ function ChapterLikeAndMemes({ chapterId, seriesId }: { chapterId: string; serie
         </div>
       </div>
 
-      {/* Sleek Meme & Sticker Window Feature Button (Opens Modal on Click) */}
-      <div className="mb-8 rounded-2xl border border-border/50 bg-gradient-to-r from-purple-950/25 via-card/80 to-amber-950/25 p-4 sm:p-5 shadow-lg backdrop-blur-md flex flex-col sm:flex-row items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-amber-500/20 to-purple-500/20 border border-amber-500/30 flex items-center justify-center text-xl shrink-0">
-            🔥
-          </div>
-          <div>
-            <h4 className="font-bold text-sm sm:text-base text-foreground flex items-center gap-2">
-              <span>Reaction Memes & Stickers</span>
-              <span className="text-[10px] bg-primary/20 text-primary font-bold px-2 py-0.5 rounded-full">
-                {POPULAR_MEME_STICKERS.length}+ Stickers
-              </span>
-            </h4>
-            <p className="text-xs text-muted-foreground">
-              Click to open the meme window and attach reaction stickers to the discussion
-            </p>
-          </div>
-        </div>
-
-        <Button
-          onClick={() => setIsFullMemeModalOpen(true)}
-          className="w-full sm:w-auto shrink-0 bg-gradient-to-r from-amber-500 via-orange-500 to-purple-600 hover:from-amber-600 hover:to-purple-700 text-white font-bold text-xs h-9 px-4 gap-2 shadow-lg shadow-purple-600/20 cursor-pointer"
-        >
-          <Sparkles className="h-3.5 w-3.5" />
-          <span>Open Memes & Stickers Window</span>
-        </Button>
-      </div>
-
       {/* Comments section */}
       <div id="comments-section">
         <ChapterComments 
           chapterId={chapterId} 
           seriesId={seriesId} 
-          pendingMeme={pendingCommentMeme}
-          onClearPendingMeme={() => setPendingCommentMeme(null)}
         />
       </div>
     </div>
@@ -2906,8 +2839,8 @@ function ChapterComments({
   const [revealedSpoilers, setRevealedSpoilers] = useState<Set<string>>(new Set());
   const contentRef = useRef<HTMLTextAreaElement | null>(null);
   const replyContentRef = useRef<HTMLTextAreaElement | null>(null);
-  const [isMemePickerOpen, setIsMemePickerOpen] = useState(false);
-  const [replyMemePickerOpen, setReplyMemePickerOpen] = useState(false);
+  const [showMemePicker, setShowMemePicker] = useState(false);
+  const [replyShowMemePicker, setReplyShowMemePicker] = useState(false);
 
   // Sync incoming meme from external Chapter Meme Vault
   useEffect(() => {
@@ -3641,12 +3574,21 @@ function ChapterComments({
                     type="button"
                     variant="outline"
                     size="sm"
-                    className="h-7 gap-1 bg-primary/10 border-primary/30 hover:bg-primary/20 text-primary transition-colors text-[10px] font-semibold cursor-pointer"
+                    className={`h-7 gap-1 text-[10px] font-semibold transition-colors cursor-pointer ${
+                      replyShowMemePicker
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : "bg-primary/10 border-primary/30 hover:bg-primary/20 text-primary"
+                    }`}
                     disabled={!user}
-                    onClick={() => setReplyMemePickerOpen(true)}
+                    onClick={() => setReplyShowMemePicker((prev) => !prev)}
                   >
-                    <Flame className="h-3 w-3 text-primary" />
-                    <span>Memes</span>
+                    <Flame className="h-3 w-3" />
+                    <span>{replyShowMemePicker ? "Hide Memes" : "Show Memes"}</span>
+                    {replyShowMemePicker ? (
+                      <ChevronUp className="h-3 w-3" />
+                    ) : (
+                      <ChevronDown className="h-3 w-3" />
+                    )}
                   </Button>
 
                   <Button
@@ -3719,6 +3661,20 @@ function ChapterComments({
                   </div>
                 </div>
               </div>
+
+              {/* Inline Reply Meme Picker */}
+              {replyShowMemePicker && (
+                <InlineMemePicker
+                  compact
+                  onSelectMeme={(meme) => {
+                    setReplyAttachmentType(meme.url.endsWith(".gif") ? "gif" : "image");
+                    setReplyAttachmentUrl(meme.url);
+                    setReplyAttachmentAlt(meme.name);
+                    toast.success(`Attached "${meme.name}" meme sticker`);
+                  }}
+                  onClose={() => setReplyShowMemePicker(false)}
+                />
+              )}
             </div>
           )}
         </div>
@@ -3736,28 +3692,6 @@ function ChapterComments({
 
   return (
     <section className="rounded-2xl border border-border/40 bg-background/35 backdrop-blur-md p-5 sm:p-6 shadow-xl relative overflow-hidden">
-      {/* Meme Modals */}
-      <MemePickerModal
-        open={isMemePickerOpen}
-        onClose={() => setIsMemePickerOpen(false)}
-        onSelectMeme={(meme) => {
-          setAttachmentType(meme.url.endsWith(".gif") ? "gif" : "image");
-          setAttachmentUrl(meme.url);
-          setAttachmentAlt(meme.name);
-          toast.success(`Attached "${meme.name}" meme sticker`);
-        }}
-      />
-
-      <MemePickerModal
-        open={replyMemePickerOpen}
-        onClose={() => setReplyMemePickerOpen(false)}
-        onSelectMeme={(meme) => {
-          setReplyAttachmentType(meme.url.endsWith(".gif") ? "gif" : "image");
-          setReplyAttachmentUrl(meme.url);
-          setReplyAttachmentAlt(meme.name);
-          toast.success(`Attached "${meme.name}" meme sticker`);
-        }}
-      />
 
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3 relative z-10">
         <div>
@@ -3845,12 +3779,21 @@ function ChapterComments({
               type="button"
               variant="outline"
               size="sm"
-              className="h-8 gap-1.5 bg-primary/10 border-primary/30 hover:bg-primary/20 text-primary transition-colors text-xs font-semibold cursor-pointer"
+              className={`h-8 gap-1.5 transition-colors text-xs font-semibold cursor-pointer ${
+                showMemePicker
+                  ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                  : "bg-primary/10 border-primary/30 hover:bg-primary/20 text-primary"
+              }`}
               disabled={!user}
-              onClick={() => setIsMemePickerOpen(true)}
+              onClick={() => setShowMemePicker((prev) => !prev)}
             >
-              <Flame className="h-3.5 w-3.5 text-primary" />
-              <span>Memes & Stickers</span>
+              <Flame className="h-3.5 w-3.5" />
+              <span>{showMemePicker ? "Hide Memes & Stickers" : "Show Memes & Stickers"}</span>
+              {showMemePicker ? (
+                <ChevronUp className="h-3.5 w-3.5" />
+              ) : (
+                <ChevronDown className="h-3.5 w-3.5" />
+              )}
             </Button>
 
             <Button
@@ -3919,6 +3862,19 @@ function ChapterComments({
             </Button>
           </div>
         </div>
+
+        {/* Inline Meme Picker */}
+        {showMemePicker && (
+          <InlineMemePicker
+            onSelectMeme={(meme) => {
+              setAttachmentType(meme.url.endsWith(".gif") ? "gif" : "image");
+              setAttachmentUrl(meme.url);
+              setAttachmentAlt(meme.name);
+              toast.success(`Attached "${meme.name}" meme sticker`);
+            }}
+            onClose={() => setShowMemePicker(false)}
+          />
+        )}
       </div>
 
       {commentsQ.isLoading ? (
