@@ -132,18 +132,22 @@ export function useAuth() {
 /* ------------------------------------------------------------------ */
 
 export function useIsAdmin() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [isAdmin, setIsAdmin] = useState(false);
   const [isMod, setIsMod] = useState(false);
   const [isUploader, setIsUploader] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (authLoading) return;
     if (!user) {
       setIsAdmin(false);
       setIsMod(false);
       setIsUploader(false);
+      setLoading(false);
       return;
     }
+    setLoading(true);
     supabase
       .from("user_roles")
       .select("role")
@@ -151,14 +155,16 @@ export function useIsAdmin() {
       .then(({ data, error }) => {
         if (error) {
           console.error("useIsAdmin roles fetch error:", error);
+          setLoading(false);
           return;
         }
         const roles = (data ?? []).map((r) => r.role);
         setIsAdmin(roles.includes("admin"));
         setIsMod(roles.includes("moderator"));
         setIsUploader(roles.includes("uploader"));
+        setLoading(false);
       });
-  }, [user]);
+  }, [user, authLoading]);
 
-  return { isAdmin, isMod, isUploader, user };
+  return { isAdmin, isMod, isUploader, user, loading };
 }

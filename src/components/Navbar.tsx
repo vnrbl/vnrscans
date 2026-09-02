@@ -241,11 +241,11 @@ export function Navbar() {
 
                     {isAdmin && (
                       <Link
-                        to="/admin/security"
+                        to="/security"
                         onClick={() => setMenuDrawerOpen(false)}
-                        className="flex items-center gap-4 w-full px-3 py-2.5 rounded-xl text-sm font-semibold text-emerald-400 hover:text-emerald-300 hover:bg-emerald-950/40 border border-emerald-500/20 transition-all duration-200"
+                        className="flex items-center gap-4 w-full px-3.5 py-2.5 rounded-xl text-sm font-bold text-emerald-400 hover:text-emerald-300 hover:bg-emerald-950/60 border border-emerald-500/30 bg-emerald-950/20 shadow-md transition-all duration-200"
                       >
-                        <ShieldAlert className="h-5 w-5 text-emerald-400 stroke-[2]" />
+                        <ShieldAlert className="h-5 w-5 text-emerald-400 stroke-[2.2]" />
                         <div className="flex items-center justify-between flex-1">
                           <span>Cyber Security SOC</span>
                           <span className="flex h-2 w-2 relative">

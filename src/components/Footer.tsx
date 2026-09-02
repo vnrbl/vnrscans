@@ -139,28 +139,25 @@ export function Footer() {
         </div>
       </div>
 
-      {/* Bottom disclaimer */}
-      <div className="border-t border-border/20 bg-secondary/5 py-6">
+      {/* Bottom disclaimer & Status Pill */}
+      <div className="border-t border-border/20 bg-background/60 py-6">
         <div className="container mx-auto px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16 flex flex-col sm:flex-row items-center justify-between gap-4 text-center sm:text-left">
-          <p className="text-3xs text-muted-foreground/80 leading-normal max-w-xl">
-            Copyright {new Date().getFullYear()} vnrscans. All rights reserved. vnrscans does not store any files on its servers. We only link to media hosted on third-party services. If you have copyright concerns, please visit our DMCA registry page.
+          <p className="text-xs text-muted-foreground/90 font-normal leading-relaxed max-w-2xl">
+            Copyright © {new Date().getFullYear()} <strong className="text-foreground font-semibold">vnrscans</strong>. All rights reserved. vnrscans does not store any files on its servers. We only link to media hosted on third-party services. If you have copyright concerns, please visit our DMCA registry page.
           </p>
-          <div className="flex items-center gap-3 text-3xs text-muted-foreground/50">
+          <div className="flex items-center shrink-0">
             <a
               href="https://status.vnrscans.com/"
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-block transition-transform hover:scale-102"
+              className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-emerald-500/40 bg-emerald-950/30 hover:bg-emerald-950/60 text-emerald-400 hover:text-emerald-300 transition-all text-xs font-mono font-semibold shadow-sm group cursor-pointer"
             >
-              <iframe
-                src="https://status.vnrscans.com/badge?theme=dark"
-                width="250"
-                height="30"
-                frameBorder="0"
-                scrolling="no"
-                style={{ colorScheme: "normal", border: "none" }}
-                title="VNR Scans System Status"
-              />
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+              </span>
+              <span>All Systems Operational</span>
+              <ExternalLink className="h-3 w-3 text-emerald-400/70 group-hover:text-emerald-300 transition-colors" />
             </a>
           </div>
         </div>

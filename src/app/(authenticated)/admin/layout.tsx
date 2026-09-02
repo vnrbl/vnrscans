@@ -107,7 +107,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   const items = [
     { to: "/admin", label: "Dashboard", icon: LayoutDashboard, exact: true, roles: ["admin", "moderator", "uploader"] },
-    { to: "/admin/security", label: "Cyber Security SOC", icon: ShieldCheck, roles: ["admin"] },
     { to: "/admin/analytics", label: "Analytics", icon: TrendingUp, roles: ["admin"] },
     { to: "/admin/scrape-terminal", label: "Scrape Terminal", icon: TerminalSquare, roles: ["admin", "moderator", "uploader"] },
     { to: "/admin/site-import", label: "Site Import", icon: Globe2, roles: ["admin"] },
