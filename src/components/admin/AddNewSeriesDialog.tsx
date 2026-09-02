@@ -84,8 +84,6 @@ export function AddNewSeriesDialog({ trigger }: AddNewSeriesDialogProps) {
   const [description, setDescription] = useState("");
   const [coverUrl, setCoverUrl] = useState("");
 
-  if (!canCreate) return null;
-
   // Search Comick for official metadata
   const handleSearchComick = async () => {
     const q = comickSearch.trim();
@@ -279,6 +277,8 @@ export function AddNewSeriesDialog({ trigger }: AddNewSeriesDialogProps) {
       toast.error(err.message || "Failed to create series");
     },
   });
+
+  if (!canCreate) return null;
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>

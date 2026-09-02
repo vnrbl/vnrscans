@@ -1020,35 +1020,49 @@ function ReadingProgressWidget({
 
 function SeriesLeaderboardWidget({ seriesId }: { seriesId: string }) {
   const leaderboardQ = useQuery({
-    queryKey: ["series-leaderboard", seriesId],
+    queryKey: ["series-leaderboard-safe", seriesId],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("reading_history")
-        .select("user_id, profiles(username, avatar_url, experience_points)")
-        .eq("series_id", seriesId)
-        .limit(50);
+      try {
+        const { data: historyData, error: historyErr } = await supabase
+          .from("reading_history")
+          .select("user_id")
+          .eq("series_id", seriesId)
+          .limit(100);
 
-      if (error) throw error;
+        if (historyErr || !historyData || historyData.length === 0) return [];
 
-      const userCounts = new Map<string, { count: number; profile: any }>();
-      (data || []).forEach((row: any) => {
-        if (row.user_id && row.profiles) {
-          const current = userCounts.get(row.user_id) || { count: 0, profile: row.profiles };
-          current.count += 1;
-          userCounts.set(row.user_id, current);
-        }
-      });
+        const userCounts = new Map<string, number>();
+        historyData.forEach((row: any) => {
+          if (row.user_id) {
+            userCounts.set(row.user_id, (userCounts.get(row.user_id) || 0) + 1);
+          }
+        });
 
-      return Array.from(userCounts.values())
-        .sort((a, b) => b.count - a.count || (b.profile?.experience_points || 0) - (a.profile?.experience_points || 0))
-        .slice(0, 3)
-        .map((item) => ({
-          username: item.profile?.username,
-          avatar_url: item.profile?.avatar_url,
-          experience_points: item.profile?.experience_points,
-          chapters_read: item.count,
-        }));
+        const userIds = Array.from(userCounts.keys()).slice(0, 10);
+        if (userIds.length === 0) return [];
+
+        const { data: profiles, error: profErr } = await supabase
+          .from("profiles")
+          .select("user_id, username, avatar_url, experience_points")
+          .in("user_id", userIds);
+
+        if (profErr || !profiles) return [];
+
+        return profiles
+          .map((p: any) => ({
+            username: p.username,
+            avatar_url: p.avatar_url,
+            experience_points: p.experience_points,
+            chapters_read: userCounts.get(p.user_id) || 1,
+          }))
+          .sort((a, b) => b.chapters_read - a.chapters_read || (b.experience_points || 0) - (a.experience_points || 0))
+          .slice(0, 3);
+      } catch (err) {
+        console.warn("[LeaderboardWidget] Error:", err);
+        return [];
+      }
     },
+    enabled: !!seriesId,
     staleTime: 1000 * 60 * 5,
   });
 
@@ -1115,11 +1129,11 @@ const RecommendationsSection = React.memo(function RecommendationsSection({
   const currentType = currentSeries?.type;
 
   const currentGenres: string[] = (currentSeries?.series_genres || [])
-    .map((sg: any) => sg.genre?.slug?.toLowerCase() || sg.genre?.name?.toLowerCase())
+    .map((sg: any) => sg?.genre?.slug?.toLowerCase() || sg?.genre?.name?.toLowerCase() || (typeof sg === "string" ? sg.toLowerCase() : null))
     .filter(Boolean);
 
   const currentTags: string[] = (currentSeries?.series_tags || [])
-    .map((st: any) => st.tag?.slug?.toLowerCase() || st.tag?.name?.toLowerCase())
+    .map((st: any) => st?.tag?.slug?.toLowerCase() || st?.tag?.name?.toLowerCase() || (typeof st === "string" ? st.toLowerCase() : null))
     .filter(Boolean);
 
   const sourceText = `${currentSeries?.title || ""} ${currentSeries?.description || ""}`.toLowerCase();
@@ -1128,62 +1142,70 @@ const RecommendationsSection = React.memo(function RecommendationsSection({
   const recommendations = useQuery({
     queryKey: ["recommendations-strict-grid", currentSeriesId],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("series")
-        .select(
-          "id,slug,title,cover_url,type,description,rating_average,status,series_genres(genre:genres(name,slug)),series_tags(tag:tags(name,slug))"
-        )
-        .neq("id", currentSeriesId)
-        .eq("is_hidden", false)
-        .order("rating_average", { ascending: false })
-        .limit(100);
+      try {
+        const { data, error } = await supabase
+          .from("series")
+          .select(
+            "id,slug,title,cover_url,type,description,rating_average,status,series_genres(genre:genres(name,slug)),series_tags(tag:tags(name,slug))"
+          )
+          .neq("id", currentSeriesId)
+          .eq("is_hidden", false)
+          .order("rating_average", { ascending: false })
+          .limit(100);
 
-      if (error) throw error;
+        if (error) {
+          console.warn("[Recommendations] Fetch error:", error);
+          return [];
+        }
 
-      const scored = (data || []).map((candidate: any) => {
-        const candGenres: string[] = (candidate.series_genres || [])
-          .map((sg: any) => sg.genre?.slug?.toLowerCase() || sg.genre?.name?.toLowerCase())
-          .filter(Boolean);
+        const scored = (data || []).map((candidate: any) => {
+          const candGenres: string[] = (candidate?.series_genres || [])
+            .map((sg: any) => sg?.genre?.slug?.toLowerCase() || sg?.genre?.name?.toLowerCase())
+            .filter(Boolean);
 
-        const candTags: string[] = (candidate.series_tags || [])
-          .map((st: any) => st.tag?.slug?.toLowerCase() || st.tag?.name?.toLowerCase())
-          .filter(Boolean);
+          const candTags: string[] = (candidate?.series_tags || [])
+            .map((st: any) => st?.tag?.slug?.toLowerCase() || st?.tag?.name?.toLowerCase())
+            .filter(Boolean);
 
-        const candText = `${candidate.title || ""} ${candidate.description || ""}`.toLowerCase();
+          const candText = `${candidate?.title || ""} ${candidate?.description || ""}`.toLowerCase();
 
-        // 1. Common Genres overlap
-        const commonGenres = candGenres.filter((g) => currentGenres.includes(g));
+          // 1. Common Genres overlap
+          const commonGenres = candGenres.filter((g) => currentGenres.includes(g));
 
-        // 2. Common Tags overlap
-        const commonTags = candTags.filter((t) => currentTags.includes(t));
+          // 2. Common Tags overlap
+          const commonTags = candTags.filter((t) => currentTags.includes(t));
 
-        // 3. Shared Story Tropes & Plot Style
-        const sharedTropes = sourceTropes.filter((trope) => candText.includes(trope));
+          // 3. Shared Story Tropes & Plot Style
+          const sharedTropes = sourceTropes.filter((trope) => candText.includes(trope));
 
-        // 4. Format / Type Match
-        const formatMatch = candidate.type === currentType;
+          // 4. Format / Type Match
+          const formatMatch = candidate?.type === currentType;
 
-        // Scoring Formula
-        let score = 0;
-        score += commonGenres.length * 20;
-        score += commonTags.length * 25;
-        score += sharedTropes.length * 20;
-        if (formatMatch) score += 15;
+          // Scoring Formula
+          let score = 0;
+          score += commonGenres.length * 20;
+          score += commonTags.length * 25;
+          score += sharedTropes.length * 20;
+          if (formatMatch) score += 15;
 
-        const totalSharedSignals = commonGenres.length + commonTags.length + sharedTropes.length;
+          const totalSharedSignals = commonGenres.length + commonTags.length + sharedTropes.length;
 
-        return {
-          ...candidate,
-          score,
-          commonCount: totalSharedSignals,
-        };
-      });
+          return {
+            ...candidate,
+            score,
+            commonCount: totalSharedSignals,
+          };
+        });
 
-      // Strict filter: Must match at least 2 story signals (genres/tags/plot tropes) AND score >= 35
-      return scored
-        .filter((item) => item.score >= 35 && item.commonCount >= 2)
-        .sort((a, b) => b.score - a.score || Number(b.rating_average || 0) - Number(a.rating_average || 0))
-        .slice(0, 14); // Exactly 14 items (2 full rows of 7 in grid)
+        // Strict filter: Must match at least 2 story signals (genres/tags/plot tropes) AND score >= 35
+        return scored
+          .filter((item) => item.score >= 35 && item.commonCount >= 2)
+          .sort((a, b) => b.score - a.score || Number(b.rating_average || 0) - Number(a.rating_average || 0))
+          .slice(0, 14); // Exactly 14 items (2 full rows of 7 in grid)
+      } catch (err) {
+        console.warn("[Recommendations] Query catch:", err);
+        return [];
+      }
     },
     enabled: !!currentSeriesId,
     staleTime: 1000 * 60 * 10,

@@ -85,17 +85,25 @@ export function SeriesReviewsSection({
   const reviewsQ = useQuery({
     queryKey: ["series-reviews", seriesId],
     queryFn: async () => {
-      const { data, error } = await (supabase.from("comments") as any)
-        .select(
-          "id,user_id,series_id,chapter_id,parent_id,content,attachment_type,attachment_url,attachment_alt,is_hidden,is_spoiler,is_pinned,created_at,updated_at"
-        )
-        .eq("series_id", seriesId)
-        .is("chapter_id", null)
-        .order("is_pinned", { ascending: false })
-        .order("created_at", { ascending: false });
+      try {
+        const { data, error } = await (supabase.from("comments") as any)
+          .select(
+            "id,user_id,series_id,chapter_id,parent_id,content,attachment_type,attachment_url,attachment_alt,is_hidden,is_spoiler,is_pinned,created_at,updated_at"
+          )
+          .eq("series_id", seriesId)
+          .is("chapter_id", null)
+          .order("is_pinned", { ascending: false })
+          .order("created_at", { ascending: false });
 
-      if (error) throw error;
-      return (data || []) as any[];
+        if (error) {
+          console.warn("[SeriesReviews] Fetch error:", error);
+          return [];
+        }
+        return (data || []) as any[];
+      } catch (err) {
+        console.warn("[SeriesReviews] Query catch:", err);
+        return [];
+      }
     },
     enabled: !!seriesId,
     staleTime: 1000 * 30,
@@ -110,31 +118,35 @@ export function SeriesReviewsSection({
     queryKey: ["series-review-profiles", userIds.join(",")],
     queryFn: async () => {
       if (userIds.length === 0) return new Map<string, any>();
-      const [profilesRes, rolesRes, userRatingsRes] = await Promise.all([
-        supabase
-          .from("profiles")
-          .select("user_id,username,avatar_url,avatar_frame,accent_color,user_level,is_vip")
-          .in("user_id", userIds),
-        supabase.from("user_roles").select("user_id,role").in("user_id", userIds),
-        supabase
-          .from("ratings")
-          .select("user_id,rating")
-          .eq("series_id", seriesId)
-          .in("user_id", userIds),
-      ]);
+      try {
+        const [profilesRes, rolesRes, userRatingsRes] = await Promise.all([
+          supabase
+            .from("profiles")
+            .select("user_id,username,avatar_url,avatar_frame,accent_color,user_level,is_vip")
+            .in("user_id", userIds),
+          supabase.from("user_roles").select("user_id,role").in("user_id", userIds),
+          supabase
+            .from("ratings")
+            .select("user_id,rating")
+            .eq("series_id", seriesId)
+            .in("user_id", userIds),
+        ]);
 
-      const map = new Map<string, any>();
-      (profilesRes.data || []).forEach((p: any) => {
-        map.set(p.user_id, {
-          ...p,
-          roles: (rolesRes.data || [])
-            .filter((r: any) => r.user_id === p.user_id)
-            .map((r: any) => r.role),
-          userRating: (userRatingsRes.data || []).find((r: any) => r.user_id === p.user_id)
-            ?.rating,
+        const map = new Map<string, any>();
+        (profilesRes.data || []).forEach((p: any) => {
+          map.set(p.user_id, {
+            ...p,
+            roles: (rolesRes.data || [])
+              .filter((r: any) => r.user_id === p.user_id)
+              .map((r: any) => r.role),
+            userRating: (userRatingsRes.data || []).find((r: any) => r.user_id === p.user_id)
+              ?.rating,
+          });
         });
-      });
-      return map;
+        return map;
+      } catch {
+        return new Map<string, any>();
+      }
     },
     enabled: userIds.length > 0,
     staleTime: 1000 * 60 * 2,
@@ -148,26 +160,32 @@ export function SeriesReviewsSection({
       if (reviewIds.length === 0)
         return { counts: new Map<string, Record<string, number>>(), mine: new Set<string>() };
 
-      const { data, error } = await (supabase.from("comment_reactions") as any)
-        .select("comment_id,user_id,reaction_type")
-        .in("comment_id", reviewIds);
+      try {
+        const { data, error } = await (supabase.from("comment_reactions") as any)
+          .select("comment_id,user_id,reaction_type")
+          .in("comment_id", reviewIds);
 
-      if (error) throw error;
-
-      const counts = new Map<string, Record<string, number>>();
-      const mine = new Set<string>();
-
-      (data || []).forEach((row: any) => {
-        const bucket = counts.get(row.comment_id) || {};
-        bucket[row.reaction_type] = (bucket[row.reaction_type] || 0) + 1;
-        counts.set(row.comment_id, bucket);
-
-        if (user && row.user_id === user.id) {
-          mine.add(`${row.comment_id}:${row.reaction_type}`);
+        if (error) {
+          return { counts: new Map<string, Record<string, number>>(), mine: new Set<string>() };
         }
-      });
 
-      return { counts, mine };
+        const counts = new Map<string, Record<string, number>>();
+        const mine = new Set<string>();
+
+        (data || []).forEach((row: any) => {
+          const bucket = counts.get(row.comment_id) || {};
+          bucket[row.reaction_type] = (bucket[row.reaction_type] || 0) + 1;
+          counts.set(row.comment_id, bucket);
+
+          if (user && row.user_id === user.id) {
+            mine.add(`${row.comment_id}:${row.reaction_type}`);
+          }
+        });
+
+        return { counts, mine };
+      } catch {
+        return { counts: new Map<string, Record<string, number>>(), mine: new Set<string>() };
+      }
     },
     enabled: reviewIds.length > 0,
     staleTime: 1000 * 20,

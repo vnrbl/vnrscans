@@ -75,12 +75,19 @@ function HomeContent({ initialData }: { initialData?: HomeInitialData }) {
   const { user } = useAuth();
   const { settings } = useReaderSettings();
   
-  // Hidden sections state (stored in localStorage)
-  const [hiddenSections, setHiddenSections] = React.useState<Set<string>>(() => {
-    if (typeof window === "undefined") return new Set();
-    const saved = window.localStorage.getItem('hiddenHomeSections');
-    return saved ? new Set(JSON.parse(saved)) : new Set();
-  });
+  // Hidden sections state (stored safely in localStorage)
+  const [hiddenSections, setHiddenSections] = React.useState<Set<string>>(new Set());
+
+  React.useEffect(() => {
+    try {
+      if (typeof window !== "undefined") {
+        const saved = window.localStorage.getItem('hiddenHomeSections');
+        if (saved) {
+          setHiddenSections(new Set(JSON.parse(saved)));
+        }
+      }
+    } catch {}
+  }, []);
 
   // Save hidden sections to localStorage
   const toggleSection = (sectionId: string) => {

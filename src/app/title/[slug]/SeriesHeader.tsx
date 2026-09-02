@@ -55,14 +55,15 @@ export const SeriesHeader = React.memo(function SeriesHeader({
 
   const { coreGenres, tropeTags } = React.useMemo(() => {
     const allMap = new Map<string, any>();
-    [...genres, ...tags].forEach((item) => {
-      if (item && (item.slug || item.id)) {
+    const safeList = [...(genres || []), ...(tags || [])];
+    safeList.forEach((item) => {
+      if (item && item.name && (item.slug || item.id)) {
         allMap.set(item.slug || item.id, item);
       }
     });
     const all = Array.from(allMap.values());
-    const core = all.filter((item) => CORE_GENRES_SET.has(item.name.toLowerCase().trim()));
-    const tropes = all.filter((item) => !CORE_GENRES_SET.has(item.name.toLowerCase().trim()));
+    const core = all.filter((item) => item?.name && CORE_GENRES_SET.has(String(item.name).toLowerCase().trim()));
+    const tropes = all.filter((item) => item?.name && !CORE_GENRES_SET.has(String(item.name).toLowerCase().trim()));
     return { coreGenres: core, tropeTags: tropes };
   }, [genres, tags, CORE_GENRES_SET]);
 
