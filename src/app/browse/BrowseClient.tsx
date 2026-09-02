@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/popover";
 import { Command, CommandGroup, CommandItem } from "@/components/ui/command";
 import { buildSeriesSearchOrFilter, prepareSearchInput, rankSeriesResults } from "@/lib/search-utils";
+import { AddNewSeriesDialog } from "@/components/admin/AddNewSeriesDialog";
 
 export type BrowseGenre = { id: string; name: string; slug: string };
 export type BrowseTag = { id: string; name: string; slug: string; color: string | null; icon: string | null };
@@ -340,12 +341,15 @@ function BrowsePageContent({ initialData }: { initialData?: BrowseInitialData })
     <div className="min-h-screen bg-background">
       <div className="container mx-auto px-4 py-6 sm:px-6 md:px-8 lg:px-12 xl:px-16">
         {/* Header */}
-        <div className="mb-6 sm:mb-8">
-          <div className="flex items-center gap-2.5">
-            <span className="h-2 w-2 rounded-full bg-purple-400 shadow-[0_0_8px_rgba(168,85,247,0.8)] animate-pulse" />
-            <h1 className="text-2xl sm:text-3xl font-bold uppercase tracking-[0.04em] text-white">Browse Manga</h1>
+        <div className="mb-6 sm:mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2.5">
+              <span className="h-2 w-2 rounded-full bg-purple-400 shadow-[0_0_8px_rgba(168,85,247,0.8)] animate-pulse" />
+              <h1 className="text-2xl sm:text-3xl font-bold uppercase tracking-[0.04em] text-white">Browse Catalog</h1>
+            </div>
+            <p className="mt-1.5 text-xs text-muted-foreground font-light">Explore indexed series by genre, tags, status, and community ratings</p>
           </div>
-          <p className="mt-1.5 text-xs text-muted-foreground font-light">Explore indexed series by genre, tags, status, and community ratings</p>
+          <AddNewSeriesDialog />
         </div>
 
         {/* Search Bar */}

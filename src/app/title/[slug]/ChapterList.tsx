@@ -27,6 +27,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { AddNewSeriesDialog } from "@/components/admin/AddNewSeriesDialog";
 import { XP_AMOUNTS } from "@/lib/xp";
 
 /* ------------------------------------------------------------------ */
@@ -249,9 +250,12 @@ export const ChapterList = React.memo(function ChapterList({
     <section id="chapters-section">
       <div className="mb-4 flex flex-col gap-4">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <h2 className="text-xl font-bold">
-            Chapters {uniqueChapterCount > 0 && <span className="text-muted-foreground">({uniqueChapterCount})</span>}
-          </h2>
+          <div className="flex items-center gap-3 flex-wrap">
+            <h2 className="text-xl font-bold">
+              Chapters {uniqueChapterCount > 0 && <span className="text-muted-foreground">({uniqueChapterCount})</span>}
+            </h2>
+            {canManage && <AddNewSeriesDialog />}
+          </div>
 
           <div className="grid grid-cols-1 gap-2 min-[420px]:grid-cols-2 sm:flex sm:flex-wrap">
             {scanlationGroups.data && scanlationGroups.data.length > 0 && (
