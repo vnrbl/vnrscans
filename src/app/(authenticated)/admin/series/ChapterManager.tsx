@@ -1240,15 +1240,21 @@ export default function ChapterManager({ seriesId, onBack }: { seriesId: string;
       let skippedExistingCount = 0;
 
       for (const chapter of selectedList) {
-        const existingChapter = await findExistingChapterByNumberAndGroup(
-          chapter.chapterNumber,
-          scanlation_group,
+        const num = Number(chapter.chapterNumber);
+        const existingInLocal = (chapters.data ?? []).some(
+          (c) => Number(c.chapter_number) === num,
         );
+        const existingChapter =
+          existingInLocal ||
+          (await findExistingChapterByNumberAndGroup(
+            chapter.chapterNumber,
+            scanlation_group,
+          ));
 
         if (existingChapter) {
           skippedExistingCount++;
           console.info(
-            `Skipped Chapter ${chapter.chapterNumber}: already exists for ${scanlationGroupLabel(scanlation_group)}.`,
+            `Skipped Chapter ${chapter.chapterNumber}: already exists in series.`,
           );
         } else {
           uploadableList.push(chapter);
@@ -1257,12 +1263,12 @@ export default function ChapterManager({ seriesId, onBack }: { seriesId: string;
 
       if (skippedExistingCount > 0) {
         toast.info(
-          `Skipped ${skippedExistingCount} existing chapter${skippedExistingCount !== 1 ? "s" : ""} for ${scanlationGroupLabel(scanlation_group)}.`,
+          `Skipped ${skippedExistingCount} existing chapter${skippedExistingCount !== 1 ? "s" : ""}.`,
         );
       }
 
       if (uploadableList.length === 0) {
-        toast.success("All selected chapters already exist for this group. Nothing was replaced.");
+        toast.success("All selected chapters already exist. Nothing was replaced.");
         return;
       }
 

@@ -395,24 +395,21 @@ export async function $runCloudScrape(args: {
 
   const activeRows = (existingRows ?? []).filter((ch: any) => !emptyChapterIds.includes(ch.id));
 
+  const existingChapterNumbers = new Set(
+    activeRows.map((chapter: any) => Number(chapter.chapter_number)),
+  );
   const existingKeys = new Set(
     activeRows.map((chapter: any) =>
       chapterScanKey(Number(chapter.chapter_number), chapter.scanlation_group),
     ),
   );
 
-  // IMPORTANT: We previously skipped any chapter whose number was <= the max
-  // already imported for this scanlation group. That was too aggressive — it
-  // silently dropped legitimate decimal chapters (12.5, 13.1), re-translations,
-  // and any chapter a site republished under an existing number. Exact
-  // duplicates are already handled by existingKeys below, so the <= max guard
-  // only caused new chapters to be missed. It has been removed.
-
   let exactDuplicateCount = 0;
   const seenKeys = new Set<string>();
   const missing = discovered.filter((chapter) => {
-    const key = chapterScanKey(chapter.chapterNumber, scanlationGroup);
-    if (existingKeys.has(key) || seenKeys.has(key)) {
+    const num = Number(chapter.chapterNumber);
+    const key = chapterScanKey(num, scanlationGroup);
+    if (existingChapterNumbers.has(num) || existingKeys.has(key) || seenKeys.has(key)) {
       exactDuplicateCount++;
       return false;
     }
@@ -656,21 +653,21 @@ export async function $syncImportSource(args: {
 
     const activeRows = (existingRows ?? []).filter((ch: any) => !emptyChapterIds.includes(ch.id));
 
+    const existingChapterNumbers = new Set(
+      activeRows.map((chapter: any) => Number(chapter.chapter_number)),
+    );
     const existingKeys = new Set(
       activeRows.map((chapter: any) =>
         chapterScanKey(Number(chapter.chapter_number), chapter.scanlation_group),
       ),
     );
 
-    // Note: the old "<= maxChapterNumber" guard was removed because it dropped
-    // legitimate decimal/re-published chapters. Exact duplicates are already
-    // covered by existingKeys. Sort newest-last so we import chronologically.
-    // Track already existing chapters in details
     const seenKeys = new Set<string>();
     const missing = discovered
       .filter((chapter) => {
-        const key = chapterScanKey(chapter.chapterNumber, scanlationGroup);
-        if (existingKeys.has(key) || seenKeys.has(key)) {
+        const num = Number(chapter.chapterNumber);
+        const key = chapterScanKey(num, scanlationGroup);
+        if (existingChapterNumbers.has(num) || existingKeys.has(key) || seenKeys.has(key)) {
           details.push({
             chapter: chapter.chapterNumber,
             status: "skipped",

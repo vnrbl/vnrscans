@@ -517,6 +517,9 @@ export async function $processNextSiteImportItem(args: {
 
       const sourcePreset = detectImportSource(item.source_url);
       const scanlationGroup = sourcePreset.scanlationGroup || "Asura Scans";
+      const existingChapterNumbers = new Set(
+        (existingChapters ?? []).map((chapter: any) => Number(chapter.chapter_number)),
+      );
       const existingKeys = new Set(
         (existingChapters ?? []).map(
           (chapter: { chapter_number: number; scanlation_group: string | null }) =>
@@ -524,7 +527,9 @@ export async function $processNextSiteImportItem(args: {
         ),
       );
       const missing = eligible.filter(
-        (chapter) => !existingKeys.has(chapterScanKey(chapter.chapterNumber, scanlationGroup)),
+        (chapter) =>
+          !existingChapterNumbers.has(Number(chapter.chapterNumber)) &&
+          !existingKeys.has(chapterScanKey(chapter.chapterNumber, scanlationGroup)),
       );
 
       if (missing.length === 0) {
