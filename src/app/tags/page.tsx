@@ -5,49 +5,41 @@ import { TagsClient, type TagsInitialData } from "./TagsClient";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Browse Manga, Manhwa & Manhua by Genre & Tags — vnrscans",
+  title: "Browse Manga, Manhwa & Manhua by Tags — vnrscans",
   description:
-    "Explore every manga, manhwa, and manhua genre and tag on vnrscans. Browse by story genre, theme, and descriptive keywords to discover your next series.",
+    "Explore every manga, manhwa, and manhua tag on vnrscans. Browse by theme and descriptive keywords to discover your next series.",
   keywords: [
-    "manga genres",
-    "manhwa genres",
-    "manhua tags",
-    "browse manga by genre",
     "manga tags",
-    "vnrscans genres",
+    "manhwa tags",
+    "manhua tags",
+    "browse manga by tag",
+    "vnrscans tags",
   ],
   alternates: {
     canonical: "/tags",
   },
   openGraph: {
-    title: "Browse Manga, Manhwa & Manhua by Genre & Tags — vnrscans",
+    title: "Browse Manga, Manhwa & Manhua by Tags — vnrscans",
     description:
-      "Explore every manga, manhwa, and manhua genre and tag on vnrscans to discover your next series.",
+      "Explore every manga, manhwa, and manhua tag on vnrscans to discover your next series.",
     url: "https://www.vnrscans.com/tags",
     type: "website",
   },
   twitter: {
     card: "summary",
-    title: "Genres & Tags — vnrscans",
+    title: "Tags — vnrscans",
     description:
-      "Explore every manga, manhwa, and manhua genre and tag on vnrscans.",
+      "Explore every manga, manhwa, and manhua tag on vnrscans.",
   },
 };
 
 async function fetchTagsData(): Promise<TagsInitialData> {
-  const [genresRes, tagsRes] = await Promise.all([
-    supabase
-      .from("genres")
-      .select("*, series_genres(count)")
-      .order("name"),
-    supabase
-      .from("tags")
-      .select("*")
-      .order("usage_count", { ascending: false }),
-  ]);
+  const tagsRes = await supabase
+    .from("tags")
+    .select("*")
+    .order("usage_count", { ascending: false });
 
   return {
-    genres: genresRes.data ?? [],
     tags: tagsRes.data ?? [],
   };
 }

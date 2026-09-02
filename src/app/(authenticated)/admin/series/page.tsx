@@ -21,6 +21,8 @@ import {
   RefreshCw,
   Power,
   Loader2,
+  LayoutList,
+  LayoutGrid,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { logAdminAction } from "@/lib/adminLog";
@@ -435,6 +437,7 @@ export default function AdminSeries() {
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [visibilityFilter, setVisibilityFilter] = useState<string>("all");
+  const [viewMode, setViewMode] = useState<"list" | "card">("list");
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 20;
 
@@ -803,129 +806,310 @@ export default function AdminSeries() {
             </Button>
           )}
 
-          <div className="ml-auto text-sm text-muted-foreground">
-            Showing {list.data?.series.length || 0} of {list.data?.totalCount || 0} titles
-            {list.data &&
-              list.data.totalPages > 1 &&
-              ` (Page ${currentPage} of ${list.data.totalPages})`}
+          <div className="ml-auto flex items-center gap-3">
+            <span className="text-sm text-muted-foreground">
+              Showing {list.data?.series.length || 0} of {list.data?.totalCount || 0} titles
+              {list.data &&
+                list.data.totalPages > 1 &&
+                ` (Page ${currentPage} of ${list.data.totalPages})`}
+            </span>
+            <div className="flex items-center rounded-lg border border-border/40 bg-card p-0.5">
+              <Button
+                variant={viewMode === "list" ? "default" : "ghost"}
+                size="icon"
+                className="h-7 w-7"
+                onClick={() => setViewMode("list")}
+                title="List view"
+              >
+                <LayoutList className="h-3.5 w-3.5" />
+              </Button>
+              <Button
+                variant={viewMode === "card" ? "default" : "ghost"}
+                size="icon"
+                className="h-7 w-7"
+                onClick={() => setViewMode("card")}
+                title="Card view"
+              >
+                <LayoutGrid className="h-3.5 w-3.5" />
+              </Button>
+            </div>
           </div>
         </div>
       </div>
 
-      <div className="mt-6 divide-y divide-border/40 rounded-lg border border-border/40 bg-card">
-        {list.isLoading && <div className="p-6 text-sm text-muted-foreground">Loading…</div>}
-        {list.data?.series.length === 0 && !list.isLoading && (
-          <div className="p-8 text-center text-muted-foreground">
-            {searchQuery ||
-            typeFilter !== "all" ||
-            statusFilter !== "all" ||
-            visibilityFilter !== "all"
-              ? "No titles match your filters"
-              : "No titles found"}
-          </div>
-        )}
-        {(list.data?.series || []).map((s: any) => (
-          <div key={s.id} className="flex items-center gap-3 p-3">
-            {s.cover_url ? (
-              <img src={s.cover_url} alt="" className="h-14 w-10 rounded object-cover" />
-            ) : (
-              <div className="h-14 w-10 rounded bg-secondary" />
-            )}
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2">
+      {list.isLoading && (
+        <div className="mt-6 rounded-lg border border-border/40 bg-card p-6 text-sm text-muted-foreground">Loading…</div>
+      )}
+      {list.data?.series.length === 0 && !list.isLoading && (
+        <div className="mt-6 rounded-lg border border-border/40 bg-card p-8 text-center text-muted-foreground">
+          {searchQuery ||
+          typeFilter !== "all" ||
+          statusFilter !== "all" ||
+          visibilityFilter !== "all"
+            ? "No titles match your filters"
+            : "No titles found"}
+        </div>
+      )}
+
+      {/* ═══ LIST VIEW ═══ */}
+      {viewMode === "list" && (list.data?.series || []).length > 0 && (
+        <div className="mt-6 divide-y divide-border/40 rounded-lg border border-border/40 bg-card">
+          {(list.data?.series || []).map((s: any) => (
+            <div key={s.id} className="flex items-center gap-3 p-3">
+              {s.cover_url ? (
+                <img src={s.cover_url} alt="" className="h-14 w-10 rounded object-cover" />
+              ) : (
+                <div className="h-14 w-10 rounded bg-secondary" />
+              )}
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => navigate({ to: "/admin/series-chapters/$seriesId", params: { seriesId: s.id } })}
+                    className="truncate text-left font-medium hover:text-primary cursor-pointer"
+                  >
+                    {s.title}
+                  </button>
+                  <Badge variant="outline" className="uppercase">
+                    {s.type}
+                  </Badge>
+                  {s.is_hidden && <Badge variant="secondary">Hidden</Badge>}
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  {s.status} · {contentRatingLabels[((s.content_rating ?? "safe") as ContentRating)]} ·{" "}
+                  {Number(s.rating_average || 0).toFixed(1)}★ · {s.view_count} views ·{" "}
+                  {s.chapter_count || 0} chapters
+                </div>
+                <div className="mt-1 flex flex-wrap gap-1">
+                  {((s.series_genres as any[]) ?? [])
+                    .map((sg) => sg.genre)
+                    .filter(Boolean)
+                    .slice(0, 4)
+                    .map((genre) => (
+                      <Badge key={genre.id} variant="secondary" className="px-1.5 py-0 text-[10px]">
+                        {genre.name}
+                      </Badge>
+                    ))}
+                  {((s.series_tags as any[]) ?? [])
+                    .map((st) => st.tag)
+                    .filter(Boolean)
+                    .slice(0, 4)
+                    .map((tag) => (
+                      <Badge
+                        key={tag.id}
+                        variant="outline"
+                        className="px-1.5 py-0 text-[10px]"
+                        style={tag.color ? { borderColor: tag.color, color: tag.color } : undefined}
+                      >
+                        {tag.icon && <span className="mr-1">{tag.icon}</span>}
+                        {tag.name}
+                      </Badge>
+                    ))}
+                </div>
+              </div>
+              <a
+                href={`/title/${s.slug}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                title="View on site"
+              >
+                <Button variant="ghost" size="icon">
+                  <ExternalLink className="h-4 w-4 text-blue-500" />
+                </Button>
+              </a>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => navigate({ to: "/admin/series-chapters/$seriesId", params: { seriesId: s.id } })}
+                title="Manage Chapters"
+              >
+                <Upload className="h-4 w-4 text-violet-600" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => {
+                  setEditingSeries(s);
+                  setForm(seriesToForm(s));
+                }}
+                title="Edit Title"
+              >
+                <Pencil className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => toggleHidden.mutate(s)}
+                title={s.is_hidden ? "Show" : "Hide"}
+              >
+                {s.is_hidden ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+              </Button>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="ghost" size="icon">
+                    <Trash2 className="h-4 w-4 text-destructive" />
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Delete "{s.title}"?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This also removes all chapters and pages. This cannot be undone.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={() => del.mutate(s.id)}>Delete</AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* ═══ CARD VIEW ═══ */}
+      {viewMode === "card" && (list.data?.series || []).length > 0 && (
+        <div className="mt-6 grid gap-4 grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+          {(list.data?.series || []).map((s: any) => (
+            <div
+              key={s.id}
+              className="group relative overflow-hidden rounded-xl border border-border/40 bg-card transition-all duration-200 hover:border-primary/40 hover:shadow-lg hover:shadow-primary/5"
+            >
+              {/* Cover image */}
+              <div className="relative aspect-[3/4] w-full overflow-hidden bg-secondary">
+                {s.cover_url ? (
+                  <img
+                    src={s.cover_url}
+                    alt={s.title}
+                    className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                  />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center text-muted-foreground">
+                    <Layers className="h-10 w-10 opacity-30" />
+                  </div>
+                )}
+                {/* Overlay badges */}
+                <div className="absolute top-2 left-2 flex flex-col gap-1">
+                  <Badge variant="outline" className="uppercase text-[10px] bg-black/60 text-white border-transparent backdrop-blur-sm">
+                    {s.type}
+                  </Badge>
+                  {s.is_hidden && (
+                    <Badge variant="secondary" className="text-[10px] bg-black/60 text-orange-300 border-transparent backdrop-blur-sm">
+                      Hidden
+                    </Badge>
+                  )}
+                </div>
+                {/* Hover action overlay */}
+                <div className="absolute inset-0 flex items-center justify-center gap-1.5 bg-black/60 opacity-0 transition-opacity duration-200 group-hover:opacity-100 backdrop-blur-[2px]">
+                  <a
+                    href={`/title/${s.slug}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title="View on site"
+                  >
+                    <Button variant="secondary" size="icon" className="h-8 w-8 rounded-full">
+                      <ExternalLink className="h-3.5 w-3.5" />
+                    </Button>
+                  </a>
+                  <Button
+                    variant="secondary"
+                    size="icon"
+                    className="h-8 w-8 rounded-full"
+                    onClick={() => navigate({ to: "/admin/series-chapters/$seriesId", params: { seriesId: s.id } })}
+                    title="Manage Chapters"
+                  >
+                    <Upload className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="icon"
+                    className="h-8 w-8 rounded-full"
+                    onClick={() => {
+                      setEditingSeries(s);
+                      setForm(seriesToForm(s));
+                    }}
+                    title="Edit Title"
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="icon"
+                    className="h-8 w-8 rounded-full"
+                    onClick={() => toggleHidden.mutate(s)}
+                    title={s.is_hidden ? "Show" : "Hide"}
+                  >
+                    {s.is_hidden ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
+                  </Button>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="destructive" size="icon" className="h-8 w-8 rounded-full">
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Delete "{s.title}"?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          This also removes all chapters and pages. This cannot be undone.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={() => del.mutate(s.id)}>Delete</AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </div>
+              </div>
+              {/* Card info */}
+              <div className="p-3">
                 <button
                   type="button"
                   onClick={() => navigate({ to: "/admin/series-chapters/$seriesId", params: { seriesId: s.id } })}
-                  className="truncate text-left font-medium hover:text-primary cursor-pointer"
+                  className="block w-full truncate text-left text-sm font-semibold hover:text-primary cursor-pointer transition-colors"
+                  title={s.title}
                 >
                   {s.title}
                 </button>
-                <Badge variant="outline" className="uppercase">
-                  {s.type}
-                </Badge>
-                {s.is_hidden && <Badge variant="secondary">Hidden</Badge>}
-              </div>
-              <div className="text-xs text-muted-foreground">
-                {s.status} · {contentRatingLabels[((s.content_rating ?? "safe") as ContentRating)]} ·{" "}
-                {Number(s.rating_average || 0).toFixed(1)}★ · {s.view_count} views ·{" "}
-                {s.chapter_count || 0} chapters
-              </div>
-              <div className="mt-1 flex flex-wrap gap-1">
-                {((s.series_genres as any[]) ?? [])
-                  .map((sg) => sg.genre)
-                  .filter(Boolean)
-                  .slice(0, 4)
-                  .map((genre) => (
-                    <Badge key={genre.id} variant="secondary" className="px-1.5 py-0 text-[10px]">
-                      {genre.name}
-                    </Badge>
-                  ))}
-                {((s.series_tags as any[]) ?? [])
-                  .map((st) => st.tag)
-                  .filter(Boolean)
-                  .slice(0, 4)
-                  .map((tag) => (
-                    <Badge
-                      key={tag.id}
-                      variant="outline"
-                      className="px-1.5 py-0 text-[10px]"
-                      style={tag.color ? { borderColor: tag.color, color: tag.color } : undefined}
-                    >
-                      {tag.icon && <span className="mr-1">{tag.icon}</span>}
-                      {tag.name}
-                    </Badge>
-                  ))}
+                <div className="mt-1 flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                  <span className="capitalize">{s.status}</span>
+                  <span>·</span>
+                  <span>{Number(s.rating_average || 0).toFixed(1)}★</span>
+                  <span>·</span>
+                  <span>{s.chapter_count || 0} ch</span>
+                </div>
+                <div className="mt-2 flex flex-wrap gap-1">
+                  {((s.series_genres as any[]) ?? [])
+                    .map((sg) => sg.genre)
+                    .filter(Boolean)
+                    .slice(0, 2)
+                    .map((genre) => (
+                      <Badge key={genre.id} variant="secondary" className="px-1.5 py-0 text-[9px]">
+                        {genre.name}
+                      </Badge>
+                    ))}
+                  {((s.series_tags as any[]) ?? [])
+                    .map((st) => st.tag)
+                    .filter(Boolean)
+                    .slice(0, 2)
+                    .map((tag) => (
+                      <Badge
+                        key={tag.id}
+                        variant="outline"
+                        className="px-1.5 py-0 text-[9px]"
+                        style={tag.color ? { borderColor: tag.color, color: tag.color } : undefined}
+                      >
+                        {tag.name}
+                      </Badge>
+                    ))}
+                </div>
               </div>
             </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => navigate({ to: "/admin/series-chapters/$seriesId", params: { seriesId: s.id } })}
-              title="Manage Chapters"
-            >
-              <Upload className="h-4 w-4 text-violet-600" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => {
-                setEditingSeries(s);
-                setForm(seriesToForm(s));
-              }}
-              title="Edit Title"
-            >
-              <Pencil className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => toggleHidden.mutate(s)}
-              title={s.is_hidden ? "Show" : "Hide"}
-            >
-              {s.is_hidden ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
-            </Button>
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button variant="ghost" size="icon">
-                  <Trash2 className="h-4 w-4 text-destructive" />
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Delete "{s.title}"?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    This also removes all chapters and pages. This cannot be undone.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction onClick={() => del.mutate(s.id)}>Delete</AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
 
       {/* Pagination Controls */}
       {list.data && list.data.totalPages > 1 && (

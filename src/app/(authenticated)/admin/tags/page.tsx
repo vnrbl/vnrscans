@@ -3,7 +3,7 @@
 import { Link, useNavigate } from "@/lib/router-compat";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { ArrowRight, Plus, Pencil, Trash2, Tag as TagIcon, Sparkles } from "lucide-react";
+import { Plus, Pencil, Trash2, Tag as TagIcon } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { logAdminAction } from "@/lib/adminLog";
@@ -27,10 +27,6 @@ type TagForm = {
   icon: string;
 };
 
-type GenreForm = {
-  name: string;
-};
-
 const emptyTagForm: TagForm = {
   name: "",
   description: "",
@@ -38,30 +34,11 @@ const emptyTagForm: TagForm = {
   icon: "",
 };
 
-const emptyGenreForm: GenreForm = {
-  name: "",
-};
-
 export default function AdminTags() {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [editingTag, setEditingTag] = useState<any | null>(null);
   const [form, setForm] = useState<TagForm>(emptyTagForm);
-  const [genreOpen, setGenreOpen] = useState(false);
-  const [editingGenre, setEditingGenre] = useState<any | null>(null);
-  const [genreForm, setGenreForm] = useState<GenreForm>(emptyGenreForm);
-
-  const genres = useQuery({
-    queryKey: ["admin", "genres"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("genres")
-        .select("*")
-        .order("name");
-      if (error) throw error;
-      return data || [];
-    },
-  });
 
   const tags = useQuery({
     queryKey: ["admin", "tags"],
@@ -73,59 +50,6 @@ export default function AdminTags() {
       if (error) throw error;
       return data || [];
     },
-  });
-
-  const createGenre = useMutation({
-    mutationFn: async () => {
-      const { error } = await supabase.from("genres").insert({
-        name: genreForm.name,
-        slug: slugify(genreForm.name),
-      });
-      if (error) throw error;
-      await logAdminAction("create", "genre", undefined, { name: genreForm.name });
-    },
-    onSuccess: () => {
-      toast.success("Genre created");
-      setGenreOpen(false);
-      setGenreForm(emptyGenreForm);
-      qc.invalidateQueries({ queryKey: ["admin", "genres"] });
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
-
-  const updateGenre = useMutation({
-    mutationFn: async () => {
-      if (!editingGenre) throw new Error("No genre selected");
-      const { error } = await supabase
-        .from("genres")
-        .update({
-          name: genreForm.name,
-          slug: slugify(genreForm.name),
-        })
-        .eq("id", editingGenre.id);
-      if (error) throw error;
-      await logAdminAction("update", "genre", editingGenre.id, { name: genreForm.name });
-    },
-    onSuccess: () => {
-      toast.success("Genre updated");
-      setEditingGenre(null);
-      setGenreForm(emptyGenreForm);
-      qc.invalidateQueries({ queryKey: ["admin", "genres"] });
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
-
-  const deleteGenre = useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase.from("genres").delete().eq("id", id);
-      if (error) throw error;
-      await logAdminAction("delete", "genre", id);
-    },
-    onSuccess: () => {
-      toast.success("Genre deleted");
-      qc.invalidateQueries({ queryKey: ["admin", "genres"] });
-    },
-    onError: (e: Error) => toast.error(e.message),
   });
 
   const createTag = useMutation({
@@ -188,71 +112,6 @@ export default function AdminTags() {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const moveTagsToGenres = useMutation({
-    mutationFn: async () => {
-      const { data: tagRows, error: tagsError } = await (supabase as any)
-        .from("tags")
-        .select("id,name,slug");
-      if (tagsError) throw tagsError;
-      const sourceTags = tagRows || [];
-      if (sourceTags.length === 0) return 0;
-
-      const tagToGenreId = new Map<string, string>();
-      for (const tag of sourceTags) {
-        const { data: genre, error } = await supabase
-          .from("genres")
-          .upsert({ name: tag.name, slug: tag.slug }, { onConflict: "slug" } as any)
-          .select("id")
-          .single();
-        if (error) throw error;
-        if (genre?.id) tagToGenreId.set(tag.id, genre.id);
-      }
-
-      const { data: links, error: linksError } = await (supabase as any)
-        .from("series_tags")
-        .select("series_id,tag_id")
-        .in("tag_id", sourceTags.map((tag: any) => tag.id));
-      if (linksError) throw linksError;
-
-      const genreLinks = (links || [])
-        .map((link: any) => ({
-          series_id: link.series_id,
-          genre_id: tagToGenreId.get(link.tag_id),
-        }))
-        .filter((link: any) => link.genre_id);
-
-      if (genreLinks.length > 0) {
-        const { error } = await supabase
-          .from("series_genres")
-          .upsert(genreLinks, { onConflict: "series_id,genre_id" } as any);
-        if (error) throw error;
-      }
-
-      const sourceTagIds = sourceTags.map((tag: any) => tag.id);
-      const { error: deleteLinksError } = await (supabase as any)
-        .from("series_tags")
-        .delete()
-        .in("tag_id", sourceTagIds);
-      if (deleteLinksError) throw deleteLinksError;
-
-      const { error: deleteTagsError } = await (supabase as any)
-        .from("tags")
-        .delete()
-        .in("id", sourceTagIds);
-      if (deleteTagsError) throw deleteTagsError;
-
-      await logAdminAction("migrate", "tag", undefined, { count: sourceTags.length });
-      return sourceTags.length;
-    },
-    onSuccess: (count) => {
-      toast.success(count ? `Moved ${count} tags to genres` : "No tags to move");
-      qc.invalidateQueries({ queryKey: ["admin", "genres"] });
-      qc.invalidateQueries({ queryKey: ["admin", "tags"] });
-      qc.invalidateQueries({ queryKey: ["admin", "series"] });
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
-
   const predefinedColors = [
     "#EF4444", "#F97316", "#F59E0B", "#10B981", "#14B8A6",
     "#3B82F6", "#6366F1", "#8B5CF6", "#A855F7", "#EC4899",
@@ -263,39 +122,10 @@ export default function AdminTags() {
     <div>
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Genres & Tags</h1>
-          <p className="text-sm text-muted-foreground">Create and manage title genres and descriptive tags</p>
+          <h1 className="text-2xl font-bold tracking-tight">Tags</h1>
+          <p className="text-sm text-muted-foreground">Create and manage descriptive tags for titles</p>
         </div>
         <div className="flex gap-2">
-          {(tags.data || []).length > 0 && (
-            <Button
-              variant="outline"
-              onClick={() => moveTagsToGenres.mutate()}
-              disabled={moveTagsToGenres.isPending}
-            >
-              <ArrowRight className="mr-1 h-4 w-4" />
-              {moveTagsToGenres.isPending ? "Moving..." : "Move Tags to Genres"}
-            </Button>
-          )}
-          <Dialog open={genreOpen} onOpenChange={setGenreOpen}>
-            <DialogTrigger asChild>
-              <Button variant="outline">
-                <Plus className="mr-1 h-4 w-4" />
-                New Genre
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-md">
-              <DialogHeader>
-                <DialogTitle>Create Genre</DialogTitle>
-              </DialogHeader>
-              <GenreFormFields form={genreForm} setForm={setGenreForm} />
-              <DialogFooter>
-                <Button onClick={() => createGenre.mutate()} disabled={!genreForm.name || createGenre.isPending}>
-                  Create
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
               <Button>
@@ -320,63 +150,6 @@ export default function AdminTags() {
 
       <div className="mt-6 space-y-4">
         <section>
-          <div className="mb-3 flex items-center gap-2">
-            <Sparkles className="h-4 w-4 text-violet-500" />
-            <h2 className="text-lg font-semibold">Genres</h2>
-          </div>
-          {genres.isLoading && <p className="text-sm text-muted-foreground">Loading genres...</p>}
-          {!genres.isLoading && (genres.data || []).length === 0 && (
-            <p className="text-sm text-muted-foreground">No genres yet. Move current tags into genres or create a new genre.</p>
-          )}
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {(genres.data || []).map((genre) => (
-              <div key={genre.id} className="rounded-lg border border-border/40 bg-card p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <h3 className="font-semibold">{genre.name}</h3>
-                    <p className="text-xs text-muted-foreground">{genre.slug}</p>
-                  </div>
-                  <div className="flex gap-1">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8"
-                      onClick={() => {
-                        setEditingGenre(genre);
-                        setGenreForm({ name: genre.name });
-                      }}
-                    >
-                      <Pencil className="h-3.5 w-3.5" />
-                    </Button>
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8">
-                          <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Delete "{genre.name}"?</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            This will remove the genre from all titles. This cannot be undone.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Cancel</AlertDialogCancel>
-                          <AlertDialogAction onClick={() => deleteGenre.mutate(genre.id)}>
-                            Delete
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        <section className="pt-4">
         <div className="mb-3 flex items-center gap-2">
           <TagIcon className="h-4 w-4 text-violet-500" />
           <h2 className="text-lg font-semibold">Tags</h2>
@@ -468,20 +241,6 @@ export default function AdminTags() {
         </div>
         </section>
       </div>
-
-      <Dialog open={!!editingGenre} onOpenChange={(v) => { if (!v) { setEditingGenre(null); setGenreForm(emptyGenreForm); } }}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Edit Genre</DialogTitle>
-          </DialogHeader>
-          <GenreFormFields form={genreForm} setForm={setGenreForm} />
-          <DialogFooter>
-            <Button onClick={() => updateGenre.mutate()} disabled={!genreForm.name || updateGenre.isPending}>
-              {updateGenre.isPending ? "Saving..." : "Save changes"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       <Dialog open={!!editingTag} onOpenChange={(v) => { if (!v) { setEditingTag(null); setForm(emptyTagForm); } }}>
         <DialogContent className="max-w-md">
@@ -593,31 +352,6 @@ function TagFormFields({
             {form.name || "Tag Name"}
           </Badge>
         </div>
-      </div>
-    </div>
-  );
-}
-
-function GenreFormFields({
-  form,
-  setForm,
-}: {
-  form: GenreForm;
-  setForm: (form: GenreForm) => void;
-}) {
-  return (
-    <div className="space-y-4">
-      <div>
-        <Label>Genre Name *</Label>
-        <Input
-          value={form.name}
-          onChange={(e) => setForm({ ...form, name: e.target.value })}
-          placeholder="e.g., Action, Romance, Fantasy"
-        />
-      </div>
-      <div className="rounded-lg border border-border/40 bg-secondary/20 p-3">
-        <Label className="text-xs text-muted-foreground">Slug</Label>
-        <p className="mt-1 text-sm font-medium">{form.name ? slugify(form.name) : "genre-slug"}</p>
       </div>
     </div>
   );
