@@ -46,12 +46,17 @@ export function AdminSecurityMonitoringModal({ trigger }: AdminSecurityMonitorin
   const router = useRouter();
   const qc = useQueryClient();
   const { isAdmin } = useIsAdmin();
+  const [mounted, setMounted] = useState(false);
   const [open, setOpen] = useState(false);
   const [testUrl, setTestUrl] = useState("");
   const [testResult, setTestResult] = useState<{ tested: boolean; safe?: boolean; error?: string } | null>(null);
 
-  // Only render for admins
-  if (!isAdmin) return null;
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Only render on client for verified admins
+  if (!mounted || !isAdmin) return null;
 
   // 1. Fetch live metrics
   const metricsQ = useQuery({

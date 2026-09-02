@@ -239,21 +239,6 @@ export function Navbar() {
                         <span>{panelLabel}</span>
                       </Link>
                     )}
-
-                    {isAdmin && (
-                      <AdminSecurityMonitoringModal
-                        trigger={
-                          <button
-                            type="button"
-                            onClick={() => setMenuDrawerOpen(false)}
-                            className="flex items-center gap-4 w-full px-3 py-2.5 rounded-xl text-sm font-medium text-emerald-400 hover:bg-emerald-950/40 transition-colors cursor-pointer text-left"
-                          >
-                            <ShieldCheck className="h-5 w-5 stroke-[1.8] text-emerald-400" />
-                            <span>Security & Threats</span>
-                          </button>
-                        }
-                      />
-                    )}
                   </div>
                 </div>
 
