@@ -2371,12 +2371,16 @@ function ChapterLikeAndMemes({ chapterId, seriesId }: { chapterId: string; serie
   const qc = useQueryClient();
   const [likeBurst, setLikeBurst] = useState(false);
 
-  // Reaction types mapped to database check constraint values ('heart', 'thumbs_up', 'laugh', 'star', 'smile')
+  // Chapter hype and community reaction types
   const memeReactions = [
     { type: "star", emoji: "🗿", label: "Peak Fiction" },
     { type: "thumbs_up", emoji: "🔥", label: "Nah, I'd Win" },
     { type: "smile", emoji: "🍿", label: "Absolute Cinema" },
     { type: "laugh", emoji: "😭", label: "Emotional Damage" },
+    { type: "skull", emoji: "💀", label: "Bro is Cooked" },
+    { type: "mindblown", emoji: "🤯", label: "Mind Blown" },
+    { type: "goat", emoji: "🐐", label: "He is HIM" },
+    { type: "cliffhanger", emoji: "⏳", label: "Cliffhanger Pain" },
   ];
 
   // Fetch reaction counts
@@ -2578,18 +2582,20 @@ function ChapterLikeAndMemes({ chapterId, seriesId }: { chapterId: string; serie
               <button
                 key={reaction.type}
                 onClick={() => handleToggleReaction(reaction.type)}
-                className={`flex items-center justify-between p-3.5 rounded-xl border transition-all duration-200 transform active:scale-95 cursor-pointer select-none ${
+                className={`group flex items-center justify-between p-3.5 rounded-xl border transition-all duration-200 transform active:scale-95 cursor-pointer select-none ${
                   hasReacted
                     ? "bg-primary/20 border-primary text-primary font-bold shadow-md shadow-primary/10 scale-[1.02]"
-                    : "bg-card/60 border-border/60 hover:bg-primary/10 hover:border-primary/50 text-foreground"
+                    : "bg-card/60 border-border/60 hover:bg-primary/10 hover:border-primary/50 text-foreground hover:shadow-sm"
                 }`}
                 title={reaction.label}
               >
-                <div className="flex items-center gap-2.5">
-                  <span className="text-2xl">{reaction.emoji}</span>
-                  <span className="text-xs font-bold">{reaction.label}</span>
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <span className="text-2xl transition-transform duration-200 group-hover:scale-125 select-none">{reaction.emoji}</span>
+                  <span className="text-xs font-bold truncate">{reaction.label}</span>
                 </div>
-                <span className="text-xs font-mono font-bold bg-secondary/80 px-2 py-0.5 rounded-md text-muted-foreground transition-all">
+                <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded-md transition-all shrink-0 ml-1.5 ${
+                  hasReacted ? "bg-primary/30 text-primary" : "bg-secondary/80 text-muted-foreground"
+                }`}>
                   {count}
                 </span>
               </button>

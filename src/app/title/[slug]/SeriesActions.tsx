@@ -216,6 +216,75 @@ export const SeriesActions = React.memo(function SeriesActions({
     staleTime: 1000 * 60 * 2,
   });
 
+  const isFavorited = useQuery({
+    queryKey: ["is-favorited", seriesId, user?.id],
+    queryFn: async () => {
+      if (!user) {
+        try {
+          const favs = JSON.parse(localStorage.getItem("vnr_favorites") || "[]");
+          return favs.includes(seriesId);
+        } catch {
+          return false;
+        }
+      }
+      const { data, error } = await supabase
+        .from("bookmarks")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("series_id", seriesId)
+        .maybeSingle();
+      if (error) return false;
+      return !!data;
+    },
+    staleTime: 1000 * 30,
+  });
+
+  const toggleFavorite = useMutation({
+    mutationFn: async () => {
+      if (!user) {
+        try {
+          const favs: string[] = JSON.parse(localStorage.getItem("vnr_favorites") || "[]");
+          const already = favs.includes(seriesId);
+          const next = already ? favs.filter((id) => id !== seriesId) : [...favs, seriesId];
+          localStorage.setItem("vnr_favorites", JSON.stringify(next));
+          return { favorited: !already };
+        } catch {
+          throw new Error("Could not update favorites");
+        }
+      }
+
+      if (isFavorited.data) {
+        const { error } = await supabase
+          .from("bookmarks")
+          .delete()
+          .eq("user_id", user.id)
+          .eq("series_id", seriesId);
+        if (error) throw error;
+        return { favorited: false };
+      } else {
+        const { error } = await supabase
+          .from("bookmarks")
+          .insert({
+            user_id: user.id,
+            series_id: seriesId,
+          });
+        if (error) throw error;
+        return { favorited: true };
+      }
+    },
+    onSuccess: (res) => {
+      qc.invalidateQueries({ queryKey: ["is-favorited", seriesId] });
+      qc.invalidateQueries({ queryKey: ["library", "favorites"] });
+      qc.invalidateQueries({ queryKey: ["library", "all"] });
+      if (res?.favorited) {
+        toast.success("Added to Favorites ❤️");
+      } else {
+        toast.info("Removed from Favorites");
+      }
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   const toggleFollow = useMutation({
     mutationFn: async () => {
       if (!user) throw new Error("Sign in to follow");
@@ -520,6 +589,24 @@ export const SeriesActions = React.memo(function SeriesActions({
             </Select>
           </div>
         )}
+
+        {/* Mark as Favorite Button */}
+        <Button
+          variant="outline"
+          onClick={() => toggleFavorite.mutate()}
+          className={`h-10 w-full font-semibold transition-all duration-200 gap-2 cursor-pointer ${
+            isFavorited.data
+              ? "border-rose-500/50 bg-rose-950/30 text-rose-400 hover:bg-rose-950/50 hover:text-rose-300 shadow-[0_0_12px_rgba(244,63,94,0.18)]"
+              : "border-border/60 hover:border-rose-500/40 hover:text-rose-400 hover:bg-rose-950/10"
+          }`}
+        >
+          <Heart
+            className={`h-4 w-4 transition-transform duration-200 ${
+              isFavorited.data ? "fill-rose-500 text-rose-500 scale-110" : "text-muted-foreground"
+            }`}
+          />
+          <span>{isFavorited.data ? "Favorited" : "Mark as Favorite"}</span>
+        </Button>
 
         {/* Admin Scan Cover Import Tool */}
         {isAdmin && (

@@ -6,6 +6,11 @@ import { Star, BookOpen, Trophy, Users, Heart } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { LiveSeriesEditor } from "@/components/admin/LiveSeriesEditor";
 
+import { useAuth } from "@/hooks/useAuth";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+
 /* ------------------------------------------------------------------ */
 /*  SeriesHeader — static metadata that never re-renders on           */
 /*  chapter pagination, search, or sort changes.                      */
@@ -40,6 +45,77 @@ export const SeriesHeader = React.memo(function SeriesHeader({
   uniqueChapterCount,
   totalLikesCount = 0,
 }: SeriesHeaderProps) {
+  const { user } = useAuth();
+  const qc = useQueryClient();
+
+  const isFavorited = useQuery({
+    queryKey: ["is-favorited", s.id, user?.id],
+    queryFn: async () => {
+      if (!user) {
+        try {
+          const favs = JSON.parse(localStorage.getItem("vnr_favorites") || "[]");
+          return favs.includes(s.id);
+        } catch {
+          return false;
+        }
+      }
+      const { data, error } = await supabase
+        .from("bookmarks")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("series_id", s.id)
+        .maybeSingle();
+      if (error) return false;
+      return !!data;
+    },
+    staleTime: 1000 * 30,
+  });
+
+  const toggleFavorite = useMutation({
+    mutationFn: async () => {
+      if (!user) {
+        try {
+          const favs: string[] = JSON.parse(localStorage.getItem("vnr_favorites") || "[]");
+          const already = favs.includes(s.id);
+          const next = already ? favs.filter((id) => id !== s.id) : [...favs, s.id];
+          localStorage.setItem("vnr_favorites", JSON.stringify(next));
+          return { favorited: !already };
+        } catch {
+          throw new Error("Could not update favorites");
+        }
+      }
+
+      if (isFavorited.data) {
+        const { error } = await supabase
+          .from("bookmarks")
+          .delete()
+          .eq("user_id", user.id)
+          .eq("series_id", s.id);
+        if (error) throw error;
+        return { favorited: false };
+      } else {
+        const { error } = await supabase
+          .from("bookmarks")
+          .insert({
+            user_id: user.id,
+            series_id: s.id,
+          });
+        if (error) throw error;
+        return { favorited: true };
+      }
+    },
+    onSuccess: (res) => {
+      qc.invalidateQueries({ queryKey: ["is-favorited", s.id] });
+      qc.invalidateQueries({ queryKey: ["library", "favorites"] });
+      qc.invalidateQueries({ queryKey: ["library", "all"] });
+      if (res?.favorited) {
+        toast.success("Added to Favorites ❤️");
+      } else {
+        toast.info("Removed from Favorites");
+      }
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
   const CORE_GENRES_SET = React.useMemo(
     () =>
       new Set([
@@ -80,7 +156,22 @@ export const SeriesHeader = React.memo(function SeriesHeader({
           </Link>
         </nav>
 
-        <LiveSeriesEditor series={s} slug={slug} />
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => toggleFavorite.mutate()}
+            className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border transition-all duration-200 cursor-pointer shadow-sm ${
+              isFavorited.data
+                ? "border-rose-500/50 bg-rose-950/30 text-rose-400 hover:bg-rose-950/50 shadow-[0_0_10px_rgba(244,63,94,0.2)]"
+                : "border-border/60 bg-secondary/50 text-muted-foreground hover:text-rose-400 hover:border-rose-500/30"
+            }`}
+            title={isFavorited.data ? "Favorited" : "Mark as Favorite"}
+          >
+            <Heart className={`h-3.5 w-3.5 transition-transform duration-200 ${isFavorited.data ? "fill-rose-500 text-rose-500 scale-110" : ""}`} />
+            <span>{isFavorited.data ? "Favorited" : "Favorite"}</span>
+          </button>
+          <LiveSeriesEditor series={s} slug={slug} />
+        </div>
       </div>
 
       <div className="mb-3 flex flex-wrap items-center justify-center gap-1.5 sm:justify-start">
