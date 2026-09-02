@@ -61,7 +61,6 @@ export function ScanCoverImporter({
   const [isAutoImporting, setIsAutoImporting] = useState(false);
   const [extractedCovers, setExtractedCovers] = useState<string[]>([]);
   const [selectedCover, setSelectedCover] = useState<string | null>(null);
-  const [saveAllToGallery, setSaveAllToGallery] = useState(true);
 
   // Check if series has an existing import source
   const existingSourceQ = useQuery({
@@ -239,7 +238,7 @@ export function ScanCoverImporter({
         .eq("id", seriesId);
       if (updateErr) throw updateErr;
 
-      // 4. Add selected cover to series_covers
+      // 4. Add ONLY the selected cover to series_covers (and keep old cover preserved)
       const { data: existing } = await supabase
         .from("series_covers")
         .select("id")
@@ -254,32 +253,9 @@ export function ScanCoverImporter({
           position: 0,
         });
       }
-
-      // 5. If saveAllToGallery is checked, save all discovered covers into series_covers too
-      if (saveAllToGallery && extractedCovers.length > 1) {
-        for (let i = 0; i < extractedCovers.length; i++) {
-          const imgUrl = extractedCovers[i];
-          if (imgUrl === coverToApply) continue;
-
-          const { data: exists } = await supabase
-            .from("series_covers")
-            .select("id")
-            .eq("series_id", seriesId)
-            .eq("image_url", imgUrl)
-            .maybeSingle();
-
-          if (!exists) {
-            await supabase.from("series_covers").insert({
-              series_id: seriesId,
-              image_url: imgUrl,
-              position: i + 2,
-            });
-          }
-        }
-      }
     },
     onSuccess: () => {
-      toast.success("Cover updated & preserved in Cover Selection!");
+      toast.success("Selected cover applied & saved to Cover Selection!");
       qc.invalidateQueries({ queryKey: ["series"] });
       qc.invalidateQueries({ queryKey: ["series", "detail", slug] });
       qc.invalidateQueries({ queryKey: ["series", "covers", seriesId] });
@@ -482,13 +458,9 @@ export function ScanCoverImporter({
                 <Label className="text-xs font-bold text-foreground">
                   Select Cover to Set as Default ({extractedCovers.length} available):
                 </Label>
-                <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer select-none">
-                  <Checkbox
-                    checked={saveAllToGallery}
-                    onCheckedChange={(c) => setSaveAllToGallery(Boolean(c))}
-                  />
-                  <span>Store all in Cover Selection</span>
-                </label>
+                <span className="text-2xs text-muted-foreground">
+                  (Only your selected cover will be added to Cover Selection)
+                </span>
               </div>
 
               <div className="grid grid-cols-3 sm:grid-cols-4 gap-2.5 max-h-60 overflow-y-auto p-1 scrollbar-thin">

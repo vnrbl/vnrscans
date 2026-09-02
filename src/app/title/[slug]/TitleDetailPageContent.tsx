@@ -859,9 +859,9 @@ export default function TitleDetailPageContent({
           currentRating={s.rating_average}
         />
 
-        {/* Recommendations Section — Moved below chapters, full width */}
+        {/* Recommendations Section — 7-per-row grid matching story style, genre & plot */}
         <div className="mt-14 pt-10 border-t border-border/40">
-          <RecommendationsSection currentSeriesId={s.id} genres={s.series_genres as any[]} />
+          <RecommendationsSection currentSeries={s} />
         </div>
       </div>
     </div>
@@ -927,21 +927,22 @@ function ShareWidget() {
           <p className="text-[11px] text-muted-foreground truncate">Share with friends & community</p>
         </div>
       </div>
-      <Button
-        variant="secondary"
-        size="sm"
-        onClick={handleShare}
-        className="w-full mt-3 gap-2 font-semibold text-xs h-9 rounded-lg hover:bg-primary hover:text-primary-foreground transition-colors cursor-pointer"
-      >
-        <Share2 className="h-3.5 w-3.5" />
-        Share Link
-      </Button>
+      <div className="mt-3 flex gap-2">
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={handleShare}
+          className="w-full text-xs font-semibold h-8 rounded-lg"
+        >
+          Share Link
+        </Button>
+      </div>
     </div>
   );
 }
 
 /* ------------------------------------------------------------------ */
-/*  Feature 2: Personal Reading Progress & XP Tracker                 */
+/*  Feature 2: Reading Progress & XP Tracker Widget                    */
 /* ------------------------------------------------------------------ */
 
 function ReadingProgressWidget({
@@ -953,175 +954,140 @@ function ReadingProgressWidget({
 }) {
   const { user } = useAuth();
 
-  const userProgress = useQuery({
-    queryKey: ["user-series-progress", seriesId, user?.id],
+  const progressQ = useQuery({
+    queryKey: ["reading-progress-widget", seriesId, user?.id],
     queryFn: async () => {
-      if (!user) return null;
-      const { data, count, error } = await supabase
+      if (!user) return { readCount: 0, totalEarnedXp: 0 };
+
+      const { data, error } = await supabase
         .from("reading_history")
-        .select("chapter_id, xp_awarded", { count: "exact" })
+        .select("chapter_id")
         .eq("user_id", user.id)
         .eq("series_id", seriesId);
 
       if (error) throw error;
-      const readCount = count ?? (data?.length || 0);
-      const xpEarned = data?.filter((d) => d.xp_awarded).length ? data.filter((d) => d.xp_awarded).length * 50 : readCount * 50;
 
-      return { readCount, xpEarned };
+      const readCount = data?.length || 0;
+      const totalEarnedXp = readCount * 10;
+
+      return { readCount, totalEarnedXp };
     },
     enabled: !!user,
     staleTime: 1000 * 60 * 2,
   });
 
-  const readCount = userProgress.data?.readCount ?? 0;
-  const xpEarned = userProgress.data?.xpEarned ?? (readCount * 50);
+  const readCount = progressQ.data?.readCount || 0;
+  const earnedXp = progressQ.data?.totalEarnedXp || 0;
   const progressPercent = totalChapters > 0 ? Math.min(100, Math.round((readCount / totalChapters) * 100)) : 0;
 
   return (
-    <div className="rounded-xl border border-border/60 bg-card/60 p-4 shadow-sm backdrop-blur-sm">
-      <div className="flex items-center justify-between mb-3">
+    <div className="rounded-xl border border-border/60 bg-card/60 p-4 shadow-sm backdrop-blur-sm space-y-3">
+      <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <div className="p-2 rounded-lg bg-violet-500/10 text-violet-400">
-            <Flame className="h-4 w-4" />
+          <div className="p-2 rounded-xl bg-purple-500/10 text-purple-400">
+            <Trophy className="h-4 w-4" />
           </div>
           <div>
-            <h3 className="text-sm font-bold leading-tight">Reading Tracker</h3>
-            <p className="text-[11px] text-muted-foreground">Your progress on this series</p>
+            <h3 className="text-xs font-bold">Your Reading Progress</h3>
+            <p className="text-[11px] text-muted-foreground">{readCount} of {totalChapters} chapters read</p>
           </div>
         </div>
-        <Badge variant="outline" className="text-[10px] font-mono font-bold border-violet-500/30 text-violet-400">
-          +{xpEarned} XP
-        </Badge>
+        <span className="text-xs font-extrabold text-primary font-mono">{progressPercent}%</span>
       </div>
 
-      {!user ? (
-        <div className="rounded-lg bg-muted/30 p-3 text-center border border-border/40">
-          <p className="text-xs text-muted-foreground mb-2">Log in to track read chapters & earn XP!</p>
-          <Button variant="secondary" size="sm" className="w-full text-xs font-semibold h-8" asChild>
-            <Link href="/auth">Sign In</Link>
-          </Button>
+      <Progress value={progressPercent} className="h-2 bg-secondary" />
+
+      {user ? (
+        <div className="flex items-center justify-between pt-1 text-[11px] text-muted-foreground">
+          <span className="flex items-center gap-1">
+            <Zap className="h-3.5 w-3.5 text-amber-400 fill-amber-400" />
+            <span>Earned from this series</span>
+          </span>
+          <span className="font-mono font-bold text-foreground">+{earnedXp} XP</span>
         </div>
       ) : (
-        <div className="space-y-2.5">
-          <div className="flex items-center justify-between text-xs font-semibold">
-            <span className="text-muted-foreground">Completion</span>
-            <span className="font-bold text-foreground">{progressPercent}%</span>
-          </div>
-          <Progress value={progressPercent} className="h-2 bg-muted/80" />
-          <div className="flex items-center justify-between text-[11px] text-muted-foreground pt-0.5">
-            <span>{readCount} of {totalChapters} chapters read</span>
-            {progressPercent === 100 && (
-              <span className="flex items-center gap-1 text-emerald-400 font-bold">
-                <Sparkles className="h-3 w-3" /> Caught up!
-              </span>
-            )}
-          </div>
-        </div>
+        <p className="text-[11px] text-muted-foreground text-center">
+          <Link href="/login" className="text-primary hover:underline font-semibold">Sign in</Link> to track reading & earn XP
+        </p>
       )}
     </div>
   );
 }
 
 /* ------------------------------------------------------------------ */
-/*  Feature 3: Series Top Readers & Supporters                        */
+/*  Feature 3: Series Leaderboard Widget                               */
 /* ------------------------------------------------------------------ */
 
 function SeriesLeaderboardWidget({ seriesId }: { seriesId: string }) {
-  const leaderboard = useQuery({
+  const leaderboardQ = useQuery({
     queryKey: ["series-leaderboard", seriesId],
     queryFn: async () => {
-      // 1. Query reading_history for users reading this series
-      const { data: historyData, error: historyErr } = await supabase
+      const { data, error } = await supabase
         .from("reading_history")
-        .select("user_id")
+        .select("user_id, profiles(username, avatar_url, experience_points)")
         .eq("series_id", seriesId)
         .limit(50);
 
-      if (historyErr) throw historyErr;
+      if (error) throw error;
 
-      const userIds = Array.from(new Set((historyData || []).map((h) => h.user_id)));
+      const userCounts = new Map<string, { count: number; profile: any }>();
+      (data || []).forEach((row: any) => {
+        if (row.user_id && row.profiles) {
+          const current = userCounts.get(row.user_id) || { count: 0, profile: row.profiles };
+          current.count += 1;
+          userCounts.set(row.user_id, current);
+        }
+      });
 
-      if (userIds.length === 0) {
-        // Fallback: fetch top profiles overall if no series specific readers exist yet
-        const { data: topProfiles } = await supabase
-          .from("profiles")
-          .select("username, avatar_url, experience_points, user_level")
-          .order("experience_points", { ascending: false })
-          .limit(3);
-        return topProfiles || [];
-      }
-
-      // 2. Fetch profiles for readers
-      const { data: profiles, error: profErr } = await supabase
-        .from("profiles")
-        .select("username, avatar_url, experience_points, user_level")
-        .in("user_id", userIds)
-        .order("experience_points", { ascending: false })
-        .limit(3);
-
-      if (profErr) throw profErr;
-      return profiles || [];
+      return Array.from(userCounts.values())
+        .sort((a, b) => b.count - a.count || (b.profile?.experience_points || 0) - (a.profile?.experience_points || 0))
+        .slice(0, 3)
+        .map((item) => ({
+          username: item.profile?.username,
+          avatar_url: item.profile?.avatar_url,
+          experience_points: item.profile?.experience_points,
+          chapters_read: item.count,
+        }));
     },
     staleTime: 1000 * 60 * 5,
   });
 
-  const topReaders = leaderboard.data || [];
+  const topReaders = leaderboardQ.data || [];
 
   return (
-    <div className="rounded-xl border border-border/60 bg-card/60 p-4 shadow-sm backdrop-blur-sm">
-      <div className="flex items-center gap-2 mb-3">
-        <div className="p-2 rounded-lg bg-amber-500/10 text-amber-400">
-          <Trophy className="h-4 w-4" />
+    <div className="rounded-xl border border-border/60 bg-card/60 p-4 shadow-sm backdrop-blur-sm space-y-3">
+      <div className="flex items-center gap-2">
+        <div className="p-2 rounded-xl bg-amber-500/10 text-amber-400">
+          <Award className="h-4 w-4" />
         </div>
         <div>
-          <h3 className="text-sm font-bold leading-tight">Top Supporters</h3>
-          <p className="text-[11px] text-muted-foreground">Community leaders for this title</p>
+          <h3 className="text-xs font-bold">Top Readers</h3>
+          <p className="text-[11px] text-muted-foreground">Most dedicated readers for this series</p>
         </div>
       </div>
 
-      {leaderboard.isLoading ? (
-        <div className="space-y-2">
+      {leaderboardQ.isLoading ? (
+        <div className="space-y-2 py-2">
           {Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className="h-9 animate-pulse rounded-lg bg-muted/40" />
+            <div key={i} className="h-8 rounded-lg bg-secondary/50 animate-pulse" />
           ))}
         </div>
       ) : topReaders.length === 0 ? (
         <p className="text-xs text-muted-foreground text-center py-2">No top readers yet.</p>
       ) : (
         <div className="space-y-2">
-          {topReaders.map((reader: any, index: number) => {
-            const rank = index + 1;
-            return (
-              <div
-                key={reader.username || index}
-                className="flex items-center justify-between p-2 rounded-lg bg-muted/30 border border-border/30 transition-colors hover:bg-muted/50"
-              >
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <span
-                    className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${
-                      rank === 1
-                        ? "bg-amber-500/20 text-amber-400 border border-amber-500/40"
-                        : rank === 2
-                        ? "bg-slate-400/20 text-slate-300 border border-slate-400/40"
-                        : "bg-amber-700/20 text-amber-600 border border-amber-700/40"
-                    }`}
-                  >
-                    #{rank}
-                  </span>
-                  <Avatar className="h-6 w-6 border border-border/60 shrink-0">
-                    <AvatarImage src={reader.avatar_url || ""} />
-                    <AvatarFallback className="text-[10px] font-bold bg-primary/10 text-primary">
-                      {(reader.username || "U").substring(0, 2).toUpperCase()}
-                    </AvatarFallback>
-                  </Avatar>
-                  <span className="text-xs font-semibold text-foreground truncate">{reader.username || "Anonymous"}</span>
-                </div>
-                <span className="text-[11px] font-mono font-semibold text-muted-foreground shrink-0 pl-2">
-                  {(reader.experience_points || 0).toLocaleString()} XP
-                </span>
+          {topReaders.map((reader: any, index: number) => (
+            <div key={reader.username} className="flex items-center justify-between p-2 rounded-lg bg-secondary/30">
+              <div className="flex items-center gap-2">
+                <Avatar className="h-6 w-6">
+                  <AvatarImage src={reader.avatar_url} />
+                  <AvatarFallback className="text-[10px]">{reader.username?.slice(0, 2)}</AvatarFallback>
+                </Avatar>
+                <span className="text-xs font-bold">{reader.username}</span>
               </div>
-            );
-          })}
+              <span className="text-[10px] font-mono text-muted-foreground">{reader.chapters_read} ch.</span>
+            </div>
+          ))}
         </div>
       )}
     </div>
@@ -1129,92 +1095,132 @@ function SeriesLeaderboardWidget({ seriesId }: { seriesId: string }) {
 }
 
 /* ------------------------------------------------------------------ */
-/*  RecommendationsSection — Memoized full-width horizontal section   */
+/*  RecommendationsSection — 7-per-row grid matching plot, style & genre */
 /* ------------------------------------------------------------------ */
 
+const STORY_PLOT_TROPES = [
+  "cultivation", "murim", "martial arts", "regression", "reincarnation", "isekai",
+  "transmigration", "system", "dungeon", "tower", "hunter", "gate", "level up",
+  "overpowered", "magic", "academy", "necromancer", "villainess", "otome", "romance",
+  "revenge", "betrayal", "monster", "apocalypse", "survival", "vr", "game", "modern",
+  "historical", "royalty", "emperor", "dragon", "god", "demon", "sword", "alchemy"
+];
+
 const RecommendationsSection = React.memo(function RecommendationsSection({
-  currentSeriesId,
-  genres,
+  currentSeries,
 }: {
-  currentSeriesId: string;
-  genres: any[];
+  currentSeries: any;
 }) {
-  const genreSlugs = genres?.map((sg) => sg.genre?.slug).filter(Boolean) || [];
-  const { scrollRef, scrollBy, dragHandlers } = useDragScroll<HTMLDivElement>();
+  const currentSeriesId = currentSeries?.id;
+  const currentType = currentSeries?.type;
+
+  const currentGenres: string[] = (currentSeries?.series_genres || [])
+    .map((sg: any) => sg.genre?.slug?.toLowerCase() || sg.genre?.name?.toLowerCase())
+    .filter(Boolean);
+
+  const currentTags: string[] = (currentSeries?.series_tags || [])
+    .map((st: any) => st.tag?.slug?.toLowerCase() || st.tag?.name?.toLowerCase())
+    .filter(Boolean);
+
+  const sourceText = `${currentSeries?.title || ""} ${currentSeries?.description || ""}`.toLowerCase();
+  const sourceTropes = STORY_PLOT_TROPES.filter((trope) => sourceText.includes(trope));
 
   const recommendations = useQuery({
-    queryKey: ["recommendations", currentSeriesId],
+    queryKey: ["recommendations-strict-grid", currentSeriesId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("series")
-        .select("id,slug,title,cover_url,type,rating_average,status,series_genres(genre:genres(slug))")
+        .select(
+          "id,slug,title,cover_url,type,description,rating_average,status,series_genres(genre:genres(name,slug)),series_tags(tag:tags(name,slug))"
+        )
         .neq("id", currentSeriesId)
+        .eq("is_hidden", false)
         .order("rating_average", { ascending: false })
-        .limit(50);
+        .limit(100);
 
       if (error) throw error;
 
-      const scored = (data || []).map((title: any) => {
-        const titleGenres = title.series_genres?.map((sg: any) => sg.genre?.slug).filter(Boolean) || [];
-        const commonGenres = titleGenres.filter((g: string) => genreSlugs.includes(g));
-        return { ...title, score: commonGenres.length };
+      const scored = (data || []).map((candidate: any) => {
+        const candGenres: string[] = (candidate.series_genres || [])
+          .map((sg: any) => sg.genre?.slug?.toLowerCase() || sg.genre?.name?.toLowerCase())
+          .filter(Boolean);
+
+        const candTags: string[] = (candidate.series_tags || [])
+          .map((st: any) => st.tag?.slug?.toLowerCase() || st.tag?.name?.toLowerCase())
+          .filter(Boolean);
+
+        const candText = `${candidate.title || ""} ${candidate.description || ""}`.toLowerCase();
+
+        // 1. Common Genres overlap
+        const commonGenres = candGenres.filter((g) => currentGenres.includes(g));
+
+        // 2. Common Tags overlap
+        const commonTags = candTags.filter((t) => currentTags.includes(t));
+
+        // 3. Shared Story Tropes & Plot Style
+        const sharedTropes = sourceTropes.filter((trope) => candText.includes(trope));
+
+        // 4. Format / Type Match
+        const formatMatch = candidate.type === currentType;
+
+        // Scoring Formula
+        let score = 0;
+        score += commonGenres.length * 20;
+        score += commonTags.length * 25;
+        score += sharedTropes.length * 20;
+        if (formatMatch) score += 15;
+
+        const totalSharedSignals = commonGenres.length + commonTags.length + sharedTropes.length;
+
+        return {
+          ...candidate,
+          score,
+          commonCount: totalSharedSignals,
+        };
       });
 
+      // Strict filter: Must match at least 2 story signals (genres/tags/plot tropes) AND score >= 35
       return scored
-        .filter((item) => item.score > 0)
-        .sort((a, b) => b.score - a.score || (b.rating_average || 0) - (a.rating_average || 0))
-        .slice(0, 15);
+        .filter((item) => item.score >= 35 && item.commonCount >= 2)
+        .sort((a, b) => b.score - a.score || Number(b.rating_average || 0) - Number(a.rating_average || 0))
+        .slice(0, 14); // Exactly 14 items (2 full rows of 7 in grid)
     },
+    enabled: !!currentSeriesId,
     staleTime: 1000 * 60 * 10,
-    gcTime: 1000 * 60 * 30,
   });
 
   return (
-    <section className="min-w-0">
-      <div className="mb-6 flex items-center justify-between">
+    <section className="min-w-0 space-y-4">
+      <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-black tracking-tight text-foreground flex items-center gap-2">
-            <Sparkles className="h-5 w-5 text-primary" /> Recommendations
+          <h2 className="text-xl sm:text-2xl font-black tracking-tight text-foreground flex items-center gap-2">
+            <Sparkles className="h-5 w-5 text-primary" /> Similar Series & Recommendations
           </h2>
-          <p className="text-xs text-muted-foreground mt-0.5">Similar series you might enjoy based on genres</p>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Carefully matched by story style, plot tropes, themes, and genres
+          </p>
         </div>
-        {(recommendations.data?.length ?? 0) > 0 && (
-          <div className="flex gap-2">
-            <Button variant="outline" size="icon" className="h-9 w-9 rounded-lg" onClick={() => scrollBy("left")}>
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <Button variant="outline" size="icon" className="h-9 w-9 rounded-lg" onClick={() => scrollBy("right")}>
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          </div>
-        )}
       </div>
 
       {recommendations.isLoading ? (
-        <div className="flex gap-4 overflow-hidden py-2">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className={`${TITLE_CARD_WIDTH} shrink-0`}>
-              <div className={`${TITLE_COVER_CLASS} animate-pulse bg-secondary rounded-lg`} />
-            </div>
+        <div className="grid grid-cols-2 xs:grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 gap-3 sm:gap-4">
+          {Array.from({ length: 7 }).map((_, i) => (
+            <div key={i} className="aspect-[2/3] rounded-xl bg-secondary/60 animate-pulse" />
           ))}
         </div>
       ) : !recommendations.data || recommendations.data.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No similar titles found.</p>
+        <div className="p-8 text-center rounded-2xl border border-border/30 bg-card/20 text-muted-foreground text-xs">
+          No matching series found with similar story style, plot tropes, and genres.
+        </div>
       ) : (
-        <div
-          ref={scrollRef}
-          {...dragHandlers}
-          className={DRAG_SCROLL_CONTAINER_CLASS}
-          style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
-        >
+        <div className="grid grid-cols-2 xs:grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 gap-3 sm:gap-4">
           {recommendations.data.map((title: any) => (
             <Link
               key={title.id}
               href={`/title/${title.slug}`}
-              className={`group ${TITLE_CARD_WIDTH} shrink-0 overflow-hidden rounded-xl border border-border/40 bg-card transition-all duration-300 hover:border-primary/50 hover:shadow-xl hover:-translate-y-1`}
-              draggable={false}
+              className="group flex flex-col overflow-hidden rounded-xl border border-border/40 bg-card transition-all duration-300 hover:border-primary/50 hover:shadow-xl hover:-translate-y-1"
             >
-              <div className={TITLE_COVER_CLASS}>
+              <div className="relative aspect-[2/3] w-full overflow-hidden bg-secondary">
                 {title.cover_url ? (
                   title.cover_url.toLowerCase().split("?")[0].endsWith(".mp4") ? (
                     <video
@@ -1233,22 +1239,21 @@ const RecommendationsSection = React.memo(function RecommendationsSection({
                       unoptimized
                       sizes="(max-width: 640px) 150px, (max-width: 768px) 180px, 220px"
                       className="object-cover transition-transform duration-500 group-hover:scale-105"
-                      draggable={false}
                     />
                   )
                 ) : (
                   <div className="flex h-full w-full items-center justify-center text-muted-foreground">
-                    <BookOpen className="h-8 w-8" />
+                    <BookOpen className="h-8 w-8 opacity-40" />
                   </div>
                 )}
                 {title.rating_average && Number(title.rating_average) > 0 ? (
-                  <div className="absolute bottom-2 right-2 flex items-center gap-1 rounded-md bg-background/85 px-2 py-0.5 text-xs font-bold backdrop-blur">
+                  <div className="absolute bottom-2 right-2 flex items-center gap-1 rounded-md bg-background/85 px-1.5 py-0.5 text-2xs font-bold backdrop-blur shadow-sm">
                     <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
                     {Number(title.rating_average).toFixed(1)}
                   </div>
                 ) : null}
               </div>
-              <div className="p-3">
+              <div className="p-2.5 flex-1 flex flex-col justify-between">
                 <h3 className="line-clamp-2 text-xs font-bold leading-snug group-hover:text-primary transition-colors">
                   {title.title}
                 </h3>
