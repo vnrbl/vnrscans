@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Search, BookOpen, User as UserIcon, Users, Loader2, X } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useNavigate, Link } from "@/lib/router-compat";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
@@ -29,6 +30,7 @@ interface NavbarSearchProps {
 }
 
 export function NavbarSearch({ open, onOpenChange }: NavbarSearchProps) {
+  const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
   const [activeSearchTab, setActiveSearchTab] = useState<SearchTab>("comics");
   const [searching, setSearching] = useState(false);
@@ -36,6 +38,14 @@ export function NavbarSearch({ open, onOpenChange }: NavbarSearchProps) {
   const [userResults, setUserResults] = useState<any[]>([]);
   const [groupResults, setGroupResults] = useState<string[]>([]);
   const navigate = useNavigate();
+
+  // Instant route prefetching when search dialog is opened
+  useEffect(() => {
+    if (open) {
+      router.prefetch("/browse");
+      router.prefetch("/request-series");
+    }
+  }, [open, router]);
 
   const hotSeries = useQuery({
     queryKey: ["navbar-hot-series"],
@@ -57,7 +67,7 @@ export function NavbarSearch({ open, onOpenChange }: NavbarSearchProps) {
   // In-memory search cache for instant sub-millisecond response on backspace/repeat
   const searchCacheRef = useRef<Map<string, { series: any[]; users: any[]; groups: string[] }>>(new Map());
 
-  // Ultra-fast search with in-memory caching and 220ms debounce
+  // Ultra-fast search with in-memory caching and 120ms debounce
   useEffect(() => {
     const rawQ = searchQuery.trim();
     if (!rawQ || rawQ.length < 2) {
@@ -69,7 +79,7 @@ export function NavbarSearch({ open, onOpenChange }: NavbarSearchProps) {
     }
 
     const prepared = prepareSearchInput(rawQ);
-    const cacheKey = prepared.normalized;
+    const cacheKey = `${activeSearchTab}:${prepared.normalized}`;
 
     // 1. Instant Cache Hit (0ms latency!)
     const cached = searchCacheRef.current.get(cacheKey);
@@ -86,60 +96,73 @@ export function NavbarSearch({ open, onOpenChange }: NavbarSearchProps) {
       if (q.length >= 2) {
         setSearching(true);
         try {
-          const seriesFilter = buildSeriesSearchOrFilter(prepared.terms);
-          
-          // Execute series and profiles query concurrently
-          // Note: Scanlation groups are fetched from lightweight sources table rather than heavy chapters table
-          const [seriesRes, usersRes, groupsRes] = await Promise.all([
-            supabase
+          if (activeSearchTab === "comics") {
+            const seriesFilter = buildSeriesSearchOrFilter(prepared.terms);
+            // Ultra-lean select without heavy descriptions for lightning response
+            const { data: seriesData, error } = await supabase
               .from("series")
-              .select(
-                "id,slug,title,alternative_titles,cover_url,type,rating_average,author,artist,description,view_count,is_trending,is_featured"
-              )
+              .select("id,slug,title,alternative_titles,cover_url,type")
               .eq("is_hidden", false)
               .or(seriesFilter)
-              .limit(40),
-            supabase
+              .limit(30);
+
+            if (error) throw error;
+            const ranked = seriesData ? rankSeriesResults(seriesData, prepared).slice(0, 24) : [];
+            setSeriesResults(ranked);
+
+            searchCacheRef.current.set(cacheKey, {
+              series: ranked,
+              users: userResults,
+              groups: groupResults,
+            });
+          } else if (activeSearchTab === "users") {
+            const { data: usersData, error } = await supabase
               .from("profiles")
               .select("username,avatar_url")
               .ilike("username", `%${q}%`)
-              .limit(8),
-            supabase
+              .limit(8);
+
+            if (error) throw error;
+            const users = usersData || [];
+            setUserResults(users);
+
+            searchCacheRef.current.set(cacheKey, {
+              series: seriesResults,
+              users,
+              groups: groupResults,
+            });
+          } else if (activeSearchTab === "groups") {
+            const { data: groupsData, error } = await supabase
               .from("series_import_sources")
               .select("scanlation_group")
               .ilike("scanlation_group", `%${q}%`)
               .not("scanlation_group", "is", null)
-              .limit(10),
-          ]);
+              .limit(10);
 
-          const ranked = seriesRes.data ? rankSeriesResults(seriesRes.data, prepared).slice(0, 24) : [];
-          const users = usersRes.data || [];
-          const uniqueGroups = groupsRes.data
-            ? (Array.from(
-                new Set(groupsRes.data.map((c: any) => c.scanlation_group).filter(Boolean))
-              ) as string[]).slice(0, 10)
-            : [];
+            if (error) throw error;
+            const uniqueGroups = groupsData
+              ? (Array.from(
+                  new Set(groupsData.map((c: any) => c.scanlation_group).filter(Boolean))
+                ) as string[]).slice(0, 10)
+              : [];
+            setGroupResults(uniqueGroups);
 
-          setSeriesResults(ranked);
-          setUserResults(users);
-          setGroupResults(uniqueGroups);
-
-          // Save to memory cache
-          searchCacheRef.current.set(cacheKey, {
-            series: ranked,
-            users,
-            groups: uniqueGroups,
-          });
+            searchCacheRef.current.set(cacheKey, {
+              series: seriesResults,
+              users: userResults,
+              groups: uniqueGroups,
+            });
+          }
         } catch (err) {
           console.error("Search error:", err);
         } finally {
           setSearching(false);
         }
       }
-    }, 220);
+    }, 120);
 
     return () => clearTimeout(timer);
-  }, [searchQuery]);
+  }, [searchQuery, activeSearchTab]);
 
   const handleSearchSelect = (slug: string) => {
     onOpenChange(false);
@@ -184,6 +207,7 @@ export function NavbarSearch({ open, onOpenChange }: NavbarSearchProps) {
                     const q = searchQuery.trim();
                     if (!q) return;
                     onOpenChange(false);
+                    setSearchQuery("");
                     navigate({ to: "/browse", search: { search: q } });
                   }
                 }}
@@ -237,6 +261,10 @@ export function NavbarSearch({ open, onOpenChange }: NavbarSearchProps) {
               loading={searching || hotSeries.isLoading}
               items={searchQuery.trim().length >= 2 ? seriesResults : hotSeries.data ?? []}
               onSelect={handleSearchSelect}
+              onClose={() => {
+                onOpenChange(false);
+                setSearchQuery("");
+              }}
             />
           )}
           {activeSearchTab === "users" && (
@@ -293,11 +321,13 @@ function SeriesSearchPanel({
   loading,
   items,
   onSelect,
+  onClose,
 }: {
   query: string;
   loading: boolean;
   items: any[];
   onSelect: (slug: string) => void;
+  onClose?: () => void;
 }) {
   const displayQuery = getSearchDisplayTerm(query);
   const isSearching = query.trim().length >= 2;
@@ -324,12 +354,16 @@ function SeriesSearchPanel({
         <div className="mt-5 flex items-center justify-center gap-2.5">
           <Link
             to="/request-series"
+            search={displayQuery ? { title: displayQuery } : undefined}
+            onClick={() => onClose?.()}
             className="inline-flex items-center gap-1.5 rounded-lg border border-purple-500/40 bg-purple-500/10 px-3.5 py-1.5 text-xs font-semibold text-purple-300 hover:bg-purple-500/20 hover:border-purple-500/60 transition cursor-pointer"
           >
             <span>Request This Series</span>
           </Link>
           <Link
             to="/browse"
+            search={displayQuery ? { search: displayQuery } : undefined}
+            onClick={() => onClose?.()}
             className="inline-flex items-center gap-1.5 rounded-lg border border-neutral-800 bg-neutral-900 px-3.5 py-1.5 text-xs font-semibold text-neutral-300 hover:text-white hover:border-neutral-700 transition cursor-pointer"
           >
             <span>Browse All</span>
