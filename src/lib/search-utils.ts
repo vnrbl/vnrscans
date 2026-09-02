@@ -1,4 +1,5 @@
 export type SearchSeriesLike = {
+  id?: string;
   slug?: string | null;
   title?: string | null;
   alternative_titles?: string | null;
@@ -6,13 +7,16 @@ export type SearchSeriesLike = {
   artist?: string | null;
   description?: string | null;
   view_count?: number | null;
+  rating_average?: number | string | null;
   is_trending?: boolean | null;
+  is_featured?: boolean | null;
 };
 
 export type PreparedSearch = {
   raw: string;
   normalized: string;
   terms: string[];
+  tokens: string[];
   primaryTerm: string;
   isUrl: boolean;
 };
@@ -31,7 +35,7 @@ const GENERIC_PATH_SEGMENTS = new Set([
   "chapters",
 ]);
 
-const STOP_WORDS = new Set(["a", "an", "and", "the", "to", "of", "in", "on", "for", "with"]);
+const STOP_WORDS = new Set(["a", "an", "and", "the", "to", "of", "in", "on", "for", "with", "is"]);
 
 export function prepareSearchInput(input: string): PreparedSearch {
   const raw = input.trim();
@@ -40,37 +44,63 @@ export function prepareSearchInput(input: string): PreparedSearch {
   const directTerms = [normalized, slugToSearchText(raw)].filter(Boolean);
   const terms = uniqueSearchTerms(urlParts.length > 0 ? urlParts : directTerms);
 
+  const tokens = normalized
+    .split(/\s+/)
+    .map((t) => t.trim())
+    .filter((t) => t.length >= 2);
+
   return {
     raw,
     normalized,
     terms,
+    tokens,
     primaryTerm: terms[0] ?? normalized,
     isUrl: urlParts.length > 0,
   };
 }
 
 export function buildSeriesSearchOrFilter(terms: string[]): string {
-  const safeTerms = terms.map(sanitizeSupabasePattern).filter((term) => term.length >= 2);
-  const clauses = safeTerms.flatMap((term) => [
-    `title.ilike.%${term}%`,
-    `alternative_titles.ilike.%${term}%`,
-    `author.ilike.%${term}%`,
-    `artist.ilike.%${term}%`,
-    `description.ilike.%${term}%`,
-    `slug.ilike.%${slugifySearchTerm(term)}%`,
-  ]);
+  const safeTerms = terms
+    .map(sanitizeSupabasePattern)
+    .filter((term) => term.length >= 2);
 
-  return clauses.join(",");
+  const clauses: string[] = [];
+
+  for (const term of safeTerms) {
+    clauses.push(`title.ilike.%${term}%`);
+    clauses.push(`alternative_titles.ilike.%${term}%`);
+    clauses.push(`slug.ilike.%${slugifySearchTerm(term)}%`);
+    clauses.push(`author.ilike.%${term}%`);
+    clauses.push(`artist.ilike.%${term}%`);
+  }
+
+  // Also include individual token matching if multiple words
+  if (terms.length > 0 && terms[0].includes(" ")) {
+    const words = terms[0]
+      .split(" ")
+      .filter((w) => w.length >= 3 && !STOP_WORDS.has(w));
+    for (const w of words) {
+      clauses.push(`title.ilike.%${sanitizeSupabasePattern(w)}%`);
+    }
+  }
+
+  return Array.from(new Set(clauses)).join(",");
 }
 
-export function rankSeriesResults<T extends SearchSeriesLike>(items: T[], prepared: PreparedSearch): T[] {
+export function rankSeriesResults<T extends SearchSeriesLike>(
+  items: T[],
+  prepared: PreparedSearch
+): T[] {
   const terms = prepared.terms.length > 0 ? prepared.terms : [prepared.normalized].filter(Boolean);
   if (terms.length === 0) return items;
 
   return [...items]
-    .map((item) => ({ item, score: scoreSeriesResult(item, terms) }))
+    .map((item) => ({ item, score: scoreSeriesResult(item, terms, prepared.tokens) }))
     .sort((a, b) => {
       if (b.score !== a.score) return b.score - a.score;
+      const bRating = Number(b.item.rating_average || 0);
+      const aRating = Number(a.item.rating_average || 0);
+      if (bRating !== aRating) return bRating - aRating;
       return Number(b.item.view_count ?? 0) - Number(a.item.view_count ?? 0);
     })
     .map(({ item }) => item);
@@ -143,7 +173,7 @@ function slugToSearchText(value: string): string {
     value
       .replace(/^https?:\/\//i, "")
       .replace(/\.[a-z0-9]{2,5}(?:[?#].*)?$/i, "")
-      .replace(/[-_+.]+/g, " "),
+      .replace(/[-_+.]+/g, " ")
   );
 }
 
@@ -189,7 +219,11 @@ function slugifySearchTerm(value: string): string {
   return sanitizeSupabasePattern(value).replace(/\s+/g, "-").toLowerCase();
 }
 
-function scoreSeriesResult(item: SearchSeriesLike, terms: string[]): number {
+function scoreSeriesResult(
+  item: SearchSeriesLike,
+  terms: string[],
+  tokens: string[] = []
+): number {
   const title = normalizeSearchText(item.title ?? "");
   const slug = normalizeSearchText((item.slug ?? "").replace(/-/g, " "));
   const alternativeTitles = normalizeSearchText(item.alternative_titles ?? "");
@@ -197,23 +231,46 @@ function scoreSeriesResult(item: SearchSeriesLike, terms: string[]): number {
   const artist = normalizeSearchText(item.artist ?? "");
   const description = normalizeSearchText(item.description ?? "");
 
-  let score = item.is_trending ? 4 : 0;
+  let score = 0;
+  if (item.is_trending) score += 10;
+  if (item.is_featured) score += 15;
+  if (item.rating_average) score += Number(item.rating_average) * 2;
 
   for (const term of terms) {
     if (!term) continue;
-    if (title === term) score += 120;
-    if (slug === term) score += 110;
-    if (title.startsWith(term)) score += 70;
-    if (slug.startsWith(term)) score += 60;
-    if (title.includes(term)) score += 45;
-    if (slug.includes(term)) score += 40;
-    if (alternativeTitles.includes(term)) score += 30;
-    if (author.includes(term) || artist.includes(term)) score += 18;
-    if (description.includes(term)) score += 6;
 
-    const words = term.split(" ").filter((word) => word.length > 1);
-    const matchedTitleWords = words.filter((word) => title.includes(word) || slug.includes(word)).length;
-    score += matchedTitleWords * 8;
+    // Exact Title Match (Highest Priority)
+    if (title === term) score += 1000;
+    else if (title.startsWith(term)) score += 500;
+    else if (title.includes(` ${term} `) || title.startsWith(`${term} `) || title.endsWith(` ${term}`)) score += 300;
+    else if (title.includes(term)) score += 180;
+
+    // Slug Matches
+    if (slug === term) score += 800;
+    else if (slug.startsWith(term)) score += 400;
+    else if (slug.includes(term)) score += 150;
+
+    // Alternative Title Matches
+    if (alternativeTitles === term) score += 600;
+    else if (alternativeTitles.startsWith(term)) score += 300;
+    else if (alternativeTitles.includes(term)) score += 140;
+
+    // Author / Artist
+    if (author === term || artist === term) score += 200;
+    else if (author.includes(term) || artist.includes(term)) score += 80;
+
+    // Description match
+    if (description.includes(term)) score += 25;
+  }
+
+  // Multi-Token Precision Check
+  if (tokens.length > 1) {
+    const matchedTitleTokens = tokens.filter((tok) => title.includes(tok) || slug.includes(tok));
+    if (matchedTitleTokens.length === tokens.length) {
+      score += 400; // All tokens present in title!
+    } else {
+      score += matchedTitleTokens.length * 50;
+    }
   }
 
   return score;

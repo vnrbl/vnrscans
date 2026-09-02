@@ -56,6 +56,7 @@ function SideWidgets({
 import { SeriesHeader } from "./SeriesHeader";
 import { SeriesActions } from "./SeriesActions";
 import { ChapterList } from "./ChapterList";
+import { SeriesReviewsSection } from "./SeriesReviewsSection";
 
 /* ------------------------------------------------------------------ */
 /*  TitleDetailPageContent — thin shell that:                         */
@@ -849,6 +850,14 @@ export default function TitleDetailPageContent({
             )}
           </div>
         )}
+
+        {/* Series Comments & Community Reviews Section */}
+        <SeriesReviewsSection
+          seriesId={s.id}
+          seriesTitle={s.title}
+          slug={slug}
+          currentRating={s.rating_average}
+        />
 
         {/* Recommendations Section — Moved below chapters, full width */}
         <div className="mt-14 pt-10 border-t border-border/40">

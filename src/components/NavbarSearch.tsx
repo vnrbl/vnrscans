@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Search, BookOpen, User as UserIcon, Users, Loader2, X } from "lucide-react";
 import { useNavigate } from "@/lib/router-compat";
 import { Badge } from "@/components/ui/badge";
@@ -54,10 +54,34 @@ export function NavbarSearch({ open, onOpenChange }: NavbarSearchProps) {
     staleTime: 10 * 60 * 1000,
   });
 
-  // Search with debounce
+  // In-memory search cache for instant sub-millisecond response on backspace/repeat
+  const searchCacheRef = useRef<Map<string, { series: any[]; users: any[]; groups: string[] }>>(new Map());
+
+  // Ultra-fast search with in-memory caching and 120ms debounce
   useEffect(() => {
+    const rawQ = searchQuery.trim();
+    if (!rawQ || rawQ.length < 2) {
+      setSeriesResults([]);
+      setUserResults([]);
+      setGroupResults([]);
+      setSearching(false);
+      return;
+    }
+
+    const prepared = prepareSearchInput(rawQ);
+    const cacheKey = prepared.normalized;
+
+    // 1. Instant Cache Hit (0ms latency!)
+    const cached = searchCacheRef.current.get(cacheKey);
+    if (cached) {
+      setSeriesResults(cached.series);
+      setUserResults(cached.users);
+      setGroupResults(cached.groups);
+      setSearching(false);
+      return;
+    }
+
     const timer = setTimeout(async () => {
-      const prepared = prepareSearchInput(searchQuery);
       const q = prepared.primaryTerm;
       if (q.length >= 2) {
         setSearching(true);
@@ -66,10 +90,12 @@ export function NavbarSearch({ open, onOpenChange }: NavbarSearchProps) {
           const [seriesRes, usersRes, groupsRes] = await Promise.all([
             supabase
               .from("series")
-              .select("id,slug,title,alternative_titles,cover_url,type,rating_average,author,artist,description,view_count,is_trending")
+              .select(
+                "id,slug,title,alternative_titles,cover_url,type,rating_average,author,artist,description,view_count,is_trending,is_featured"
+              )
               .eq("is_hidden", false)
               .or(seriesFilter)
-              .limit(48),
+              .limit(50),
             supabase
               .from("profiles")
               .select("username,avatar_url")
@@ -82,25 +108,33 @@ export function NavbarSearch({ open, onOpenChange }: NavbarSearchProps) {
               .not("scanlation_group", "is", null)
               .limit(30),
           ]);
-          if (seriesRes.data) setSeriesResults(rankSeriesResults(seriesRes.data, prepared).slice(0, 24));
-          if (usersRes.data) setUserResults(usersRes.data);
-          if (groupsRes.data) {
-            const uniqueGroups = Array.from(
-              new Set(groupsRes.data.map((c: any) => c.scanlation_group).filter(Boolean))
-            ) as string[];
-            setGroupResults(uniqueGroups.slice(0, 12));
-          }
+
+          const ranked = seriesRes.data ? rankSeriesResults(seriesRes.data, prepared).slice(0, 24) : [];
+          const users = usersRes.data || [];
+          const uniqueGroups = groupsRes.data
+            ? (Array.from(
+                new Set(groupsRes.data.map((c: any) => c.scanlation_group).filter(Boolean))
+              ) as string[]).slice(0, 12)
+            : [];
+
+          setSeriesResults(ranked);
+          setUserResults(users);
+          setGroupResults(uniqueGroups);
+
+          // Save to memory cache
+          searchCacheRef.current.set(cacheKey, {
+            series: ranked,
+            users,
+            groups: uniqueGroups,
+          });
         } catch (err) {
           console.error("Search error:", err);
         } finally {
           setSearching(false);
         }
-      } else {
-        setSeriesResults([]);
-        setUserResults([]);
-        setGroupResults([]);
       }
-    }, 300);
+    }, 120);
+
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
