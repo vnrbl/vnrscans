@@ -62,7 +62,7 @@ export const SeriesActions = React.memo(function SeriesActions({
   const [isGalleryOpen, setIsGalleryOpen] = React.useState(false);
   const [galleryIdx, setGalleryIdx] = React.useState(0);
   const [activeView, setActiveView] = React.useState<"grid" | "lightbox">("grid");
-  const [favTrigger, setFavTrigger] = React.useState(0);
+  const [favCoverUrl, setFavCoverUrl] = React.useState<string | null>(null);
 
   // Fetch all cover images from the dedicated series_covers table
   const chapterCoversQuery = useQuery({
@@ -108,17 +108,20 @@ export const SeriesActions = React.memo(function SeriesActions({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isGalleryOpen, activeView, allCovers.length]);
 
-  // Load favorite cover on mount or allCovers change
+  // Load favorite cover safely on client mount
   React.useEffect(() => {
-    if (allCovers.length > 0) {
-      const favCover = localStorage.getItem(`fav-cover-${seriesId}`);
-      if (favCover) {
-        const idx = allCovers.indexOf(favCover);
-        if (idx !== -1) {
-          setActiveCoverIdx(idx);
+    try {
+      if (typeof window !== "undefined") {
+        const favCover = localStorage.getItem(`fav-cover-${seriesId}`);
+        if (favCover) {
+          setFavCoverUrl(favCover);
+          const idx = allCovers.indexOf(favCover);
+          if (idx !== -1) {
+            setActiveCoverIdx(idx);
+          }
         }
       }
-    }
+    } catch {}
   }, [allCovers, seriesId]);
 
   // Delete Cover Mutation (Admin only)
@@ -337,33 +340,37 @@ export const SeriesActions = React.memo(function SeriesActions({
               />
             )}
             {/* Favorite Cover Heart Button */}
-            <button
-              type="button"
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                const favKey = `fav-cover-${seriesId}`;
-                const currentUrl = allCovers[activeCoverIdx];
-                const isFav = localStorage.getItem(favKey) === currentUrl;
-                
-                if (isFav) {
-                  localStorage.removeItem(favKey);
-                  toast.success("Removed from favorite covers");
-                } else {
-                  localStorage.setItem(favKey, currentUrl);
-                  toast.success("Set as favorite cover!");
-                }
-                setFavTrigger(prev => prev + 1);
-              }}
-              className={`absolute top-2.5 right-2.5 p-2 rounded-full backdrop-blur-md border transition-all duration-300 z-20 hover:scale-110 shadow-md ${
-                localStorage.getItem(`fav-cover-${seriesId}`) === allCovers[activeCoverIdx]
-                  ? "bg-pink-600/85 border-pink-500 text-white"
-                  : "bg-black/60 border-white/10 text-white/80 hover:text-white"
-              }`}
-              aria-label="Set as favorite cover"
-            >
-              <Heart className={`h-4 w-4 ${localStorage.getItem(`fav-cover-${seriesId}`) === allCovers[activeCoverIdx] ? "fill-current" : ""}`} />
-            </button>
+            {(() => {
+              const currentUrl = allCovers[activeCoverIdx];
+              const isFav = favCoverUrl === currentUrl;
+              return (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const favKey = `fav-cover-${seriesId}`;
+                    if (isFav) {
+                      try { localStorage.removeItem(favKey); } catch {}
+                      setFavCoverUrl(null);
+                      toast.success("Removed from favorite covers");
+                    } else {
+                      try { localStorage.setItem(favKey, currentUrl); } catch {}
+                      setFavCoverUrl(currentUrl);
+                      toast.success("Set as favorite cover!");
+                    }
+                  }}
+                  className={`absolute top-2.5 right-2.5 p-2 rounded-full backdrop-blur-md border transition-all duration-300 z-20 hover:scale-110 shadow-md ${
+                    isFav
+                      ? "bg-pink-600/85 border-pink-500 text-white"
+                      : "bg-black/60 border-white/10 text-white/80 hover:text-white"
+                  }`}
+                  aria-label="Set as favorite cover"
+                >
+                  <Heart className={`h-4 w-4 ${isFav ? "fill-current" : ""}`} />
+                </button>
+              );
+            })()}
 
             {allCovers.length > 1 && (
               <>
