@@ -346,11 +346,16 @@ export function AddNewSeriesDialog({ trigger }: AddNewSeriesDialogProps) {
           <div className="space-y-4 pt-1">
             {/* Step 1: Comick Metadata Search */}
             <div className="p-4 rounded-xl bg-purple-950/20 border border-purple-500/25 space-y-3">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
-                <Label className="text-xs font-bold text-purple-200 flex items-center gap-1.5">
-                  <Search className="h-3.5 w-3.5 text-purple-400" /> Step 1: Search Series on Comick.dev
-                </Label>
-                <span className="text-[11px] text-muted-foreground font-normal">Fetches genres, tags, synopsis & HD cover</span>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
+                <div className="flex items-center gap-2">
+                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-purple-500/20 text-[11px] font-bold text-purple-300">1</span>
+                  <span className="text-sm font-semibold tracking-tight text-purple-100">
+                    Search Series on Comick.dev
+                  </span>
+                </div>
+                <span className="text-xs text-neutral-400 font-normal">
+                  Fetches official metadata, genres, tags & HD cover
+                </span>
               </div>
 
               <div className="flex gap-2">
@@ -359,23 +364,22 @@ export function AddNewSeriesDialog({ trigger }: AddNewSeriesDialogProps) {
                   onChange={(e) => setComickSearch(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && handleSearchComick()}
                   placeholder="e.g. Solo Leveling, Eleceed, Return of the Mount Hua..."
-                  className="text-xs bg-background/80"
+                  className="h-10 text-sm bg-neutral-900/90 border-neutral-800 focus:border-purple-500 text-white placeholder:text-neutral-500 rounded-lg font-normal"
                 />
                 <Button
                   type="button"
-                  size="sm"
                   onClick={handleSearchComick}
                   disabled={isSearchingComick || !comickSearch.trim()}
-                  className="text-xs font-bold bg-purple-600 hover:bg-purple-500 text-white shrink-0 cursor-pointer"
+                  className="h-10 px-4 text-xs font-semibold bg-purple-600 hover:bg-purple-500 text-white shrink-0 rounded-lg cursor-pointer transition-colors shadow-sm"
                 >
-                  {isSearchingComick ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Search"}
+                  {isSearchingComick ? <Loader2 className="h-4 w-4 animate-spin" /> : "Search"}
                 </Button>
               </div>
 
               {/* Comick Search Results Grid */}
               {comickResults.length > 0 && (
                 <div className="space-y-2 pt-2 border-t border-purple-500/20">
-                  <span className="text-2xs font-semibold text-muted-foreground">
+                  <span className="text-xs font-medium text-neutral-400">
                     Select the matching series from Comick ({comickResults.length} found):
                   </span>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto p-1 scrollbar-thin">
@@ -385,7 +389,7 @@ export function AddNewSeriesDialog({ trigger }: AddNewSeriesDialogProps) {
                         <div
                           key={comic.slug}
                           onClick={() => setSelectedComic(comic)}
-                          className={`flex items-center gap-3 p-2 rounded-xl border cursor-pointer transition-all ${
+                          className={`flex items-center gap-3 p-2.5 rounded-xl border cursor-pointer transition-all ${
                             isSelected
                               ? "bg-purple-600/20 border-purple-500 ring-1 ring-purple-500"
                               : "bg-card/40 border-border/40 hover:border-purple-500/40"
@@ -394,14 +398,14 @@ export function AddNewSeriesDialog({ trigger }: AddNewSeriesDialogProps) {
                           <img
                             src={comic.coverUrl || ""}
                             alt={comic.title}
-                            className="h-14 w-10 object-cover rounded-md bg-secondary shrink-0"
+                            className="h-14 w-10 object-cover rounded-md bg-secondary shrink-0 shadow-sm"
                           />
                           <div className="min-w-0 flex-1">
-                            <h4 className="text-xs font-bold text-foreground truncate">{comic.title}</h4>
+                            <h4 className="text-xs font-semibold text-white truncate">{comic.title}</h4>
                             <div className="flex items-center gap-1.5 mt-0.5">
-                              <span className="text-[10px] text-muted-foreground">{comic.releaseYear || "N/A"}</span>
+                              <span className="text-[11px] text-neutral-400">{comic.releaseYear || "N/A"}</span>
                             </div>
-                            <p className="text-[10px] text-muted-foreground truncate mt-0.5">{comic.author || "Unknown"}</p>
+                            <p className="text-[11px] text-neutral-400 truncate mt-0.5 font-normal">{comic.author || "Unknown"}</p>
                           </div>
                           {isSelected && <Check className="h-4 w-4 text-purple-400 shrink-0" />}
                         </div>
@@ -411,9 +415,9 @@ export function AddNewSeriesDialog({ trigger }: AddNewSeriesDialogProps) {
 
                   {/* Format Selector for Smart Mode */}
                   <div className="pt-2 flex items-center gap-3">
-                    <Label className="text-xs font-bold shrink-0">Series Format:</Label>
+                    <span className="text-xs font-semibold text-neutral-300 shrink-0">Series Format:</span>
                     <Select value={selectedType} onValueChange={(v: any) => setSelectedType(v)}>
-                      <SelectTrigger className="text-xs h-8 w-36">
+                      <SelectTrigger className="text-xs h-8 w-36 bg-neutral-900/80 border-neutral-800 text-white rounded-lg">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -430,38 +434,43 @@ export function AddNewSeriesDialog({ trigger }: AddNewSeriesDialogProps) {
             </div>
 
             {/* Step 2: Scan Chapter Source */}
-            <div className="p-4 rounded-xl bg-card/40 border border-border/40 space-y-3">
-              <div>
-                <Label className="text-xs font-bold text-foreground flex items-center gap-1.5">
-                  <Globe className="h-3.5 w-3.5 text-primary" /> Step 2: Attach Scan Source for Chapters (Optional)
-                </Label>
-                <p className="text-2xs text-muted-foreground mt-0.5">
+            <div className="p-4 rounded-xl bg-neutral-900/40 border border-neutral-800/80 space-y-3">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-neutral-800 text-[11px] font-bold text-neutral-300">2</span>
+                  <span className="text-sm font-semibold tracking-tight text-neutral-100">
+                    Attach Scan Source for Chapters <span className="text-xs font-normal text-neutral-400">(Optional)</span>
+                  </span>
+                </div>
+                <p className="text-xs text-neutral-400 font-normal leading-relaxed pl-7">
                   Paste the series URL from Asura, Reaper, FlameScans, Realm, Void, etc. Chapters will be synced directly from this source!
                 </p>
               </div>
 
-              <Input
-                value={scanSourceUrl}
-                onChange={(e) => setScanSourceUrl(e.target.value)}
-                placeholder="e.g. https://asuracomic.net/series/solo-leveling"
-                className="text-xs bg-background/80"
-              />
+              <div className="pl-7">
+                <Input
+                  value={scanSourceUrl}
+                  onChange={(e) => setScanSourceUrl(e.target.value)}
+                  placeholder="e.g. https://asuracomic.net/series/solo-leveling"
+                  className="h-10 text-sm bg-neutral-900/90 border-neutral-800 focus:border-purple-500 text-white placeholder:text-neutral-500 rounded-lg font-normal"
+                />
+              </div>
             </div>
 
             {/* Summary & Create Button */}
             {selectedComic && (
-              <div className="p-3 rounded-xl bg-secondary/30 border border-border/30 flex items-center justify-between gap-3 text-xs">
+              <div className="p-3.5 rounded-xl bg-secondary/30 border border-border/30 flex items-center justify-between gap-3 text-xs">
                 <div className="min-w-0 flex items-center gap-2.5">
                   <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
-                  <span className="font-semibold text-foreground truncate">
-                    Ready to create <strong className="text-purple-300">{selectedComic.title}</strong>
+                  <span className="font-medium text-neutral-200 truncate text-xs">
+                    Ready to create <strong className="text-purple-300 font-semibold">{selectedComic.title}</strong>
                   </span>
                 </div>
                 <Button
                   type="button"
                   onClick={handleHybridCreate}
                   disabled={isHybridSubmitting}
-                  className="font-bold bg-primary hover:bg-primary/90 text-primary-foreground text-xs gap-1.5 shrink-0 cursor-pointer shadow-md"
+                  className="h-9 px-4 font-semibold bg-primary hover:bg-primary/90 text-primary-foreground text-xs gap-1.5 shrink-0 cursor-pointer rounded-lg shadow-md transition-all"
                 >
                   {isHybridSubmitting ? (
                     <>
