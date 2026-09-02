@@ -262,10 +262,8 @@ export function SeriesReviewsSection({
 
   // Toggle Reaction Mutation
   const toggleReactionMutation = useMutation({
-    mutationFn: async ({ reviewId, type }: { reviewId: string; type: string }) => {
+    mutationFn: async ({ reviewId, type, hasReacted }: { reviewId: string; type: string; hasReacted: boolean }) => {
       if (!user) throw new Error("Please sign in to react");
-      const key = `${reviewId}:${type}`;
-      const hasReacted = reactionsQ.data?.mine.has(key);
 
       if (hasReacted) {
         await (supabase.from("comment_reactions") as any)
@@ -281,7 +279,44 @@ export function SeriesReviewsSection({
         });
       }
     },
-    onSuccess: () => {
+    onMutate: async ({ reviewId, type, hasReacted }) => {
+      const queryKey = ["series-review-reactions", reviewIds.join(",")];
+      await qc.cancelQueries({ queryKey });
+
+      const prevData = qc.getQueryData<{
+        counts: Map<string, Record<string, number>>;
+        mine: Set<string>;
+      }>(queryKey);
+
+      if (prevData) {
+        const nextCounts = new Map(prevData.counts);
+        const nextMine = new Set(prevData.mine);
+        const key = `${reviewId}:${type}`;
+
+        const reviewBucket = { ...(nextCounts.get(reviewId) || {}) };
+        const currentCount = reviewBucket[type] || 0;
+
+        if (hasReacted) {
+          nextMine.delete(key);
+          reviewBucket[type] = Math.max(0, currentCount - 1);
+        } else {
+          nextMine.add(key);
+          reviewBucket[type] = currentCount + 1;
+        }
+
+        nextCounts.set(reviewId, reviewBucket);
+        qc.setQueryData(queryKey, { counts: nextCounts, mine: nextMine });
+      }
+
+      return { prevData, queryKey };
+    },
+    onError: (err: any, _, context) => {
+      if (context?.prevData) {
+        qc.setQueryData(context.queryKey, context.prevData);
+      }
+      toast.error(err.message || "Failed to update reaction");
+    },
+    onSettled: () => {
       qc.invalidateQueries({ queryKey: ["series-review-reactions"] });
     },
   });
@@ -734,10 +769,18 @@ export function SeriesReviewsSection({
                         <button
                           key={r.type}
                           type="button"
-                          onClick={() =>
-                            toggleReactionMutation.mutate({ reviewId: review.id, type: r.type })
-                          }
-                          className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                          onClick={() => {
+                            if (!user) {
+                              toast.error("Please sign in to react");
+                              return;
+                            }
+                            toggleReactionMutation.mutate({
+                              reviewId: review.id,
+                              type: r.type,
+                              hasReacted: Boolean(active),
+                            });
+                          }}
+                          className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer select-none ${
                             active
                               ? "bg-purple-600/20 text-purple-300 border border-purple-500/40"
                               : "bg-secondary/40 text-muted-foreground hover:text-foreground hover:bg-secondary border border-transparent"

@@ -2417,13 +2417,14 @@ function ChapterLikeAndMemes({ chapterId, seriesId }: { chapterId: string; serie
   });
 
   const toggleReaction = useMutation({
-    mutationFn: async (reactionType: string) => {
-      if (!user) {
-        toast.error("Sign in to react");
-        return;
-      }
-
-      const hasReacted = userReactionsQ.data?.includes(reactionType);
+    mutationFn: async ({
+      reactionType,
+      hasReacted,
+    }: {
+      reactionType: string;
+      hasReacted: boolean;
+    }) => {
+      if (!user) throw new Error("Sign in to react");
 
       if (hasReacted) {
         const { error } = await supabase
@@ -2440,18 +2441,57 @@ function ChapterLikeAndMemes({ chapterId, seriesId }: { chapterId: string; serie
           reaction_type: reactionType,
         });
         if (error) throw error;
-        if (reactionType === "heart") {
-          setLikeBurst(true);
-          setTimeout(() => setLikeBurst(false), 1200);
-        }
       }
     },
-    onSuccess: () => {
+    onMutate: async ({ reactionType, hasReacted }) => {
+      // Cancel queries to prevent race conditions
+      await qc.cancelQueries({ queryKey: ["chapter-reactions", chapterId] });
+      await qc.cancelQueries({ queryKey: ["user-chapter-reactions", chapterId, user?.id] });
+
+      const prevReactions = qc.getQueryData<Record<string, number>>(["chapter-reactions", chapterId]) || {};
+      const prevUserReactions = qc.getQueryData<string[]>(["user-chapter-reactions", chapterId, user?.id]) || [];
+
+      // Optimistically calculate new reaction counts
+      const currentCount = prevReactions[reactionType] || 0;
+      const nextCount = hasReacted ? Math.max(0, currentCount - 1) : currentCount + 1;
+      const nextReactions = { ...prevReactions, [reactionType]: nextCount };
+
+      // Optimistically update user reacted list
+      const nextUserReactions = hasReacted
+        ? prevUserReactions.filter((r) => r !== reactionType)
+        : [...prevUserReactions, reactionType];
+
+      qc.setQueryData(["chapter-reactions", chapterId], nextReactions);
+      qc.setQueryData(["user-chapter-reactions", chapterId, user?.id], nextUserReactions);
+
+      if (reactionType === "heart" && !hasReacted) {
+        setLikeBurst(true);
+        setTimeout(() => setLikeBurst(false), 1200);
+      }
+
+      return { prevReactions, prevUserReactions };
+    },
+    onError: (e: Error, _, context) => {
+      if (context) {
+        qc.setQueryData(["chapter-reactions", chapterId], context.prevReactions);
+        qc.setQueryData(["user-chapter-reactions", chapterId, user?.id], context.prevUserReactions);
+      }
+      toast.error(e.message || "Failed to update reaction");
+    },
+    onSettled: () => {
       qc.invalidateQueries({ queryKey: ["chapter-reactions", chapterId] });
       qc.invalidateQueries({ queryKey: ["user-chapter-reactions", chapterId, user?.id] });
     },
-    onError: (e: Error) => toast.error(e.message),
   });
+
+  const handleToggleReaction = (reactionType: string) => {
+    if (!user) {
+      toast.error("Please sign in to react or like this chapter");
+      return;
+    }
+    const hasReacted = userReactionsQ.data?.includes(reactionType) ?? false;
+    toggleReaction.mutate({ reactionType, hasReacted });
+  };
 
   const isLiked = userReactionsQ.data?.includes("heart");
   const likeCount = reactionsQ.data?.["heart"] || 0;
@@ -2481,9 +2521,8 @@ function ChapterLikeAndMemes({ chapterId, seriesId }: { chapterId: string; serie
         {/* Big Animated Like Button */}
         <div className="mt-6 flex flex-col items-center">
           <button
-            onClick={() => toggleReaction.mutate("heart")}
-            disabled={toggleReaction.isPending}
-            className={`group relative flex items-center gap-3 px-9 py-4 rounded-full font-bold text-base transition-all duration-300 transform active:scale-95 cursor-pointer shadow-xl ${
+            onClick={() => handleToggleReaction("heart")}
+            className={`group relative flex items-center gap-3 px-9 py-4 rounded-full font-bold text-base transition-all duration-300 transform active:scale-95 cursor-pointer shadow-xl select-none ${
               isLiked
                 ? "bg-gradient-to-r from-pink-600 via-rose-500 to-pink-600 text-white shadow-pink-500/30 ring-2 ring-pink-400/60 scale-105"
                 : "bg-secondary/80 hover:bg-pink-500/10 text-foreground border border-border hover:border-pink-500/40 hover:text-pink-400"
@@ -2496,7 +2535,7 @@ function ChapterLikeAndMemes({ chapterId, seriesId }: { chapterId: string; serie
             />
             <span>{isLiked ? "Liked!" : "Like Chapter"}</span>
             <span
-              className={`ml-1 text-xs font-mono font-bold px-2.5 py-0.5 rounded-full ${
+              className={`ml-1 text-xs font-mono font-bold px-2.5 py-0.5 rounded-full transition-colors ${
                 isLiked ? "bg-white/20 text-white" : "bg-background/80 text-muted-foreground"
               }`}
             >
@@ -2532,14 +2571,13 @@ function ChapterLikeAndMemes({ chapterId, seriesId }: { chapterId: string; serie
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {memeReactions.map((reaction) => {
             const count = reactionsQ.data?.[reaction.type] || 0;
-            const hasReacted = userReactionsQ.data?.includes(reaction.type);
+            const hasReacted = userReactionsQ.data?.includes(reaction.type) || false;
 
             return (
               <button
                 key={reaction.type}
-                onClick={() => toggleReaction.mutate(reaction.type)}
-                disabled={toggleReaction.isPending}
-                className={`flex items-center justify-between p-3.5 rounded-xl border transition-all duration-200 transform active:scale-95 cursor-pointer ${
+                onClick={() => handleToggleReaction(reaction.type)}
+                className={`flex items-center justify-between p-3.5 rounded-xl border transition-all duration-200 transform active:scale-95 cursor-pointer select-none ${
                   hasReacted
                     ? "bg-primary/20 border-primary text-primary font-bold shadow-md shadow-primary/10 scale-[1.02]"
                     : "bg-card/60 border-border/60 hover:bg-primary/10 hover:border-primary/50 text-foreground"
@@ -2550,7 +2588,7 @@ function ChapterLikeAndMemes({ chapterId, seriesId }: { chapterId: string; serie
                   <span className="text-2xl">{reaction.emoji}</span>
                   <span className="text-xs font-bold">{reaction.label}</span>
                 </div>
-                <span className="text-xs font-mono font-bold bg-secondary/80 px-2 py-0.5 rounded-md text-muted-foreground">
+                <span className="text-xs font-mono font-bold bg-secondary/80 px-2 py-0.5 rounded-md text-muted-foreground transition-all">
                   {count}
                 </span>
               </button>
@@ -3195,12 +3233,13 @@ function ChapterComments({
     mutationFn: async ({
       commentId,
       reactionType,
+      hasReacted,
     }: {
       commentId: string;
       reactionType: string;
+      hasReacted: boolean;
     }) => {
       if (!user) throw new Error("Sign in to react");
-      const hasReacted = reactionsQ.data?.mine.has(`${commentId}:${reactionType}`);
 
       if (hasReacted) {
         const { error } = await (supabase.from("comment_reactions") as any)
@@ -3219,8 +3258,43 @@ function ChapterComments({
       });
       if (error) throw error;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["comment-reactions", chapterId] }),
-    onError: (error: Error) => toast.error(error.message),
+    onMutate: async ({ commentId, reactionType, hasReacted }) => {
+      await qc.cancelQueries({ queryKey: ["comment-reactions", chapterId] });
+
+      const prevData = qc.getQueryData<{
+        counts: Map<string, Record<string, number>>;
+        mine: Set<string>;
+      }>(["comment-reactions", chapterId]);
+
+      if (prevData) {
+        const nextCounts = new Map(prevData.counts);
+        const nextMine = new Set(prevData.mine);
+        const key = `${commentId}:${reactionType}`;
+
+        const commentBucket = { ...(nextCounts.get(commentId) || {}) };
+        const currentCount = commentBucket[reactionType] || 0;
+
+        if (hasReacted) {
+          nextMine.delete(key);
+          commentBucket[reactionType] = Math.max(0, currentCount - 1);
+        } else {
+          nextMine.add(key);
+          commentBucket[reactionType] = currentCount + 1;
+        }
+
+        nextCounts.set(commentId, commentBucket);
+        qc.setQueryData(["comment-reactions", chapterId], { counts: nextCounts, mine: nextMine });
+      }
+
+      return { prevData };
+    },
+    onError: (error: Error, _, context) => {
+      if (context?.prevData) {
+        qc.setQueryData(["comment-reactions", chapterId], context.prevData);
+      }
+      toast.error(error.message || "Failed to update reaction");
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: ["comment-reactions", chapterId] }),
   });
 
   const reportComment = useMutation({
@@ -3573,13 +3647,18 @@ function ChapterComments({
               return (
                 <button
                   key={reaction.type}
-                  onClick={() =>
+                  onClick={() => {
+                    if (!user) {
+                      toast.error("Please sign in to react");
+                      return;
+                    }
                     toggleCommentReaction.mutate({
                       commentId: comment.id,
                       reactionType: reaction.type,
-                    })
-                  }
-                  className={`flex h-7 items-center gap-1.5 rounded-full border px-2.5 text-xs font-medium transition-all duration-200 hover:scale-105 active:scale-95 ${
+                      hasReacted: Boolean(active),
+                    });
+                  }}
+                  className={`flex h-7 items-center gap-1.5 rounded-full border px-2.5 text-xs font-medium transition-all duration-200 hover:scale-105 active:scale-95 cursor-pointer select-none ${
                     active
                       ? "border-primary/60 bg-primary/10 text-primary shadow-[0_0_10px_rgba(139,92,246,0.15)]"
                       : "border-border/50 bg-background/30 hover:border-border hover:bg-muted/40 hover:text-foreground text-muted-foreground"
