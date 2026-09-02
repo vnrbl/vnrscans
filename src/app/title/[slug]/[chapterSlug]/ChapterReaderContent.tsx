@@ -2212,16 +2212,16 @@ function InlineMemePicker({
   });
 
   return (
-    <div className="mt-3 rounded-xl border border-border/60 bg-card/95 p-3.5 shadow-lg animate-in fade-in slide-in-from-top-2 duration-200">
+    <div className="mt-3 rounded-2xl border border-border/60 bg-card/95 p-2.5 sm:p-3.5 shadow-xl animate-in fade-in slide-in-from-top-2 duration-200 backdrop-blur-md">
       {/* Header & Search */}
-      <div className="flex items-center gap-2 mb-2.5">
+      <div className="flex items-center gap-2 mb-2">
         <div className="relative flex-1">
           <input
             type="text"
-            placeholder="Search memes & reaction stickers (Peak, Cinema, Gojo, Anya)..."
+            placeholder="Search memes & reaction GIFs (Peak, Cinema, Gojo, Anya)..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full h-8 rounded-lg border border-border/60 bg-background/80 px-3 text-xs focus:outline-none focus:ring-1 focus:ring-primary text-foreground placeholder:text-muted-foreground"
+            className="w-full h-8 sm:h-9 rounded-xl border border-border/60 bg-background/80 px-3 text-xs focus:outline-none focus:ring-1 focus:ring-primary text-foreground placeholder:text-muted-foreground"
           />
         </div>
         {onClose && (
@@ -2229,26 +2229,26 @@ function InlineMemePicker({
             type="button"
             variant="ghost"
             size="sm"
-            className="h-8 px-2.5 text-xs text-muted-foreground hover:text-foreground shrink-0 cursor-pointer"
+            className="h-8 sm:h-9 px-2.5 text-xs text-muted-foreground hover:text-foreground shrink-0 cursor-pointer"
             onClick={onClose}
           >
             <ChevronUp className="h-3.5 w-3.5 mr-1" />
-            Hide
+            <span>Hide</span>
           </Button>
         )}
       </div>
 
       {/* Categories */}
-      <div className="flex items-center gap-1.5 overflow-x-auto pb-2 scrollbar-none border-b border-border/30 mb-2.5">
+      <div className="flex items-center gap-1.5 overflow-x-auto pb-2 scrollbar-none border-b border-border/30 mb-2.5 touch-pan-x">
         {MEME_CATEGORIES.map((cat) => (
           <button
             key={cat.id}
             type="button"
             onClick={() => setSelectedCategory(cat.id)}
-            className={`shrink-0 px-2.5 py-1 rounded-full text-[11px] font-semibold transition-all cursor-pointer ${
+            className={`shrink-0 px-2.5 py-1 rounded-full text-[10px] sm:text-[11px] font-semibold transition-all cursor-pointer ${
               selectedCategory === cat.id
                 ? "bg-primary text-primary-foreground shadow-sm shadow-primary/20 scale-105"
-                : "bg-secondary/60 text-muted-foreground hover:bg-secondary hover:text-foreground"
+                : "bg-secondary/70 text-muted-foreground hover:bg-secondary hover:text-foreground"
             }`}
           >
             {cat.label}
@@ -2256,8 +2256,8 @@ function InlineMemePicker({
         ))}
       </div>
 
-      {/* Meme Grid */}
-      <div className={`grid ${compact ? "grid-cols-3 sm:grid-cols-4 md:grid-cols-5" : "grid-cols-3 sm:grid-cols-4 md:grid-cols-6"} gap-2 max-h-60 overflow-y-auto pr-1`}>
+      {/* Meme Grid - Responsive for mobile & desktop */}
+      <div className={`grid ${compact ? "grid-cols-2 xs:grid-cols-3 sm:grid-cols-4 md:grid-cols-5" : "grid-cols-2 xs:grid-cols-3 sm:grid-cols-4 md:grid-cols-6"} gap-2 max-h-56 sm:max-h-72 overflow-y-auto pr-1 scrollbar-thin`}>
         {filteredMemes.map((meme) => (
           <MemeGridItem
             key={meme.id}
@@ -2544,20 +2544,20 @@ function CommentAttachmentMedia({
 
   return (
     <>
-      <div className="mt-3 inline-block max-w-xs sm:max-w-sm">
+      <div className="mt-2.5 inline-block max-w-full sm:max-w-md">
         <div
           onClick={() => setExpanded(true)}
-          className="group relative block overflow-hidden rounded-xl border border-border/60 bg-black/40 hover:border-primary/50 transition-all duration-200 shadow-md cursor-pointer select-none"
+          className="group relative block overflow-hidden rounded-xl border border-border/60 bg-black/40 hover:border-primary/50 transition-all duration-200 shadow-md cursor-pointer select-none max-w-full"
         >
           {loading && !error && (
-            <div className="h-44 w-60 animate-pulse bg-secondary/80 rounded-xl flex items-center justify-center text-muted-foreground text-xs font-medium">
+            <div className="h-40 w-48 sm:h-48 sm:w-64 animate-pulse bg-secondary/80 rounded-xl flex items-center justify-center text-muted-foreground text-xs font-medium">
               Loading meme...
             </div>
           )}
 
           {error ? (
-            <div className="flex items-center gap-3 p-3.5 bg-secondary/50 rounded-xl border border-border/50">
-              <span className="text-3xl">🔥</span>
+            <div className="flex items-center gap-2.5 p-3 bg-secondary/50 rounded-xl border border-border/50">
+              <span className="text-2xl">🔥</span>
               <div className="min-w-0 flex-1">
                 <p className="text-xs font-bold text-foreground truncate">{alt || "Anime Reaction Meme"}</p>
                 <span className="text-[10px] text-primary font-semibold">Click to view image</span>
@@ -2570,7 +2570,7 @@ function CommentAttachmentMedia({
               referrerPolicy="no-referrer"
               loading="lazy"
               decoding="async"
-              className={`max-h-72 w-full object-contain rounded-xl group-hover:scale-[1.02] transition-transform duration-200 ${
+              className={`max-h-56 sm:max-h-72 w-auto max-w-full object-contain rounded-xl group-hover:scale-[1.01] transition-transform duration-200 ${
                 loading ? "hidden" : "block"
               }`}
               onLoad={() => setLoading(false)}
@@ -3056,7 +3056,7 @@ function ChapterComments({
         series_id: seriesId,
         chapter_id: chapterId,
         parent_id: parentId,
-        content: cleanBody || (attachmentType === "gif" ? "Shared a GIF" : "Shared a Meme/Image"),
+        content: cleanBody || "",
         attachment_type: attachmentType,
         attachment_url: attachmentUrl,
         attachment_alt: attachmentAlt,
@@ -3442,11 +3442,16 @@ function ChapterComments({
             </div>
           </div>
 
-          <div
-            className={`mt-3 whitespace-pre-wrap text-sm leading-relaxed ${spoilerHidden ? "select-none rounded bg-secondary p-3 text-transparent blur-sm" : ""}`}
-          >
-            {spoilerHidden ? comment.content : renderCommentMarkdown(comment.content)}
-          </div>
+          {Boolean(
+            comment.content &&
+            !["shared a meme/image", "shared a gif", "shared a meme", "shared an image", "shared a sticker"].includes(comment.content.trim().toLowerCase())
+          ) && (
+            <div
+              className={`mt-2.5 whitespace-pre-wrap text-xs sm:text-sm leading-relaxed text-foreground/90 ${spoilerHidden ? "select-none rounded bg-secondary p-2.5 sm:p-3 text-transparent blur-sm" : ""}`}
+            >
+              {spoilerHidden ? comment.content : renderCommentMarkdown(comment.content)}
+            </div>
+          )}
 
           {comment.attachment_url && !spoilerHidden && (() => {
             const safeAttachmentUrl = safeUrlOrNull(comment.attachment_url);
