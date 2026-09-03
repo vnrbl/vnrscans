@@ -645,4 +645,45 @@ html.perf-mode .shimmer-dark {
   background: #18181f !important;
 }
 
+/* 🍃 Battery Saver / Eco Mode */
+html.eco-mode *,
+html.eco-mode *::before,
+html.eco-mode *::after {
+  animation-duration: 0.001s !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001s !important;
+}
+
+html.eco-mode .animate-pulse,
+html.eco-mode .animate-spin,
+html.eco-mode .animate-bounce,
+html.eco-mode .shimmer-dark {
+  animation: none !important;
+}
+
+/* 📖 Aggressive Reader Turbo */
+html.reader-turbo .reader-page-container {
+  contain: strict !important;
+  content-visibility: auto !important;
+  contain-intrinsic-size: 1000px 1400px !important;
+}
+
+/* ⚡ Hardware GPU Compositing Acceleration */
+html.gpu-accel main,
+html.gpu-accel .reader-page-container {
+  transform: translate3d(0, 0, 0);
+  backface-visibility: hidden;
+  perspective: 1000px;
+}
+
+/* 🌐 Network & Data Saver Mode */
+html.data-saver img {
+  image-rendering: -webkit-optimize-contrast;
+}
+html.data-saver video {
+  display: none !important;
+}
+
+
+
 

@@ -1392,6 +1392,7 @@ function ImageView({
                     src={p.image_url}
                     alt={`${seriesTitle || "Manga"} Chapter ${chapterNumber} Page ${p.page_number} - vnrscans`}
                     loading={idx < 2 ? "eager" : "lazy"}
+                    decoding="async"
                     fetchPriority={idx < 2 ? "high" : "auto"}
                     className="mx-auto block w-full transition-transform duration-200"
                     referrerPolicy="no-referrer"
