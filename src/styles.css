@@ -661,11 +661,11 @@ html.eco-mode .shimmer-dark {
   animation: none !important;
 }
 
-/* 📖 Aggressive Reader Turbo */
+/* 📖 Aggressive Reader Turbo - Mobile Responsive Safe */
 html.reader-turbo .reader-page-container {
-  contain: strict !important;
+  contain: content !important;
   content-visibility: auto !important;
-  contain-intrinsic-size: 1000px 1400px !important;
+  contain-intrinsic-size: auto 800px !important;
 }
 
 /* ⚡ Hardware GPU Compositing Acceleration */
@@ -675,6 +675,20 @@ html.gpu-accel .reader-page-container {
   backface-visibility: hidden;
   perspective: 1000px;
 }
+
+/* Global Mobile Overflow & Full Responsiveness */
+html, body {
+  max-width: 100vw;
+  overflow-x: clip;
+}
+
+/* Ensure images and media never overflow screen width */
+.reader-page-container img,
+.reader-page-container video {
+  max-width: 100% !important;
+  height: auto !important;
+}
+
 
 /* 🌐 Network & Data Saver Mode */
 html.data-saver img {

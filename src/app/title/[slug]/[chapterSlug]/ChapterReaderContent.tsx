@@ -692,10 +692,10 @@ export default function Reader({ slug, chapterSlug }: { slug: string; chapterSlu
   const isNovel = c.chapter_type === "novel";
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background w-full max-w-full overflow-x-clip">
       {/* Top Bar - Auto-hide */}
       <div
-        className={`sticky top-0 z-30 transition-transform duration-300 ${
+        className={`sticky top-0 z-30 w-full transition-transform duration-300 ${
           controlsVisible ? "translate-y-0" : "-translate-y-full"
         }`}
       >
@@ -972,24 +972,26 @@ function ReaderTopBar({
   const showGroupSwitcher = alternateGroups.length > 1;
 
   return (
-    <header className="sticky top-0 z-30 border-b border-border/50 bg-background/90 backdrop-blur">
-      <div className="container mx-auto flex items-center justify-between gap-2 px-4 py-3">
+    <header className="sticky top-0 z-30 w-full border-b border-border/50 bg-background/95 backdrop-blur-md">
+      <div className="w-full max-w-7xl mx-auto flex items-center justify-between gap-2 px-3 sm:px-6 py-2 sm:py-3">
         <Link
           to="/title/$slug"
           params={{ slug: seriesSlug }}
-          className="flex min-w-0 items-center gap-2 text-sm"
+          className="flex min-w-0 items-center gap-2 text-sm hover:opacity-85 transition-opacity"
         >
-          <ArrowLeft className="h-4 w-4" />
+          <ArrowLeft className="h-4 w-4 shrink-0 text-muted-foreground" />
           <div className="min-w-0">
-            <div className="truncate font-semibold">{seriesTitle}</div>
-            <div className="truncate text-xs text-muted-foreground">{title}</div>
+            <div className="truncate font-semibold text-xs sm:text-sm text-foreground max-w-[130px] min-[360px]:max-w-[170px] sm:max-w-md">
+              {seriesTitle}
+            </div>
+            <div className="truncate text-[11px] text-muted-foreground">{title}</div>
             {/* Screen-reader-only h1 tag for absolute SEO compliance and hierarchy */}
             <h1 className="sr-only">
               Read {seriesTitle} {title.includes("Ch. ") ? `Chapter ${title.replace("Ch. ", "")}` : title} Online Free
             </h1>
           </div>
         </Link>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
           {showGroupSwitcher && (
             <Select
               value={currentChapterSlug}
@@ -1000,7 +1002,7 @@ function ReaderTopBar({
                 })
               }
             >
-              <SelectTrigger className="w-[160px]">
+              <SelectTrigger className="w-[100px] sm:w-[150px] text-xs h-8 sm:h-9">
                 <SelectValue placeholder="Scan group" />
               </SelectTrigger>
               <SelectContent>
@@ -1013,7 +1015,7 @@ function ReaderTopBar({
             </Select>
           )}
           {!showGroupSwitcher && currentGroup && (
-            <span className="hidden text-xs text-muted-foreground sm:inline">{currentGroup}</span>
+            <span className="hidden text-xs text-muted-foreground md:inline">{currentGroup}</span>
           )}
           {allChapters.length > 0 && (
             <Select
@@ -1025,13 +1027,13 @@ function ReaderTopBar({
                 })
               }
             >
-              <SelectTrigger className="w-full min-[420px]:w-[180px]">
-                <List className="mr-2 h-4 w-4" />
+              <SelectTrigger className="w-[115px] min-[360px]:w-[135px] sm:w-[175px] text-xs h-8 sm:h-9 px-2 sm:px-3">
+                <List className="mr-1.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                 <SelectValue placeholder="Select Chapter" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="max-h-72">
                 {allChapters.map((ch) => (
-                  <SelectItem key={ch.id} value={ch.slug}>
+                  <SelectItem key={ch.id} value={ch.slug} className="text-xs">
                     Chapter {ch.chapter_number}
                   </SelectItem>
                 ))}
@@ -1323,9 +1325,9 @@ function ImageView({
       )}
 
       {/* Pages */}
-      <div className="mx-auto max-w-3xl px-2 py-4">
+      <div className="mx-auto max-w-3xl w-full px-0 sm:px-2 py-2 sm:py-4 overflow-hidden">
         {pages.map((p, idx) => (
-          <div key={p.id} id={`chapter-page-${idx}`} data-page-index={idx} className="relative scroll-mt-14 reader-page-container">
+          <div key={p.id} id={`chapter-page-${idx}`} data-page-index={idx} className="relative scroll-mt-14 reader-page-container w-full max-w-full overflow-hidden">
             {imageErrors[p.id] ? (
               // Error fallback UI
               <div className="mx-auto flex aspect-[2/3] w-full flex-col items-center justify-center rounded-lg border-2 border-dashed border-border bg-secondary/50 text-center">
@@ -1394,7 +1396,7 @@ function ImageView({
                     loading={idx < 2 ? "eager" : "lazy"}
                     decoding="async"
                     fetchPriority={idx < 2 ? "high" : "auto"}
-                    className="mx-auto block w-full transition-transform duration-200"
+                    className="mx-auto block w-full max-w-full h-auto object-contain transition-transform duration-200"
                     referrerPolicy="no-referrer"
                     style={{
                       opacity: imageLoading[p.id] ? 0.3 : 1,
