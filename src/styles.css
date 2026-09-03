@@ -492,8 +492,9 @@
   /* Reader and long feed virtualization containment */
   .reader-page-container {
     content-visibility: auto;
-    contain-intrinsic-size: 1000px;
-    contain: layout paint;
+    contain-intrinsic-size: auto 1200px;
+    width: 100%;
+    max-width: 100%;
   }
 
   /* Sleek purple glows */
@@ -663,9 +664,10 @@ html.eco-mode .shimmer-dark {
 
 /* 📖 Aggressive Reader Turbo - Mobile Responsive Safe */
 html.reader-turbo .reader-page-container {
-  contain: content !important;
   content-visibility: auto !important;
-  contain-intrinsic-size: auto 800px !important;
+  contain-intrinsic-size: auto 1200px !important;
+  width: 100% !important;
+  max-width: 100% !important;
 }
 
 /* ⚡ Hardware GPU Compositing Acceleration */
@@ -682,11 +684,16 @@ html, body {
   overflow-x: clip;
 }
 
-/* Ensure images and media never overflow screen width */
+/* Ensure reader images fit 100% screen width naturally without crop or zoom */
 .reader-page-container img,
 .reader-page-container video {
+  width: 100% !important;
   max-width: 100% !important;
   height: auto !important;
+  object-fit: contain !important;
+  display: block !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
 }
 
 

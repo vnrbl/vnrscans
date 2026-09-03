@@ -13,46 +13,8 @@ import {
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
-// Real-Time On-Screen FPS Counter HUD component
-export function LiveFpsHud() {
-  const [fps, setFps] = useState<number>(60);
-  const [frameTime, setFrameTime] = useState<number>(16.6);
-
-  useEffect(() => {
-    let frameCount = 0;
-    let lastTime = performance.now();
-    let rafId: number;
-
-    const tick = (now: number) => {
-      frameCount++;
-      const delta = now - lastTime;
-      if (delta >= 1000) {
-        const currentFps = Math.round((frameCount * 1000) / delta);
-        setFps(currentFps);
-        setFrameTime(parseFloat((1000 / Math.max(currentFps, 1)).toFixed(1)));
-        frameCount = 0;
-        lastTime = now;
-      }
-      rafId = requestAnimationFrame(tick);
-    };
-
-    rafId = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(rafId);
-  }, []);
-
-  const isHighSmooth = fps >= 55;
-
-  return (
-    <div className="fixed bottom-4 left-4 z-50 flex items-center gap-2 px-3 py-1.5 rounded-full bg-black/95 border border-emerald-500/50 text-emerald-400 font-mono text-xs font-bold shadow-2xl backdrop-blur-md pointer-events-none select-none animate-in fade-in slide-in-from-bottom-2">
-      <span className={`h-2 w-2 rounded-full ${isHighSmooth ? "bg-emerald-400 animate-pulse" : "bg-amber-400"}`} />
-      <span>{fps} FPS</span>
-      <span className="text-[10px] text-neutral-400 font-normal">({frameTime}ms)</span>
-      <span className="text-[9px] uppercase tracking-wider text-emerald-300 font-semibold px-1 py-0.2 rounded bg-emerald-950/60 border border-emerald-500/30">
-        Turbo
-      </span>
-    </div>
-  );
-}
+// Re-export draggable LiveFpsHud component
+export { LiveFpsHud } from "@/components/LiveFpsHud";
 
 export function PerformanceModeButton({ isMobile = false }: { isMobile?: boolean }) {
   // Master ON/OFF state
@@ -212,6 +174,7 @@ export function PerformanceModeButton({ isMobile = false }: { isMobile?: boolean
     setShowFpsHud(val);
     try {
       localStorage.setItem("vnr-perf-fps-hud", String(val));
+      window.dispatchEvent(new Event("vnr-perf-change"));
     } catch {}
   };
 
@@ -267,10 +230,7 @@ export function PerformanceModeButton({ isMobile = false }: { isMobile?: boolean
   }
 
   return (
-    <>
-      {showFpsHud && <LiveFpsHud />}
-
-      <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
+    <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
         {/* DESKTOP SPLIT BUTTON: DIRECT 1-CLICK TOGGLE + OPTIONS CHEVRON */}
         {!isMobile ? (
           <div className="hidden sm:flex items-center rounded-lg border border-border/50 bg-background/50 overflow-hidden shadow-sm hover:border-amber-500/40 transition-colors">
@@ -517,6 +477,5 @@ export function PerformanceModeButton({ isMobile = false }: { isMobile?: boolean
           </div>
         </PopoverContent>
       </Popover>
-    </>
   );
 }

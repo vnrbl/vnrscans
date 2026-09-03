@@ -26,6 +26,7 @@ import { AuthProvider } from "@/hooks/useAuth";
 import { NavigationProgress } from "@/components/NavigationProgress";
 
 import { ProcessingTaskProvider } from "@/contexts/ProcessingTaskContext";
+import { LiveFpsHud } from "@/components/LiveFpsHud";
 
 export function Providers({ children }: { children: ReactNode }) {
   const [queryClient] = useState(
@@ -99,6 +100,7 @@ function AppShell({ children }: { children: ReactNode }) {
         {children}
         <Toaster />
         <Analytics />
+        <LiveFpsHud />
       </>
     );
   }
@@ -114,6 +116,7 @@ function AppShell({ children }: { children: ReactNode }) {
       <Footer />
       <Toaster />
       <Analytics />
+      <LiveFpsHud />
     </div>
   );
 }

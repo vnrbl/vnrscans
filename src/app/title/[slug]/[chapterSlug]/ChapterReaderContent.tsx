@@ -726,9 +726,9 @@ export default function Reader({
         />
       </div>
 
-      <div className="flex">
+      <div className="w-full max-w-full">
         {/* Main content */}
-        <div className="flex-1">
+        <div className="w-full max-w-full">
           {isNovel ? (
             <NovelView
               content={c.novel_content ?? ""}
@@ -1340,9 +1340,9 @@ function ImageView({
       )}
 
       {/* Pages */}
-      <div className="mx-auto max-w-3xl w-full px-0 sm:px-2 py-2 sm:py-4 overflow-hidden">
+      <div className="mx-auto max-w-3xl w-full px-0 sm:px-2 py-2 sm:py-4">
         {pages.map((p, idx) => (
-          <div key={p.id} id={`chapter-page-${idx}`} data-page-index={idx} className="relative scroll-mt-14 reader-page-container w-full max-w-full overflow-hidden">
+          <div key={p.id} id={`chapter-page-${idx}`} data-page-index={idx} className="relative scroll-mt-14 reader-page-container w-full max-w-full">
             {imageErrors[p.id] ? (
               // Error fallback UI
               <div className="mx-auto flex aspect-[2/3] w-full flex-col items-center justify-center rounded-lg border-2 border-dashed border-border bg-secondary/50 text-center">
