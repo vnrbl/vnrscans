@@ -2,12 +2,12 @@ import type { Metadata } from "next";
 import { LeaderboardClient } from "./LeaderboardClient";
 
 export const metadata: Metadata = {
-  title: "User Leaderboard & Season Ranks — vnrscans",
+  title: "Leaderboard Coming Soon — vnrscans",
   description:
-    "Real-time rankings of top manga and manhwa readers, cultivation levels, reading streaks, and seasonal rank tier rewards on vnrscans.",
+    "Season 1 Heavenly Dao Ascension leaderboard is coming soon to vnrscans. Prepare your reading streaks and spiritual Qi.",
   openGraph: {
-    title: "User Leaderboard & Season Ranks — vnrscans",
-    description: "Compete on the global reader leaderboard, climb rank tiers, and claim exclusive seasonal rewards.",
+    title: "Leaderboard Coming Soon — vnrscans",
+    description: "Season 1 Heavenly Dao Ascension cultivation leaderboard is coming soon to vnrscans.",
     url: "https://www.vnrscans.com/leaderboard",
   },
 };

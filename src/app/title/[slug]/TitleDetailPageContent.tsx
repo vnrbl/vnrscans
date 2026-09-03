@@ -370,7 +370,7 @@ export default function TitleDetailPageContent({
         </div>
 
         {/* Main layout grid: Chapters on Left, New Side Panel on Right */}
-        <div className="mt-10 grid gap-8 xl:grid-cols-[1fr_340px]">
+        <div className="mt-8 grid gap-8 xl:grid-cols-[1fr_340px]">
           {/* Chapter list & Release Schedule */}
           <div className="space-y-6">
             <ReleaseScheduleCard
@@ -930,22 +930,22 @@ function ShareWidget() {
   };
 
   return (
-    <div className="rounded-xl border border-border/60 bg-card/60 p-4 shadow-sm backdrop-blur-sm">
-      <div className="flex items-center gap-3">
-        <div className="p-2.5 rounded-xl bg-primary/10 text-primary shrink-0">
-          <Share2 className="h-5 w-5" />
+    <div className="rounded-xl border border-white/10 bg-neutral-950 p-3.5 shadow-md">
+      <div className="flex items-center gap-2.5">
+        <div className="p-2 rounded-lg bg-white/5 border border-white/10 text-purple-400 shrink-0">
+          <Share2 className="h-4 w-4" />
         </div>
         <div className="flex-1 min-w-0">
-          <h3 className="text-sm font-bold leading-tight">Share Series</h3>
-          <p className="text-[11px] text-muted-foreground truncate">Share with friends & community</p>
+          <h3 className="text-xs font-mono font-bold uppercase tracking-wider text-white">Share Series</h3>
+          <p className="text-[10px] text-neutral-400 truncate font-sans">Share with friends & community</p>
         </div>
       </div>
-      <div className="mt-3 flex gap-2">
+      <div className="mt-2.5">
         <Button
-          variant="secondary"
+          variant="outline"
           size="sm"
           onClick={handleShare}
-          className="w-full text-xs font-semibold h-8 rounded-lg"
+          className="w-full text-xs font-mono font-bold h-7.5 rounded-lg border-white/10 bg-neutral-900/80 hover:bg-neutral-800 text-neutral-300 hover:text-white cursor-pointer"
         >
           Share Link
         </Button>
@@ -995,33 +995,33 @@ function ReadingProgressWidget({
   const progressPercent = totalChapters > 0 ? Math.min(100, Math.round((readCount / totalChapters) * 100)) : 0;
 
   return (
-    <div className="rounded-xl border border-border/60 bg-card/60 p-4 shadow-sm backdrop-blur-sm space-y-3">
+    <div className="rounded-xl border border-white/10 bg-neutral-950 p-3.5 shadow-md space-y-2.5">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <div className="p-2 rounded-xl bg-purple-500/10 text-purple-400">
-            <Trophy className="h-4 w-4" />
+          <div className="p-1.5 rounded-lg bg-white/5 border border-white/10 text-purple-400">
+            <Trophy className="h-3.5 w-3.5" />
           </div>
           <div>
-            <h3 className="text-xs font-bold">Your Reading Progress</h3>
-            <p className="text-[11px] text-muted-foreground">{readCount} of {totalChapters} chapters read</p>
+            <h3 className="text-xs font-mono font-bold uppercase tracking-wider text-white">Your Progress</h3>
+            <p className="text-[10px] text-neutral-400 font-sans">{readCount} of {totalChapters} chapters read</p>
           </div>
         </div>
-        <span className="text-xs font-extrabold text-primary font-mono">{progressPercent}%</span>
+        <span className="text-xs font-mono font-bold text-purple-400 tabular-nums">{progressPercent}%</span>
       </div>
 
-      <Progress value={progressPercent} className="h-2 bg-secondary" />
+      <Progress value={progressPercent} className="h-1.5 bg-neutral-900" />
 
       {user ? (
-        <div className="flex items-center justify-between pt-1 text-[11px] text-muted-foreground">
+        <div className="flex items-center justify-between pt-0.5 text-[10px] font-mono text-neutral-400">
           <span className="flex items-center gap-1">
-            <Zap className="h-3.5 w-3.5 text-amber-400 fill-amber-400" />
-            <span>Earned from this series</span>
+            <Zap className="h-3 w-3 text-amber-400 fill-amber-400" />
+            <span>Spiritual Qi</span>
           </span>
-          <span className="font-mono font-bold text-foreground">+{earnedXp} XP</span>
+          <span className="font-mono font-bold text-white">+{earnedXp} Qi</span>
         </div>
       ) : (
-        <p className="text-[11px] text-muted-foreground text-center">
-          <Link href="/login" className="text-primary hover:underline font-semibold">Sign in</Link> to track reading & earn XP
+        <p className="text-[10px] text-neutral-500 text-center font-sans">
+          <Link href="/login" className="text-purple-400 hover:underline font-semibold">Sign in</Link> to track reading & gather Qi
         </p>
       )}
     </div>
@@ -1083,37 +1083,37 @@ function SeriesLeaderboardWidget({ seriesId }: { seriesId: string }) {
   const topReaders = leaderboardQ.data || [];
 
   return (
-    <div className="rounded-xl border border-border/60 bg-card/60 p-4 shadow-sm backdrop-blur-sm space-y-3">
+    <div className="rounded-xl border border-white/10 bg-neutral-950 p-3.5 shadow-md space-y-2.5">
       <div className="flex items-center gap-2">
-        <div className="p-2 rounded-xl bg-amber-500/10 text-amber-400">
-          <Award className="h-4 w-4" />
+        <div className="p-1.5 rounded-lg bg-white/5 border border-white/10 text-amber-400">
+          <Award className="h-3.5 w-3.5" />
         </div>
         <div>
-          <h3 className="text-xs font-bold">Top Readers</h3>
-          <p className="text-[11px] text-muted-foreground">Most dedicated readers for this series</p>
+          <h3 className="text-xs font-mono font-bold uppercase tracking-wider text-white">Top Cultivators</h3>
+          <p className="text-[10px] text-neutral-400 font-sans">Most dedicated readers for this series</p>
         </div>
       </div>
 
       {leaderboardQ.isLoading ? (
-        <div className="space-y-2 py-2">
+        <div className="space-y-1.5 py-1">
           {Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className="h-8 rounded-lg bg-secondary/50 animate-pulse" />
+            <div key={i} className="h-7 rounded-lg bg-neutral-900 animate-pulse" />
           ))}
         </div>
       ) : topReaders.length === 0 ? (
-        <p className="text-xs text-muted-foreground text-center py-2">No top readers yet.</p>
+        <p className="text-[11px] text-neutral-500 text-center py-1 font-sans">No top readers yet.</p>
       ) : (
-        <div className="space-y-2">
+        <div className="space-y-1.5">
           {topReaders.map((reader: any, index: number) => (
-            <div key={reader.username} className="flex items-center justify-between p-2 rounded-lg bg-secondary/30">
+            <div key={reader.username} className="flex items-center justify-between p-2 rounded-lg bg-black/60 border border-white/5">
               <div className="flex items-center gap-2">
-                <Avatar className="h-6 w-6">
+                <Avatar className="h-5 w-5">
                   <AvatarImage src={reader.avatar_url} />
-                  <AvatarFallback className="text-[10px]">{reader.username?.slice(0, 2)}</AvatarFallback>
+                  <AvatarFallback className="text-[9px] font-mono">{reader.username?.slice(0, 2)}</AvatarFallback>
                 </Avatar>
-                <span className="text-xs font-bold">{reader.username}</span>
+                <span className="text-xs font-bold text-neutral-200">{reader.username}</span>
               </div>
-              <span className="text-[10px] font-mono text-muted-foreground">{reader.chapters_read} ch.</span>
+              <span className="text-[10px] font-mono font-bold text-amber-300">{reader.chapters_read} ch.</span>
             </div>
           ))}
         </div>

@@ -426,24 +426,24 @@ export function Navbar() {
                         <div className="flex items-center justify-between">
                           <span className="flex items-center gap-2">
                             <UserIcon className="h-4 w-4" />
-                            {isAdmin ? "Maxed Out" : `Level ${userStats.data.user_level}`}
+                            {isAdmin ? "Dao Realm: Lv. ∞" : `Realm: Lv. ${userStats.data.user_level}`}
                             {userStats.data.is_vip && <Badge className="bg-gradient-to-r from-yellow-500 to-orange-500">VIP</Badge>}
                           </span>
                         </div>
                         <div className="mt-2 text-xs font-normal text-muted-foreground">
                           <div className="flex items-center gap-1">
-                            Streak: {userStats.data.reading_streak} days
+                            Dao Heart Streak: {userStats.data.reading_streak} days
                           </div>
                           <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-secondary">
                             <div
-                              className="h-full bg-gradient-to-r from-violet-600 to-purple-600"
+                              className="h-full bg-gradient-to-r from-amber-500 via-violet-600 to-purple-600"
                               style={{ width: isAdmin ? "100%" : `${((userStats.data.experience_points % 100) / 100) * 100}%` }}
                             />
                           </div>
                           <div className="mt-1 text-xs">
                             {isAdmin
-                              ? "Infinite Aura and XP"
-                              : `${userStats.data.experience_points % 100}/100 XP to Level ${userStats.data.user_level + 1}`}
+                              ? "Infinite Qi • Boundless Dao Ancestor"
+                              : `${userStats.data.experience_points % 100}/100 Qi to Realm Level ${userStats.data.user_level + 1}`}
                           </div>
                         </div>
                       </DropdownMenuLabel>

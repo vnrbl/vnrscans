@@ -1,20 +1,13 @@
 import type { Metadata, Viewport } from "next";
-import { Plus_Jakarta_Sans, Outfit } from "next/font/google";
+import { Inter } from "next/font/google";
 import { Providers } from "@/components/Providers";
 import "@/styles.css";
 
-const sans = Plus_Jakarta_Sans({
+const inter = Inter({
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700", "800"],
+  weight: ["400", "500", "600", "700", "800", "900"],
   display: "swap",
-  variable: "--font-sans",
-});
-
-const outfit = Outfit({
-  subsets: ["latin"],
-  weight: ["500", "600", "700", "800", "900"],
-  display: "swap",
-  variable: "--font-outfit",
+  variable: "--font-inter",
 });
 
 export const metadata: Metadata = {
@@ -66,7 +59,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`dark ${sans.variable} ${outfit.variable}`}
+      className={`dark ${inter.variable}`}
       suppressHydrationWarning
     >
       <head>

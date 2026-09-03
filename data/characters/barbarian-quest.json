@@ -1,0 +1,19 @@
+[
+  {
+    "id": "anilist-329449",
+    "seriesSlug": "barbarian-quest",
+    "slug": "urich",
+    "name": "Urich",
+    "aliases": [],
+    "role": "MAIN",
+    "imageUrl": "https://s4.anilist.co/file/anilistcdn/character/large/b329449-lKveKaKn8Swj.png",
+    "description": "The greatest warrior of the Boulder Axe Tribe, beyond the Sky Mountain Range.",
+    "bioData": {
+      "gender": "Male",
+      "roleType": "Main Cast"
+    },
+    "relationships": [],
+    "sourceUrl": "https://anilist.co/character/329449",
+    "updatedAt": "2026-09-03T13:08:25.443Z"
+  }
+]

@@ -1,0 +1,501 @@
+[
+  {
+    "id": "anilist-309777",
+    "seriesSlug": "revenge-of-the-iron-blooded-sword-hound",
+    "slug": "vikir-van-baskerville",
+    "name": "Vikir van Baskerville",
+    "nativeName": "비키르 반 바스커빌",
+    "aliases": [
+      "Bikir van Baskerville",
+      "Hound of the Baskerville Clan"
+    ],
+    "role": "MAIN",
+    "imageUrl": "https://s4.anilist.co/file/anilistcdn/character/large/b309777-xsCX7xtpqN44.jpg",
+    "description": "The Hound of the Baskerville Clan who regressed after being cut down by the blade of the guillotine.",
+    "bioData": {
+      "gender": "Male",
+      "roleType": "Main Cast"
+    },
+    "relationships": [
+      {
+        "name": "Aiyen",
+        "slug": "aiyen",
+        "relationType": "Key Associate",
+        "isSpoiler": false
+      },
+      {
+        "name": "Camyu Morgue",
+        "slug": "camyu-morgue",
+        "relationType": "Key Associate",
+        "isSpoiler": false
+      },
+      {
+        "name": "Akwilla",
+        "slug": "akwilla",
+        "relationType": "Key Associate",
+        "isSpoiler": false
+      }
+    ],
+    "sourceUrl": "https://anilist.co/character/309777",
+    "updatedAt": "2026-09-03T13:08:34.598Z"
+  },
+  {
+    "id": "anilist-309778",
+    "seriesSlug": "revenge-of-the-iron-blooded-sword-hound",
+    "slug": "aiyen",
+    "name": "Aiyen",
+    "nativeName": "아이옌",
+    "aliases": [],
+    "role": "SUPPORTING",
+    "imageUrl": "https://s4.anilist.co/file/anilistcdn/character/large/b309778-y6BwRZvY5SUZ.jpg",
+    "description": "She first met Vikir when he saved her from being sold as a slave in the auction.",
+    "bioData": {
+      "gender": "Female",
+      "roleType": "Supporting Role"
+    },
+    "relationships": [
+      {
+        "name": "Vikir van Baskerville",
+        "slug": "vikir-van-baskerville",
+        "relationType": "Allied Protagonist",
+        "isSpoiler": false
+      },
+      {
+        "name": "Camyu Morgue",
+        "slug": "camyu-morgue",
+        "relationType": "Key Associate",
+        "isSpoiler": false
+      },
+      {
+        "name": "Akwilla",
+        "slug": "akwilla",
+        "relationType": "Key Associate",
+        "isSpoiler": false
+      }
+    ],
+    "sourceUrl": "https://anilist.co/character/309778",
+    "updatedAt": "2026-09-03T13:08:34.598Z"
+  },
+  {
+    "id": "anilist-309780",
+    "seriesSlug": "revenge-of-the-iron-blooded-sword-hound",
+    "slug": "camyu-morgue",
+    "name": "Camyu Morgue",
+    "nativeName": "까뮤 모르그",
+    "aliases": [
+      "Morgue Clan's Steel-Blooded Empress"
+    ],
+    "role": "SUPPORTING",
+    "imageUrl": "https://s4.anilist.co/file/anilistcdn/character/large/b309780-Vw3PsEyWevai.jpg",
+    "description": "She was known as a Morgue Clan's Steel-Blooded Empress before Bikir's regression.",
+    "bioData": {
+      "gender": "Female",
+      "roleType": "Supporting Role"
+    },
+    "relationships": [
+      {
+        "name": "Vikir van Baskerville",
+        "slug": "vikir-van-baskerville",
+        "relationType": "Allied Protagonist",
+        "isSpoiler": false
+      },
+      {
+        "name": "Aiyen",
+        "slug": "aiyen",
+        "relationType": "Key Associate",
+        "isSpoiler": false
+      },
+      {
+        "name": "Akwilla",
+        "slug": "akwilla",
+        "relationType": "Key Associate",
+        "isSpoiler": false
+      }
+    ],
+    "sourceUrl": "https://anilist.co/character/309780",
+    "updatedAt": "2026-09-03T13:08:34.598Z"
+  },
+  {
+    "id": "anilist-309779",
+    "seriesSlug": "revenge-of-the-iron-blooded-sword-hound",
+    "slug": "akwilla",
+    "name": "Akwilla",
+    "nativeName": "아퀼라",
+    "aliases": [
+      "Fox of The Night"
+    ],
+    "role": "SUPPORTING",
+    "imageUrl": "https://s4.anilist.co/file/anilistcdn/character/large/b309779-B61TgZj61ImM.jpg",
+    "description": "Chieftain of Ballack and mother of Aiyen. She is the person who gave Hugo a big scar on the bridge of his nose.",
+    "bioData": {
+      "gender": "Female",
+      "roleType": "Supporting Role"
+    },
+    "relationships": [
+      {
+        "name": "Vikir van Baskerville",
+        "slug": "vikir-van-baskerville",
+        "relationType": "Allied Protagonist",
+        "isSpoiler": false
+      },
+      {
+        "name": "Aiyen",
+        "slug": "aiyen",
+        "relationType": "Key Associate",
+        "isSpoiler": false
+      },
+      {
+        "name": "Camyu Morgue",
+        "slug": "camyu-morgue",
+        "relationType": "Key Associate",
+        "isSpoiler": false
+      }
+    ],
+    "sourceUrl": "https://anilist.co/character/309779",
+    "updatedAt": "2026-09-03T13:08:34.598Z"
+  },
+  {
+    "id": "anilist-320667",
+    "seriesSlug": "revenge-of-the-iron-blooded-sword-hound",
+    "slug": "dolores-quovadis",
+    "name": "Dolores Quovadis",
+    "nativeName": "돌로레스 룬 쿼바다스",
+    "aliases": [],
+    "role": "SUPPORTING",
+    "imageUrl": "https://s4.anilist.co/file/anilistcdn/character/large/b320667-31YpmwGnlZPN.jpg",
+    "description": "She's a saintess who is a living embodiment of goodness.",
+    "bioData": {
+      "gender": "Female",
+      "roleType": "Supporting Role"
+    },
+    "relationships": [
+      {
+        "name": "Vikir van Baskerville",
+        "slug": "vikir-van-baskerville",
+        "relationType": "Allied Protagonist",
+        "isSpoiler": false
+      },
+      {
+        "name": "Aiyen",
+        "slug": "aiyen",
+        "relationType": "Key Associate",
+        "isSpoiler": false
+      },
+      {
+        "name": "Camyu Morgue",
+        "slug": "camyu-morgue",
+        "relationType": "Key Associate",
+        "isSpoiler": false
+      },
+      {
+        "name": "Akwilla",
+        "slug": "akwilla",
+        "relationType": "Key Associate",
+        "isSpoiler": false
+      }
+    ],
+    "sourceUrl": "https://anilist.co/character/320667",
+    "updatedAt": "2026-09-03T13:08:34.598Z"
+  },
+  {
+    "id": "anilist-321151",
+    "seriesSlug": "revenge-of-the-iron-blooded-sword-hound",
+    "slug": "hugo-baskerville",
+    "name": "Hugo Baskerville",
+    "nativeName": "휴고 르 바스커빌",
+    "aliases": [],
+    "role": "SUPPORTING",
+    "imageUrl": "https://s4.anilist.co/file/anilistcdn/character/large/b321151-PCb3Fv9jxmBM.png",
+    "description": "He is the Patriarch of the Baskerville family and the father of Bikir van Baskerville.",
+    "bioData": {
+      "gender": "Male",
+      "roleType": "Supporting Role"
+    },
+    "relationships": [
+      {
+        "name": "Vikir van Baskerville",
+        "slug": "vikir-van-baskerville",
+        "relationType": "Allied Protagonist",
+        "isSpoiler": false
+      },
+      {
+        "name": "Aiyen",
+        "slug": "aiyen",
+        "relationType": "Key Associate",
+        "isSpoiler": false
+      },
+      {
+        "name": "Camyu Morgue",
+        "slug": "camyu-morgue",
+        "relationType": "Key Associate",
+        "isSpoiler": false
+      },
+      {
+        "name": "Akwilla",
+        "slug": "akwilla",
+        "relationType": "Key Associate",
+        "isSpoiler": false
+      }
+    ],
+    "sourceUrl": "https://anilist.co/character/321151",
+    "updatedAt": "2026-09-03T13:08:34.598Z"
+  },
+  {
+    "id": "anilist-321141",
+    "seriesSlug": "revenge-of-the-iron-blooded-sword-hound",
+    "slug": "john-barrymore",
+    "name": "John Barrymore",
+    "nativeName": "존 배리모어",
+    "aliases": [],
+    "role": "SUPPORTING",
+    "imageUrl": "https://s4.anilist.co/file/anilistcdn/character/large/b321141-69J59yrKzXUh.png",
+    "description": "Key character in Revenge of the Iron-Blooded Sword Hound.",
+    "bioData": {
+      "gender": "Male",
+      "roleType": "Supporting Role"
+    },
+    "relationships": [
+      {
+        "name": "Vikir van Baskerville",
+        "slug": "vikir-van-baskerville",
+        "relationType": "Allied Protagonist",
+        "isSpoiler": false
+      },
+      {
+        "name": "Aiyen",
+        "slug": "aiyen",
+        "relationType": "Key Associate",
+        "isSpoiler": false
+      },
+      {
+        "name": "Camyu Morgue",
+        "slug": "camyu-morgue",
+        "relationType": "Key Associate",
+        "isSpoiler": false
+      },
+      {
+        "name": "Akwilla",
+        "slug": "akwilla",
+        "relationType": "Key Associate",
+        "isSpoiler": false
+      }
+    ],
+    "sourceUrl": "https://anilist.co/character/321141",
+    "updatedAt": "2026-09-03T13:08:34.598Z"
+  },
+  {
+    "id": "anilist-321142",
+    "seriesSlug": "revenge-of-the-iron-blooded-sword-hound",
+    "slug": "chihuahua-baskerville",
+    "name": "Chihuahua Baskerville",
+    "nativeName": "치와와 바스커빌",
+    "aliases": [],
+    "role": "SUPPORTING",
+    "imageUrl": "https://s4.anilist.co/file/anilistcdn/character/large/b321142-5yGvq4dVoyC6.png",
+    "description": "He is the office manager in Underdog City in the territory of Baskerville.",
+    "bioData": {
+      "gender": "Male",
+      "roleType": "Supporting Role"
+    },
+    "relationships": [
+      {
+        "name": "Vikir van Baskerville",
+        "slug": "vikir-van-baskerville",
+        "relationType": "Allied Protagonist",
+        "isSpoiler": false
+      },
+      {
+        "name": "Aiyen",
+        "slug": "aiyen",
+        "relationType": "Key Associate",
+        "isSpoiler": false
+      },
+      {
+        "name": "Camyu Morgue",
+        "slug": "camyu-morgue",
+        "relationType": "Key Associate",
+        "isSpoiler": false
+      },
+      {
+        "name": "Akwilla",
+        "slug": "akwilla",
+        "relationType": "Key Associate",
+        "isSpoiler": false
+      }
+    ],
+    "sourceUrl": "https://anilist.co/character/321142",
+    "updatedAt": "2026-09-03T13:08:34.598Z"
+  },
+  {
+    "id": "anilist-321143",
+    "seriesSlug": "revenge-of-the-iron-blooded-sword-hound",
+    "slug": "staffordshire-baskerville",
+    "name": "Staffordshire Baskerville",
+    "nativeName": "스태퍼드셔 바스커빌",
+    "aliases": [],
+    "role": "SUPPORTING",
+    "imageUrl": "https://s4.anilist.co/file/anilistcdn/character/large/b321143-6jjfEST9m2wJ.png",
+    "description": "Key character in Revenge of the Iron-Blooded Sword Hound.",
+    "bioData": {
+      "gender": "Male",
+      "roleType": "Supporting Role"
+    },
+    "relationships": [
+      {
+        "name": "Vikir van Baskerville",
+        "slug": "vikir-van-baskerville",
+        "relationType": "Allied Protagonist",
+        "isSpoiler": false
+      },
+      {
+        "name": "Aiyen",
+        "slug": "aiyen",
+        "relationType": "Key Associate",
+        "isSpoiler": false
+      },
+      {
+        "name": "Camyu Morgue",
+        "slug": "camyu-morgue",
+        "relationType": "Key Associate",
+        "isSpoiler": false
+      },
+      {
+        "name": "Akwilla",
+        "slug": "akwilla",
+        "relationType": "Key Associate",
+        "isSpoiler": false
+      }
+    ],
+    "sourceUrl": "https://anilist.co/character/321143",
+    "updatedAt": "2026-09-03T13:08:34.598Z"
+  },
+  {
+    "id": "anilist-321149",
+    "seriesSlug": "revenge-of-the-iron-blooded-sword-hound",
+    "slug": "boston-terrier-baskerville",
+    "name": "Boston Terrier Baskerville",
+    "nativeName": "보스턴 테리어 르 바스커빌",
+    "aliases": [],
+    "role": "SUPPORTING",
+    "imageUrl": "https://s4.anilist.co/file/anilistcdn/character/large/b321149-PI5VDy2QCek6.png",
+    "description": "Key character in Revenge of the Iron-Blooded Sword Hound.",
+    "bioData": {
+      "gender": "Male",
+      "roleType": "Supporting Role"
+    },
+    "relationships": [
+      {
+        "name": "Vikir van Baskerville",
+        "slug": "vikir-van-baskerville",
+        "relationType": "Allied Protagonist",
+        "isSpoiler": false
+      },
+      {
+        "name": "Aiyen",
+        "slug": "aiyen",
+        "relationType": "Key Associate",
+        "isSpoiler": false
+      },
+      {
+        "name": "Camyu Morgue",
+        "slug": "camyu-morgue",
+        "relationType": "Key Associate",
+        "isSpoiler": false
+      },
+      {
+        "name": "Akwilla",
+        "slug": "akwilla",
+        "relationType": "Key Associate",
+        "isSpoiler": false
+      }
+    ],
+    "sourceUrl": "https://anilist.co/character/321149",
+    "updatedAt": "2026-09-03T13:08:34.598Z"
+  },
+  {
+    "id": "anilist-321148",
+    "seriesSlug": "revenge-of-the-iron-blooded-sword-hound",
+    "slug": "lowborough-baskerville",
+    "name": "Lowborough Baskerville",
+    "nativeName": "로우버러 르 바스커빌",
+    "aliases": [],
+    "role": "SUPPORTING",
+    "imageUrl": "https://s4.anilist.co/file/anilistcdn/character/large/b321148-07nL8xP3eKFt.png",
+    "description": "Key character in Revenge of the Iron-Blooded Sword Hound.",
+    "bioData": {
+      "gender": "Male",
+      "roleType": "Supporting Role"
+    },
+    "relationships": [
+      {
+        "name": "Vikir van Baskerville",
+        "slug": "vikir-van-baskerville",
+        "relationType": "Allied Protagonist",
+        "isSpoiler": false
+      },
+      {
+        "name": "Aiyen",
+        "slug": "aiyen",
+        "relationType": "Key Associate",
+        "isSpoiler": false
+      },
+      {
+        "name": "Camyu Morgue",
+        "slug": "camyu-morgue",
+        "relationType": "Key Associate",
+        "isSpoiler": false
+      },
+      {
+        "name": "Akwilla",
+        "slug": "akwilla",
+        "relationType": "Key Associate",
+        "isSpoiler": false
+      }
+    ],
+    "sourceUrl": "https://anilist.co/character/321148",
+    "updatedAt": "2026-09-03T13:08:34.598Z"
+  },
+  {
+    "id": "anilist-321154",
+    "seriesSlug": "revenge-of-the-iron-blooded-sword-hound",
+    "slug": "middleborough-baskerville",
+    "name": "Middleborough Baskerville",
+    "nativeName": "미들버러 르 바스커빌",
+    "aliases": [],
+    "role": "SUPPORTING",
+    "imageUrl": "https://s4.anilist.co/file/anilistcdn/character/large/b321154-5pWtjZZJ9K8i.png",
+    "description": "Key character in Revenge of the Iron-Blooded Sword Hound.",
+    "bioData": {
+      "gender": "Male",
+      "roleType": "Supporting Role"
+    },
+    "relationships": [
+      {
+        "name": "Vikir van Baskerville",
+        "slug": "vikir-van-baskerville",
+        "relationType": "Allied Protagonist",
+        "isSpoiler": false
+      },
+      {
+        "name": "Aiyen",
+        "slug": "aiyen",
+        "relationType": "Key Associate",
+        "isSpoiler": false
+      },
+      {
+        "name": "Camyu Morgue",
+        "slug": "camyu-morgue",
+        "relationType": "Key Associate",
+        "isSpoiler": false
+      },
+      {
+        "name": "Akwilla",
+        "slug": "akwilla",
+        "relationType": "Key Associate",
+        "isSpoiler": false
+      }
+    ],
+    "sourceUrl": "https://anilist.co/character/321154",
+    "updatedAt": "2026-09-03T13:08:34.598Z"
+  }
+]

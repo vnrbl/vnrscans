@@ -88,6 +88,15 @@ export async function detectSourceScanTiming(params: {
       while (nextDrop.getTime() <= now.getTime()) {
         nextDrop = new Date(nextDrop.getTime() + 7 * 24 * 60 * 60 * 1000);
       }
+
+      // If the expected chapter is already imported locally (currentMaxChapter >= sourceLatestChapter),
+      // reset and advance countdown to the upcoming next chapter release!
+      if (sourceLatestChapter != null && currentMaxChapter >= sourceLatestChapter) {
+        // If nextDrop is within 6 hours or in past, advance to next weekly cycle
+        if (nextDrop.getTime() - now.getTime() < 6 * 60 * 60 * 1000) {
+          nextDrop = new Date(nextDrop.getTime() + 7 * 24 * 60 * 60 * 1000);
+        }
+      }
     }
 
     const isSourceAhead = sourceLatestChapter != null && sourceLatestChapter > currentMaxChapter;

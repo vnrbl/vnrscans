@@ -103,11 +103,49 @@ export function ReleaseScheduleCard({
       };
     }
 
-    // 3. Check DB synced Estimated Next Release time
+    // 3. Priority: Live data imported from Comick.dev with update timings
+    if (liveData?.found && liveData?.nextExpectedDrop) {
+      let liveTarget = new Date(liveData.nextExpectedDrop);
+      const sourceLatest = liveData.sourceLatestChapter || 0;
+
+      // If the expected chapter is already imported into our list (currentMaxChapter >= sourceLatest):
+      // Reset countdown to the NEXT upcoming release cycle for chapter currentMaxChapter + 1!
+      if (currentMaxChapter >= sourceLatest && sourceLatest > 0) {
+        while (liveTarget <= now || liveTarget.getTime() - now.getTime() < 6 * 60 * 60 * 1000) {
+          liveTarget = new Date(liveTarget.getTime() + 7 * 24 * 60 * 60 * 1000);
+        }
+      } else {
+        while (liveTarget <= now) {
+          liveTarget = new Date(liveTarget.getTime() + 7 * 24 * 60 * 60 * 1000);
+        }
+      }
+
+      const nextChapterNum =
+        currentMaxChapter >= sourceLatest && sourceLatest > 0
+          ? currentMaxChapter + 1
+          : liveData.isSourceAhead && sourceLatest > currentMaxChapter
+          ? sourceLatest
+          : (currentMaxChapter || 0) + 1;
+
+      return {
+        targetDate: liveTarget,
+        chapterNumber: nextChapterNum,
+        cadenceText: liveData.cadence || "Weekly",
+        sourceName: liveData.sourceName || "Comick.dev",
+        isScheduled: false,
+        isUnlockingSoon: false,
+        sourceUrl: null,
+        isSourceAhead: liveData.isSourceAhead && currentMaxChapter < sourceLatest,
+        aheadBy: currentMaxChapter < sourceLatest ? liveData.aheadBy : 0,
+        sourceLatestChapter: liveData.sourceLatestChapter,
+      };
+    }
+
+    // 4. Fallback: Check DB synced Estimated Next Release time
     if (estimatedNextReleaseAt) {
-      const dbTarget = new Date(estimatedNextReleaseAt);
+      let dbTarget = new Date(estimatedNextReleaseAt);
       while (dbTarget <= now) {
-        dbTarget.setTime(dbTarget.getTime() + 7 * 24 * 60 * 60 * 1000);
+        dbTarget = new Date(dbTarget.getTime() + 7 * 24 * 60 * 60 * 1000);
       }
       return {
         targetDate: dbTarget,
@@ -120,32 +158,6 @@ export function ReleaseScheduleCard({
         isSourceAhead: false,
         aheadBy: 0,
         sourceLatestChapter: undefined,
-      };
-    }
-
-    // 4. Priority: Live data imported from Comick.dev or other web scans!
-    if (liveData?.found && liveData?.nextExpectedDrop) {
-      const liveTarget = new Date(liveData.nextExpectedDrop);
-      // Ensure target is in future
-      while (liveTarget <= now) {
-        liveTarget.setTime(liveTarget.getTime() + 7 * 24 * 60 * 60 * 1000);
-      }
-
-      const nextChapterNum = liveData.isSourceAhead && liveData.sourceLatestChapter
-        ? liveData.sourceLatestChapter + 1
-        : (currentMaxChapter || 0) + 1;
-
-      return {
-        targetDate: liveTarget,
-        chapterNumber: nextChapterNum,
-        cadenceText: liveData.cadence || "Weekly",
-        sourceName: liveData.sourceName || "Comick.dev",
-        isScheduled: false,
-        isUnlockingSoon: false,
-        sourceUrl: null,
-        isSourceAhead: liveData.isSourceAhead,
-        aheadBy: liveData.aheadBy,
-        sourceLatestChapter: liveData.sourceLatestChapter,
       };
     }
 
@@ -259,14 +271,14 @@ export function ReleaseScheduleCard({
   if (!scheduleInfo || !timeLeft) return null;
 
   return (
-    <div className="rounded-xl border border-border/60 bg-gradient-to-br from-card/80 via-card/50 to-primary/5 p-4 shadow-sm backdrop-blur-sm">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/40 pb-2.5">
+    <div className="rounded-xl border border-white/10 bg-neutral-950 p-3.5 shadow-md">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/5 pb-2.5">
         <div className="flex items-center gap-2">
-          <div className="grid h-7 w-7 place-items-center rounded-lg bg-primary/20 text-primary">
-            <Clock className="h-4 w-4" />
+          <div className="grid h-7 w-7 place-items-center rounded-lg bg-white/5 border border-white/10 text-purple-400">
+            <Clock className="h-3.5 w-3.5" />
           </div>
           <div>
-            <span className="text-xs font-bold text-foreground">
+            <span className="text-xs font-mono font-bold uppercase tracking-wider text-white">
               {(scheduleInfo as any).isUnlockingSoon
                 ? "Early Access Hold"
                 : scheduleInfo.isScheduled
@@ -274,7 +286,7 @@ export function ReleaseScheduleCard({
                 : "Estimated Next Release"}
             </span>
             {scheduleInfo.chapterNumber && (
-              <span className="ml-1.5 text-xs text-primary font-semibold">
+              <span className="ml-1.5 text-xs font-mono font-bold text-amber-300">
                 (Ch. {scheduleInfo.chapterNumber})
               </span>
             )}
@@ -283,13 +295,13 @@ export function ReleaseScheduleCard({
 
         <div className="flex items-center gap-1.5 flex-wrap">
           {liveData?.found && (
-            <div className="flex items-center gap-1 rounded-full bg-emerald-950/40 px-2 py-0.5 text-[10px] font-semibold text-emerald-400 border border-emerald-500/30">
+            <div className="flex items-center gap-1 rounded-full bg-emerald-950/40 px-2 py-0.5 text-[10px] font-mono font-bold uppercase tracking-wider text-emerald-400 border border-emerald-500/30">
               <Globe className="h-2.5 w-2.5" />
               <span>{scheduleInfo.sourceName}</span>
             </div>
           )}
-          <div className="flex items-center gap-1.5 rounded-full bg-secondary/80 px-2.5 py-0.5 text-[11px] font-medium text-muted-foreground border border-border/40">
-            <Calendar className="h-3 w-3 text-primary" />
+          <div className="flex items-center gap-1 rounded-full bg-white/5 px-2 py-0.5 text-[10px] font-mono font-medium text-neutral-300 border border-white/10">
+            <Calendar className="h-2.5 w-2.5 text-purple-400" />
             <span>{scheduleInfo.cadenceText}</span>
           </div>
         </div>
@@ -297,31 +309,31 @@ export function ReleaseScheduleCard({
 
       <div className="mt-3 flex items-center justify-between gap-3">
         {/* Live Countdown Display */}
-        <div className="flex items-center gap-2 text-center">
-          <div className="flex flex-col items-center rounded-lg bg-background/80 border border-border/50 px-2.5 py-1 min-w-[42px]">
-            <span className="font-mono text-sm font-bold text-foreground">{timeLeft.days}</span>
-            <span className="text-[9px] uppercase tracking-wider text-muted-foreground">Days</span>
+        <div className="flex items-center gap-1.5 sm:gap-2 text-center">
+          <div className="flex flex-col items-center rounded-lg bg-black border border-white/10 px-2 sm:px-2.5 py-1 min-w-[38px] sm:min-w-[42px]">
+            <span className="font-mono text-sm sm:text-base font-bold text-white tabular-nums">{timeLeft.days}</span>
+            <span className="text-[8px] sm:text-[9px] font-mono uppercase tracking-widest text-neutral-400">Days</span>
           </div>
-          <span className="font-mono text-xs text-muted-foreground">:</span>
-          <div className="flex flex-col items-center rounded-lg bg-background/80 border border-border/50 px-2.5 py-1 min-w-[42px]">
-            <span className="font-mono text-sm font-bold text-foreground">
+          <span className="font-mono text-xs text-neutral-600">:</span>
+          <div className="flex flex-col items-center rounded-lg bg-black border border-white/10 px-2 sm:px-2.5 py-1 min-w-[38px] sm:min-w-[42px]">
+            <span className="font-mono text-sm sm:text-base font-bold text-white tabular-nums">
               {String(timeLeft.hours).padStart(2, "0")}
             </span>
-            <span className="text-[9px] uppercase tracking-wider text-muted-foreground">Hours</span>
+            <span className="text-[8px] sm:text-[9px] font-mono uppercase tracking-widest text-neutral-400">Hours</span>
           </div>
-          <span className="font-mono text-xs text-muted-foreground">:</span>
-          <div className="flex flex-col items-center rounded-lg bg-background/80 border border-border/50 px-2.5 py-1 min-w-[42px]">
-            <span className="font-mono text-sm font-bold text-foreground">
+          <span className="font-mono text-xs text-neutral-600">:</span>
+          <div className="flex flex-col items-center rounded-lg bg-black border border-white/10 px-2 sm:px-2.5 py-1 min-w-[38px] sm:min-w-[42px]">
+            <span className="font-mono text-sm sm:text-base font-bold text-white tabular-nums">
               {String(timeLeft.minutes).padStart(2, "0")}
             </span>
-            <span className="text-[9px] uppercase tracking-wider text-muted-foreground">Mins</span>
+            <span className="text-[8px] sm:text-[9px] font-mono uppercase tracking-widest text-neutral-400">Mins</span>
           </div>
-          <span className="font-mono text-xs text-muted-foreground">:</span>
-          <div className="flex flex-col items-center rounded-lg bg-background/80 border border-border/50 px-2.5 py-1 min-w-[42px]">
-            <span className="font-mono text-sm font-bold text-primary animate-pulse">
+          <span className="font-mono text-xs text-neutral-600">:</span>
+          <div className="flex flex-col items-center rounded-lg bg-black border border-white/10 px-2 sm:px-2.5 py-1 min-w-[38px] sm:min-w-[42px]">
+            <span className="font-mono text-sm sm:text-base font-bold text-purple-400 tabular-nums">
               {String(timeLeft.seconds).padStart(2, "0")}
             </span>
-            <span className="text-[9px] uppercase tracking-wider text-muted-foreground">Secs</span>
+            <span className="text-[8px] sm:text-[9px] font-mono uppercase tracking-widest text-neutral-400">Secs</span>
           </div>
         </div>
 
@@ -332,10 +344,10 @@ export function ReleaseScheduleCard({
               href={(scheduleInfo as any).sourceUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="h-8 inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 px-3 py-1 text-xs font-bold text-white shadow-sm transition-all hover:scale-105 shrink-0"
+              className="h-7.5 inline-flex items-center gap-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 px-3 py-1 text-xs font-mono font-bold text-white shadow-sm transition-all shrink-0"
               title="Read immediately on official scans source"
             >
-              <span>(Read now)</span>
+              <span>Read now</span>
               <ExternalLink className="h-3 w-3" />
             </a>
           )}
@@ -343,18 +355,18 @@ export function ReleaseScheduleCard({
             size="sm"
             variant={isTracking ? "secondary" : "outline"}
             onClick={handleToggleTrack}
-            className={`h-8 text-xs font-semibold gap-1.5 transition-all ${
-              isTracking ? "border-primary/50 text-primary bg-primary/15" : "border-border/60 hover:border-primary/40"
+            className={`h-7.5 text-xs font-mono font-bold gap-1.5 rounded-lg transition-all cursor-pointer ${
+              isTracking ? "border-purple-500/50 text-purple-300 bg-purple-950/40" : "border-white/10 bg-neutral-900/80 hover:bg-neutral-800 text-neutral-300"
             }`}
           >
             {isTracking ? (
               <>
-                <CheckCircle2 className="h-3.5 w-3.5 text-primary" />
+                <CheckCircle2 className="h-3.5 w-3.5 text-purple-400" />
                 <span>Tracking</span>
               </>
             ) : (
               <>
-                <Bell className="h-3.5 w-3.5 text-muted-foreground" />
+                <Bell className="h-3.5 w-3.5 text-neutral-400" />
                 <span>Track Drop</span>
               </>
             )}

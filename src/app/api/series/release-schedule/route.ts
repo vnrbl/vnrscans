@@ -111,6 +111,13 @@ export async function GET(req: NextRequest) {
         while (nextDrop.getTime() < now.getTime()) {
           nextDrop = new Date(nextDrop.getTime() + 7 * 24 * 60 * 60 * 1000);
         }
+
+        // If the expected chapter has already been imported into the list, reset & advance to next drop
+        if (sourceLatestChapter != null && currentMaxChapter >= sourceLatestChapter) {
+          if (nextDrop.getTime() - now.getTime() < 6 * 60 * 60 * 1000) {
+            nextDrop = new Date(nextDrop.getTime() + 7 * 24 * 60 * 60 * 1000);
+          }
+        }
         nextExpectedDrop = nextDrop.toISOString();
       }
 

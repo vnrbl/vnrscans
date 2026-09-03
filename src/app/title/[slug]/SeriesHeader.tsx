@@ -146,12 +146,12 @@ export const SeriesHeader = React.memo(function SeriesHeader({
   return (
     <main className="min-w-0 flex-1 text-center sm:text-left">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <nav className="flex flex-wrap items-center justify-center gap-1.5 text-xs uppercase tracking-wider text-muted-foreground font-semibold sm:justify-start">
-          <Link href="/home" className="hover:text-primary transition-colors">
+        <nav className="flex flex-wrap items-center justify-center gap-2 text-xs font-sans font-medium text-neutral-400 sm:justify-start">
+          <Link href="/home" className="hover:text-white transition-colors">
             Home
           </Link>
-          <span>/</span>
-          <Link href={`/browse?type=${s.type}`} className="hover:text-primary transition-colors">
+          <span className="text-neutral-600 font-light">/</span>
+          <Link href={`/browse?type=${s.type}`} className="hover:text-purple-300 text-neutral-300 capitalize transition-colors font-semibold">
             {s.type}
           </Link>
         </nav>
@@ -160,10 +160,10 @@ export const SeriesHeader = React.memo(function SeriesHeader({
           <button
             type="button"
             onClick={() => toggleFavorite.mutate()}
-            className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border transition-all duration-200 cursor-pointer shadow-sm ${
+            className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-sans font-semibold border transition-all duration-200 cursor-pointer shadow-sm ${
               isFavorited.data
-                ? "border-rose-500/50 bg-rose-950/30 text-rose-400 hover:bg-rose-950/50 shadow-[0_0_10px_rgba(244,63,94,0.2)]"
-                : "border-border/60 bg-secondary/50 text-muted-foreground hover:text-rose-400 hover:border-rose-500/30"
+                ? "border-rose-500/50 bg-rose-950/30 text-rose-300 hover:bg-rose-950/50 shadow-[0_0_10px_rgba(244,63,94,0.2)]"
+                : "border-white/10 bg-neutral-900/70 text-neutral-400 hover:text-rose-400 hover:border-rose-500/30"
             }`}
             title={isFavorited.data ? "Favorited" : "Mark as Favorite"}
           >
@@ -174,79 +174,80 @@ export const SeriesHeader = React.memo(function SeriesHeader({
         </div>
       </div>
 
-      <div className="mb-3 flex flex-wrap items-center justify-center gap-1.5 sm:justify-start">
-        <Badge variant="secondary" className="rounded-md uppercase text-[10px] font-semibold tracking-wider px-2 py-0.5 bg-secondary/50">
+      <div className="mb-2.5 flex flex-wrap items-center justify-center gap-1.5 sm:justify-start">
+        <span className="rounded-full uppercase text-[10px] font-mono font-bold tracking-wider px-2 py-0.5 bg-purple-950/50 text-purple-300 border border-purple-500/30">
           {s.type}
-        </Badge>
+        </span>
         {contentRating && (
-          <Badge
-            className={`rounded-md uppercase text-[10px] font-semibold tracking-wider px-2 py-0.5 ${
+          <span
+            className={`rounded-full uppercase text-[10px] font-mono font-bold tracking-wider px-2 py-0.5 border ${
               contentRating === "safe"
-                ? "bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600/30"
+                ? "bg-emerald-950/40 text-emerald-400 border-emerald-500/30"
                 : contentRating === "suggestive"
-                  ? "bg-amber-600/20 text-amber-400 hover:bg-amber-600/30"
-                  : "bg-red-600/20 text-red-400 hover:bg-red-600/30"
+                  ? "bg-amber-950/40 text-amber-400 border-amber-500/30"
+                  : "bg-red-950/40 text-red-400 border-red-500/30"
             }`}
           >
             {contentRating}
-          </Badge>
+          </span>
         )}
         {s.release_year && (
-          <Badge variant="outline" className="rounded-md text-[10px] font-semibold px-2 py-0.5 border-border/50">
+          <span className="rounded-full text-[10px] font-mono font-bold tracking-wider px-2 py-0.5 border border-white/10 bg-white/5 text-neutral-400">
             {s.release_year}
-          </Badge>
+          </span>
         )}
-        <Badge variant="outline" className="gap-1 rounded-md capitalize text-[10px] font-semibold px-2 py-0.5 border-border/50">
+        <span className="inline-flex items-center gap-1.5 rounded-full capitalize text-[10px] font-mono font-bold tracking-wider px-2 py-0.5 border border-white/10 bg-white/5 text-neutral-300">
           {s.status === "ongoing" && (
-            <span className="h-1 w-1 rounded-full bg-emerald-500 animate-pulse" />
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
           )}
           {statusLabel(s.status)}
-        </Badge>
+        </span>
       </div>
 
-      <h1 className="text-2xl font-black tracking-tight text-foreground sm:text-3xl md:text-4xl lg:text-[2.75rem] lg:leading-tight">
+      <h1 className="text-2xl font-black tracking-tight text-white uppercase font-heading sm:text-3xl md:text-4xl lg:text-[2.6rem] lg:leading-[1.1]">
         {s.title}
       </h1>
 
       {s.alternative_titles && (
-        <p className="mt-2 text-sm leading-relaxed text-muted-foreground font-medium">{s.alternative_titles}</p>
+        <p className="mt-1.5 text-xs leading-relaxed text-neutral-400 font-sans font-normal">{s.alternative_titles}</p>
       )}
 
-      <div className="mt-4 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-sm sm:justify-start">
+      <div className="mt-3.5 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-xs sm:justify-start font-sans">
         {seriesRank && (
-          <span className="inline-flex items-center gap-1.5 rounded-md bg-primary/15 px-2.5 py-1 font-semibold text-primary shadow-sm shadow-primary/5">
-            <Trophy className="h-4 w-4" />
-            #{seriesRank.toLocaleString()}
+          <span className="inline-flex items-center gap-1.5 rounded-md bg-amber-500/10 border border-amber-500/25 px-2 py-0.5 text-xs font-mono font-bold text-amber-300 shadow-sm shadow-amber-500/5">
+            <Trophy className="h-3.5 w-3.5 text-amber-400" />
+            <span>#{seriesRank.toLocaleString()}</span>
           </span>
         )}
-        <span className="inline-flex items-center gap-1.5 text-muted-foreground">
-          <Star className="h-4 w-4 fill-primary text-primary" />
-          <span className="font-bold text-foreground">
+        <span className="inline-flex items-center gap-1.5 text-neutral-400">
+          <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
+          <span className="font-mono font-bold text-white">
             {Number(s.rating_average || 0).toFixed(1)}
           </span>
-          by {ratingsCount?.toLocaleString() ?? 0} users
+          <span className="text-[11px] text-neutral-500 font-sans">({ratingsCount?.toLocaleString() ?? 0})</span>
         </span>
-        <span className="inline-flex items-center gap-1.5 text-pink-400 font-medium">
-          <Heart className="h-4 w-4 fill-pink-500 text-pink-500" />
-          <span className="font-bold text-foreground">
+        <span className="inline-flex items-center gap-1.5 text-neutral-400">
+          <Heart className="h-3.5 w-3.5 fill-pink-500 text-pink-500" />
+          <span className="font-mono font-bold text-pink-400">
             {(totalLikesCount ?? 0).toLocaleString()}
-          </span>{" "}
-          likes
+          </span>
+          <span className="text-[11px] text-neutral-500 font-sans">likes</span>
         </span>
-        <span className="inline-flex items-center gap-1.5 text-muted-foreground">
-          <Users className="h-4 w-4" />
-          <span className="font-semibold text-foreground">
+        <span className="inline-flex items-center gap-1.5 text-neutral-400">
+          <Users className="h-3.5 w-3.5 text-neutral-400" />
+          <span className="font-mono font-bold text-white">
             {followersCount?.toLocaleString() ?? 0}
-          </span>{" "}
-          followed
+          </span>
+          <span className="text-[11px] text-neutral-500 font-sans">followers</span>
         </span>
-        <span className="text-muted-foreground">
-          <span className="font-semibold text-foreground">{Number(s.view_count || 0).toLocaleString()}</span> views
+        <span className="text-neutral-400 font-sans">
+          <span className="font-mono font-bold text-white">{Number(s.view_count || 0).toLocaleString()}</span>
+          <span className="text-[11px] text-neutral-500 ml-1">views</span>
         </span>
       </div>
 
       {s.description && (
-        <div className="mt-5 max-w-3xl">
+        <div className="mt-4 max-w-3xl">
           <ExpandableSynopsis text={s.description} />
         </div>
       )}
@@ -279,7 +280,7 @@ export const SeriesHeader = React.memo(function SeriesHeader({
         </MetaSection>
       )}
 
-      <MetaSection label="Info">
+      <MetaSection label="Details">
         <MetaPill>Updated {new Date(s.updated_at).toLocaleDateString()}</MetaPill>
         {uniqueChapterCount > 0 && (
           <button
@@ -287,7 +288,7 @@ export const SeriesHeader = React.memo(function SeriesHeader({
               const chaptersSection = document.getElementById('chapters-section');
               chaptersSection?.scrollIntoView({ behavior: 'smooth' });
             }}
-            className="inline-flex items-center rounded-full bg-secondary px-3 py-1.5 text-sm font-medium text-secondary-foreground transition-colors hover:bg-primary hover:text-primary-foreground"
+            className="inline-flex items-center rounded-md border border-purple-500/30 bg-purple-950/40 px-2.5 py-1 text-xs font-mono font-bold text-purple-300 transition-colors hover:bg-purple-900/60 hover:text-white cursor-pointer"
           >
             {uniqueChapterCount} chapters
           </button>
@@ -304,9 +305,9 @@ export const SeriesHeader = React.memo(function SeriesHeader({
 
 function MetaSection({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="mt-5">
-      <h3 className="mb-2.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">{label}</h3>
-      <div className="flex flex-wrap justify-center gap-2 sm:justify-start">{children}</div>
+    <div className="mt-4">
+      <h3 className="mb-2 text-[10px] font-mono font-bold uppercase tracking-widest text-neutral-400">{label}</h3>
+      <div className="flex flex-wrap justify-center gap-1.5 sm:justify-start">{children}</div>
     </div>
   );
 }
@@ -322,7 +323,7 @@ function MetaPill({
   search?: Record<string, string>;
   className?: string;
 }) {
-  const pillClass = `inline-flex rounded-md bg-secondary/70 px-3 py-1.5 text-sm text-foreground transition hover:bg-secondary ${className}`;
+  const pillClass = `inline-flex items-center rounded-md border border-white/[0.08] bg-neutral-900/80 px-2.5 py-0.5 text-xs font-medium text-neutral-300 font-sans transition-colors hover:border-purple-500/40 hover:text-white ${className}`;
 
   if (href) {
     const searchStr = search ? new URLSearchParams(search).toString() : "";
@@ -368,9 +369,9 @@ function LimitedGenrePills({
         <button
           type="button"
           onClick={() => setShowAll(true)}
-          className="inline-flex rounded-md border border-primary/30 bg-primary/10 px-3 py-1.5 text-sm font-medium text-primary transition hover:bg-primary hover:text-primary-foreground md:hidden"
+          className="inline-flex items-center rounded-md border border-purple-500/30 bg-purple-950/30 px-2.5 py-0.5 text-xs font-mono font-medium text-purple-300 transition-colors hover:bg-purple-900/50 hover:text-white md:hidden cursor-pointer"
         >
-          Show all +{genres.length - 10}
+          +{genres.length - 10} more
         </button>
       )}
 
@@ -378,9 +379,9 @@ function LimitedGenrePills({
         <button
           type="button"
           onClick={() => setShowAll(true)}
-          className="hidden rounded-md border border-primary/30 bg-primary/10 px-3 py-1.5 text-sm font-medium text-primary transition hover:bg-primary hover:text-primary-foreground md:inline-flex"
+          className="hidden items-center rounded-md border border-purple-500/30 bg-purple-950/30 px-2.5 py-0.5 text-xs font-mono font-medium text-purple-300 transition-colors hover:bg-purple-900/50 hover:text-white md:inline-flex cursor-pointer"
         >
-          Show all +{genres.length - 20}
+          +{genres.length - 20} more
         </button>
       )}
 
@@ -388,7 +389,7 @@ function LimitedGenrePills({
         <button
           type="button"
           onClick={() => setShowAll(false)}
-          className="inline-flex rounded-md border border-border/60 bg-secondary/50 px-3 py-1.5 text-sm font-medium text-muted-foreground transition hover:bg-secondary hover:text-foreground"
+          className="inline-flex items-center rounded-md border border-white/10 bg-neutral-900/80 px-2.5 py-0.5 text-xs font-mono font-medium text-neutral-400 transition-colors hover:text-white cursor-pointer"
         >
           Show less
         </button>
@@ -430,9 +431,9 @@ function LimitedTagPills({
         <button
           type="button"
           onClick={() => setShowAll(true)}
-          className="inline-flex rounded-md border border-primary/30 bg-primary/10 px-3 py-1.5 text-sm font-medium text-primary transition hover:bg-primary hover:text-primary-foreground md:hidden"
+          className="inline-flex items-center rounded-md border border-purple-500/30 bg-purple-950/30 px-2.5 py-0.5 text-xs font-mono font-medium text-purple-300 transition-colors hover:bg-purple-900/50 hover:text-white md:hidden cursor-pointer"
         >
-          Show all +{tags.length - 10}
+          +{tags.length - 10} more
         </button>
       )}
 
@@ -440,9 +441,9 @@ function LimitedTagPills({
         <button
           type="button"
           onClick={() => setShowAll(true)}
-          className="hidden rounded-md border border-primary/30 bg-primary/10 px-3 py-1.5 text-sm font-medium text-primary transition hover:bg-primary hover:text-primary-foreground md:inline-flex"
+          className="hidden items-center rounded-md border border-purple-500/30 bg-purple-950/30 px-2.5 py-0.5 text-xs font-mono font-medium text-purple-300 transition-colors hover:bg-purple-900/50 hover:text-white md:inline-flex cursor-pointer"
         >
-          Show all +{tags.length - 20}
+          +{tags.length - 20} more
         </button>
       )}
 
@@ -450,7 +451,7 @@ function LimitedTagPills({
         <button
           type="button"
           onClick={() => setShowAll(false)}
-          className="inline-flex rounded-md border border-border/60 bg-secondary/50 px-3 py-1.5 text-sm font-medium text-muted-foreground transition hover:bg-secondary hover:text-foreground"
+          className="inline-flex items-center rounded-md border border-white/10 bg-neutral-900/80 px-2.5 py-0.5 text-xs font-mono font-medium text-neutral-400 transition-colors hover:text-white cursor-pointer"
         >
           Show less
         </button>
@@ -466,15 +467,15 @@ function ExpandableSynopsis({ text }: { text: string }) {
   const displayText = expanded || !isLong ? text : `${text.slice(0, 320).trim()}…`;
 
   return (
-    <div className="text-sm leading-relaxed text-muted-foreground whitespace-pre-line space-y-2">
+    <div className="text-[13px] sm:text-sm leading-relaxed text-neutral-300 whitespace-pre-line font-sans">
       <span>{displayText}</span>
       {isLong && (
         <button
           type="button"
           onClick={() => setExpanded((prev) => !prev)}
-          className="ml-1.5 inline-block font-semibold text-primary hover:underline cursor-pointer"
+          className="ml-2 inline-flex items-center text-xs font-mono font-bold uppercase tracking-wider text-purple-400 hover:text-purple-300 cursor-pointer"
         >
-          [{expanded ? "view less" : "view more"}]
+          [{expanded ? "less" : "more"}]
         </button>
       )}
     </div>

@@ -25,6 +25,7 @@ import {
   Play,
   Pause,
   ArrowUp,
+  ArrowDown,
   Send,
   Reply,
   Trash2,
@@ -343,13 +344,24 @@ export default function Reader({
       const progress =
         scrollHeight > 0 ? Math.min(Math.round(scrollRatio * 100), 100) : 0;
 
+      if (progress > 0) {
+        const lastLocalProgress = parseInt(
+          localStorage.getItem(`chapter-progress-${ch.id}`) || "0",
+          10
+        );
+        if (Math.abs(progress - lastLocalProgress) >= 3 || lastLocalProgress === 0) {
+          localStorage.setItem(`chapter-progress-${ch.id}`, progress.toString());
+        }
+      }
+
       if (user && progress >= 50) {
         // Only update database if progress has changed significantly (every 5%) or first reaching 50%
-        const lastProgress = parseInt(
-          localStorage.getItem(`chapter-progress-${ch.id}`) || "0",
+        const lastDbProgress = parseInt(
+          localStorage.getItem(`chapter-db-progress-${ch.id}`) || "0",
+          10
         );
-        if (Math.abs(progress - lastProgress) >= 5 || lastProgress < 50) {
-          localStorage.setItem(`chapter-progress-${ch.id}`, progress.toString());
+        if (Math.abs(progress - lastDbProgress) >= 5 || lastDbProgress < 50) {
+          localStorage.setItem(`chapter-db-progress-${ch.id}`, progress.toString());
           supabase
             .from("reading_history")
             .upsert(
@@ -1351,8 +1363,14 @@ function ImageView({
   const [imageRetries, setImageRetries] = useState<Record<string, number>>({});
   const [imageLoading, setImageLoading] = useState<Record<string, boolean>>({});
 
-  // Exact reading position tracking & restoration
-  const [restoredBanner, setRestoredBanner] = useState<{ page: number; total: number; percent: number } | null>(null);
+  // Exact reading position tracking & continue where left off prompt
+  type ContinuePromptData = {
+    targetPage: number;
+    percent: number;
+    scrollRatio: number;
+    scrollTop: number;
+  };
+  const [continuePrompt, setContinuePrompt] = useState<ContinuePromptData | null>(null);
   const restoredChapterRef = useRef<string | null>(null);
   const activePageRef = useRef(0);
   const isRestoringRef = useRef(true);
@@ -1440,74 +1458,88 @@ function ImageView({
       }
 
       const savedPos = getChapterReadingPosition(chapterId);
+      const savedLocalProgress = parseInt(
+        localStorage.getItem(`chapter-progress-${chapterId}`) || "0",
+        10
+      );
 
-      const targetPage = savedPos ? Math.min(Math.max(0, savedPos.pageIndex || 0), pages.length - 1) : 0;
-      const hasProgress = savedPos && (targetPage > 0 || (savedPos.scrollRatio && savedPos.scrollRatio > 0.05) || (savedPos.scrollTop && savedPos.scrollTop > 100));
+      let targetPage = savedPos ? Math.min(Math.max(0, savedPos.pageIndex || 0), pages.length - 1) : 0;
+      let percent = savedPos?.scrollRatio ? Math.round(savedPos.scrollRatio * 100) : savedLocalProgress;
+      if (targetPage === 0 && savedLocalProgress > 5) {
+        targetPage = Math.min(Math.floor((savedLocalProgress / 100) * pages.length), pages.length - 1);
+      }
+
+      const hasProgress =
+        (targetPage > 0 || (savedPos?.scrollRatio && savedPos.scrollRatio > 0.04) || (savedPos?.scrollTop && savedPos.scrollTop > 80) || savedLocalProgress > 5) &&
+        percent < 98;
 
       // 1. BRAND NEW OR UNREAD CHAPTER: ALWAYS START FROM TOP
-      if (!savedPos || !hasProgress) {
+      if (!hasProgress) {
         window.scrollTo({ top: 0, left: 0, behavior: "instant" });
         if (typeof document !== "undefined") {
           document.documentElement.scrollTop = 0;
           document.body.scrollTop = 0;
         }
+        setContinuePrompt(null);
         const timer = setTimeout(() => {
           isRestoringRef.current = false;
         }, 300);
         return () => clearTimeout(timer);
       }
 
-      // 2. RETURNING READERS: RESUME WHERE THEY LEFT OFF
+      // 2. RETURNING READERS: REDIRECT DIRECTLY TO MIDDLE & SHOW PROMPT
+      const finalPercent = Math.max(
+        percent,
+        targetPage > 0 ? Math.round(((targetPage + 1) / pages.length) * 100) : 0
+      );
+      const promptData: ContinuePromptData = {
+        targetPage,
+        percent: finalPercent,
+        scrollRatio: savedPos?.scrollRatio || (finalPercent / 100),
+        scrollTop: savedPos?.scrollTop || 0,
+      };
+      setContinuePrompt(promptData);
+
       let cancelled = false;
       let attempts = 0;
-      const maxAttempts = 15;
+      const maxAttempts = 20;
 
-      const attemptScrollToPage = () => {
-        if (cancelled) return;
-        attempts++;
-
+      const performScroll = (smooth = true) => {
         if (targetPage > 0) {
           const targetEl = document.getElementById(`chapter-page-${targetPage}`);
           if (targetEl) {
-            targetEl.scrollIntoView({ block: "start", behavior: "instant" });
-            setRestoredBanner({
-              page: targetPage + 1,
-              total: pages.length,
-              percent: Math.round((savedPos.scrollRatio || (targetPage / pages.length)) * 100),
-            });
-            setTimeout(() => setRestoredBanner(null), 4500);
-
-            setTimeout(() => {
-              if (!cancelled) isRestoringRef.current = false;
-            }, 500);
-            return;
+            targetEl.scrollIntoView({ block: "start", behavior: smooth ? "smooth" : "instant" });
+            return true;
           }
-        } else if (savedPos.scrollTop > 80) {
-          window.scrollTo({ top: savedPos.scrollTop, behavior: "instant" });
-          setRestoredBanner({
-            page: 1,
-            total: pages.length,
-            percent: Math.round((savedPos.scrollRatio || 0) * 100),
-          });
-          setTimeout(() => setRestoredBanner(null), 4500);
-          setTimeout(() => {
-            if (!cancelled) isRestoringRef.current = false;
-          }, 500);
-          return;
         }
+        const scrollHeight = document.documentElement.scrollHeight - window.innerHeight;
+        if (scrollHeight > 0 && promptData.scrollRatio > 0) {
+          window.scrollTo({ top: promptData.scrollRatio * scrollHeight, behavior: smooth ? "smooth" : "instant" });
+          return true;
+        } else if (promptData.scrollTop > 50) {
+          window.scrollTo({ top: promptData.scrollTop, behavior: smooth ? "smooth" : "instant" });
+          return true;
+        }
+        return false;
+      };
 
-        if (attempts < maxAttempts) {
-          requestAnimationFrame(attemptScrollToPage);
+      // Direct smooth scroll to where they left off once layout mounts
+      const attemptRedirect = () => {
+        if (cancelled) return;
+        attempts++;
+        const scrolled = performScroll(true);
+        if (!scrolled && attempts < maxAttempts) {
+          setTimeout(attemptRedirect, 150);
         } else {
           isRestoringRef.current = false;
         }
       };
 
-      const rafId = requestAnimationFrame(attemptScrollToPage);
+      const redirectTimer = setTimeout(attemptRedirect, 350);
 
       return () => {
         cancelled = true;
-        cancelAnimationFrame(rafId);
+        clearTimeout(redirectTimer);
       };
     }
   }, [chapterId, loading, pages]);
@@ -1580,19 +1612,50 @@ function ImageView({
 
   return (
     <>
-      {/* Floating Exact Resume Notification Banner */}
-      {restoredBanner && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 flex items-center gap-3 px-4 py-2.5 rounded-full bg-black/85 text-white border border-primary/40 shadow-2xl backdrop-blur-md animate-in fade-in slide-in-from-bottom-4 duration-300">
-          <span className="text-sm font-semibold text-primary-foreground flex items-center gap-1.5">
-            <span>📍 Resumed at Page {restoredBanner.page} of {restoredBanner.total}</span>
-            <span className="text-xs text-primary/80">({restoredBanner.percent}%)</span>
-          </span>
-          <button
-            onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
-            className="text-xs bg-primary/30 hover:bg-primary text-white px-2.5 py-1 rounded-full font-bold transition-colors cursor-pointer"
-          >
-            Top ⬆
-          </button>
+      {/* Floating Continue Where You Left Off Prompt (Matching site purple theme & user screenshot) */}
+      {continuePrompt && (
+        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 animate-in fade-in slide-in-from-bottom-5 duration-300 pointer-events-auto select-none">
+          <div className="flex items-center gap-2 pl-4 pr-2.5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white shadow-2xl shadow-purple-950/80 border border-purple-400/40 backdrop-blur-md transition-all">
+            <button
+              type="button"
+              onClick={() => {
+                if (continuePrompt.targetPage > 0) {
+                  const targetEl = document.getElementById(`chapter-page-${continuePrompt.targetPage}`);
+                  if (targetEl) {
+                    targetEl.scrollIntoView({ block: "start", behavior: "smooth" });
+                    return;
+                  }
+                }
+                const scrollHeight = document.documentElement.scrollHeight - window.innerHeight;
+                if (scrollHeight > 0 && continuePrompt.scrollRatio > 0) {
+                  window.scrollTo({ top: continuePrompt.scrollRatio * scrollHeight, behavior: "smooth" });
+                } else if (continuePrompt.scrollTop > 50) {
+                  window.scrollTo({ top: continuePrompt.scrollTop, behavior: "smooth" });
+                }
+              }}
+              className="flex items-center gap-2 text-xs sm:text-sm font-semibold text-white hover:text-purple-100 transition-colors cursor-pointer"
+            >
+              <ArrowDown className="h-4 w-4 stroke-[2.5] shrink-0 animate-bounce" />
+              <span>Continue where you left off</span>
+              {continuePrompt.percent > 0 && (
+                <span className="text-3xs bg-black/25 px-1.5 py-0.5 rounded font-mono font-bold">
+                  {continuePrompt.percent}%
+                </span>
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setContinuePrompt(null);
+              }}
+              className="ml-1 p-1 rounded-lg hover:bg-white/20 text-white/80 hover:text-white transition-colors cursor-pointer"
+              title="Dismiss"
+              aria-label="Dismiss continue prompt"
+            >
+              <X className="h-3.5 w-3.5 stroke-[2.5]" />
+            </button>
+          </div>
         </div>
       )}
 
@@ -1747,8 +1810,13 @@ function NovelView({
     }
   }, []);
 
-  // Exact reading position tracking & restoration for novels
-  const [restoredBanner, setRestoredBanner] = useState<{ percent: number } | null>(null);
+  // Exact reading position tracking & continue where left off prompt for novels
+  type NovelContinuePromptData = {
+    percent: number;
+    scrollRatio: number;
+    scrollTop: number;
+  };
+  const [continuePrompt, setContinuePrompt] = useState<NovelContinuePromptData | null>(null);
   const restoredNovelChapterRef = useRef<string | null>(null);
   const isRestoringRef = useRef(true);
 
@@ -1821,34 +1889,56 @@ function NovelView({
       }
 
       const savedPos = getChapterReadingPosition(chapterId);
-      const hasProgress = savedPos && (savedPos.scrollTop > 60 || (savedPos.scrollRatio && savedPos.scrollRatio > 0.04));
+      const savedLocalProgress = parseInt(
+        localStorage.getItem(`chapter-progress-${chapterId}`) || "0",
+        10
+      );
 
-      if (!savedPos || !hasProgress) {
+      const percent = savedPos?.scrollRatio
+        ? Math.round(savedPos.scrollRatio * 100)
+        : savedLocalProgress;
+      const hasProgress =
+        (savedPos && (savedPos.scrollTop > 60 || (savedPos.scrollRatio && savedPos.scrollRatio > 0.04))) ||
+        (savedLocalProgress > 5 && savedLocalProgress < 98);
+
+      if (!hasProgress) {
         window.scrollTo({ top: 0, left: 0, behavior: "instant" });
         if (typeof document !== "undefined") {
           document.documentElement.scrollTop = 0;
           document.body.scrollTop = 0;
         }
+        setContinuePrompt(null);
         const timer = setTimeout(() => {
           isRestoringRef.current = false;
         }, 300);
         return () => clearTimeout(timer);
       }
 
-      const restoreTimer = setTimeout(() => {
-        if (savedPos.scrollTop > 0) {
-          window.scrollTo({ top: savedPos.scrollTop, behavior: "instant" });
-        }
-        setRestoredBanner({
-          percent: Math.round((savedPos.scrollRatio || 0) * 100),
-        });
-        setTimeout(() => setRestoredBanner(null), 4500);
-        setTimeout(() => {
-          isRestoringRef.current = false;
-        }, 400);
-      }, 100);
+      const promptData: NovelContinuePromptData = {
+        percent,
+        scrollRatio: savedPos?.scrollRatio || percent / 100,
+        scrollTop: savedPos?.scrollTop || 0,
+      };
+      setContinuePrompt(promptData);
 
-      return () => clearTimeout(restoreTimer);
+      const performScroll = (smooth = true) => {
+        const scrollHeight = document.documentElement.scrollHeight - window.innerHeight;
+        if (scrollHeight > 0 && promptData.scrollRatio > 0) {
+          window.scrollTo({ top: promptData.scrollRatio * scrollHeight, behavior: smooth ? "smooth" : "instant" });
+          return true;
+        } else if (promptData.scrollTop > 50) {
+          window.scrollTo({ top: promptData.scrollTop, behavior: smooth ? "smooth" : "instant" });
+          return true;
+        }
+        return false;
+      };
+
+      const redirectTimer = setTimeout(() => {
+        performScroll(true);
+        isRestoringRef.current = false;
+      }, 350);
+
+      return () => clearTimeout(redirectTimer);
     }
   }, [chapterId, content]);
 
@@ -1907,18 +1997,43 @@ function NovelView({
 
   return (
     <div className={`relative min-h-screen ${themeStyles.bg} ${themeStyles.text} transition-colors duration-300`}>
-      {/* Floating Exact Resume Notification Banner */}
-      {restoredBanner && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 flex items-center gap-3 px-4 py-2.5 rounded-full bg-black/85 text-white border border-primary/40 shadow-2xl backdrop-blur-md animate-in fade-in slide-in-from-bottom-4 duration-300">
-          <span className="text-sm font-semibold text-primary-foreground flex items-center gap-1.5">
-            <span>📍 Resumed at {restoredBanner.percent}%</span>
-          </span>
-          <button
-            onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
-            className="text-xs bg-primary/30 hover:bg-primary text-white px-2.5 py-1 rounded-full font-bold transition-colors cursor-pointer"
-          >
-            Top ⬆
-          </button>
+      {/* Floating Continue Where You Left Off Prompt for Novels */}
+      {continuePrompt && (
+        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 animate-in fade-in slide-in-from-bottom-5 duration-300 pointer-events-auto select-none">
+          <div className="flex items-center gap-2 pl-4 pr-2.5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white shadow-2xl shadow-purple-950/80 border border-purple-400/40 backdrop-blur-md transition-all">
+            <button
+              type="button"
+              onClick={() => {
+                const scrollHeight = document.documentElement.scrollHeight - window.innerHeight;
+                if (scrollHeight > 0 && continuePrompt.scrollRatio > 0) {
+                  window.scrollTo({ top: continuePrompt.scrollRatio * scrollHeight, behavior: "smooth" });
+                } else if (continuePrompt.scrollTop > 50) {
+                  window.scrollTo({ top: continuePrompt.scrollTop, behavior: "smooth" });
+                }
+              }}
+              className="flex items-center gap-2 text-xs sm:text-sm font-semibold text-white hover:text-purple-100 transition-colors cursor-pointer"
+            >
+              <ArrowDown className="h-4 w-4 stroke-[2.5] shrink-0 animate-bounce" />
+              <span>Continue where you left off</span>
+              {continuePrompt.percent > 0 && (
+                <span className="text-3xs bg-black/25 px-1.5 py-0.5 rounded font-mono font-bold">
+                  {continuePrompt.percent}%
+                </span>
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setContinuePrompt(null);
+              }}
+              className="ml-1 p-1 rounded-lg hover:bg-white/20 text-white/80 hover:text-white transition-colors cursor-pointer"
+              title="Dismiss"
+              aria-label="Dismiss continue prompt"
+            >
+              <X className="h-3.5 w-3.5 stroke-[2.5]" />
+            </button>
+          </div>
         </div>
       )}
 

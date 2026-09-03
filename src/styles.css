@@ -82,6 +82,10 @@
 
 /* ─── BASE TOKENS ──────────────────────────────────────────────────────────── */
 :root {
+  --font-sans: var(--font-inter), 'Inter', sans-serif;
+  --font-heading: var(--font-inter), 'Inter', sans-serif;
+  --font-outfit: var(--font-inter), 'Inter', sans-serif;
+
   /*
    * SpaceX radius scale: xs=4 sm=8 md=16 pill=32
    * We use 4px as base (xs) — everything is tight and engineered.
@@ -238,41 +242,34 @@
      *   Letters track positively (+0.32px body, +1.17px caps)
      *   Leading is TIGHT on display (0.95), normal on body (1.5–1.7)
      */
-    font-family: var(--font-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-    letter-spacing: -0.012em;
-    line-height: 1.55;
+    font-family: var(--font-inter), 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    font-weight: 700;
+    letter-spacing: -0.011em;
+    line-height: 1.6;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
 
   html {
     text-size-adjust: 100%;
-    font-family: var(--font-sans), -apple-system, BlinkMacSystemFont, sans-serif;
+    font-family: var(--font-inter), 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
   }
 
-  h1 {
-    font-family: var(--font-outfit), var(--font-sans), sans-serif;
-    font-weight: 800;
-    line-height: 1.15;
-    letter-spacing: -0.03em;
+  p {
+    font-family: var(--font-inter), 'Inter', sans-serif;
+    font-weight: 700;
   }
-  h2 {
-    font-family: var(--font-outfit), var(--font-sans), sans-serif;
-    font-weight: 750;
-    line-height: 1.2;
+
+  h1, h2, h3, h4, h5, h6, .font-heading, .font-display, .font-outfit, .font-title {
+    font-family: var(--font-inter), 'Inter', sans-serif !important;
+    font-weight: 800 !important;
+    line-height: 1.18;
     letter-spacing: -0.025em;
   }
-  h3, h4 {
-    font-family: var(--font-outfit), var(--font-sans), sans-serif;
+
+  .font-body, .font-sans {
+    font-family: var(--font-inter), 'Inter', sans-serif !important;
     font-weight: 700;
-    line-height: 1.3;
-    letter-spacing: -0.02em;
-  }
-  h5, h6 {
-    font-family: var(--font-outfit), var(--font-sans), sans-serif;
-    font-weight: 650;
-    line-height: 1.35;
-    letter-spacing: -0.015em;
   }
 
   img, video, canvas, svg {
@@ -308,12 +305,64 @@
   }
   .animate-shine { animation: shine 1.5s ease-in-out; }
 
-  /* Navbar avatar frame animations — moved here so we don't inject a <style>
-     tag from JS on every component render (was a hidden INP cost). */
-  @keyframes navRotCW  { 0% { transform: rotate(0deg); }   100% { transform: rotate(360deg); } }
-  @keyframes navRotCCW { 0% { transform: rotate(360deg); } 100% { transform: rotate(0deg); } }
-  @keyframes navPulse  { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.06); } }
-  @keyframes navGlitch { 0%, 100% { filter: hue-rotate(0deg); } 50% { filter: hue-rotate(30deg); } }
+  /* Avatar frame keyframes — shared across Profile, Leaderboard, Navbar & Comments */
+  @keyframes rotationCW  { 0% { transform: rotate(0deg); }   100% { transform: rotate(360deg); } }
+  @keyframes rotationCCW { 0% { transform: rotate(360deg); } 100% { transform: rotate(0deg); } }
+  @keyframes navRotCW    { 0% { transform: rotate(0deg); }   100% { transform: rotate(360deg); } }
+  @keyframes navRotCCW   { 0% { transform: rotate(360deg); } 100% { transform: rotate(0deg); } }
+  @keyframes navPulse    { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.06); } }
+  @keyframes navGlitch   { 0%, 100% { filter: hue-rotate(0deg); } 50% { filter: hue-rotate(30deg); } }
+  @keyframes lightningFlicker {
+    0%, 100% { opacity: 1; filter: brightness(1) drop-shadow(0 0 10px rgba(168,85,247,0.3)); }
+    5%       { opacity: 0.85; filter: brightness(1.2) drop-shadow(0 0 15px rgba(6,182,212,0.6)); }
+    10%      { opacity: 1; filter: brightness(1) drop-shadow(0 0 10px rgba(168,85,247,0.3)); }
+    35%      { opacity: 1; }
+    36%      { opacity: 0.9; filter: brightness(1.3) drop-shadow(0 0 20px rgba(236,72,153,0.7)); }
+    38%      { opacity: 1; filter: brightness(1) drop-shadow(0 0 10px rgba(168,85,247,0.3)); }
+  }
+  @keyframes smoothBreath {
+    0%, 100% { transform: scale(1); }
+    50%      { transform: scale(1.03); }
+  }
+  @keyframes runeJadePulse {
+    0%   { transform: scale(1) rotate(0deg); opacity: 0.7; }
+    50%  { transform: scale(1.03) rotate(180deg); opacity: 1; }
+    100% { transform: scale(1) rotate(360deg); opacity: 0.7; }
+  }
+  @keyframes asuraRage {
+    0%, 100% { transform: scale(1); filter: brightness(1) drop-shadow(0 0 8px rgba(239,68,68,0.5)); }
+    50%      { transform: scale(1.04); filter: brightness(1.25) drop-shadow(0 0 22px rgba(239,68,68,0.9)); }
+  }
+  @keyframes abyssVoidGlow {
+    0%, 100% { filter: brightness(1) drop-shadow(0 0 8px rgba(217, 70, 239, 0.45)); transform: scale(1); }
+    50%      { filter: brightness(1.25) drop-shadow(0 0 22px rgba(139, 92, 246, 0.75)); transform: scale(1.03); }
+  }
+  @keyframes glitchFlicker {
+    0%, 100% { transform: scale(1) skew(0deg); opacity: 1; filter: hue-rotate(0deg); }
+    10%      { transform: scale(1.02) skew(1deg); opacity: 0.95; filter: hue-rotate(30deg); }
+    20%      { transform: scale(0.98) skew(-1deg); opacity: 0.9; filter: hue-rotate(-30deg); }
+    30%      { transform: scale(1) skew(0deg); opacity: 1; filter: hue-rotate(0deg); }
+  }
+  @keyframes divineHalo {
+    0%, 100% { filter: brightness(1) drop-shadow(0 0 10px rgba(252, 211, 77, 0.5)); transform: scale(1); }
+    50%      { filter: brightness(1.25) drop-shadow(0 0 22px rgba(255, 255, 255, 0.75)); transform: scale(1.04); }
+  }
+  @keyframes avatarSmokeOrbit {
+    0%   { transform: rotate(0deg) translateX(24px) rotate(0deg) scale(0.7); opacity: 0; filter: blur(2px); }
+    15%  { opacity: 0.35; }
+    50%  { transform: rotate(180deg) translateX(24px) rotate(-180deg) scale(1.1); opacity: 0.2; filter: blur(3px); }
+    85%  { opacity: 0.1; }
+    100% { transform: rotate(360deg) translateX(24px) rotate(-360deg) scale(0.7); opacity: 0; filter: blur(2px); }
+  }
+  @keyframes starTwinkle {
+    0%, 100% { transform: scale(0.6) rotate(0deg); opacity: 0.3; }
+    50%      { transform: scale(1.1) rotate(90deg); opacity: 1; }
+  }
+  @keyframes shadowWispMove {
+    0%   { transform: scale(1) translate(0, 0); opacity: 0.2; }
+    50%  { transform: scale(1.08) translate(2px, -2px); opacity: 0.5; filter: blur(2px); }
+    100% { transform: scale(1) translate(0, 0); opacity: 0.2; }
+  }
   @keyframes fireTongue {
     0%, 100% { transform: scaleY(1) skewX(0deg) scaleX(1);     opacity: 0.85; filter: blur(1px) brightness(1); }
     25%      { transform: scaleY(1.25) skewX(3deg) scaleX(0.95); opacity: 1;    filter: blur(0.5px) brightness(1.25); }

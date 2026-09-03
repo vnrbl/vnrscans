@@ -1,0 +1,562 @@
+[
+  {
+    "id": "anilist-129928",
+    "seriesSlug": "solo-leveling",
+    "slug": "jin-u-seong",
+    "name": "Jin-U Seong",
+    "nativeName": "성진우",
+    "aliases": [
+      "Sung Jin-Woo",
+      "Shun Mizushino (水篠旬)",
+      "World's Weakest Hunter",
+      "The Weakest Hunter of All Mankind",
+      "World's Strongest Hunter",
+      "Shadow Monarch"
+    ],
+    "role": "MAIN",
+    "imageUrl": "https://s4.anilist.co/file/anilistcdn/character/large/b129928-BCEjVaP0AQSw.png",
+    "description": "Seong Jin-U is known as an infamously weak E-Rank Hunter. He is a humble and benevolent individual who cares deeply for his family and has an ardent desire to become stronger. As a result, he shares a close relationship with his sister and his mother, and rarely wastes an opportunity to refine his skills and gain more power.\n\nHe becomes an S-Rank hunter after being given a chance to become stronger by the System.",
+    "bioData": {
+      "combatClass": "Mage",
+      "affiliation": "Korean Hunters Association (helper), White Tiger Guild (helper), Hunters Guild (helper), Knights Guild (helper), Ahjin Guild (Guild Master)",
+      "gender": "Male",
+      "age": "23-24",
+      "roleType": "Main Cast"
+    },
+    "relationships": [
+      {
+        "name": "Park Kyung-Hye",
+        "slug": "park-kyung-hye",
+        "relationType": "Mother",
+        "isSpoiler": false
+      },
+      {
+        "name": "Seong Jin-Ah",
+        "slug": "seong-jin-ah",
+        "relationType": "Sister",
+        "isSpoiler": false
+      },
+      {
+        "name": "Seong Il-Hwan",
+        "slug": "seong-il-hwan",
+        "relationType": "Father",
+        "isSpoiler": false
+      },
+      {
+        "name": "Cha Hae-In",
+        "slug": "cha-hae-in",
+        "relationType": "Wife",
+        "isSpoiler": false
+      },
+      {
+        "name": "Seong Su-Ho",
+        "slug": "seong-su-ho",
+        "relationType": "Son",
+        "isSpoiler": false
+      }
+    ],
+    "spoilerSummary": "[Seong Il-Hwan](https://anilist.co/character/138790/IlHwan-Sung) (Father), [Cha Hae-In](https://anilist.co/character/138789/HaeIn-Cha) (Wife), [Seong Su-Ho](https://anilist.co/character/306654/Suho-Sung) (Son) • __Guild:__ Ahjin Guild (Guild Master)\n__Affiliation:__ Korean Hunters Association (helper), White Tiger Guild (helper), Hunters Guild (helper), Knights Guild (helper), Ahjin Guild (Guild Master) • He becomes an S-Rank hunter after being given a chance to become stronger by the System.",
+    "sourceUrl": "https://anilist.co/character/129928",
+    "updatedAt": "2026-09-03T13:06:57.060Z"
+  },
+  {
+    "id": "anilist-138789",
+    "seriesSlug": "solo-leveling",
+    "slug": "hae-in-cha",
+    "name": "Hae-In Cha",
+    "nativeName": "차해인",
+    "aliases": [
+      "Shizuku Kousaka (向坂雫)",
+      "Blade Dancer"
+    ],
+    "role": "SUPPORTING",
+    "imageUrl": "https://s4.anilist.co/file/anilistcdn/character/large/b138789-AhE8m0LWjE7E.png",
+    "description": "Cha Hae-In is the Vice-Guild Master of the Hunters Guild. She is an S rank hunter and the 9th ranked hunter in South Korea. She possesses the unique ability of mana smell and hates the smell of hunters except for Sung Jin-Woo.",
+    "bioData": {
+      "affiliation": "Jeju Island Raid Party, Song Chi-Yul’s Dojo (Disciple)",
+      "combatClass": "Sword Fighter",
+      "gender": "Female",
+      "age": "23",
+      "roleType": "Supporting Role"
+    },
+    "relationships": [
+      {
+        "name": "Jin-U Seong",
+        "slug": "jin-u-seong",
+        "relationType": "Allied Protagonist",
+        "isSpoiler": false
+      },
+      {
+        "name": "Chi-Yul Song",
+        "slug": "chi-yul-song",
+        "relationType": "Key Associate",
+        "isSpoiler": false
+      },
+      {
+        "name": "Ju-Hui Lee",
+        "slug": "ju-hui-lee",
+        "relationType": "Key Associate",
+        "isSpoiler": false
+      }
+    ],
+    "sourceUrl": "https://anilist.co/character/138789",
+    "updatedAt": "2026-09-03T13:06:57.061Z"
+  },
+  {
+    "id": "anilist-136073",
+    "seriesSlug": "solo-leveling",
+    "slug": "chi-yul-song",
+    "name": "Chi-Yul Song",
+    "nativeName": "송치율",
+    "aliases": [
+      "Isao Mabuchi (馬渕勲)",
+      "Chi-Yeol (송치열)"
+    ],
+    "role": "SUPPORTING",
+    "imageUrl": "https://s4.anilist.co/file/anilistcdn/character/large/b136073-0hZNgsWB9ZLH.png",
+    "description": "Korean C-Rank Hunter and kumdo teacher. He is also one of Jinwoo's old friends, having known him since he was a E-Rank Hunter.",
+    "bioData": {
+      "abilities": [
+        "Fire"
+      ],
+      "gender": "Male",
+      "roleType": "Supporting Role"
+    },
+    "relationships": [
+      {
+        "name": "Jin-U Seong",
+        "slug": "jin-u-seong",
+        "relationType": "Allied Protagonist",
+        "isSpoiler": false
+      },
+      {
+        "name": "Hae-In Cha",
+        "slug": "hae-in-cha",
+        "relationType": "Key Associate",
+        "isSpoiler": false
+      },
+      {
+        "name": "Ju-Hui Lee",
+        "slug": "ju-hui-lee",
+        "relationType": "Key Associate",
+        "isSpoiler": false
+      }
+    ],
+    "sourceUrl": "https://anilist.co/character/136073",
+    "updatedAt": "2026-09-03T13:06:57.061Z"
+  },
+  {
+    "id": "anilist-136074",
+    "seriesSlug": "solo-leveling",
+    "slug": "ju-hui-lee",
+    "name": "Ju-Hui Lee",
+    "nativeName": "이주희",
+    "aliases": [
+      "Lee Joohee",
+      "Lee Ju-Hee",
+      "Eri Mizuki (観月絵里)"
+    ],
+    "role": "SUPPORTING",
+    "imageUrl": "https://s4.anilist.co/file/anilistcdn/character/large/b136074-pLyumEnxjL7P.png",
+    "description": "She is a healer with rank B.",
+    "bioData": {
+      "gender": "Female",
+      "roleType": "Supporting Role"
+    },
+    "relationships": [
+      {
+        "name": "Jin-U Seong",
+        "slug": "jin-u-seong",
+        "relationType": "Allied Protagonist",
+        "isSpoiler": false
+      },
+      {
+        "name": "Hae-In Cha",
+        "slug": "hae-in-cha",
+        "relationType": "Key Associate",
+        "isSpoiler": false
+      },
+      {
+        "name": "Chi-Yul Song",
+        "slug": "chi-yul-song",
+        "relationType": "Key Associate",
+        "isSpoiler": false
+      }
+    ],
+    "sourceUrl": "https://anilist.co/character/136074",
+    "updatedAt": "2026-09-03T13:06:57.061Z"
+  },
+  {
+    "id": "anilist-136075",
+    "seriesSlug": "solo-leveling",
+    "slug": "dong-su-hwang",
+    "name": "Dong-Su Hwang",
+    "nativeName": "황동수",
+    "aliases": [
+      "Dongsoo Hwang",
+      "Masato Ukyou (右京将人)"
+    ],
+    "role": "SUPPORTING",
+    "imageUrl": "https://s4.anilist.co/file/anilistcdn/character/large/b136075-M6VRrZyHpaI5.png",
+    "description": "Hwang Dong-su is an​ S-class hunter who works for Scavenger's Guild in America.",
+    "bioData": {
+      "gender": "Male",
+      "roleType": "Supporting Role"
+    },
+    "relationships": [
+      {
+        "name": "Jin-U Seong",
+        "slug": "jin-u-seong",
+        "relationType": "Allied Protagonist",
+        "isSpoiler": false
+      },
+      {
+        "name": "Hae-In Cha",
+        "slug": "hae-in-cha",
+        "relationType": "Key Associate",
+        "isSpoiler": false
+      },
+      {
+        "name": "Chi-Yul Song",
+        "slug": "chi-yul-song",
+        "relationType": "Key Associate",
+        "isSpoiler": false
+      },
+      {
+        "name": "Ju-Hui Lee",
+        "slug": "ju-hui-lee",
+        "relationType": "Key Associate",
+        "isSpoiler": false
+      }
+    ],
+    "sourceUrl": "https://anilist.co/character/136075",
+    "updatedAt": "2026-09-03T13:06:57.061Z"
+  },
+  {
+    "id": "anilist-136076",
+    "seriesSlug": "solo-leveling",
+    "slug": "jin-ho-yu",
+    "name": "Jin-Ho Yu",
+    "nativeName": "유진호",
+    "aliases": [
+      "Kenta Morobishi (諸菱賢太)",
+      "Yoo Jin-Ho"
+    ],
+    "role": "SUPPORTING",
+    "imageUrl": "https://s4.anilist.co/file/anilistcdn/character/large/b136076-D7eiE3pA9U8g.jpg",
+    "description": "Yoo Jin-Ho is a D rank hunter and is Jin-U Seong's faithful assistant and combat partner.",
+    "bioData": {
+      "combatClass": "Tanker",
+      "affiliation": "Ahjin Guild (Vice-Guild Master)",
+      "gender": "Male",
+      "age": "22",
+      "roleType": "Supporting Role"
+    },
+    "relationships": [
+      {
+        "name": "Jin-U Seong",
+        "slug": "jin-u-seong",
+        "relationType": "Allied Protagonist",
+        "isSpoiler": false
+      },
+      {
+        "name": "Hae-In Cha",
+        "slug": "hae-in-cha",
+        "relationType": "Key Associate",
+        "isSpoiler": false
+      },
+      {
+        "name": "Chi-Yul Song",
+        "slug": "chi-yul-song",
+        "relationType": "Key Associate",
+        "isSpoiler": false
+      },
+      {
+        "name": "Ju-Hui Lee",
+        "slug": "ju-hui-lee",
+        "relationType": "Key Associate",
+        "isSpoiler": false
+      }
+    ],
+    "spoilerSummary": "Ahjin Guild (Vice-Guild Master)",
+    "sourceUrl": "https://anilist.co/character/136076",
+    "updatedAt": "2026-09-03T13:06:57.061Z"
+  },
+  {
+    "id": "anilist-136077",
+    "seriesSlug": "solo-leveling",
+    "slug": "yun-ho-baek",
+    "name": "Yun-Ho Baek",
+    "nativeName": "백윤호",
+    "aliases": [
+      "Taiga Shirakawa (白川大虎)",
+      "Baek Yoon-Ho"
+    ],
+    "role": "SUPPORTING",
+    "imageUrl": "https://s4.anilist.co/file/anilistcdn/character/large/b136077-IIMqRmMK5Fgs.png",
+    "description": "He is a S rank hunter and master of the White Tiger guild.",
+    "bioData": {
+      "gender": "Male",
+      "roleType": "Supporting Role"
+    },
+    "relationships": [
+      {
+        "name": "Jin-U Seong",
+        "slug": "jin-u-seong",
+        "relationType": "Allied Protagonist",
+        "isSpoiler": false
+      },
+      {
+        "name": "Hae-In Cha",
+        "slug": "hae-in-cha",
+        "relationType": "Key Associate",
+        "isSpoiler": false
+      },
+      {
+        "name": "Chi-Yul Song",
+        "slug": "chi-yul-song",
+        "relationType": "Key Associate",
+        "isSpoiler": false
+      },
+      {
+        "name": "Ju-Hui Lee",
+        "slug": "ju-hui-lee",
+        "relationType": "Key Associate",
+        "isSpoiler": false
+      }
+    ],
+    "sourceUrl": "https://anilist.co/character/136077",
+    "updatedAt": "2026-09-03T13:06:57.061Z"
+  },
+  {
+    "id": "anilist-136819",
+    "seriesSlug": "solo-leveling",
+    "slug": "jin-cheol-u",
+    "name": "Jin-Cheol U",
+    "nativeName": "우진철",
+    "aliases": [
+      "Akira Inukai (犬飼晃)",
+      "Woo Jin-Chul",
+      "Wool Jinchu"
+    ],
+    "role": "SUPPORTING",
+    "imageUrl": "https://s4.anilist.co/file/anilistcdn/character/large/b136819-okbPuuFAefYX.png",
+    "description": "An A rank hunter that works for Hunter's association of Korea.",
+    "bioData": {
+      "gender": "Male",
+      "roleType": "Supporting Role"
+    },
+    "relationships": [
+      {
+        "name": "Jin-U Seong",
+        "slug": "jin-u-seong",
+        "relationType": "Allied Protagonist",
+        "isSpoiler": false
+      },
+      {
+        "name": "Hae-In Cha",
+        "slug": "hae-in-cha",
+        "relationType": "Key Associate",
+        "isSpoiler": false
+      },
+      {
+        "name": "Chi-Yul Song",
+        "slug": "chi-yul-song",
+        "relationType": "Key Associate",
+        "isSpoiler": false
+      },
+      {
+        "name": "Ju-Hui Lee",
+        "slug": "ju-hui-lee",
+        "relationType": "Key Associate",
+        "isSpoiler": false
+      }
+    ],
+    "sourceUrl": "https://anilist.co/character/136819",
+    "updatedAt": "2026-09-03T13:06:57.061Z"
+  },
+  {
+    "id": "anilist-138790",
+    "seriesSlug": "solo-leveling",
+    "slug": "il-hwan-seong",
+    "name": "Il-Hwan Seong",
+    "nativeName": "성일환",
+    "aliases": [
+      "Suspect-S",
+      "Sung Il-hwan",
+      "Junichirou Mizushino (水篠潤一郎)"
+    ],
+    "role": "SUPPORTING",
+    "imageUrl": "https://s4.anilist.co/file/anilistcdn/character/large/b138790-i3DFMscWID9D.jpg",
+    "description": "Il-Hwan is a muscular middle-aged man with black eyes, shaggy black hair, and slight facial hair. When using his powers or agitated, his eyes glows bright yellow.",
+    "bioData": {
+      "gender": "Male",
+      "roleType": "Supporting Role"
+    },
+    "relationships": [
+      {
+        "name": "Jin-U Seong",
+        "slug": "jin-u-seong",
+        "relationType": "Allied Protagonist",
+        "isSpoiler": false
+      },
+      {
+        "name": "Hae-In Cha",
+        "slug": "hae-in-cha",
+        "relationType": "Key Associate",
+        "isSpoiler": false
+      },
+      {
+        "name": "Chi-Yul Song",
+        "slug": "chi-yul-song",
+        "relationType": "Key Associate",
+        "isSpoiler": false
+      },
+      {
+        "name": "Ju-Hui Lee",
+        "slug": "ju-hui-lee",
+        "relationType": "Key Associate",
+        "isSpoiler": false
+      }
+    ],
+    "sourceUrl": "https://anilist.co/character/138790",
+    "updatedAt": "2026-09-03T13:06:57.061Z"
+  },
+  {
+    "id": "anilist-138791",
+    "seriesSlug": "solo-leveling",
+    "slug": "jin-a-seong",
+    "name": "Jin-A Seong",
+    "nativeName": "성진아",
+    "aliases": [
+      "Aoi Mizushino (水篠葵)",
+      "Sung Jin-Ah"
+    ],
+    "role": "SUPPORTING",
+    "imageUrl": "https://s4.anilist.co/file/anilistcdn/character/large/b138791-IngjgBQqGMWc.png",
+    "description": "Jin-U's younger sister.",
+    "bioData": {
+      "gender": "Female",
+      "roleType": "Supporting Role"
+    },
+    "relationships": [
+      {
+        "name": "Jin-U Seong",
+        "slug": "jin-u-seong",
+        "relationType": "Allied Protagonist",
+        "isSpoiler": false
+      },
+      {
+        "name": "Hae-In Cha",
+        "slug": "hae-in-cha",
+        "relationType": "Key Associate",
+        "isSpoiler": false
+      },
+      {
+        "name": "Chi-Yul Song",
+        "slug": "chi-yul-song",
+        "relationType": "Key Associate",
+        "isSpoiler": false
+      },
+      {
+        "name": "Ju-Hui Lee",
+        "slug": "ju-hui-lee",
+        "relationType": "Key Associate",
+        "isSpoiler": false
+      }
+    ],
+    "sourceUrl": "https://anilist.co/character/138791",
+    "updatedAt": "2026-09-03T13:06:57.061Z"
+  },
+  {
+    "id": "anilist-138792",
+    "seriesSlug": "solo-leveling",
+    "slug": "geon-hui-go",
+    "name": "Geon-Hui Go",
+    "nativeName": "고건희",
+    "aliases": [
+      "Kiyoomi Gotou (後藤清臣)",
+      "Go Gun-Hee"
+    ],
+    "role": "SUPPORTING",
+    "imageUrl": "https://s4.anilist.co/file/anilistcdn/character/large/b138792-TXFrDA1wpbmo.png",
+    "description": "Go Gun-Hee (고건희) is a South Korean S-Rank Hunter and the Chairman of the Korean Hunters Association.",
+    "bioData": {
+      "gender": "Male",
+      "roleType": "Supporting Role"
+    },
+    "relationships": [
+      {
+        "name": "Jin-U Seong",
+        "slug": "jin-u-seong",
+        "relationType": "Allied Protagonist",
+        "isSpoiler": false
+      },
+      {
+        "name": "Hae-In Cha",
+        "slug": "hae-in-cha",
+        "relationType": "Key Associate",
+        "isSpoiler": false
+      },
+      {
+        "name": "Chi-Yul Song",
+        "slug": "chi-yul-song",
+        "relationType": "Key Associate",
+        "isSpoiler": false
+      },
+      {
+        "name": "Ju-Hui Lee",
+        "slug": "ju-hui-lee",
+        "relationType": "Key Associate",
+        "isSpoiler": false
+      }
+    ],
+    "sourceUrl": "https://anilist.co/character/138792",
+    "updatedAt": "2026-09-03T13:06:57.061Z"
+  },
+  {
+    "id": "anilist-138793",
+    "seriesSlug": "solo-leveling",
+    "slug": "song-i-han",
+    "name": "Song-I Han",
+    "nativeName": "한송이",
+    "aliases": [
+      "Song-Yi Han"
+    ],
+    "role": "SUPPORTING",
+    "imageUrl": "https://s4.anilist.co/file/anilistcdn/character/large/b138793-eijpaPPkcipD.png",
+    "description": "Han Song-I is an E-Rank hunter who quit school after gaining money through the Yoo Jin-Ho and Sung Jin-Woo motley group of party. She is friends with Sung Jin-Ah. She first appeared when Jin-Ah visited Jin-Woo in the hospital but she didn't know him then.",
+    "bioData": {
+      "gender": "Female",
+      "roleType": "Supporting Role"
+    },
+    "relationships": [
+      {
+        "name": "Jin-U Seong",
+        "slug": "jin-u-seong",
+        "relationType": "Allied Protagonist",
+        "isSpoiler": false
+      },
+      {
+        "name": "Hae-In Cha",
+        "slug": "hae-in-cha",
+        "relationType": "Key Associate",
+        "isSpoiler": false
+      },
+      {
+        "name": "Chi-Yul Song",
+        "slug": "chi-yul-song",
+        "relationType": "Key Associate",
+        "isSpoiler": false
+      },
+      {
+        "name": "Ju-Hui Lee",
+        "slug": "ju-hui-lee",
+        "relationType": "Key Associate",
+        "isSpoiler": false
+      }
+    ],
+    "sourceUrl": "https://anilist.co/character/138793",
+    "updatedAt": "2026-09-03T13:06:57.061Z"
+  }
+]
