@@ -37,6 +37,7 @@ import {
   getOfflineChapters,
   deleteOfflineChapter,
 } from "@/lib/offlineStorage";
+import { DownloadChaptersModal } from "@/components/DownloadChaptersModal";
 
 /* ------------------------------------------------------------------ */
 /*  ChapterList — ALL chapter interaction state lives here.           */
@@ -177,6 +178,7 @@ export const ChapterList = React.memo(function ChapterList({
   const [downloadProgress, setDownloadProgress] = React.useState<number>(0);
   const [isBatchDownloading, setIsBatchDownloading] = React.useState<boolean>(false);
   const [batchStatus, setBatchStatus] = React.useState<string | null>(null);
+  const [downloadModalOpen, setDownloadModalOpen] = React.useState<boolean>(false);
 
   const refreshOfflineStatus = React.useCallback(() => {
     const offline = getOfflineChapters();
@@ -456,22 +458,12 @@ export const ChapterList = React.memo(function ChapterList({
             <Button
               variant="outline"
               size="sm"
-              onClick={() => handleBatchDownload(5)}
-              disabled={isBatchDownloading || !!downloadingChapterId}
-              title="Download next 5 un-saved chapters for offline reading"
-              className="w-full gap-2 sm:w-auto border-emerald-500/40 text-emerald-400 hover:bg-emerald-950/30 hover:border-emerald-500/60 transition-all cursor-pointer"
+              onClick={() => setDownloadModalOpen(true)}
+              title="Download all chapters, select wanted chapters, or pick a range with 6x fast download"
+              className="w-full gap-2 sm:w-auto border-emerald-500/50 bg-emerald-950/20 text-emerald-400 hover:bg-emerald-950/40 hover:border-emerald-500/70 transition-all cursor-pointer font-bold shadow-sm"
             >
-              {isBatchDownloading ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin text-emerald-400" />
-                  <span className="text-xs">{batchStatus || "Saving..."}</span>
-                </>
-              ) : (
-                <>
-                  <Download className="h-4 w-4 text-emerald-400" />
-                  <span className="text-xs">Save 5 Offline</span>
-                </>
-              )}
+              <Download className="h-4 w-4 text-emerald-400" />
+              <span className="text-xs">Download Chapters</span>
             </Button>
           </div>
         </div>
@@ -827,6 +819,16 @@ export const ChapterList = React.memo(function ChapterList({
           )}
         </>
       )}
+
+      <DownloadChaptersModal
+        open={downloadModalOpen}
+        onOpenChange={setDownloadModalOpen}
+        seriesId={seriesId}
+        seriesSlug={slug}
+        seriesTitle={seriesTitle || slug}
+        seriesCoverUrl={seriesCoverUrl}
+        chapters={chaptersQ.data || []}
+      />
     </section>
   );
 });
