@@ -2,8 +2,8 @@
 
 import React, { type ReactNode } from "react";
 import { Link } from "@/lib/router-compat";
-import { useQuery } from "@tanstack/react-query";
-import { BookOpen, Clock, History, ChevronLeft, ChevronRight, Star, MoreVertical, EyeOff } from "lucide-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { BookOpen, Clock, History, ChevronLeft, ChevronRight, ChevronUp, Star, MoreVertical, EyeOff } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -290,17 +290,39 @@ function HomeContent({ initialData }: { initialData?: HomeInitialData }) {
   const latestUpdates = useQuery({
     queryKey: ["latest-updates", settings.showNovelsOnHome],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .rpc("get_series_with_latest_chapters", { limit_count: 1000 });
+      const [rpcRes, allSeriesRes] = await Promise.all([
+        supabase.rpc("get_series_with_latest_chapters", { limit_count: 1000 }),
+        supabase.from("series").select("id,slug,title,cover_url,type,updated_at").order("title"),
+      ]);
 
-      if (error) throw error;
-      
-      let list = data ?? [];
+      if (rpcRes.error) throw rpcRes.error;
+
+      const rpcMap = new Map((rpcRes.data ?? []).map((s: any) => [s.id, s]));
+      let fullSeriesList = (allSeriesRes.data ?? []).map((s: any) => {
+        const existing = rpcMap.get(s.id);
+        if (existing) return existing;
+        return {
+          id: s.id,
+          slug: s.slug,
+          title: s.title,
+          cover_url: s.cover_url,
+          type: s.type,
+          latest_chapter_created_at: s.updated_at,
+          recent_chapters: [],
+        };
+      });
+
       if (!settings.showNovelsOnHome) {
-        list = list.filter((series: any) => series.type !== "novel");
+        fullSeriesList = fullSeriesList.filter((series: any) => series.type !== "novel");
       }
 
-      return list.map((series: any) => ({
+      fullSeriesList.sort(
+        (a: any, b: any) =>
+          new Date(b.latest_chapter_created_at || 0).getTime() -
+          new Date(a.latest_chapter_created_at || 0).getTime()
+      );
+
+      return fullSeriesList.map((series: any) => ({
         id: series.id,
         slug: series.slug,
         title: series.title,
@@ -319,6 +341,43 @@ function HomeContent({ initialData }: { initialData?: HomeInitialData }) {
     staleTime: 1000 * 60 * 5,
     gcTime: 1000 * 60 * 20,
   });
+
+  // Realtime subscription: synchronize Latest Updates and Reading History with live DB updates
+  const queryClient = useQueryClient();
+  React.useEffect(() => {
+    const channel = supabase
+      .channel("home-db-realtime-sync")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "chapters" },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ["latest-updates"] });
+          queryClient.invalidateQueries({ queryKey: ["home-followed-chapters"] });
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "reading_history" },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ["home-reading-history"] });
+          queryClient.invalidateQueries({ queryKey: ["latest-updates-reading-history"] });
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "series" },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ["latest-updates"] });
+          queryClient.invalidateQueries({ queryKey: ["high-score"] });
+          queryClient.invalidateQueries({ queryKey: ["popular"] });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient]);
 
   // High score manhwa
   const highScoreInitialData = React.useMemo(() => {
@@ -885,9 +944,10 @@ function LatestUpdatesSection({
 }) {
   const [visibleCount, setVisibleCount] = React.useState(LATEST_UPDATES_BATCH_SIZE);
 
+  // Prevent background query refetches from resetting user's expanded scroll state
   React.useEffect(() => {
-    setVisibleCount(LATEST_UPDATES_BATCH_SIZE);
-  }, [series]);
+    setVisibleCount((prev) => Math.min(prev, Math.max(LATEST_UPDATES_BATCH_SIZE, series.length)));
+  }, [series.length]);
 
   // Fetch reading history to determine read status
   const readingHistoryQuery = useQuery({
@@ -1009,30 +1069,37 @@ function LatestUpdatesSection({
 
                     {/* Recent Chapters List */}
                     <div className="space-y-1.5">
-                      {item.recent_chapters.map((chapter) => {
-                        const isRead = readChapterIds.has(chapter.id);
+                      {item.recent_chapters.length > 0 ? (
+                        item.recent_chapters.map((chapter) => {
+                          const isRead = readChapterIds.has(chapter.id);
 
-                        return (
-                          <Link
-                            key={chapter.id}
-                            to="/title/$titleSlug/$chapterSlug"
-                            params={{ titleSlug: item.slug, chapterSlug: chapter.slug }}
-                            className={`flex items-center justify-between text-xs px-2.5 py-1.5 rounded border border-white/10 bg-surface-1/60 hover:bg-surface-2 hover:border-purple-500/40 hover:text-white transition-colors ${
-                              isRead ? 'text-neutral-500 opacity-75' : 'text-neutral-200'
-                            }`}
-                          >
-                            <div className="flex min-w-0 flex-1 items-center gap-1.5">
-                              <BookOpen className={`h-3 w-3 shrink-0 ${isRead ? 'text-neutral-500' : 'text-purple-400'}`} />
-                              <span className="truncate text-xs font-medium">
-                                Chapter {chapter.chapter_number}
+                          return (
+                            <Link
+                              key={chapter.id}
+                              to="/title/$titleSlug/$chapterSlug"
+                              params={{ titleSlug: item.slug, chapterSlug: chapter.slug }}
+                              className={`flex items-center justify-between text-xs px-2.5 py-1.5 rounded border border-white/10 bg-surface-1/60 hover:bg-surface-2 hover:border-purple-500/40 hover:text-white transition-colors ${
+                                isRead ? 'text-neutral-500 opacity-75' : 'text-neutral-200'
+                              }`}
+                            >
+                              <div className="flex min-w-0 flex-1 items-center gap-1.5">
+                                <BookOpen className={`h-3 w-3 shrink-0 ${isRead ? 'text-neutral-500' : 'text-purple-400'}`} />
+                                <span className="truncate text-xs font-medium">
+                                  Chapter {chapter.chapter_number}
+                                </span>
+                              </div>
+                              <span className="ml-1.5 shrink-0 text-xs text-neutral-400">
+                                {formatTimeAgo(chapter.created_at)}
                               </span>
-                            </div>
-                            <span className="ml-1.5 shrink-0 text-xs text-neutral-400">
-                              {formatTimeAgo(chapter.created_at)}
-                            </span>
-                          </Link>
-                        );
-                      })}
+                            </Link>
+                          );
+                        })
+                      ) : (
+                        <div className="flex items-center text-xs text-neutral-500 py-2 px-2.5 rounded border border-white/5 bg-white/[0.02]">
+                          <Clock className="h-3 w-3 mr-1.5 text-neutral-600 shrink-0" />
+                          <span>Coming Soon</span>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -1040,20 +1107,29 @@ function LatestUpdatesSection({
             ))}
           </div>
 
-          {hasMoreSeries && (
-            <div className="mt-6 flex justify-center">
+          <div className="mt-6 flex items-center justify-center gap-3">
+            <Button
+              variant="outline"
+              disabled={visibleCount <= LATEST_UPDATES_BATCH_SIZE}
+              className="min-w-36 gap-2 border-white/10 bg-surface-1/80 hover:bg-surface-2 hover:border-purple-500/40 text-neutral-300 hover:text-white transition-all disabled:opacity-40 disabled:hover:border-white/10 disabled:cursor-not-allowed"
+              onClick={() => setVisibleCount((count) => Math.max(LATEST_UPDATES_BATCH_SIZE, count - LATEST_UPDATES_BATCH_SIZE))}
+            >
+              <ChevronUp className="h-4 w-4 text-neutral-400" />
+              Show Less
+            </Button>
+            {hasMoreSeries && (
               <Button
                 variant="outline"
-                className="min-w-40 gap-2"
+                className="min-w-40 gap-2 border-white/10 bg-surface-1/80 hover:bg-surface-2 hover:border-purple-500/40 text-white transition-all cursor-pointer"
                 onClick={() => setVisibleCount((count) => Math.min(count + LATEST_UPDATES_BATCH_SIZE, series.length))}
               >
                 Load More
-                <span className="text-xs text-muted-foreground">
+                <span className="text-xs text-neutral-400">
                   {Math.min(visibleCount, series.length)}/{series.length}
                 </span>
               </Button>
-            </div>
-          )}
+            )}
+          </div>
         </>
       ) : (
         <div className="rounded-lg border border-border/40 bg-card p-8 text-center">

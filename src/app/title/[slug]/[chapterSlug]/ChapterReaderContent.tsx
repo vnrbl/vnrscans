@@ -3,7 +3,7 @@
 import NextLink from "next/link";
 import { useRouter } from "next/navigation";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
-import { useEffect, useState, useRef, useMemo, type ReactNode } from "react";
+import { useEffect, useState, useRef, useMemo, useCallback, type ReactNode } from "react";
 import {
   ChevronLeft,
   ChevronRight,
@@ -395,113 +395,127 @@ export default function Reader({
     };
   }, [user, chapterQ.data, seriesSlug]);
 
-  // Award XP once per chapter completion (>= 90% scroll, or chapters that fit
-  // entirely on screen). The RPC itself is idempotent per (user, chapter).
+  // Award Qi strictly once at the very end/last of the chapter.
   const xpAwardedRef = useRef<string | null>(null);
+  const awardXp = useCallback(async () => {
+    if (!user || !chapterQ.data) return;
+    const chapterId = chapterQ.data.id;
+    if (xpAwardedRef.current === chapterId) return;
+    xpAwardedRef.current = chapterId;
+
+    const { data, error } = await supabase.rpc("award_chapter_completion_xp", {
+      _chapter_id: chapterId,
+    });
+    if (error) return;
+
+    const rows = Array.isArray(data) ? data : data ? [data] : [];
+    if (rows.length === 0) return;
+
+    let invalidated = false;
+    for (const row of rows) {
+      if (!row) continue;
+      if (row.source === "summary") {
+        if (row.leveled_up) {
+          toast.success(`Level up! You're now Level ${row.new_level}`);
+        }
+        continue;
+      }
+      if (!row.xp_gained || row.xp_gained <= 0) continue;
+      invalidated = true;
+      const label =
+        row.source === "chapter_complete"
+          ? "Chapter complete"
+          : row.source === "caught_up"
+          ? "Caught up to latest"
+          : row.source === "series_complete"
+          ? "Title finished"
+          : "Qi gathered";
+      toast.success(`+${row.xp_gained} Qi — ${label}`, {
+        description: row.description ?? undefined,
+      });
+    }
+
+    if (invalidated) {
+      qc.invalidateQueries({ queryKey: ["profile"] });
+      qc.invalidateQueries({ queryKey: ["user-stats"] });
+      qc.invalidateQueries({ queryKey: ["xp-history"] });
+      qc.invalidateQueries({ queryKey: ["chapter-reader-counts"] });
+      qc.invalidateQueries({ queryKey: ["read-chapters"] });
+    }
+
+    // Synchronize reading history to all sister scan sources with the same chapter number in this series
+    const chNum = chapterQ.data?.chapter_number;
+    const chSeriesId = chapterQ.data?.series_id;
+    if (chNum != null && chSeriesId) {
+      supabase
+        .from("chapters")
+        .select("id")
+        .eq("series_id", chSeriesId)
+        .eq("chapter_number", chNum)
+        .then(({ data: sisterChapters }) => {
+          if (sisterChapters && sisterChapters.length > 1) {
+            const sisterRows = sisterChapters
+              .filter((sc) => sc.id !== chapterId)
+              .map((sc) => ({
+                user_id: user.id,
+                series_id: chSeriesId,
+                chapter_id: sc.id,
+                progress: 100,
+                xp_awarded: true,
+                updated_at: new Date().toISOString(),
+              }));
+            if (sisterRows.length > 0) {
+              supabase.from("reading_history").upsert(sisterRows, { onConflict: "user_id,chapter_id" } as any).then(() => {});
+            }
+          }
+        });
+    }
+  }, [user, chapterQ.data, qc]);
+
   useEffect(() => {
     if (!user || !chapterQ.data) return;
 
-    const chapterId = chapterQ.data.id;
-    let cancelled = false;
-
-    const awardXp = async () => {
-      if (xpAwardedRef.current === chapterId) return;
-      xpAwardedRef.current = chapterId;
-
-      const { data, error } = await supabase.rpc("award_chapter_completion_xp", {
-        _chapter_id: chapterId,
-      });
-      if (cancelled || error) return;
-
-      const rows = Array.isArray(data) ? data : data ? [data] : [];
-      if (rows.length === 0) return;
-
-      let invalidated = false;
-      for (const row of rows) {
-        if (!row) continue;
-        if (row.source === "summary") {
-          if (row.leveled_up) {
-            toast.success(`Level up! You're now Level ${row.new_level}`);
-          }
-          continue;
-        }
-        if (!row.xp_gained || row.xp_gained <= 0) continue;
-        invalidated = true;
-        const label =
-          row.source === "chapter_complete"
-            ? "Chapter complete"
-            : row.source === "caught_up"
-            ? "Caught up to latest"
-            : row.source === "series_complete"
-            ? "Title finished"
-            : "Qi gathered";
-        toast.success(`+${row.xp_gained} Qi — ${label}`, {
-          description: row.description ?? undefined,
-        });
-      }
-
-      if (invalidated) {
-        qc.invalidateQueries({ queryKey: ["profile"] });
-        qc.invalidateQueries({ queryKey: ["user-stats"] });
-        qc.invalidateQueries({ queryKey: ["xp-history"] });
-        qc.invalidateQueries({ queryKey: ["chapter-reader-counts"] });
-        qc.invalidateQueries({ queryKey: ["read-chapters"] });
-      }
-
-      // Synchronize reading history to all sister scan sources with the same chapter number in this series
-      const chNum = chapterQ.data?.chapter_number;
-      const chSeriesId = chapterQ.data?.series_id;
-      if (chNum != null && chSeriesId) {
-        supabase
-          .from("chapters")
-          .select("id")
-          .eq("series_id", chSeriesId)
-          .eq("chapter_number", chNum)
-          .then(({ data: sisterChapters }) => {
-            if (sisterChapters && sisterChapters.length > 1) {
-              const sisterRows = sisterChapters
-                .filter((sc) => sc.id !== chapterId)
-                .map((sc) => ({
-                  user_id: user.id,
-                  series_id: chSeriesId,
-                  chapter_id: sc.id,
-                  progress: 100,
-                  xp_awarded: true,
-                  updated_at: new Date().toISOString(),
-                }));
-              if (sisterRows.length > 0) {
-                supabase.from("reading_history").upsert(sisterRows, { onConflict: "user_id,chapter_id" } as any).then(() => {});
-              }
-            }
-          });
-      }
-    };
-
+    // Check if user has reached the very bottom/end of the chapter
     const checkCompletion = () => {
       const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
       const scrollHeight = document.documentElement.scrollHeight - window.innerHeight;
-      // Chapter shorter than the viewport — nothing to scroll, count as read.
-      if (scrollHeight <= 0) {
-        awardXp();
-        return;
-      }
-      const progress = (scrollTop / scrollHeight) * 100;
-      if (progress >= 90) {
-        awardXp();
+
+      // Only check when content has fully loaded and rendered
+      if (scrollHeight > 400) {
+        const reachedBottom = (scrollTop >= scrollHeight - 120) || ((scrollTop / scrollHeight) * 100 >= 98.5);
+        if (reachedBottom) {
+          awardXp();
+        }
       }
     };
 
-    // Run once shortly after mount for short chapters / restored scroll
-    // positions that already exceed the threshold.
-    const initialTimeout = setTimeout(checkCompletion, 800);
+    // IntersectionObserver strictly on the end-of-chapter anchor element
+    let observer: IntersectionObserver | null = null;
+    if (typeof IntersectionObserver !== "undefined") {
+      observer = new IntersectionObserver(
+        (entries) => {
+          for (const entry of entries) {
+            if (entry.isIntersecting) {
+              awardXp();
+            }
+          }
+        },
+        { rootMargin: "0px 0px 50px 0px" }
+      );
+
+      const anchor = document.getElementById("chapter-bottom-completion-anchor");
+      if (anchor) {
+        observer.observe(anchor);
+      }
+    }
+
     window.addEventListener("scroll", checkCompletion, { passive: true });
 
     return () => {
-      cancelled = true;
-      clearTimeout(initialTimeout);
+      if (observer) observer.disconnect();
       window.removeEventListener("scroll", checkCompletion);
     };
-  }, [user, chapterQ.data, qc]);
+  }, [user, chapterQ.data, awardXp]);
 
 
   useEffect(() => {
@@ -860,13 +874,15 @@ export default function Reader({
                   params: { titleSlug: seriesSlug, chapterSlug: prev.slug },
                 })
               }
-              onNext={() =>
-                next &&
-                navigate({
-                  to: "/title/$titleSlug/$chapterSlug",
-                  params: { titleSlug: seriesSlug, chapterSlug: next.slug },
-                })
-              }
+              onNext={() => {
+                awardXp();
+                if (next) {
+                  navigate({
+                    to: "/title/$titleSlug/$chapterSlug",
+                    params: { titleSlug: seriesSlug, chapterSlug: next.slug },
+                  });
+                }
+              }}
               seriesSlug={seriesSlug}
               seriesTitle={c.series?.title ?? ""}
               chapterNumber={c.chapter_number}
@@ -887,13 +903,15 @@ export default function Reader({
                   params: { titleSlug: seriesSlug, chapterSlug: prev.slug },
                 })
               }
-              onNext={() =>
-                next &&
-                navigate({
-                  to: "/title/$titleSlug/$chapterSlug",
-                  params: { titleSlug: seriesSlug, chapterSlug: next.slug },
-                })
-              }
+              onNext={() => {
+                awardXp();
+                if (next) {
+                  navigate({
+                    to: "/title/$titleSlug/$chapterSlug",
+                    params: { titleSlug: seriesSlug, chapterSlug: next.slug },
+                  });
+                }
+              }}
               seriesSlug={seriesSlug}
               seriesTitle={c.series?.title ?? ""}
               chapterNumber={c.chapter_number}
@@ -920,13 +938,15 @@ export default function Reader({
               params: { titleSlug: seriesSlug, chapterSlug: prev.slug },
             })
           }
-          onNext={() =>
-            next &&
-            navigate({
-              to: "/title/$titleSlug/$chapterSlug",
-              params: { titleSlug: seriesSlug, chapterSlug: next.slug },
-            })
-          }
+          onNext={() => {
+            awardXp();
+            if (next) {
+              navigate({
+                to: "/title/$titleSlug/$chapterSlug",
+                params: { titleSlug: seriesSlug, chapterSlug: next.slug },
+              });
+            }
+          }}
           seriesSlug={seriesSlug}
           allChapters={siblingsQ.data ?? []}
           currentChapterSlug={chapterSlug}
@@ -1773,6 +1793,9 @@ function ImageView({
           </div>
         ))}
 
+        {/* Chapter bottom completion anchor - triggers Qi when reaching the end */}
+        <div id="chapter-bottom-completion-anchor" className="h-4 w-full" />
+
         {/* Chapter Navigation Buttons - Above Reactions */}
         <ChapterNavigation
           hasPrev={hasPrev}
@@ -2134,6 +2157,9 @@ function NovelView({
             </div>
           )}
         </article>
+
+        {/* Chapter bottom completion anchor - triggers Qi when reaching the end */}
+        <div id="chapter-bottom-completion-anchor" className="h-4 w-full" />
 
         {/* Chapter Navigation Buttons - Above Reactions */}
         <div className={`mt-10 border-t ${themeStyles.border} pt-6`}>
