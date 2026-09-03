@@ -103,7 +103,7 @@ export function HomeHeroCarousel() {
     return shuffledItems.slice(0, 12);
   }, [shuffledItems]);
 
-  const loopedItems = displayItems.length > 0 ? [...displayItems, ...displayItems, ...displayItems] : [];
+  const loopedItems = displayItems.length > 0 ? [...displayItems, ...displayItems] : [];
 
   const metricsRef = useRef({
     itemWidth: 0,
@@ -170,7 +170,7 @@ export function HomeHeroCarousel() {
         if (scrollLeft <= 5) {
           container.scrollLeft = scrollLeft + sectionWidth;
           scrollPosRef.current = container.scrollLeft;
-        } else if (scrollLeft >= sectionWidth * 2) {
+        } else if (scrollLeft >= sectionWidth * 1.5) {
           container.scrollLeft = scrollLeft - sectionWidth;
           scrollPosRef.current = container.scrollLeft;
         } else if (isPausedRef.current) {
@@ -336,7 +336,7 @@ export function HomeHeroCarousel() {
             <Button
               variant="secondary"
               size="icon"
-              className="absolute left-1 top-1/2 z-20 -translate-y-1/2 h-11 w-11 rounded-[4px] bg-black/75 backdrop-blur-md border border-white/15 text-white opacity-0 group-hover:opacity-100 hover:border-purple-500/60 hover:text-purple-300 hover:scale-105 transition-all shadow-xl shadow-black/80"
+              className="absolute left-1 top-1/2 z-20 -translate-y-1/2 h-11 w-11 rounded-[4px] bg-black/75 border border-white/15 text-white opacity-0 group-hover:opacity-100 hover:border-purple-500/60 hover:text-purple-300 hover:scale-105 transition-[opacity,border-color,color,transform] shadow-xl shadow-black/80"
               onClick={() => scroll('left')}
             >
               <ChevronLeft className="h-5 w-5 stroke-[1.8]" />
@@ -363,14 +363,9 @@ export function HomeHeroCarousel() {
                 to="/title/$slug"
                 params={{ slug: item.series.slug }}
                 className="group/card flex-shrink-0 block"
-                style={{ perspective: '1000px' }}
               >
                 <div
-                  className="relative h-[240px] w-[168px] overflow-hidden rounded-[4px] border border-neutral-800/80 bg-neutral-950 transition-all duration-300 group-hover/card:border-purple-500/50 group-hover/card:shadow-[0_0_25px_-5px_rgba(168,85,247,0.3)] sm:h-[300px] sm:w-[210px] md:h-[345px] md:w-[240px] lg:h-[390px] lg:w-[270px]"
-                  style={{
-                    transformStyle: 'preserve-3d',
-                    transform: 'rotateY(0deg) rotateX(0deg)'
-                  }}
+                  className="relative h-[240px] w-[168px] overflow-hidden rounded-[4px] border border-neutral-800/80 bg-neutral-950 transition-[border-color,box-shadow] duration-300 group-hover/card:border-purple-500/50 group-hover/card:shadow-[0_0_25px_-5px_rgba(168,85,247,0.3)] sm:h-[300px] sm:w-[210px] md:h-[345px] md:w-[240px] lg:h-[390px] lg:w-[270px]"
                   onMouseMove={handleCardTilt}
                   onMouseLeave={resetCardTilt}
                 >
@@ -379,7 +374,7 @@ export function HomeHeroCarousel() {
                     src={item.series.cover_url}
                     alt={item.series.title}
                     seriesId={item.series.id}
-                    className="w-full h-full object-cover transition-transform duration-500 group-hover/card:scale-105"
+                    className="w-full h-full object-cover transition-transform duration-300 group-hover/card:scale-105"
                     priority={isAboveFold}
                   />
                   
@@ -388,7 +383,7 @@ export function HomeHeroCarousel() {
                     <div className="absolute inset-0 overflow-hidden">
                       <div className="absolute -inset-full animate-shine bg-gradient-to-r from-transparent via-white/20 to-transparent skew-x-12" />
                     </div>
-                    <div className="absolute inset-0 bg-gradient-to-br from-purple-500/10 via-transparent to-transparent backdrop-blur-[0.5px]" />
+                    <div className="absolute inset-0 bg-gradient-to-br from-purple-500/10 via-transparent to-transparent" />
                   </div>
                   
                   {/* Dark Gradient Overlay on Hover */}
@@ -396,7 +391,7 @@ export function HomeHeroCarousel() {
                   
                   {/* Title on Hover */}
                   <div className="absolute bottom-0 left-0 right-0 p-4 transform translate-y-full group-hover/card:translate-y-0 transition-transform duration-300">
-                    <div className="inline-block mb-1.5 px-2 py-0.5 rounded bg-black/80 border border-white/20 backdrop-blur-md text-purple-300 text-xs font-semibold uppercase tracking-wider">
+                    <div className="inline-block mb-1.5 px-2 py-0.5 rounded bg-black/85 border border-white/20 text-purple-300 text-xs font-semibold uppercase tracking-wider">
                       {item.series.type}
                     </div>
                     <h3 className="text-white text-sm sm:text-base font-bold leading-snug line-clamp-2">
@@ -417,7 +412,7 @@ export function HomeHeroCarousel() {
             <Button
               variant="secondary"
               size="icon"
-              className="absolute right-1 top-1/2 z-20 -translate-y-1/2 h-11 w-11 rounded-[4px] bg-black/75 backdrop-blur-md border border-white/15 text-white opacity-0 group-hover:opacity-100 hover:border-purple-500/60 hover:text-purple-300 hover:scale-105 transition-all shadow-xl shadow-black/80"
+              className="absolute right-1 top-1/2 z-20 -translate-y-1/2 h-11 w-11 rounded-[4px] bg-black/75 border border-white/15 text-white opacity-0 group-hover:opacity-100 hover:border-purple-500/60 hover:text-purple-300 hover:scale-105 transition-[opacity,border-color,color,transform] shadow-xl shadow-black/80"
               onClick={() => scroll('right')}
             >
               <ChevronRight className="h-5 w-5 stroke-[1.8]" />

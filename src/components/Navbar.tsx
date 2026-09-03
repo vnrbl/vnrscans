@@ -498,7 +498,7 @@ export function Navbar() {
       </header>
 
       {/* Mobile Bottom Navigation Bar */}
-      <nav className="fixed bottom-0 left-0 right-0 z-50 flex sm:hidden h-14 items-center justify-around border-t border-border/60 bg-[#111115]/95 backdrop-blur-lg px-2 shadow-2xl">
+      <nav className="fixed bottom-0 left-0 right-0 z-50 flex sm:hidden h-14 items-center justify-around border-t border-border/60 bg-[#111115] px-2 shadow-2xl">
         <Link
           to="/home"
           className="flex flex-col items-center justify-center gap-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground hover:text-primary transition-colors py-1 flex-1"

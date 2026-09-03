@@ -175,7 +175,7 @@ function HomeContent({ initialData }: { initialData?: HomeInitialData }) {
         .eq("status", "published")
         .order("created_at", { ascending: false })
         .order("chapter_number", { ascending: false })
-        .limit(1000);
+        .limit(200);
       if (error) throw error;
 
       // Group by series so that mass updates (e.g. 5+ chapters) collapse into ONE cover card
@@ -541,7 +541,7 @@ function ChapterCarouselSection({
                 variant="outline"
                 size="icon"
                 onClick={() => scrollBy("left")}
-                className="h-8 w-8 rounded-[4px] border-border/60 bg-surface-1/80 hover:border-purple-500/50 hover:text-purple-300 transition-all"
+                className="h-8 w-8 rounded-[4px] border-border/60 bg-surface-1/80 hover:border-purple-500/50 hover:text-purple-300 transition-colors"
               >
                 <ChevronLeft className="h-4 w-4" />
               </Button>
@@ -549,7 +549,7 @@ function ChapterCarouselSection({
                 variant="outline"
                 size="icon"
                 onClick={() => scrollBy("right")}
-                className="h-8 w-8 rounded-[4px] border-border/60 bg-surface-1/80 hover:border-purple-500/50 hover:text-purple-300 transition-all"
+                className="h-8 w-8 rounded-[4px] border-border/60 bg-surface-1/80 hover:border-purple-500/50 hover:text-purple-300 transition-colors"
               >
                 <ChevronRight className="h-4 w-4" />
               </Button>
@@ -649,7 +649,7 @@ function FollowedUpdatesCarouselSection({
                 variant="outline"
                 size="icon"
                 onClick={() => scrollBy("left")}
-                className="h-8 w-8 rounded-[4px] border-border/60 bg-surface-1/80 hover:border-emerald-500/50 hover:text-emerald-300 transition-all"
+                className="h-8 w-8 rounded-[4px] border-border/60 bg-surface-1/80 hover:border-emerald-500/50 hover:text-emerald-300 transition-colors"
               >
                 <ChevronLeft className="h-4 w-4" />
               </Button>
@@ -657,7 +657,7 @@ function FollowedUpdatesCarouselSection({
                 variant="outline"
                 size="icon"
                 onClick={() => scrollBy("right")}
-                className="h-8 w-8 rounded-[4px] border-border/60 bg-surface-1/80 hover:border-emerald-500/50 hover:text-emerald-300 transition-all"
+                className="h-8 w-8 rounded-[4px] border-border/60 bg-surface-1/80 hover:border-emerald-500/50 hover:text-emerald-300 transition-colors"
               >
                 <ChevronRight className="h-4 w-4" />
               </Button>
@@ -758,7 +758,7 @@ function SeriesCarouselSection({
                 variant="outline"
                 size="icon"
                 onClick={() => scrollBy("left")}
-                className="h-8 w-8 rounded-[4px] border-border/60 bg-surface-1/80 hover:border-purple-500/50 hover:text-purple-300 transition-all"
+                className="h-8 w-8 rounded-[4px] border-border/60 bg-surface-1/80 hover:border-purple-500/50 hover:text-purple-300 transition-colors"
               >
                 <ChevronLeft className="h-4 w-4" />
               </Button>
@@ -766,7 +766,7 @@ function SeriesCarouselSection({
                 variant="outline"
                 size="icon"
                 onClick={() => scrollBy("right")}
-                className="h-8 w-8 rounded-[4px] border-border/60 bg-surface-1/80 hover:border-purple-500/50 hover:text-purple-300 transition-all"
+                className="h-8 w-8 rounded-[4px] border-border/60 bg-surface-1/80 hover:border-purple-500/50 hover:text-purple-300 transition-colors"
               >
                 <ChevronRight className="h-4 w-4" />
               </Button>
@@ -822,7 +822,7 @@ function SeriesCarouselSection({
                   src={item.cover_url}
                   alt={item.title}
                   seriesId={item.id}
-                  className="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-105"
+                  className="h-full w-full object-cover transition-transform duration-300 ease-out group-hover:scale-105"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-transparent to-transparent pointer-events-none" />
                 <div className="absolute left-2.5 top-2.5">
@@ -971,7 +971,7 @@ function LatestUpdatesSection({
             {visibleSeries.map((item) => (
               <div
                 key={item.id}
-                className="glass-card group rounded-lg p-3 hover-lift transition-all flex flex-col justify-between"
+                className="glass-card group rounded-lg p-3 hover-lift transition-[border-color,box-shadow] flex flex-col justify-between"
               >
                 <div className="flex gap-3">
                   {/* Cover Image */}
@@ -985,7 +985,7 @@ function LatestUpdatesSection({
                         src={item.cover_url}
                         alt={item.title}
                         seriesId={item.id}
-                        className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                        className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
                       />
                       <div className="absolute top-2 left-2">
                         <Badge variant="outline" className="badge-glass text-xs font-medium uppercase py-0.5 px-1.5">
@@ -1018,7 +1018,7 @@ function LatestUpdatesSection({
                             key={chapter.id}
                             to="/title/$titleSlug/$chapterSlug"
                             params={{ titleSlug: item.slug, chapterSlug: chapter.slug }}
-                            className={`flex items-center justify-between text-xs px-2.5 py-1.5 rounded border border-white/10 bg-surface-1/60 hover:bg-surface-2 hover:border-purple-500/40 hover:text-white transition-all ${
+                            className={`flex items-center justify-between text-xs px-2.5 py-1.5 rounded border border-white/10 bg-surface-1/60 hover:bg-surface-2 hover:border-purple-500/40 hover:text-white transition-colors ${
                               isRead ? 'text-neutral-500 opacity-75' : 'text-neutral-200'
                             }`}
                           >
@@ -1137,7 +1137,7 @@ function FollowedChapterCard({ chapter }: { chapter: RecentChapter }) {
   const maxCh = (chapter as any).maxChapterNumber;
 
   return (
-    <article className="group glass-card flex flex-col h-full rounded-lg overflow-hidden hover-lift transition-all relative">
+    <article className="group glass-card flex flex-col h-full rounded-lg overflow-hidden hover-lift transition-[border-color,box-shadow] relative">
       <Link
         to="/title/$titleSlug/$chapterSlug"
         params={{ titleSlug: seriesSlug, chapterSlug: chapter.slug }}
@@ -1149,7 +1149,7 @@ function FollowedChapterCard({ chapter }: { chapter: RecentChapter }) {
             src={chapter.series?.cover_url ?? null}
             alt={chapter.series?.title ?? ""}
             seriesId={chapter.series?.id}
-            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
           />
 
           {isMassUpdate && (
@@ -1170,7 +1170,7 @@ function FollowedChapterCard({ chapter }: { chapter: RecentChapter }) {
           </div>
 
           {/* Full Series Name Reveal On Hover */}
-          <div className="absolute inset-0 z-20 flex flex-col justify-end bg-gradient-to-t from-black via-black/95 to-black/30 p-2.5 opacity-0 group-hover:opacity-100 transition-all duration-200 pointer-events-none">
+          <div className="absolute inset-0 z-20 flex flex-col justify-end bg-gradient-to-t from-black via-black/95 to-black/30 p-2.5 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none">
             <p className="text-xs font-bold leading-tight text-white drop-shadow-md break-words">
               {chapter.series?.title}
             </p>
@@ -1242,7 +1242,7 @@ function RecentChapterCard({
       />
 
       {/* Full Series Name Reveal On Hover */}
-      <div className="absolute inset-0 z-20 flex flex-col justify-end bg-gradient-to-t from-black via-black/95 to-black/30 p-2.5 opacity-0 group-hover:opacity-100 transition-all duration-200 pointer-events-none">
+      <div className="absolute inset-0 z-20 flex flex-col justify-end bg-gradient-to-t from-black via-black/95 to-black/30 p-2.5 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none">
         <p className="text-xs font-bold leading-tight text-white drop-shadow-md break-words">
           {chapter.series?.title}
         </p>
@@ -1265,7 +1265,7 @@ function RecentChapterCard({
   );
 
   return (
-    <article className="group glass-card flex flex-col h-full rounded-lg overflow-hidden hover-lift transition-all">
+    <article className="group glass-card flex flex-col h-full rounded-lg overflow-hidden hover-lift transition-[border-color,box-shadow]">
       <Link to="/title/$slug" params={{ slug: seriesSlug }} className="block shrink-0">
         {cover}
       </Link>

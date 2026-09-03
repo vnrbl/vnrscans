@@ -29,14 +29,14 @@ export const SeriesCard = memo(function SeriesCard({ s, rank }: { s: Series; ran
           src={s.cover_url}
           alt={s.title}
           seriesId={s.id}
-          className="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-105"
+          className="h-full w-full object-cover transition-transform duration-300 ease-out group-hover:scale-105"
         />
         
         {/* Cinematic bottom gradient */}
         <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent opacity-80 group-hover:opacity-60 transition-opacity duration-300 pointer-events-none" />
 
         {rank !== undefined && (
-          <div className="absolute left-2.5 top-2.5 flex h-7 w-7 items-center justify-center rounded bg-black/80 border border-neutral-700/80 text-xs font-mono font-bold text-white shadow-md backdrop-blur-md">
+          <div className="absolute left-2.5 top-2.5 flex h-7 w-7 items-center justify-center rounded bg-black/85 border border-neutral-700/80 text-xs font-mono font-bold text-white shadow-md">
             #{rank}
           </div>
         )}
@@ -48,7 +48,7 @@ export const SeriesCard = memo(function SeriesCard({ s, rank }: { s: Series; ran
         </div>
 
         {s.rating_average && Number(s.rating_average) > 0 ? (
-          <div className="absolute right-2.5 bottom-2.5 flex items-center gap-1 rounded border border-white/10 bg-black/75 px-2 py-0.5 text-3xs backdrop-blur-md text-amber-300 font-mono font-bold shadow-sm transition-opacity group-hover:opacity-0">
+          <div className="absolute right-2.5 bottom-2.5 flex items-center gap-1 rounded border border-white/10 bg-black/85 px-2 py-0.5 text-3xs text-amber-300 font-mono font-bold shadow-sm transition-opacity group-hover:opacity-0">
             <Star className="h-3 w-3 fill-amber-400 text-amber-400 stroke-[1.5]" />
             {Number(s.rating_average).toFixed(1)}
           </div>
