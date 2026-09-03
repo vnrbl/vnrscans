@@ -69,6 +69,17 @@ export default function RootLayout({
       className={`dark ${sans.variable} ${outfit.variable}`}
       suppressHydrationWarning
     >
+      <head>
+        <link rel="preconnect" href="https://edvqhmvqbtujzcfqkrbe.supabase.co" crossOrigin="" />
+        <link rel="dns-prefetch" href="https://edvqhmvqbtujzcfqkrbe.supabase.co" />
+        <link rel="preconnect" href="https://media.qimanga.com" crossOrigin="" />
+        <link rel="dns-prefetch" href="https://media.qimanga.com" />
+        <link rel="preconnect" href="https://media.qiscans.org" crossOrigin="" />
+        <link rel="dns-prefetch" href="https://media.qiscans.org" />
+        <link rel="preconnect" href="https://cdn.asurascans.com" crossOrigin="" />
+        <link rel="dns-prefetch" href="https://cdn.asurascans.com" />
+        <link rel="dns-prefetch" href="https://meo.comick.pictures" />
+      </head>
       <body suppressHydrationWarning>
         <Providers>{children}</Providers>
       </body>

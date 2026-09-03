@@ -103,7 +103,19 @@ function useNavigate() {
   };
 }
 
-export default function Reader({ slug, chapterSlug }: { slug: string; chapterSlug: string }) {
+export default function Reader({
+  slug,
+  chapterSlug,
+  initialChapterData,
+  initialPagesData,
+  initialSiblingsData,
+}: {
+  slug: string;
+  chapterSlug: string;
+  initialChapterData?: any;
+  initialPagesData?: any[];
+  initialSiblingsData?: any[];
+}) {
   const titleSlug = slug;
   const seriesSlug = titleSlug;
   const { user } = useAuth();
@@ -156,6 +168,7 @@ export default function Reader({ slug, chapterSlug }: { slug: string; chapterSlu
 
       return data;
     },
+    initialData: initialChapterData,
     staleTime: 1000 * 60 * 5,
     gcTime: 1000 * 60 * 20,
   });
@@ -172,6 +185,7 @@ export default function Reader({ slug, chapterSlug }: { slug: string; chapterSlu
       return data ?? [];
     },
     enabled: !!chapterQ.data,
+    initialData: initialPagesData,
     staleTime: 1000 * 60 * 30,
     gcTime: 1000 * 60 * 60,
   });
@@ -200,6 +214,7 @@ export default function Reader({ slug, chapterSlug }: { slug: string; chapterSlu
       return data ?? [];
     },
     enabled: !!chapterQ.data?.series?.id,
+    initialData: initialSiblingsData,
     staleTime: 1000 * 60 * 5,
     gcTime: 1000 * 60 * 20,
   });

@@ -9,14 +9,15 @@ type PageProps = {
   params: Promise<{ slug: string; chapterSlug: string }>;
 };
 
-// Server-side helper to fetch series + chapter details for metadata, deduplicated in request scope
-const getChapterMetadataDetails = cache(async (seriesSlug: string, chapterSlug: string) => {
+// Server-side helper to fetch series + chapter + pages in one deduplicated request
+const getChapterFullData = cache(async (seriesSlug: string, chapterSlug: string) => {
   const { data: chapter } = await supabase
     .from("chapters")
     .select(`
-      chapter_number,
-      title,
+      *,
       series:series_id (
+        id,
+        slug,
         title,
         cover_url,
         type,
@@ -26,12 +27,34 @@ const getChapterMetadataDetails = cache(async (seriesSlug: string, chapterSlug: 
     .eq("slug", chapterSlug)
     .maybeSingle();
 
-  return chapter;
+  if (!chapter) return null;
+
+  // In parallel, fetch chapter pages and sibling chapters for instant navigation
+  const [pagesRes, siblingsRes] = await Promise.all([
+    supabase
+      .from("chapter_pages")
+      .select("id,page_number,image_url")
+      .eq("chapter_id", chapter.id)
+      .order("page_number"),
+    supabase
+      .from("chapters")
+      .select("id,slug,chapter_number,scanlation_group")
+      .eq("series_id", chapter.series_id)
+      .eq("status", "published")
+      .order("chapter_number"),
+  ]);
+
+  return {
+    chapter,
+    pages: pagesRes.data ?? [],
+    siblings: siblingsRes.data ?? [],
+  };
 });
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug, chapterSlug } = await params;
-  const data = await getChapterMetadataDetails(slug, chapterSlug);
+  const fullData = await getChapterFullData(slug, chapterSlug);
+  const data = fullData?.chapter;
 
   if (!data || !data.series) {
     return {
@@ -96,7 +119,8 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
 export default async function Page({ params }: PageProps) {
   const { slug, chapterSlug } = await params;
-  const data = await getChapterMetadataDetails(slug, chapterSlug);
+  const fullData = await getChapterFullData(slug, chapterSlug);
+  const data = fullData?.chapter;
 
   const series = data?.series as unknown as {
     title: string;
@@ -135,7 +159,13 @@ export default async function Page({ params }: PageProps) {
           dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbLd) }}
         />
       )}
-      <ChapterReaderContent slug={slug} chapterSlug={chapterSlug} />
+      <ChapterReaderContent
+        slug={slug}
+        chapterSlug={chapterSlug}
+        initialChapterData={data}
+        initialPagesData={fullData?.pages}
+        initialSiblingsData={fullData?.siblings}
+      />
     </>
   );
 }
