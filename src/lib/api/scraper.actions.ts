@@ -6,9 +6,15 @@ import {
   extractChaptersFromSeriesUrl,
   extractImagesFromChapterUrl,
   extractImagesFromChapterUrls,
+  isPremiumOrLockedChapter,
 } from "../chapter-scraper";
 import { buildChapterSlug } from "../chapter-utils";
 import { detectImportSource } from "../import-source-utils";
+import {
+  detectSourceScanTiming,
+  advanceNextReleaseAfterDrop,
+  isSourceDueForScraping,
+} from "../release-timing";
 
 function getAdminSupabase() {
   const url = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
@@ -613,7 +619,9 @@ export async function $syncImportSource(args: {
     })
     .parse(data);
 
-  await verifyAdmin(validated.accessToken);
+  if (validated.accessToken !== "cron-internal") {
+    await verifyAdmin(validated.accessToken);
+  }
 
   const admin = getAdminSupabase();
   const maxChapters = validated.maxChapters ?? 50;
@@ -662,7 +670,7 @@ export async function $syncImportSource(args: {
 
     const { data: existingRows, error: existingError } = await admin
       .from("chapters")
-      .select("id,chapter_number,scanlation_group,chapter_type,chapter_pages(id)")
+      .select("id,chapter_number,scanlation_group,chapter_type,created_at,chapter_pages(id)")
       .eq("series_id", source.series_id);
 
     if (existingError) throw existingError;
@@ -723,6 +731,8 @@ export async function $syncImportSource(args: {
       slug: string;
       chapter_type: string;
       status: string;
+      scheduled_at?: string | null;
+      source_url?: string | null;
       uploaded_by: string | null;
       scanlation_group: string;
     }> = [];
@@ -745,13 +755,19 @@ export async function $syncImportSource(args: {
           scanlationGroup,
         });
 
+        // Set unlock delay: hold chapter for 30 minutes with countdown and direct source link
+        const unlockDelayMinutes = 30;
+        const scheduledAt = new Date(Date.now() + unlockDelayMinutes * 60 * 1000).toISOString();
+
         chapterRows.push({
           series_id: source.series_id,
           chapter_number: chapter.chapterNumber,
           title: chapter.title || null,
           slug: targetSlug,
           chapter_type: "image",
-          status: source.auto_publish ? "published" : "draft",
+          status: "published",
+          scheduled_at: scheduledAt,
+          source_url: chapter.url,
           uploaded_by: source.source_site || sourcePreset.sourceSite,
           scanlation_group: scanlationGroup,
         });
@@ -844,14 +860,63 @@ export async function $syncImportSource(args: {
       details,
     });
 
-    await admin
-      .from("series_import_sources")
-      .update({
-        last_checked_at: startedAt,
-        last_success_at: imported > 0 || failed === 0 ? startedAt : source.last_success_at,
-        last_error: failed > 0 && imported === 0 ? details.find((entry) => entry.status === "failed")?.message : null,
-      })
-      .eq("id", source.id);
+    // 5. Scan source update timing and update Estimated Next Release time
+    let timingCadence: string | undefined;
+    let nextScheduledDrop: string | undefined;
+    try {
+      const maxChapterInDb = Math.max(
+        0,
+        ...activeRows.map((r: any) => Number(r.chapter_number) || 0),
+        ...chapterRows.map((r: any) => Number(r.chapter_number) || 0)
+      );
+
+      const timing = await detectSourceScanTiming({
+        seriesTitle: seriesTitle || "",
+        sourceUrl: source.source_url,
+        currentMaxChapter: maxChapterInDb,
+        localChapters: activeRows,
+      });
+
+      timingCadence = timing.cadence;
+      nextScheduledDrop = timing.estimatedNextRelease;
+
+      if (imported > 0) {
+        nextScheduledDrop = advanceNextReleaseAfterDrop(timing.estimatedNextRelease, timing.cadence);
+      }
+
+      await admin
+        .from("series_import_sources")
+        .update({
+          last_checked_at: startedAt,
+          last_success_at: imported > 0 || failed === 0 ? startedAt : source.last_success_at,
+          last_error: failed > 0 && imported === 0 ? details.find((entry) => entry.status === "failed")?.message : null,
+          estimated_next_release_at: nextScheduledDrop,
+          release_cadence: timingCadence,
+          last_scanned_timing_at: startedAt,
+        })
+        .eq("id", source.id);
+
+      if (source.series_id) {
+        await admin
+          .from("series")
+          .update({
+            estimated_next_release_at: nextScheduledDrop,
+            release_cadence: timingCadence,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", source.series_id);
+      }
+    } catch (timingErr) {
+      console.warn("[Scraper] Failed to detect/update scan timing for source:", timingErr);
+      await admin
+        .from("series_import_sources")
+        .update({
+          last_checked_at: startedAt,
+          last_success_at: imported > 0 || failed === 0 ? startedAt : source.last_success_at,
+          last_error: failed > 0 && imported === 0 ? details.find((entry) => entry.status === "failed")?.message : null,
+        })
+        .eq("id", source.id);
+    }
 
     return {
       success: true,
@@ -1008,32 +1073,8 @@ function chapterScanKey(chapterNumber: number, scanlationGroup: string | null) {
   return `${chapterNumber}::${scanlationGroup?.trim() || ""}`;
 }
 
-const PREMIUM_KEYWORDS = [
-  "premium", "locked", "paid", "coin", "coins", "points",
-  "vip", "paywall", "buy", "purchase", "unlock", "ticket", "tickets",
-  "early-access", "early access", "subscribers-only", "subscriber only",
-  "fastpass", "fast-pass", "kofi", "patreon", "subscribers",
-  "🔒", "🔐", "💰", "💎", "🪙", "🏷️",
-];
-
 function isPremiumChapter(chapter: { chapterNumber: number; title?: string; url: string }): boolean {
-  const titleLower = (chapter.title || "").toLowerCase();
-  const urlLower = chapter.url.toLowerCase();
-
-  // 1. Keyword checks in title and URL
-  if (PREMIUM_KEYWORDS.some((kw) => titleLower.includes(kw) || urlLower.includes(kw))) {
-    return true;
-  }
-
-  // 2. Price / currency / lock patterns in chapter title
-  if (/\b(?:cost|price|buy|\d+\s*(?:coins?|points?|gems?|diamonds?|tickets?))\b/i.test(titleLower)) {
-    return true;
-  }
-  if (/\b(?:locked|unlock\s*with|subscriber\s*only|paid\s*chapter|early\s*access)\b/i.test(titleLower)) {
-    return true;
-  }
-
-  return false;
+  return isPremiumOrLockedChapter(chapter);
 }
 
 function inferSourceGroup(sourceUrl: string) {
@@ -1185,4 +1226,185 @@ export async function $bulkDeleteChapters(args: {
     };
   }
 }
+
+/**
+ * Sync all series import sources that are due on their Estimated Next Release Time.
+ */
+export async function $syncDueScheduledSeries(args?: {
+  data?: {
+    accessToken?: string;
+    forceAll?: boolean;
+    maxChaptersPerSeries?: number;
+  };
+}) {
+  try {
+    const token = args?.data?.accessToken || "cron-internal";
+    if (token !== "cron-internal") {
+      await verifyAdmin(token);
+    }
+
+    const admin = getAdminSupabase();
+
+    // Fetch all enabled import sources
+    const { data: sources, error } = await admin
+      .from("series_import_sources")
+      .select("*, series:series(id, title, slug, cover_url)")
+      .eq("enabled", true);
+
+    if (error) throw error;
+    if (!sources || sources.length === 0) {
+      return {
+        success: true,
+        message: "No enabled import sources found.",
+        totalProcessed: 0,
+        totalImported: 0,
+        results: [],
+      };
+    }
+
+    const forceAll = args?.data?.forceAll ?? false;
+    const dueSources = forceAll
+      ? sources
+      : sources.filter((s) => isSourceDueForScraping(s));
+
+    console.log(`[ScheduledImporter] ${dueSources.length} of ${sources.length} sources are due for checking.`);
+
+    const results = [];
+    let totalImported = 0;
+
+    for (const source of dueSources) {
+      const seriesTitle = (source as any)?.series?.title || "Unknown Series";
+      console.log(`[ScheduledImporter] Checking ${seriesTitle} (${source.source_url})...`);
+
+      const syncRes = await $syncImportSource({
+        data: {
+          sourceId: source.id,
+          accessToken: "cron-internal",
+          maxChapters: args?.data?.maxChaptersPerSeries ?? 25,
+        },
+      });
+
+      if (syncRes.success) {
+        totalImported += syncRes.imported ?? 0;
+        results.push({
+          sourceId: source.id,
+          seriesTitle,
+          imported: syncRes.imported ?? 0,
+          status: syncRes.failed && syncRes.failed > 0 ? "partial" : "success",
+        });
+      } else {
+        results.push({
+          sourceId: source.id,
+          seriesTitle,
+          imported: 0,
+          status: "failed",
+          error: syncRes.error,
+        });
+      }
+    }
+
+    return {
+      success: true,
+      totalDue: dueSources.length,
+      totalProcessed: results.length,
+      totalImported,
+      results,
+    };
+  } catch (err: any) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : "Scheduled sync failed",
+    };
+  }
+}
+
+/**
+ * Scan all series to recalculate and refresh their Estimated Next Release timing.
+ */
+export async function $scanAllSeriesTimings(args?: {
+  data?: { accessToken: string };
+}) {
+  try {
+    const token = args?.data?.accessToken || "cron-internal";
+    if (token !== "cron-internal") {
+      await verifyAdmin(token);
+    }
+
+    const admin = getAdminSupabase();
+
+    const { data: sources, error } = await admin
+      .from("series_import_sources")
+      .select("*, series:series(id, title, slug)")
+      .eq("enabled", true);
+
+    if (error) throw error;
+    if (!sources || sources.length === 0) {
+      return { success: true, message: "No sources found", updated: 0 };
+    }
+
+    let updatedCount = 0;
+    const now = new Date().toISOString();
+
+    for (const source of sources) {
+      try {
+        const seriesTitle = (source as any)?.series?.title || "";
+        if (!seriesTitle) continue;
+
+        // Fetch recent chapters for local cadence calculation
+        const { data: chapters } = await admin
+          .from("chapters")
+          .select("chapter_number, created_at")
+          .eq("series_id", source.series_id)
+          .eq("status", "published")
+          .order("chapter_number", { ascending: false })
+          .limit(10);
+
+        const maxChapter = Math.max(0, ...(chapters || []).map((c) => Number(c.chapter_number) || 0));
+
+        const timing = await detectSourceScanTiming({
+          seriesTitle,
+          sourceUrl: source.source_url,
+          currentMaxChapter: maxChapter,
+          localChapters: chapters || [],
+        });
+
+        await admin
+          .from("series_import_sources")
+          .update({
+            estimated_next_release_at: timing.estimatedNextRelease,
+            release_cadence: timing.cadence,
+            last_scanned_timing_at: now,
+          })
+          .eq("id", source.id);
+
+        if (source.series_id) {
+          await admin
+            .from("series")
+            .update({
+              estimated_next_release_at: timing.estimatedNextRelease,
+              release_cadence: timing.cadence,
+              updated_at: now,
+            })
+            .eq("id", source.series_id);
+        }
+
+        updatedCount++;
+      } catch (e) {
+        console.warn(`[TimingScan] Failed for source ${source.id}:`, e);
+      }
+    }
+
+    return {
+      success: true,
+      message: `Updated release timings for ${updatedCount} sources.`,
+      updated: updatedCount,
+    };
+  } catch (err: any) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : "Failed to scan timings",
+    };
+  }
+}
+
 

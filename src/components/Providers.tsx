@@ -121,7 +121,6 @@ function AppShell({ children }: { children: ReactNode }) {
       <Toaster />
       <Analytics />
       <LiveFpsHud />
-      <CommandSearchModal />
       <PwaInstallPrompt />
     </div>
   );

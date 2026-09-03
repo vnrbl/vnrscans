@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
+import { isChapterReadingPath } from "@/lib/layout";
 import {
   CommandDialog,
   CommandInput,
@@ -30,9 +31,22 @@ export function CommandSearchModal() {
   const [results, setResults] = useState<SearchSeriesResult[]>([]);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
+  const pathname = usePathname();
 
-  // Listen for Cmd+K and custom event sitewide
+  // Only active while reading chapters / chapter reader pages
+  const isReading = isChapterReadingPath(pathname || "");
+
+  // Auto-close if navigating away from chapter reading
   useEffect(() => {
+    if (!isReading) {
+      setOpen(false);
+    }
+  }, [isReading]);
+
+  // Listen for Cmd+K and custom event ONLY while reading chapters
+  useEffect(() => {
+    if (!isReading) return;
+
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
@@ -49,7 +63,7 @@ export function CommandSearchModal() {
       window.removeEventListener("keydown", handleKeyDown);
       window.removeEventListener("open-global-search", handleCustomOpen);
     };
-  }, []);
+  }, [isReading]);
 
   // Debounced search query
   useEffect(() => {
@@ -87,6 +101,10 @@ export function CommandSearchModal() {
     },
     [router]
   );
+
+  if (!isReading) {
+    return null;
+  }
 
   return (
     <CommandDialog open={open} onOpenChange={setOpen}>

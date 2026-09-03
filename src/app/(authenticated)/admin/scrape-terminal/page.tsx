@@ -2,7 +2,7 @@
 
 import { Link, useNavigate } from "@/lib/router-compat";
 import { useState, useRef, useEffect } from "react";
-import { $runCloudScrape, $syncAllSeriesImportSources } from "@/lib/api/scraper.actions";
+import { $runCloudScrape, $syncAllSeriesImportSources, $syncDueScheduledSeries, $scanAllSeriesTimings } from "@/lib/api/scraper.actions";
 import { supabase } from "@/integrations/supabase/client";
 import { logAdminAction } from "@/lib/adminLog";
 
@@ -49,6 +49,8 @@ const formatSeriesPrompt = (seriesList: SeriesOption[]) => [
   "",
   "Available Series in database:",
   ...seriesList.map((series, index) => `  [${index + 1}] ${series.title}`),
+  "  [R] ⏱️ Check & Import Due Scheduled Series (Estimated Next Release)",
+  "  [T] 🔍 Scan & Recalculate Scan Timings for All Series",
   "  [A] ⚡ Sync ALL Series' New Chapters (Automated Update)",
   "  [S] Search by Title",
   "  [M] Enter UUID manually",
@@ -313,6 +315,91 @@ export default function ScrapeTerminal() {
 
     if (step === "AWAITING_SERIES_OPTION") {
       const choice = val.toLowerCase();
+
+      if (choice === "r") {
+        setStep("PROCESSING");
+        appendLine("");
+        appendLine("⏱️ Checking all series on their Estimated Next Release timing...");
+        appendLine("Holding newly imported chapters for 30 minutes with direct source links...");
+
+        (async () => {
+          try {
+            const { data: sessionData } = await supabase.auth.getSession();
+            const accessToken = sessionData.session?.access_token;
+            if (!accessToken) {
+              appendLine("❌ You must be signed in as admin.");
+              printSeriesPrompt();
+              setStep("AWAITING_SERIES_OPTION");
+              return;
+            }
+
+            const res = await $syncDueScheduledSeries({
+              data: { accessToken, forceAll: false, maxChaptersPerSeries: 25 },
+            });
+
+            if (!res.success) {
+              appendLine(`❌ Scheduled check failed: ${res.error || "Unknown error"}`);
+            } else {
+              appendLine(`✅ Scheduled Check Complete!`);
+              appendLine(`📊 Due Sources Processed: ${res.totalProcessed} (Total Due: ${res.totalDue})`);
+              appendLine(`✨ New Chapters Imported: ${res.totalImported} (30-min unlock hold applied)`);
+              if (res.results && res.results.length > 0) {
+                appendLine("");
+                appendLine("Summary:");
+                res.results.forEach((r: any) => {
+                  appendLine(`  - ${r.seriesTitle}: ${r.imported} imported [${r.status}]`);
+                });
+              }
+            }
+          } catch (err: any) {
+            appendLine(`❌ Fatal error: ${err.message}`);
+          } finally {
+            appendLine("");
+            appendLine("---");
+            printSeriesPrompt();
+            setStep("AWAITING_SERIES_OPTION");
+          }
+        })();
+        return;
+      }
+
+      if (choice === "t") {
+        setStep("PROCESSING");
+        appendLine("");
+        appendLine("🔍 Scanning source update timings and recalculating Estimated Next Release times...");
+
+        (async () => {
+          try {
+            const { data: sessionData } = await supabase.auth.getSession();
+            const accessToken = sessionData.session?.access_token;
+            if (!accessToken) {
+              appendLine("❌ You must be signed in as admin.");
+              printSeriesPrompt();
+              setStep("AWAITING_SERIES_OPTION");
+              return;
+            }
+
+            const res = await $scanAllSeriesTimings({
+              data: { accessToken },
+            });
+
+            if (!res.success) {
+              appendLine(`❌ Timing scan failed: ${res.error || "Unknown error"}`);
+            } else {
+              appendLine(`✅ Timing Scan Complete!`);
+              appendLine(`⏱️ ${res.message}`);
+            }
+          } catch (err: any) {
+            appendLine(`❌ Fatal error: ${err.message}`);
+          } finally {
+            appendLine("");
+            appendLine("---");
+            printSeriesPrompt();
+            setStep("AWAITING_SERIES_OPTION");
+          }
+        })();
+        return;
+      }
 
       if (choice === "a") {
         setStep("PROCESSING");

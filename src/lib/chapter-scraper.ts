@@ -97,11 +97,14 @@ export async function extractChaptersFromSeriesUrl(seriesUrl: string): Promise<C
             }
 
             if (allChaptersRaw.length > 0) {
-              const chapters: ChapterInfo[] = allChaptersRaw.map((c: any) => ({
-                chapterNumber: Number(c.number),
-                title: c.title || undefined,
-                url: `${urlObj.origin}/series/${slug}/${c.slug}`,
-              }));
+              const chapters: ChapterInfo[] = allChaptersRaw
+                .filter((c: any) => !c.is_locked && !c.locked && !c.is_premium && !c.price && !c.coins)
+                .map((c: any) => ({
+                  chapterNumber: Number(c.number),
+                  title: c.title || undefined,
+                  url: `${urlObj.origin}/series/${slug}/${c.slug}`,
+                }))
+                .filter((c: ChapterInfo) => !isPremiumOrLockedChapter(c));
               return chapters;
             }
           }
@@ -159,11 +162,12 @@ export async function extractChaptersFromSeriesUrl(seriesUrl: string): Promise<C
       }
     }
     
-    if (chapters.length === 0) {
-      throw new Error('No chapters found on the series page. Please check the URL or upload chapters manually.');
+    const freeChapters = chapters.filter((c) => !isPremiumOrLockedChapter(c));
+    if (freeChapters.length === 0) {
+      throw new Error('No free/unlocked chapters found on the series page. Locked/premium chapters are skipped.');
     }
 
-    return chapters;
+    return freeChapters;
   } catch (error) {
     if (error instanceof Error) {
       throw new Error(`Failed to extract chapters: ${error.message}`);
@@ -878,6 +882,59 @@ function isChapterLink(url: string, text: string): boolean {
   return false;
 }
 
+export const PREMIUM_KEYWORDS = [
+  "premium", "locked", "paid", "coin", "coins", "point", "points",
+  "vip", "paywall", "buy", "purchase", "unlock", "ticket", "tickets",
+  "early-access", "early access", "subscribers-only", "subscriber only",
+  "fastpass", "fast-pass", "kofi", "patreon", "subscribers", "gems", "gem",
+  "rental", "rent",
+  "🔒", "🔐", "💰", "💎", "🪙", "🏷️",
+];
+
+export function isPremiumOrLockedChapter(chapter: {
+  chapterNumber?: number;
+  title?: string;
+  url: string;
+  rawHtml?: string;
+}): boolean {
+  const titleLower = (chapter.title || "").toLowerCase();
+  const urlLower = (chapter.url || "").toLowerCase();
+  const rawLower = (chapter.rawHtml || "").toLowerCase();
+
+  // If explicitly marked free / unlocked and has no lock emoji
+  if (
+    (titleLower.includes("free") || titleLower.includes("unlocked")) &&
+    !/[🔒🔐]/.test(titleLower) &&
+    !/[🔒🔐]/.test(rawLower)
+  ) {
+    return false;
+  }
+
+  // 1. Keyword checks
+  if (PREMIUM_KEYWORDS.some((kw) => titleLower.includes(kw) || urlLower.includes(kw) || rawLower.includes(kw))) {
+    return true;
+  }
+
+  // 2. Price / currency / lock patterns
+  if (/\b(?:cost|price|buy|\d+\s*(?:coins?|points?|gems?|diamonds?|tickets?))\b/i.test(titleLower) || /\b(?:cost|price|buy|\d+\s*(?:coins?|points?|gems?|diamonds?|tickets?))\b/i.test(rawLower)) {
+    return true;
+  }
+  if (/\b(?:locked|unlock\s*with|subscriber\s*only|paid\s*chapter|early\s*access)\b/i.test(titleLower) || /\b(?:locked|unlock\s*with|subscriber\s*only|paid\s*chapter|early\s*access)\b/i.test(rawLower)) {
+    return true;
+  }
+
+  // 3. HTML attribute patterns
+  if (
+    /class=["'][^"']*\b(locked|is-locked|lock-icon|chapter-locked|has-lock|paid-chapter|premium-chapter)\b[^"']*["']/i.test(rawLower) ||
+    /data-(?:locked|paid|premium)=["']true["']/i.test(rawLower) ||
+    /fa-lock|icon-lock|lucide-lock|svg[^>]*lock/i.test(rawLower)
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
 export function extractChapterLinks(html: string, baseUrl: string): ChapterInfo[] {
   const chapters: ChapterInfo[] = [];
   const seenUrls = new Set<string>();
@@ -888,17 +945,8 @@ export function extractChapterLinks(html: string, baseUrl: string): ChapterInfo[
 
     const cleanText = rawText.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
 
-    // Skip chapters that are explicitly locked / coin / buy / unlock / paywalled
-    const lowercaseCleanText = cleanText.toLowerCase();
-    const lowercaseRaw = rawText.toLowerCase();
-    const isLocked =
-      /\b(unlock|locked|buy\s+chapter|coins?|points?|early\s+access|premium\s+only|paywall|vip\s+only|subscribers?\s+only)\b/i.test(lowercaseCleanText) ||
-      /\b(unlock\s+with|coins?\s+required|cost:\s*\d+|price:\s*\d+)\b/i.test(lowercaseCleanText) ||
-      /class=["'][^"']*\b(locked|is-locked|lock-icon|chapter-locked|has-lock|paid-chapter|premium-chapter)\b[^"']*["']/i.test(lowercaseRaw) ||
-      /data-(?:locked|paid|premium)=["']true["']/i.test(lowercaseRaw) ||
-      /fa-lock|icon-lock|lucide-lock|svg[^>]*lock/i.test(lowercaseRaw);
-
-    if (isLocked && !lowercaseCleanText.includes('free') && !lowercaseCleanText.includes('unlocked')) {
+    // Skip chapters that are explicitly locked / coin / buy / unlock / paywalled / premium
+    if (isPremiumOrLockedChapter({ url, title: cleanText, rawHtml: rawText })) {
       return;
     }
 
@@ -1009,6 +1057,7 @@ export function extractChapterLinks(html: string, baseUrl: string): ChapterInfo[
     }
 
     if (seenUrls.has(url)) continue;
+    if (isPremiumOrLockedChapter({ url, title: rawContent, rawHtml: rawContent })) continue;
 
     const chapterNum = parseFloat(dataChap);
     if (!isNaN(chapterNum)) {
@@ -1023,8 +1072,10 @@ export function extractChapterLinks(html: string, baseUrl: string): ChapterInfo[
     }
   }
 
-  // Sort by chapter number
-  return chapters.sort((a, b) => a.chapterNumber - b.chapterNumber);
+  // Filter out any premium/locked/coin/early-access chapters
+  return chapters
+    .filter((c) => !isPremiumOrLockedChapter(c))
+    .sort((a, b) => a.chapterNumber - b.chapterNumber);
 }
 
 function extractChapterNumber(url: string, text: string): number | null {
@@ -1104,6 +1155,10 @@ export async function extractImagesFromChapterUrl(
   options: ExtractChapterImagesOptions = {},
 ): Promise<string[]> {
   assertSafePublicUrl(chapterUrl);
+  if (isPremiumOrLockedChapter({ url: chapterUrl })) {
+    console.warn(`[Scraper] Chapter URL ${chapterUrl} is flagged as premium/locked. Skipping image extraction.`);
+    return [];
+  }
   try {
     // 1. Direct Qi Scans / Qi Manga JSON API Extraction (instant & 100% reliable)
     if (isQimanhwaLikeUrl(chapterUrl)) {
@@ -1230,7 +1285,9 @@ export async function extractImagesFromChapterUrls(
   chapterUrls: string[],
   options: { concurrency?: number; imageUrlExample?: string | null } = {},
 ): Promise<Map<string, string[]>> {
-  const uniqueUrls = Array.from(new Set(chapterUrls));
+  const uniqueUrls = Array.from(new Set(chapterUrls)).filter(
+    (url) => !isPremiumOrLockedChapter({ url })
+  );
   const results = new Map<string, string[]>();
   const failedUrls: string[] = [];
 

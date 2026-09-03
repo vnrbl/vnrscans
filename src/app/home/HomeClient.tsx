@@ -134,9 +134,10 @@ function HomeContent({ initialData }: { initialData?: HomeInitialData }) {
       const { data, error } = await supabase
         .from("reading_history")
         .select(
-          "id,updated_at,series_id,series:series_id(id,slug,title,cover_url),chapters:chapter_id(slug,chapter_number,title)"
+          "id,updated_at,progress,series_id,series:series_id(id,slug,title,cover_url),chapters:chapter_id(slug,chapter_number,title)"
         )
         .eq("user_id", user!.id)
+        .gte("progress", 50)
         .order("updated_at", { ascending: false });
       if (error) throw error;
 
@@ -174,7 +175,7 @@ function HomeContent({ initialData }: { initialData?: HomeInitialData }) {
         .eq("status", "published")
         .order("created_at", { ascending: false })
         .order("chapter_number", { ascending: false })
-        .limit(100);
+        .limit(1000);
       if (error) throw error;
 
       // Group by series so that mass updates (e.g. 5+ chapters) collapse into ONE cover card
@@ -211,13 +212,40 @@ function HomeContent({ initialData }: { initialData?: HomeInitialData }) {
         }
       });
 
-      const groupedChapters = Array.from(seriesMap.values()).map((entry) => ({
-        ...entry.latestChapter,
-        massUpdateCount: entry.totalUpdated,
-        minChapterNumber: entry.minChapter,
-        maxChapterNumber: entry.maxChapter,
-        batchChapters: entry.chapters,
-      }));
+      // Include all-time history: for any followed series not covered in recent drops,
+      // fetch their latest chapter so all followed series are represented
+      const missingSeriesIds = seriesIds.filter((id) => !seriesMap.has(id));
+      if (missingSeriesIds.length > 0) {
+        const { data: olderChapters } = await supabase
+          .from("chapters")
+          .select("id,slug,title,chapter_number,created_at,series_id,series:series_id(id,slug,title,cover_url)")
+          .in("series_id", missingSeriesIds)
+          .eq("status", "published")
+          .order("chapter_number", { ascending: false });
+
+        (olderChapters ?? []).forEach((chapter: any) => {
+          const sid = chapter.series_id;
+          if (!sid || !chapter.series || seriesMap.has(sid)) return;
+          const num = Number(chapter.chapter_number);
+          seriesMap.set(sid, {
+            latestChapter: chapter,
+            chapters: [chapter],
+            minChapter: num,
+            maxChapter: num,
+            totalUpdated: 1,
+          });
+        });
+      }
+
+      const groupedChapters = Array.from(seriesMap.values())
+        .sort((a, b) => new Date(b.latestChapter.created_at).getTime() - new Date(a.latestChapter.created_at).getTime())
+        .map((entry) => ({
+          ...entry.latestChapter,
+          massUpdateCount: entry.totalUpdated,
+          minChapterNumber: entry.minChapter,
+          maxChapterNumber: entry.maxChapter,
+          batchChapters: entry.chapters,
+        }));
 
       return groupedChapters.slice(0, HOME_HORIZONTAL_CARD_LIMIT);
     },

@@ -202,6 +202,7 @@ export default function TitleDetailPageContent({
         .select("chapter_id,chapters(slug,chapter_number)")
         .eq("user_id", user.id)
         .eq("series_id", seriesQ.data.id)
+        .gte("progress", 50)
         .order("updated_at", { ascending: false })
         .limit(1)
         .maybeSingle();
@@ -376,6 +377,8 @@ export default function TitleDetailPageContent({
               chapters={initialChaptersData || []}
               status={s.status}
               seriesTitle={s.title}
+              estimatedNextReleaseAt={(s as any).estimated_next_release_at}
+              releaseCadence={(s as any).release_cadence}
             />
             <ChapterList
               slug={slug}
@@ -973,7 +976,8 @@ function ReadingProgressWidget({
         .from("reading_history")
         .select("chapter_id")
         .eq("user_id", user.id)
-        .eq("series_id", seriesId);
+        .eq("series_id", seriesId)
+        .gte("progress", 50);
 
       if (error) throw error;
 

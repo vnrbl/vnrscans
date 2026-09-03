@@ -4,9 +4,14 @@ import {
   extractChaptersFromSeriesUrl,
   extractImagesFromChapterUrl,
   extractImagesFromChapterUrls,
+  isPremiumOrLockedChapter,
 } from '../src/lib/chapter-scraper';
 import { buildChapterSlug } from '../src/lib/chapter-utils';
 import { detectImportSource } from '../src/lib/import-source-utils';
+import {
+  detectSourceScanTiming,
+  advanceNextReleaseAfterDrop,
+} from '../src/lib/release-timing';
 
 config();
 
@@ -122,6 +127,9 @@ async function syncAllSeriesChapters() {
         const seenKeys = new Set<string>();
         const newChapters = discovered
           .filter((ch) => {
+            if (isPremiumOrLockedChapter(ch)) {
+              return false;
+            }
             const key = chapterScanKey(ch.chapterNumber, scanlationGroup);
             if (existingKeys.has(key) || seenKeys.has(key)) {
               return false;
@@ -165,6 +173,9 @@ async function syncAllSeriesChapters() {
               scanlationGroup,
             });
 
+            // Set 30-minute unlock delay and direct source link
+            const scheduledAt = new Date(Date.now() + 30 * 60 * 1000).toISOString();
+
             const { data: chapterRecord, error: insertError } = await supabase
               .from('chapters')
               .insert({
@@ -173,7 +184,9 @@ async function syncAllSeriesChapters() {
                 title: chapter.title || null,
                 slug,
                 chapter_type: 'image',
-                status: source.auto_publish ? 'published' : 'draft',
+                status: 'published',
+                scheduled_at: scheduledAt,
+                source_url: chapter.url,
                 uploaded_by: source.source_site || preset.sourceSite,
                 scanlation_group: scanlationGroup,
               })
@@ -198,7 +211,7 @@ async function syncAllSeriesChapters() {
             } else {
               seriesImportedCount++;
               totalNewChaptersImported++;
-              console.log(`✨ Imported Chapter ${chapter.chapterNumber} with ${images.length} pages.`);
+              console.log(`✨ Imported Chapter ${chapter.chapterNumber} (held in 30-min unlock delay) with ${images.length} pages.`);
               existingKeys.add(chapterScanKey(chapter.chapterNumber, scanlationGroup));
             }
           } catch (chErr: any) {
@@ -206,14 +219,51 @@ async function syncAllSeriesChapters() {
           }
         }
 
-        // Update import source record
-        await supabase
-          .from('series_import_sources')
-          .update({
-            last_checked_at: new Date().toISOString(),
-            last_success_at: seriesImportedCount > 0 ? new Date().toISOString() : source.last_success_at,
-          })
-          .eq('id', source.id);
+        // Detect scan timing and update Estimated Next Release Time
+        try {
+          const timing = await detectSourceScanTiming({
+            seriesTitle: series.title,
+            sourceUrl: source.source_url,
+            currentMaxChapter: maxChapterNumber,
+            localChapters: activeRows,
+          });
+
+          let nextEstimated = timing.estimatedNextRelease;
+          if (seriesImportedCount > 0) {
+            nextEstimated = advanceNextReleaseAfterDrop(timing.estimatedNextRelease, timing.cadence);
+          }
+
+          await supabase
+            .from('series_import_sources')
+            .update({
+              last_checked_at: new Date().toISOString(),
+              last_success_at: seriesImportedCount > 0 ? new Date().toISOString() : source.last_success_at,
+              estimated_next_release_at: nextEstimated,
+              release_cadence: timing.cadence,
+              last_scanned_timing_at: new Date().toISOString(),
+            })
+            .eq('id', source.id);
+
+          await supabase
+            .from('series')
+            .update({
+              estimated_next_release_at: nextEstimated,
+              release_cadence: timing.cadence,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', series.id);
+
+          console.log(`⏱️ [${series.title}] Next estimated release: ${nextEstimated} (${timing.cadence})`);
+        } catch (timeErr) {
+          console.warn(`⚠️ Failed to update release timing for ${series.title}:`, timeErr);
+          await supabase
+            .from('series_import_sources')
+            .update({
+              last_checked_at: new Date().toISOString(),
+              last_success_at: seriesImportedCount > 0 ? new Date().toISOString() : source.last_success_at,
+            })
+            .eq('id', source.id);
+        }
 
       } catch (srcErr: any) {
         console.error(`❌ Error scraping source ${source.source_url}:`, srcErr?.message || srcErr);

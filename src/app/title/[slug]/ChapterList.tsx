@@ -15,6 +15,8 @@ import {
   Download,
   CheckCircle2,
   Loader2,
+  Lock,
+  ExternalLink,
 } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -107,7 +109,7 @@ export const ChapterList = React.memo(function ChapterList({
     queryFn: async () => {
       let query = supabase
         .from("chapters")
-        .select("id,slug,chapter_number,title,chapter_type,created_at,status,scheduled_at,uploaded_by,scanlation_group")
+        .select("id,slug,chapter_number,title,chapter_type,created_at,status,scheduled_at,uploaded_by,scanlation_group,source_url")
         .eq("series_id", seriesId)
         .eq("status", "published");
 
@@ -117,9 +119,25 @@ export const ChapterList = React.memo(function ChapterList({
 
       query = query.order("chapter_number", { ascending: sortOrder === "asc" });
 
-      const { data, error } = await query;
+      let { data, error } = await query;
+      if (error && (error.code === "42703" || error.message?.includes("source_url"))) {
+        let fallbackQuery = supabase
+          .from("chapters")
+          .select("id,slug,chapter_number,title,chapter_type,created_at,status,scheduled_at,uploaded_by,scanlation_group")
+          .eq("series_id", seriesId)
+          .eq("status", "published");
+
+        if (selectedGroup !== "all") {
+          fallbackQuery = fallbackQuery.eq("scanlation_group", selectedGroup);
+        }
+
+        fallbackQuery = fallbackQuery.order("chapter_number", { ascending: sortOrder === "asc" });
+        const fallbackRes = await fallbackQuery;
+        data = (fallbackRes.data ?? []).map((c: any) => ({ ...c, source_url: null }));
+        error = fallbackRes.error;
+      }
       if (error) throw error;
-      return (data ?? []).filter((c) => c.chapter_number !== 0 && (!c.scheduled_at || new Date(c.scheduled_at) <= new Date()));
+      return (data ?? []).filter((c) => c.chapter_number !== 0);
     },
     placeholderData: selectedGroup === "all" && sortOrder === "desc" ? initialChaptersData : undefined,
     staleTime: 1000 * 60 * 2,
@@ -347,7 +365,8 @@ export const ChapterList = React.memo(function ChapterList({
         .from("reading_history")
         .select("chapter_id")
         .eq("user_id", user.id)
-        .eq("series_id", seriesId);
+        .eq("series_id", seriesId)
+        .gte("progress", 50);
       return new Set(data?.map((r) => r.chapter_id) ?? []);
     },
     enabled: !!user,
@@ -509,26 +528,50 @@ export const ChapterList = React.memo(function ChapterList({
               const isLatest = latestChapterId === c.id;
               const readerCount = readerCounts.data?.get(c.id) ?? 0;
               const chapterLikes = chapterLikeCounts.data?.get(c.id) ?? 0;
+              const isScheduledLock = !!c.scheduled_at && new Date(c.scheduled_at) > new Date();
+              const remainingMinutes = isScheduledLock
+                ? Math.max(1, Math.ceil((new Date(c.scheduled_at!).getTime() - Date.now()) / (1000 * 60)))
+                : 0;
+              const sourceUrl = (c as any).source_url;
 
               return (
-                <Link
+                <div
                   key={c.id}
-                  href={`/title/${slug}/${c.slug}`}
                   className="glass-card block rounded-lg p-3 hover-lift transition-all"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
-                        <span
-                          className="font-semibold text-sm text-white"
+                        <Link
+                          href={`/title/${slug}/${c.slug}`}
+                          className="font-semibold text-sm text-white hover:text-purple-400 transition-colors"
                           style={isRead ? { color: "#c084fc" } : undefined}
                         >
                           Chapter {c.chapter_number}
-                        </span>
+                        </Link>
                         {showNewBadge && (
                           <span className="shrink-0 rounded bg-purple-600 px-1.5 py-0.5 text-[10px] font-bold uppercase text-white">
                             NEW
                           </span>
+                        )}
+                        {isScheduledLock && (
+                          <span className="inline-flex items-center gap-1 shrink-0 rounded-md bg-amber-500/20 border border-amber-500/40 px-1.5 py-0.5 text-[10px] font-bold text-amber-300 animate-pulse">
+                            <Lock className="h-3 w-3 text-amber-400" />
+                            Unlocks in {remainingMinutes}m
+                          </span>
+                        )}
+                        {isScheduledLock && sourceUrl && (
+                          <a
+                            href={sourceUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            className="inline-flex items-center gap-1 rounded bg-primary/20 hover:bg-primary/35 border border-primary/50 px-2 py-0.5 text-[11px] font-bold text-primary transition-all hover:scale-105"
+                            title="Read immediately on official scans source"
+                          >
+                            <span>(Read now)</span>
+                            <ExternalLink className="h-3 w-3" />
+                          </a>
                         )}
                         <XpBadge
                           isRead={isRead}
@@ -593,7 +636,7 @@ export const ChapterList = React.memo(function ChapterList({
                     <span>{new Date(c.created_at).toLocaleDateString()}</span>
                     <span>{formatChapterAge(c.created_at)}</span>
                   </div>
-                </Link>
+                </div>
               );
             })}
           </div>
@@ -624,23 +667,49 @@ export const ChapterList = React.memo(function ChapterList({
                 const isLatest = latestChapterId === c.id;
                 const readerCount = readerCounts.data?.get(c.id) ?? 0;
                 const chapterLikes = chapterLikeCounts.data?.get(c.id) ?? 0;
+                const isScheduledLock = !!c.scheduled_at && new Date(c.scheduled_at) > new Date();
+                const remainingMinutes = isScheduledLock
+                  ? Math.max(1, Math.ceil((new Date(c.scheduled_at!).getTime() - Date.now()) / (1000 * 60)))
+                  : 0;
+                const sourceUrl = (c as any).source_url;
 
                 return (
                   <tr key={c.id} className="transition-colors hover:bg-surface-2/60 group">
                     <td className="px-4 py-3">
-                      <Link
-                        href={`/title/${slug}/${c.slug}`}
-                        className="flex items-center gap-2"
-                      >
-                        <span className="font-semibold text-sm text-white group-hover:text-purple-400 transition-colors" style={isRead ? { color: "#c084fc" } : undefined}>
-                          Chapter {c.chapter_number}
-                        </span>
-                        {showNewBadge && (
-                          <span className="shrink-0 rounded bg-purple-600 px-1.5 py-0.5 text-[10px] font-bold uppercase text-white">
-                            NEW
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <Link
+                          href={`/title/${slug}/${c.slug}`}
+                          className="flex items-center gap-2"
+                        >
+                          <span className="font-semibold text-sm text-white group-hover:text-purple-400 transition-colors" style={isRead ? { color: "#c084fc" } : undefined}>
+                            Chapter {c.chapter_number}
+                          </span>
+                          {showNewBadge && (
+                            <span className="shrink-0 rounded bg-purple-600 px-1.5 py-0.5 text-[10px] font-bold uppercase text-white">
+                              NEW
+                            </span>
+                          )}
+                        </Link>
+                        {isScheduledLock && (
+                          <span className="inline-flex items-center gap-1 shrink-0 rounded-md bg-amber-500/20 border border-amber-500/40 px-2 py-0.5 text-[10px] font-bold text-amber-300 animate-pulse">
+                            <Lock className="h-3 w-3 text-amber-400" />
+                            Unlocks in {remainingMinutes}m
                           </span>
                         )}
-                      </Link>
+                        {isScheduledLock && sourceUrl && (
+                          <a
+                            href={sourceUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            className="inline-flex items-center gap-1 rounded bg-primary/20 hover:bg-primary/35 border border-primary/50 px-2.5 py-0.5 text-xs font-bold text-primary transition-all hover:scale-105"
+                            title="Read immediately on official scans source"
+                          >
+                            <span>(Read now)</span>
+                            <ExternalLink className="h-3 w-3" />
+                          </a>
+                        )}
+                      </div>
                     </td>
                     <td className="px-4 py-3">
                       {(c as { uploaded_by?: string }).uploaded_by ? (

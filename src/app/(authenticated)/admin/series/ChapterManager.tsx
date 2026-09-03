@@ -148,6 +148,8 @@ type ImportSourceRow = {
   last_checked_at: string | null;
   last_success_at: string | null;
   last_error: string | null;
+  estimated_next_release_at?: string | null;
+  release_cadence?: string | null;
   created_at: string;
 };
 
@@ -1701,6 +1703,15 @@ export default function ChapterManager({ seriesId, onBack }: { seriesId: string;
                           <span className="ml-2 text-red-500">{source.last_error}</span>
                         ) : null}
                       </div>
+                      {source.estimated_next_release_at && (
+                        <div className="mt-1 flex items-center gap-1.5 text-xs text-violet-400 font-medium">
+                          <span>⏱️ Estimated next drop:</span>
+                          <span>{new Date(source.estimated_next_release_at).toLocaleString()}</span>
+                          {source.release_cadence && (
+                            <span className="text-muted-foreground">({source.release_cadence})</span>
+                          )}
+                        </div>
+                      )}
                       {lastLog && (
                         <div className="mt-2 text-xs text-muted-foreground">
                           Last run: {lastLog.message} Found {lastLog.chapters_found}, imported{" "}

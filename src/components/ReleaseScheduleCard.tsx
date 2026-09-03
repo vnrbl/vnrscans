@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from "react";
-import { Clock, Calendar, Bell, Sparkles, CheckCircle2, Globe, Zap } from "lucide-react";
+import { Clock, Calendar, Bell, Sparkles, CheckCircle2, Globe, Zap, Lock, ExternalLink } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -13,12 +13,21 @@ interface ReleaseScheduleProps {
     created_at: string;
     scheduled_at?: string | null;
     status?: string;
+    source_url?: string | null;
   }>;
   status?: string | null;
   seriesTitle?: string;
+  estimatedNextReleaseAt?: string | null;
+  releaseCadence?: string | null;
 }
 
-export function ReleaseScheduleCard({ chapters, status, seriesTitle }: ReleaseScheduleProps) {
+export function ReleaseScheduleCard({
+  chapters,
+  status,
+  seriesTitle,
+  estimatedNextReleaseAt,
+  releaseCadence,
+}: ReleaseScheduleProps) {
   const [timeLeft, setTimeLeft] = useState<{ days: number; hours: number; minutes: number; seconds: number } | null>(null);
   const [isTracking, setIsTracking] = useState(false);
 
@@ -57,7 +66,7 @@ export function ReleaseScheduleCard({ chapters, status, seriesTitle }: ReleaseSc
 
   // Determine schedule data
   const scheduleInfo = useMemo(() => {
-    // 1. Check for an upcoming confirmed scheduled chapter in database
+    // 1. Check for an upcoming confirmed scheduled chapter in database (e.g. 30-min unlock hold)
     const now = new Date();
     const scheduled = chapters?.find(
       (c) => c.scheduled_at && new Date(c.scheduled_at) > now
@@ -67,9 +76,11 @@ export function ReleaseScheduleCard({ chapters, status, seriesTitle }: ReleaseSc
       return {
         targetDate: new Date(scheduled.scheduled_at),
         chapterNumber: scheduled.chapter_number,
-        cadenceText: "Official Schedule",
-        sourceName: "vnrscans Official",
+        cadenceText: "30-Min Hold",
+        sourceName: "Early Access",
         isScheduled: true,
+        isUnlockingSoon: true,
+        sourceUrl: scheduled.source_url || null,
         isSourceAhead: false,
         aheadBy: 0,
         sourceLatestChapter: undefined,
@@ -84,13 +95,35 @@ export function ReleaseScheduleCard({ chapters, status, seriesTitle }: ReleaseSc
         cadenceText: "Series Completed",
         sourceName: liveData?.sourceName || "Official",
         isScheduled: false,
+        isUnlockingSoon: false,
+        sourceUrl: null,
         isSourceAhead: false,
         aheadBy: 0,
         sourceLatestChapter: undefined,
       };
     }
 
-    // 3. Priority: Live data imported from Comick.dev or other web scans!
+    // 3. Check DB synced Estimated Next Release time
+    if (estimatedNextReleaseAt) {
+      const dbTarget = new Date(estimatedNextReleaseAt);
+      while (dbTarget <= now) {
+        dbTarget.setTime(dbTarget.getTime() + 7 * 24 * 60 * 60 * 1000);
+      }
+      return {
+        targetDate: dbTarget,
+        chapterNumber: (currentMaxChapter || 0) + 1,
+        cadenceText: releaseCadence || "Weekly",
+        sourceName: "Scans Schedule",
+        isScheduled: false,
+        isUnlockingSoon: false,
+        sourceUrl: null,
+        isSourceAhead: false,
+        aheadBy: 0,
+        sourceLatestChapter: undefined,
+      };
+    }
+
+    // 4. Priority: Live data imported from Comick.dev or other web scans!
     if (liveData?.found && liveData?.nextExpectedDrop) {
       const liveTarget = new Date(liveData.nextExpectedDrop);
       // Ensure target is in future
@@ -108,13 +141,15 @@ export function ReleaseScheduleCard({ chapters, status, seriesTitle }: ReleaseSc
         cadenceText: liveData.cadence || "Weekly",
         sourceName: liveData.sourceName || "Comick.dev",
         isScheduled: false,
+        isUnlockingSoon: false,
+        sourceUrl: null,
         isSourceAhead: liveData.isSourceAhead,
         aheadBy: liveData.aheadBy,
         sourceLatestChapter: liveData.sourceLatestChapter,
       };
     }
 
-    // 4. Fallback: Estimate cadence from local chapters history
+    // 5. Fallback: Estimate cadence from local chapters history
     if (!chapters || chapters.length === 0) return null;
 
     const published = chapters
@@ -232,7 +267,11 @@ export function ReleaseScheduleCard({ chapters, status, seriesTitle }: ReleaseSc
           </div>
           <div>
             <span className="text-xs font-bold text-foreground">
-              {scheduleInfo.isScheduled ? "Confirmed Next Release" : "Estimated Next Release"}
+              {(scheduleInfo as any).isUnlockingSoon
+                ? "Early Access Hold"
+                : scheduleInfo.isScheduled
+                ? "Confirmed Next Release"
+                : "Estimated Next Release"}
             </span>
             {scheduleInfo.chapterNumber && (
               <span className="ml-1.5 text-xs text-primary font-semibold">
@@ -286,27 +325,41 @@ export function ReleaseScheduleCard({ chapters, status, seriesTitle }: ReleaseSc
           </div>
         </div>
 
-        {/* Notify Button */}
-        <Button
-          size="sm"
-          variant={isTracking ? "secondary" : "outline"}
-          onClick={handleToggleTrack}
-          className={`h-8 text-xs font-semibold gap-1.5 transition-all ${
-            isTracking ? "border-primary/50 text-primary bg-primary/15" : "border-border/60 hover:border-primary/40"
-          }`}
-        >
-          {isTracking ? (
-            <>
-              <CheckCircle2 className="h-3.5 w-3.5 text-primary" />
-              <span>Tracking</span>
-            </>
-          ) : (
-            <>
-              <Bell className="h-3.5 w-3.5 text-muted-foreground" />
-              <span>Track Drop</span>
-            </>
+        {/* Action Buttons */}
+        <div className="flex items-center gap-2">
+          {(scheduleInfo as any).isUnlockingSoon && (scheduleInfo as any).sourceUrl && (
+            <a
+              href={(scheduleInfo as any).sourceUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="h-8 inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 px-3 py-1 text-xs font-bold text-white shadow-sm transition-all hover:scale-105 shrink-0"
+              title="Read immediately on official scans source"
+            >
+              <span>(Read now)</span>
+              <ExternalLink className="h-3 w-3" />
+            </a>
           )}
-        </Button>
+          <Button
+            size="sm"
+            variant={isTracking ? "secondary" : "outline"}
+            onClick={handleToggleTrack}
+            className={`h-8 text-xs font-semibold gap-1.5 transition-all ${
+              isTracking ? "border-primary/50 text-primary bg-primary/15" : "border-border/60 hover:border-primary/40"
+            }`}
+          >
+            {isTracking ? (
+              <>
+                <CheckCircle2 className="h-3.5 w-3.5 text-primary" />
+                <span>Tracking</span>
+              </>
+            ) : (
+              <>
+                <Bell className="h-3.5 w-3.5 text-muted-foreground" />
+                <span>Track Drop</span>
+              </>
+            )}
+          </Button>
+        </div>
       </div>
 
       {scheduleInfo.isSourceAhead && scheduleInfo.sourceLatestChapter && (

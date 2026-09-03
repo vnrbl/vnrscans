@@ -631,8 +631,8 @@ html.perf-mode .hover-scale:hover {
 /* Streamline glass surfaces to solid opaque dark backgrounds for zero compositing load */
 html.perf-mode .glass-card,
 html.perf-mode .glass-panel {
-  background: #121217 !important;
-  border-color: rgba(255, 255, 255, 0.08) !important;
+  background: #09090d !important;
+  border-color: rgba(255, 255, 255, 0.05) !important;
   box-shadow: none !important;
 }
 
@@ -643,7 +643,7 @@ html.perf-mode .animate-pulse {
 
 html.perf-mode .shimmer-dark {
   animation: none !important;
-  background: #18181f !important;
+  background: #101015 !important;
 }
 
 /* 🍃 Battery Saver / Eco Mode */

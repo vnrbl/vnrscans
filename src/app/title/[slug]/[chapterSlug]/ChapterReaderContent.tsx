@@ -45,6 +45,9 @@ import {
   Loader2,
   SunMoon,
   Search,
+  Lock,
+  ExternalLink,
+  Clock,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { renderCommentMarkdown, COMMENT_TEXT_COLORS } from "@/lib/bbcode";
@@ -331,24 +334,8 @@ export default function Reader({
     if (!chapterQ.data) return;
     const ch = chapterQ.data;
 
-    // Save initial reading history entry for auth users
-    if (user) {
-      supabase
-        .from("reading_history")
-        .upsert(
-          {
-            user_id: user.id,
-            series_id: ch.series_id,
-            chapter_id: ch.id,
-            progress: 0,
-            updated_at: new Date().toISOString(),
-          },
-          { onConflict: "user_id,chapter_id" } as any,
-        )
-        .then(() => {});
-    }
-
-    // Update reading progress based on scroll position
+    // Update reading progress based on scroll position.
+    // Note: Per user directive, a chapter is ONLY added to reading history once completed at least 50%.
     const updateProgress = () => {
       const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
       const scrollHeight = document.documentElement.scrollHeight - window.innerHeight;
@@ -356,12 +343,12 @@ export default function Reader({
       const progress =
         scrollHeight > 0 ? Math.min(Math.round(scrollRatio * 100), 100) : 0;
 
-      if (user) {
-        // Only update database if progress has changed significantly (every 5%)
+      if (user && progress >= 50) {
+        // Only update database if progress has changed significantly (every 5%) or first reaching 50%
         const lastProgress = parseInt(
           localStorage.getItem(`chapter-progress-${ch.id}`) || "0",
         );
-        if (Math.abs(progress - lastProgress) >= 5) {
+        if (Math.abs(progress - lastProgress) >= 5 || lastProgress < 50) {
           localStorage.setItem(`chapter-progress-${ch.id}`, progress.toString());
           supabase
             .from("reading_history")
@@ -810,7 +797,16 @@ export default function Reader({
       <div className="w-full max-w-full">
         {/* Main content */}
         <div className="w-full max-w-full">
-          {isNovel ? (
+          {c.scheduled_at && new Date(c.scheduled_at) > new Date() ? (
+            <ScheduledChapterUnlockView
+              chapter={c}
+              seriesSlug={seriesSlug}
+              onUnlock={() => {
+                qc.invalidateQueries({ queryKey: ["pages", c.id] });
+                qc.invalidateQueries({ queryKey: ["chapter", slug, chapterSlug] });
+              }}
+            />
+          ) : isNovel ? (
             <NovelView
               content={c.novel_content ?? ""}
               chapterId={c.id}
@@ -1206,6 +1202,119 @@ function ReaderTopBar({
         </div>
       </div>
     </header>
+  );
+}
+
+function ScheduledChapterUnlockView({
+  chapter,
+  seriesSlug,
+  onUnlock,
+}: {
+  chapter: any;
+  seriesSlug: string;
+  onUnlock: () => void;
+}) {
+  const [timeLeft, setTimeLeft] = useState<{ minutes: number; seconds: number } | null>(null);
+  const targetDate = useMemo(() => new Date(chapter.scheduled_at), [chapter.scheduled_at]);
+
+  useEffect(() => {
+    const updateCountdown = () => {
+      const now = Date.now();
+      const diff = targetDate.getTime() - now;
+      if (diff <= 0) {
+        setTimeLeft({ minutes: 0, seconds: 0 });
+        onUnlock();
+        return;
+      }
+      const minutes = Math.floor(diff / (1000 * 60));
+      const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+      setTimeLeft({ minutes, seconds });
+    };
+
+    updateCountdown();
+    const timer = setInterval(updateCountdown, 1000);
+    return () => clearInterval(timer);
+  }, [targetDate, onUnlock]);
+
+  const sourceUrl = chapter.source_url;
+  const sourceName = chapter.uploaded_by || chapter.scanlation_group || "Official Scans Source";
+
+  return (
+    <div className="flex min-h-[65vh] items-center justify-center px-4 py-12">
+      <div className="relative w-full max-w-lg overflow-hidden rounded-2xl border border-amber-500/30 bg-gradient-to-b from-card/95 via-card/75 to-background/95 p-6 sm:p-8 text-center shadow-2xl backdrop-blur-xl">
+        {/* Glow backdrop */}
+        <div className="absolute -top-20 left-1/2 -translate-x-1/2 h-44 w-44 rounded-full bg-amber-500/20 blur-3xl pointer-events-none" />
+
+        {/* Lock Icon */}
+        <div className="relative mx-auto mb-4 grid h-16 w-16 place-items-center rounded-2xl bg-amber-500/20 border border-amber-500/40 text-amber-400 shadow-inner animate-pulse">
+          <Lock className="h-8 w-8" />
+        </div>
+
+        <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/15 border border-amber-500/30 px-3 py-1 text-xs font-bold text-amber-300">
+          <Clock className="h-3.5 w-3.5" />
+          30-Minute Early Access Hold
+        </span>
+
+        <h2 className="mt-4 text-2xl sm:text-3xl font-black tracking-tight text-white">
+          Chapter {chapter.chapter_number} Unlocks Soon!
+        </h2>
+
+        <p className="mt-2 text-sm text-neutral-300 leading-relaxed">
+          This newly imported chapter has a 30-minute early-access hold on vnrscans before unlocking for free.
+        </p>
+
+        {/* Live Timer Box */}
+        <div className="mt-5 flex items-center justify-center gap-3">
+          <div className="flex flex-col items-center rounded-xl bg-background/90 border border-amber-500/40 px-4 py-2 min-w-[70px]">
+            <span className="font-mono text-2xl font-black text-amber-300">
+              {String(timeLeft?.minutes ?? 0).padStart(2, "0")}
+            </span>
+            <span className="text-[10px] uppercase font-semibold text-neutral-400">Minutes</span>
+          </div>
+          <span className="font-mono text-xl font-bold text-amber-400 animate-pulse">:</span>
+          <div className="flex flex-col items-center rounded-xl bg-background/90 border border-amber-500/40 px-4 py-2 min-w-[70px]">
+            <span className="font-mono text-2xl font-black text-amber-300">
+              {String(timeLeft?.seconds ?? 0).padStart(2, "0")}
+            </span>
+            <span className="text-[10px] uppercase font-semibold text-neutral-400">Seconds</span>
+          </div>
+        </div>
+
+        {/* Action card for Read Now on source */}
+        {sourceUrl && (
+          <div className="mt-6 rounded-xl border border-primary/40 bg-primary/10 p-4 text-left">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs font-semibold text-primary uppercase tracking-wider">
+                Support the Scans Group
+              </span>
+              <span className="text-[11px] text-neutral-400">{sourceName}</span>
+            </div>
+            <p className="mt-1 text-xs text-neutral-300">
+              Want to read right now without waiting? Read Chapter {chapter.chapter_number} directly on the scan source:
+            </p>
+            <a
+              href={sourceUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 px-4 py-2.5 text-sm font-bold text-white shadow-lg shadow-purple-600/30 transition-all hover:scale-[1.02] active:scale-[0.98]"
+            >
+              <span>(Read now) on {sourceName}</span>
+              <ExternalLink className="h-4 w-4" />
+            </a>
+          </div>
+        )}
+
+        <div className="mt-6 flex items-center justify-center gap-3">
+          <NextLink
+            href={`/title/${seriesSlug}`}
+            className="inline-flex items-center gap-1.5 text-xs font-semibold text-neutral-400 hover:text-white transition-colors"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" />
+            Back to Chapter List
+          </NextLink>
+        </div>
+      </div>
+    </div>
   );
 }
 

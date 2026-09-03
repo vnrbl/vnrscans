@@ -88,6 +88,7 @@ export type Database = {
           view_count: number
           uploaded_by: string | null
           scanlation_group: string | null
+          source_url: string | null
         }
         Insert: {
           chapter_number: number
@@ -104,6 +105,7 @@ export type Database = {
           view_count?: number
           uploaded_by?: string | null
           scanlation_group?: string | null
+          source_url?: string | null
         }
         Update: {
           chapter_number?: number
@@ -120,6 +122,7 @@ export type Database = {
           view_count?: number
           uploaded_by?: string | null
           scanlation_group?: string | null
+          source_url?: string | null
         }
         Relationships: [
           {
@@ -447,6 +450,8 @@ export type Database = {
           type: Database["public"]["Enums"]["series_type"]
           updated_at: string
           view_count: number
+          estimated_next_release_at: string | null
+          release_cadence: string | null
         }
         Insert: {
           alternative_titles?: string | null
@@ -468,6 +473,8 @@ export type Database = {
           type?: Database["public"]["Enums"]["series_type"]
           updated_at?: string
           view_count?: number
+          estimated_next_release_at?: string | null
+          release_cadence?: string | null
         }
         Update: {
           alternative_titles?: string | null
@@ -489,6 +496,8 @@ export type Database = {
           type?: Database["public"]["Enums"]["series_type"]
           updated_at?: string
           view_count?: number
+          estimated_next_release_at?: string | null
+          release_cadence?: string | null
         }
         Relationships: []
       }
@@ -1400,20 +1409,44 @@ export type Database = {
         Row: {
           id: string
           series_id: string
-          source_name: string
+          source_name?: string
           source_url: string
-          last_scraped_at: string | null
-          is_active: boolean | null
+          source_site?: string | null
+          scanlation_group?: string | null
+          image_url_example?: string | null
+          enabled?: boolean
+          auto_publish?: boolean
+          check_interval_minutes?: number
+          last_checked_at?: string | null
+          last_success_at?: string | null
+          last_error?: string | null
+          last_scraped_at?: string | null
+          is_active?: boolean | null
+          estimated_next_release_at?: string | null
+          release_cadence?: string | null
+          last_scanned_timing_at?: string | null
           created_at: string | null
           updated_at: string | null
         }
         Insert: {
           id?: string
           series_id: string
-          source_name: string
+          source_name?: string
           source_url: string
+          source_site?: string | null
+          scanlation_group?: string | null
+          image_url_example?: string | null
+          enabled?: boolean
+          auto_publish?: boolean
+          check_interval_minutes?: number
+          last_checked_at?: string | null
+          last_success_at?: string | null
+          last_error?: string | null
           last_scraped_at?: string | null
           is_active?: boolean | null
+          estimated_next_release_at?: string | null
+          release_cadence?: string | null
+          last_scanned_timing_at?: string | null
           created_at?: string | null
           updated_at?: string | null
         }
@@ -1422,8 +1455,20 @@ export type Database = {
           series_id?: string
           source_name?: string
           source_url?: string
+          source_site?: string | null
+          scanlation_group?: string | null
+          image_url_example?: string | null
+          enabled?: boolean
+          auto_publish?: boolean
+          check_interval_minutes?: number
+          last_checked_at?: string | null
+          last_success_at?: string | null
+          last_error?: string | null
           last_scraped_at?: string | null
           is_active?: boolean | null
+          estimated_next_release_at?: string | null
+          release_cadence?: string | null
+          last_scanned_timing_at?: string | null
           created_at?: string | null
           updated_at?: string | null
         }

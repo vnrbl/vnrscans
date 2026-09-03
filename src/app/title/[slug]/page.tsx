@@ -25,16 +25,24 @@ const getSeriesData = cache(async (slug: string) => {
 });
 
 const getChaptersData = cache(async (seriesId: string) => {
-  const { data } = await supabase
+  let { data, error } = await supabase
     .from("chapters")
-    .select("id,slug,chapter_number,title,chapter_type,created_at,status,scheduled_at,uploaded_by,scanlation_group")
+    .select("id,slug,chapter_number,title,chapter_type,created_at,status,scheduled_at,uploaded_by,scanlation_group,source_url")
     .eq("series_id", seriesId)
     .eq("status", "published")
     .order("chapter_number", { ascending: false });
 
-  return (data ?? []).filter(
-    (c) => !c.scheduled_at || new Date(c.scheduled_at) <= new Date()
-  );
+  if (error && (error.code === "42703" || error.message?.includes("source_url"))) {
+    const fallback = await supabase
+      .from("chapters")
+      .select("id,slug,chapter_number,title,chapter_type,created_at,status,scheduled_at,uploaded_by,scanlation_group")
+      .eq("series_id", seriesId)
+      .eq("status", "published")
+      .order("chapter_number", { ascending: false });
+    data = (fallback.data ?? []).map((c: any) => ({ ...c, source_url: null }));
+  }
+
+  return (data ?? []).filter((c) => c.chapter_number !== 0);
 });
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {

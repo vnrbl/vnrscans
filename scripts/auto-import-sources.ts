@@ -4,9 +4,14 @@ import {
   extractChaptersFromSeriesUrl,
   extractImagesFromChapterUrl,
   extractImagesFromChapterUrls,
+  isPremiumOrLockedChapter,
 } from '../src/lib/chapter-scraper';
 import { buildChapterSlug } from '../src/lib/chapter-utils';
 import { detectImportSource } from '../src/lib/import-source-utils';
+import {
+  detectSourceScanTiming,
+  advanceNextReleaseAfterDrop,
+} from '../src/lib/release-timing';
 
 config();
 
@@ -38,11 +43,23 @@ async function main() {
 
   if (error) throw error;
 
+  const now = Date.now();
   const dueSources = (sources ?? []).filter((source: any) => {
+    // 1. If never checked, it is due
     if (!source.last_checked_at) return true;
+
+    // 2. Scheduled scraping: Check if Estimated Next Release time has arrived (with 5 min grace)
+    if (source.estimated_next_release_at) {
+      const releaseTime = new Date(source.estimated_next_release_at).getTime();
+      if (releaseTime <= now + 5 * 60 * 1000) {
+        return true;
+      }
+    }
+
+    // 3. Fallback interval
     const lastChecked = new Date(source.last_checked_at).getTime();
-    const intervalMs = Number(source.check_interval_minutes || 60) * 60 * 1000;
-    return Date.now() - lastChecked >= intervalMs;
+    const intervalMs = Number(source.check_interval_minutes || 120) * 60 * 1000;
+    return now - lastChecked >= intervalMs;
   });
 
   console.log(`Auto import: ${dueSources.length} due source(s).`);
@@ -97,6 +114,9 @@ async function syncSource(source: any) {
     const seenKeys = new Set<string>();
     const missing = discovered
       .filter((chapter) => {
+        if (isPremiumOrLockedChapter(chapter)) {
+          return false;
+        }
         const key = chapterScanKey(chapter.chapterNumber, scanlationGroup);
         if (existingKeys.has(key) || seenKeys.has(key)) {
           return false;
@@ -128,6 +148,9 @@ async function syncSource(source: any) {
           scanlationGroup,
         });
 
+        // Hold newly imported chapter with 30-minute unlock delay & direct source link
+        const scheduledAt = new Date(Date.now() + 30 * 60 * 1000).toISOString();
+
         const { data: chapterRecord, error: chapterError } = await supabase
           .from('chapters')
           .insert({
@@ -136,7 +159,9 @@ async function syncSource(source: any) {
             title: chapter.title || null,
             slug,
             chapter_type: 'image',
-            status: source.auto_publish ? 'published' : 'draft',
+            status: 'published',
+            scheduled_at: scheduledAt,
+            source_url: chapter.url,
             uploaded_by: source.source_site || preset.sourceSite,
             scanlation_group: scanlationGroup,
           })
@@ -173,14 +198,60 @@ async function syncSource(source: any) {
         : 'No new chapters were imported.';
 
     await writeLog(source.id, status, message, chaptersFound, imported, skipped, failed, details);
-    await supabase
-      .from('series_import_sources')
-      .update({
-        last_checked_at: startedAt,
-        last_success_at: imported > 0 || failed === 0 ? startedAt : source.last_success_at,
-        last_error: failed > 0 && imported === 0 ? details.find((entry) => entry.status === 'failed')?.message : null,
-      })
-      .eq('id', source.id);
+
+    // Update release schedule & scan timing
+    try {
+      const { data: seriesRow } = await supabase
+        .from('series')
+        .select('title')
+        .eq('id', source.series_id)
+        .single();
+
+      const timing = await detectSourceScanTiming({
+        seriesTitle: seriesRow?.title || '',
+        sourceUrl: source.source_url,
+        currentMaxChapter: Math.max(0, ...activeRows.map((r: any) => Number(r.chapter_number) || 0)),
+        localChapters: activeRows,
+      });
+
+      let nextEstimated = timing.estimatedNextRelease;
+      if (imported > 0) {
+        nextEstimated = advanceNextReleaseAfterDrop(timing.estimatedNextRelease, timing.cadence);
+      }
+
+      await supabase
+        .from('series_import_sources')
+        .update({
+          last_checked_at: startedAt,
+          last_success_at: imported > 0 || failed === 0 ? startedAt : source.last_success_at,
+          last_error: failed > 0 && imported === 0 ? details.find((entry) => entry.status === 'failed')?.message : null,
+          estimated_next_release_at: nextEstimated,
+          release_cadence: timing.cadence,
+          last_scanned_timing_at: startedAt,
+        })
+        .eq('id', source.id);
+
+      if (source.series_id) {
+        await supabase
+          .from('series')
+          .update({
+            estimated_next_release_at: nextEstimated,
+            release_cadence: timing.cadence,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', source.series_id);
+      }
+    } catch (timingErr) {
+      console.warn('[AutoImport] Timing update error:', timingErr);
+      await supabase
+        .from('series_import_sources')
+        .update({
+          last_checked_at: startedAt,
+          last_success_at: imported > 0 || failed === 0 ? startedAt : source.last_success_at,
+          last_error: failed > 0 && imported === 0 ? details.find((entry) => entry.status === 'failed')?.message : null,
+        })
+        .eq('id', source.id);
+    }
 
     console.log(`${message} Found ${chaptersFound}, failed ${failed}.`);
   } catch (error) {

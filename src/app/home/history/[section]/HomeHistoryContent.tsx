@@ -257,8 +257,9 @@ async function fetchReadingHistory(userId: string, period: Period): Promise<Chap
     const to = from + pageSize - 1;
     let query = supabase
       .from("reading_history")
-      .select("id,updated_at,series:series_id(id,slug,title,cover_url),chapters:chapter_id(slug,chapter_number,title)")
+      .select("id,updated_at,progress,series:series_id(id,slug,title,cover_url),chapters:chapter_id(slug,chapter_number,title)")
       .eq("user_id", userId)
+      .gte("progress", 50)
       .order("updated_at", { ascending: false })
       .range(from, to);
 

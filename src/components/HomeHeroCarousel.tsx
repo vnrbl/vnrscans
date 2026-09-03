@@ -26,6 +26,8 @@ export function HomeHeroCarousel() {
   const [showRightArrow, setShowRightArrow] = useState(true);
   const [isAutoScrolling, setIsAutoScrolling] = useState(true);
   const [isPaused, setIsPaused] = useState(false);
+  const isPausedRef = useRef<boolean>(false);
+  const scrollPosRef = useRef<number>(0);
   const autoScrollRafRef = useRef<number | null>(null);
   const tiltRafByCard = useRef<WeakMap<HTMLElement, number>>(new WeakMap());
   const prefersReducedMotion = useRef<boolean>(false);
@@ -156,21 +158,23 @@ export function HomeHeroCarousel() {
 
       requestAnimationFrame(() => {
         ticking = false;
-        const { itemWidth, sectionWidth } = metricsRef.current;
-        if (!itemWidth || !sectionWidth) {
+        const { sectionWidth } = metricsRef.current;
+        if (!sectionWidth) {
           measureMetrics();
           return;
         }
 
         const scrollLeft = container.scrollLeft;
-        const scrollWidth = container.scrollWidth;
-        const clientWidth = container.clientWidth;
 
-        // Reset to middle section when reaching edges
-        if (scrollLeft <= itemWidth) {
-          container.scrollLeft = sectionWidth + itemWidth;
-        } else if (scrollLeft >= scrollWidth - clientWidth - itemWidth) {
-          container.scrollLeft = sectionWidth - clientWidth + itemWidth;
+        // Reset to middle section when reaching edges seamlessly
+        if (scrollLeft <= 5) {
+          container.scrollLeft = scrollLeft + sectionWidth;
+          scrollPosRef.current = container.scrollLeft;
+        } else if (scrollLeft >= sectionWidth * 2) {
+          container.scrollLeft = scrollLeft - sectionWidth;
+          scrollPosRef.current = container.scrollLeft;
+        } else if (isPausedRef.current) {
+          scrollPosRef.current = scrollLeft;
         }
 
         updateArrows();
@@ -190,6 +194,7 @@ export function HomeHeroCarousel() {
         const { sectionWidth } = metricsRef.current;
         if (sectionWidth > 0) {
           container.scrollLeft = sectionWidth;
+          scrollPosRef.current = sectionWidth;
         }
         updateArrows();
       }, 50);
@@ -197,10 +202,10 @@ export function HomeHeroCarousel() {
     }
   }, [displayItems.length, measureMetrics, updateArrows]);
 
-  // Auto-scroll animation: rAF based, pauses automatically when offscreen via IntersectionObserver
+  // Auto-scroll continuous slide loop animation: rAF based with float sub-pixel accumulator
   useEffect(() => {
     const container = scrollContainerRef.current;
-    if (!container || displayItems.length === 0 || isPaused || !isAutoScrolling) return;
+    if (!container || displayItems.length === 0 || !isAutoScrolling) return;
     if (prefersReducedMotion.current) return;
 
     let isVisibleInViewport = true;
@@ -215,16 +220,29 @@ export function HomeHeroCarousel() {
     observer.observe(container);
 
     let lastTime = performance.now();
-    const PX_PER_MS = 33 / 1000;
+    const PX_PER_SEC = 48; // Smooth 48px/sec cinematic glide
 
     const tick = (now: number) => {
-      const delta = Math.min(now - lastTime, 64); // Cap delta to prevent jump after long tab pause
+      const delta = Math.min(now - lastTime, 64);
       lastTime = now;
-      if (!isPaused && isVisibleInViewport && document.visibilityState === "visible") {
-        container.scrollLeft += delta * PX_PER_MS;
+
+      if (!isPausedRef.current && isVisibleInViewport && document.visibilityState === "visible") {
+        scrollPosRef.current += (delta / 1000) * PX_PER_SEC;
+
+        const { sectionWidth } = metricsRef.current;
+        if (sectionWidth > 0) {
+          if (scrollPosRef.current >= sectionWidth * 2) {
+            scrollPosRef.current -= sectionWidth;
+          } else if (scrollPosRef.current <= 0) {
+            scrollPosRef.current += sectionWidth;
+          }
+        }
+
+        container.scrollLeft = scrollPosRef.current;
       }
       autoScrollRafRef.current = requestAnimationFrame(tick);
     };
+
     autoScrollRafRef.current = requestAnimationFrame(tick);
 
     return () => {
@@ -234,7 +252,7 @@ export function HomeHeroCarousel() {
         autoScrollRafRef.current = null;
       }
     };
-  }, [displayItems.length, isPaused, isAutoScrolling]);
+  }, [displayItems.length, isAutoScrolling]);
 
   // rAF-throttled 3D tilt: previous handler ran on every mousemove (60+/sec)
   // and called getBoundingClientRect synchronously, forcing layout each event.
@@ -274,25 +292,32 @@ export function HomeHeroCarousel() {
     
     // Pause auto-scroll when user interacts
     setIsPaused(true);
+    isPausedRef.current = true;
     
     const scrollAmount = 800;
     const newScrollLeft = scrollContainerRef.current.scrollLeft + (direction === 'left' ? -scrollAmount : scrollAmount);
     
     scrollContainerRef.current.scrollTo({ left: newScrollLeft, behavior: 'smooth' });
+    scrollPosRef.current = newScrollLeft;
     
-    // Resume auto-scroll after 5 seconds of no interaction
-    setTimeout(() => setIsPaused(false), 5000);
+    // Resume auto-scroll after 4 seconds of no interaction
+    setTimeout(() => {
+      setIsPaused(false);
+      isPausedRef.current = false;
+    }, 4000);
   };
 
   const handleMouseEnter = () => {
     setIsPaused(true);
+    isPausedRef.current = true;
   };
 
   const handleMouseLeave = () => {
     // Small delay to prevent flickering when moving between cards
     setTimeout(() => {
       setIsPaused(false);
-    }, 100);
+      isPausedRef.current = false;
+    }, 150);
   };
 
   if (carouselSeries.isLoading || items.length === 0) return null;
