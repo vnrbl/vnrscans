@@ -3,7 +3,7 @@
   "name": "vnrscans — Manga, Manhwa & Light Novels",
   "short_name": "vnrscans",
   "description": "Read high quality manga, manhwa, manhua, and light novels online for free on vnrscans.",
-  "start_url": "/",
+  "start_url": "/home",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait-primary",
@@ -33,6 +33,29 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Home",
+      "short_name": "Home",
+      "description": "Latest updates and trending manga",
+      "url": "/home",
+      "icons": [{ "src": "/favicon-96x96.png", "sizes": "96x96" }]
+    },
+    {
+      "name": "My Library",
+      "short_name": "Library",
+      "description": "Your reading list and bookmarks",
+      "url": "/library",
+      "icons": [{ "src": "/favicon-96x96.png", "sizes": "96x96" }]
+    },
+    {
+      "name": "Offline Chapters",
+      "short_name": "Offline",
+      "description": "Read downloaded chapters offline",
+      "url": "/library?tab=offline",
+      "icons": [{ "src": "/favicon-96x96.png", "sizes": "96x96" }]
     }
   ],
   "categories": ["books", "entertainment"]

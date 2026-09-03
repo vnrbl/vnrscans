@@ -10,11 +10,17 @@ export function PwaInstallPrompt() {
   const [isStandalone, setIsStandalone] = useState(false);
 
   useEffect(() => {
-    // Check if already running as standalone PWA
+    // Check if already running as standalone PWA and ensure it starts on /home
     const checkStandalone = () => {
       const isDisplayStandalone = window.matchMedia("(display-mode: standalone)").matches;
       const isNavStandalone = (window.navigator as any).standalone === true;
-      setIsStandalone(isDisplayStandalone || isNavStandalone);
+      const standalone = isDisplayStandalone || isNavStandalone;
+      setIsStandalone(standalone);
+
+      // If opened as installed PWA at root URL, redirect to /home
+      if (standalone && window.location.pathname === "/") {
+        window.location.replace("/home");
+      }
     };
     checkStandalone();
 

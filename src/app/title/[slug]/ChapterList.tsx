@@ -828,6 +828,8 @@ export const ChapterList = React.memo(function ChapterList({
         seriesTitle={seriesTitle || slug}
         seriesCoverUrl={seriesCoverUrl}
         chapters={chaptersQ.data || []}
+        scanlationGroups={scanlationGroups.data || []}
+        readChapterIds={readChapters.data}
       />
     </section>
   );

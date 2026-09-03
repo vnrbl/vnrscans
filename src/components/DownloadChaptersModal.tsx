@@ -13,6 +13,13 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Download,
   CheckCircle2,
   Loader2,
@@ -22,6 +29,8 @@ import {
   XCircle,
   HardDrive,
   Layers,
+  ArrowUpDown,
+  Filter,
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -37,6 +46,8 @@ export interface ChapterItem {
   slug: string;
   title?: string | null;
   created_at?: string;
+  uploaded_by?: string | null;
+  scanlation_group?: string | null;
 }
 
 interface DownloadChaptersModalProps {
@@ -47,6 +58,8 @@ interface DownloadChaptersModalProps {
   seriesTitle: string;
   seriesCoverUrl?: string | null;
   chapters: ChapterItem[];
+  scanlationGroups?: string[];
+  readChapterIds?: Set<string> | Set<any>;
 }
 
 type SelectionMode = "all" | "range" | "custom" | "next10";
@@ -59,12 +72,9 @@ export function DownloadChaptersModal({
   seriesTitle,
   seriesCoverUrl,
   chapters,
+  scanlationGroups = [],
+  readChapterIds,
 }: DownloadChaptersModalProps) {
-  // Sort chapters ascending for logical range selection
-  const sortedChapters = useMemo(() => {
-    return [...chapters].sort((a, b) => a.chapter_number - b.chapter_number);
-  }, [chapters]);
-
   // Track already downloaded chapter IDs
   const [downloadedSet, setDownloadedSet] = useState<Set<string>>(new Set());
 
@@ -84,26 +94,90 @@ export function DownloadChaptersModal({
     return () => window.removeEventListener("vnr-offline-change", refreshDownloaded);
   }, []);
 
-  // Selection states
+  // Filter States (Same as Chapter Table)
+  const [selectedGroup, setSelectedGroup] = useState<string>("all");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+  const [readFilter, setReadFilter] = useState<"all" | "unread" | "read">("all");
+  const [searchQuery, setSearchQuery] = useState<string>("");
+
+  // Mode & Selection
   const [mode, setMode] = useState<SelectionMode>("all");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [searchQuery, setSearchQuery] = useState("");
+
+  // Filtered Chapters matching the table filters
+  const filteredChapters = useMemo(() => {
+    let list = [...chapters];
+
+    // 1. Scanlation Group
+    if (selectedGroup !== "all") {
+      list = list.filter((c) => c.scanlation_group === selectedGroup);
+    }
+
+    // 2. Read / Unread Status
+    if (readFilter === "unread" && readChapterIds) {
+      list = list.filter((c) => !readChapterIds.has(c.id));
+    } else if (readFilter === "read" && readChapterIds) {
+      list = list.filter((c) => readChapterIds.has(c.id));
+    }
+
+    // 3. Search Query (Number, Title, Group, or Uploader)
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      list = list.filter((c) => {
+        const numStr = c.chapter_number.toString();
+        const titleStr = (c.title || "").toLowerCase();
+        const groupStr = (c.scanlation_group || "").toLowerCase();
+        const uploaderStr = (c.uploaded_by || "").toLowerCase();
+        return (
+          numStr.includes(q) ||
+          titleStr.includes(q) ||
+          groupStr.includes(q) ||
+          uploaderStr.includes(q)
+        );
+      });
+    }
+
+    // 4. Sort Order
+    list.sort((a, b) => {
+      return sortOrder === "desc"
+        ? b.chapter_number - a.chapter_number
+        : a.chapter_number - b.chapter_number;
+    });
+
+    return list;
+  }, [chapters, selectedGroup, readFilter, searchQuery, sortOrder, readChapterIds]);
 
   // Range inputs
-  const minCh = sortedChapters[0]?.chapter_number ?? 1;
-  const maxCh = sortedChapters[sortedChapters.length - 1]?.chapter_number ?? 1;
+  const minCh = useMemo(() => {
+    if (chapters.length === 0) return 1;
+    return Math.min(...chapters.map((c) => c.chapter_number));
+  }, [chapters]);
+
+  const maxCh = useMemo(() => {
+    if (chapters.length === 0) return 1;
+    return Math.max(...chapters.map((c) => c.chapter_number));
+  }, [chapters]);
+
   const [rangeStart, setRangeStart] = useState<string>(String(minCh));
   const [rangeEnd, setRangeEnd] = useState<string>(String(maxCh));
 
-  // Update selection when mode changes
+  // Sync range bounds when chapters load
+  useEffect(() => {
+    if (chapters.length > 0) {
+      setRangeStart(String(minCh));
+      setRangeEnd(String(maxCh));
+    }
+  }, [chapters, minCh, maxCh]);
+
+  // Update selection when mode or filtered list changes
   useEffect(() => {
     if (mode === "all") {
-      const allUndownloaded = sortedChapters
+      const allUndownloaded = filteredChapters
         .filter((c) => !downloadedSet.has(c.id))
         .map((c) => c.id);
       setSelectedIds(new Set(allUndownloaded));
     } else if (mode === "next10") {
-      const next10 = sortedChapters
+      const next10 = filteredChapters
         .filter((c) => !downloadedSet.has(c.id))
         .slice(0, 10)
         .map((c) => c.id);
@@ -111,7 +185,7 @@ export function DownloadChaptersModal({
     } else if (mode === "range") {
       const start = parseFloat(rangeStart) || minCh;
       const end = parseFloat(rangeEnd) || maxCh;
-      const inRange = sortedChapters
+      const inRange = filteredChapters
         .filter(
           (c) =>
             c.chapter_number >= Math.min(start, end) &&
@@ -121,7 +195,7 @@ export function DownloadChaptersModal({
         .map((c) => c.id);
       setSelectedIds(new Set(inRange));
     }
-  }, [mode, rangeStart, rangeEnd, sortedChapters, downloadedSet, minCh, maxCh]);
+  }, [mode, rangeStart, rangeEnd, filteredChapters, downloadedSet, minCh, maxCh]);
 
   // Active Download State
   const [isDownloading, setIsDownloading] = useState(false);
@@ -130,17 +204,6 @@ export function DownloadChaptersModal({
   const [currentChapterProgress, setCurrentChapterProgress] = useState(0);
   const [currentChapterTitle, setCurrentChapterTitle] = useState("");
   const abortControllerRef = useRef<AbortController | null>(null);
-
-  // Filtered chapters for manual selection search
-  const visibleChapters = useMemo(() => {
-    if (!searchQuery.trim()) return sortedChapters;
-    const q = searchQuery.toLowerCase();
-    return sortedChapters.filter(
-      (c) =>
-        c.chapter_number.toString().includes(q) ||
-        (c.title && c.title.toLowerCase().includes(q))
-    );
-  }, [sortedChapters, searchQuery]);
 
   const toggleChapter = (id: string) => {
     setSelectedIds((prev) => {
@@ -157,7 +220,7 @@ export function DownloadChaptersModal({
   const selectAllVisible = () => {
     setSelectedIds((prev) => {
       const next = new Set(prev);
-      visibleChapters.forEach((c) => {
+      filteredChapters.forEach((c) => {
         if (!downloadedSet.has(c.id)) next.add(c.id);
       });
       return next;
@@ -175,7 +238,10 @@ export function DownloadChaptersModal({
       return;
     }
 
-    const queue = sortedChapters.filter((c) => selectedIds.has(c.id));
+    const queue = chapters
+      .filter((c) => selectedIds.has(c.id))
+      .sort((a, b) => a.chapter_number - b.chapter_number);
+
     if (queue.length === 0) {
       toast.info("Please select at least one chapter to download.");
       return;
@@ -200,7 +266,6 @@ export function DownloadChaptersModal({
       setCurrentChapterProgress(0);
 
       try {
-        // 1. Fetch chapter pages
         const { data: pages, error } = await supabase
           .from("chapter_pages")
           .select("id, page_number, image_url")
@@ -210,7 +275,7 @@ export function DownloadChaptersModal({
         if (error) throw error;
         if (!pages || pages.length === 0) continue;
 
-        // 2. High-speed 6x concurrent download into Cache API
+        // 6x Parallel Download Pool
         await saveChapterOffline(
           {
             id: chapter.id,
@@ -236,7 +301,7 @@ export function DownloadChaptersModal({
         refreshDownloaded();
       } catch (err: any) {
         if (err?.name === "AbortError" || controller.signal.aborted) {
-          toast.info("Download paused/cancelled.");
+          toast.info("Download cancelled.");
           break;
         }
         console.error(`Failed to download chapter ${chapter.chapter_number}:`, err);
@@ -248,7 +313,7 @@ export function DownloadChaptersModal({
 
     if (successfulCount > 0) {
       toast.success(`⚡ Download Complete!`, {
-        description: `Successfully saved ${successfulCount} chapters offline. Ready to read anytime!`,
+        description: `Successfully saved ${successfulCount} chapters offline. Ready to read!`,
       });
       refreshDownloaded();
     }
@@ -261,7 +326,6 @@ export function DownloadChaptersModal({
     setIsDownloading(false);
   };
 
-  // Estimated size (~2.5 MB per chapter average)
   const estimatedSizeMb = (selectedIds.size * 2.6).toFixed(0);
 
   return (
@@ -278,16 +342,16 @@ export function DownloadChaptersModal({
         }
       }}
     >
-      <DialogContent className="max-w-2xl bg-zinc-950 border border-border/60 p-0 overflow-hidden shadow-2xl rounded-2xl">
+      <DialogContent className="max-w-3xl bg-zinc-950 border border-border/60 p-0 overflow-hidden shadow-2xl rounded-2xl">
         <DialogTitle className="sr-only">Download Chapters Offline</DialogTitle>
         <DialogDescription className="sr-only">
-          Select chapters to download for offline reading
+          Select chapters with filters matching the chapter table to download for offline reading
         </DialogDescription>
 
         {/* Modal Header */}
-        <div className="p-5 border-b border-border/40 bg-zinc-900/50 flex items-center justify-between">
+        <div className="p-4 sm:p-5 border-b border-border/40 bg-zinc-900/60 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+            <div className="h-10 w-10 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0">
               <Download className="h-5 w-5" />
             </div>
             <div>
@@ -299,7 +363,7 @@ export function DownloadChaptersModal({
                 </span>
               </h2>
               <p className="text-xs text-muted-foreground line-clamp-1">
-                {seriesTitle} • {sortedChapters.length} Total Chapters
+                {seriesTitle} • {chapters.length} Total Chapters ({downloadedSet.size} Saved)
               </p>
             </div>
           </div>
@@ -308,7 +372,7 @@ export function DownloadChaptersModal({
         {/* Content Body */}
         {isDownloading ? (
           /* Active Downloading Dashboard */
-          <div className="p-6 flex flex-col items-center justify-center gap-5 min-h-[320px]">
+          <div className="p-6 flex flex-col items-center justify-center gap-5 min-h-[340px]">
             <div className="relative">
               <div className="h-20 w-20 rounded-full bg-emerald-950/40 border border-emerald-500/40 flex items-center justify-center animate-pulse">
                 <Download className="h-9 w-9 text-emerald-400 animate-bounce" />
@@ -320,7 +384,7 @@ export function DownloadChaptersModal({
                 Downloading {currentChapterTitle}...
               </h3>
               <p className="text-xs text-muted-foreground">
-                Chapter {currentChapterIndex + 1} of {totalToDownload} • 6x Multi-Threaded Engine
+                Chapter {currentChapterIndex + 1} of {totalToDownload} • 6x Multi-Threaded Stream
               </p>
             </div>
 
@@ -337,7 +401,7 @@ export function DownloadChaptersModal({
               <div>
                 <div className="flex justify-between text-xs font-mono text-muted-foreground mb-1">
                   <span>Total Batch Progress</span>
-                  <span>
+                  <span className="font-bold">
                     {Math.round(((currentChapterIndex + (currentChapterProgress / 100)) / totalToDownload) * 100)}%
                   </span>
                 </div>
@@ -359,14 +423,14 @@ export function DownloadChaptersModal({
             </Button>
           </div>
         ) : (
-          /* Chapter Selection Controls */
-          <div className="p-5 space-y-4">
+          /* Selection & Table-matching Filters */
+          <div className="p-4 sm:p-5 space-y-4">
             {/* Quick Selection Modes */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               <button
                 type="button"
                 onClick={() => setMode("all")}
-                className={`flex flex-col items-start p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                className={`flex flex-col items-start p-2.5 sm:p-3 rounded-xl border text-left transition-all cursor-pointer ${
                   mode === "all"
                     ? "border-emerald-500/60 bg-emerald-950/30 text-emerald-300 ring-1 ring-emerald-500/30"
                     : "border-border/40 bg-card/60 hover:bg-card text-muted-foreground hover:text-foreground"
@@ -374,17 +438,17 @@ export function DownloadChaptersModal({
               >
                 <div className="flex items-center gap-1.5 text-xs font-bold">
                   <Layers className="h-3.5 w-3.5" />
-                  All Chapters
+                  All Filtered
                 </div>
                 <span className="text-[11px] text-muted-foreground mt-0.5">
-                  {sortedChapters.filter((c) => !downloadedSet.has(c.id)).length} new
+                  {filteredChapters.filter((c) => !downloadedSet.has(c.id)).length} chapters
                 </span>
               </button>
 
               <button
                 type="button"
                 onClick={() => setMode("next10")}
-                className={`flex flex-col items-start p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                className={`flex flex-col items-start p-2.5 sm:p-3 rounded-xl border text-left transition-all cursor-pointer ${
                   mode === "next10"
                     ? "border-emerald-500/60 bg-emerald-950/30 text-emerald-300 ring-1 ring-emerald-500/30"
                     : "border-border/40 bg-card/60 hover:bg-card text-muted-foreground hover:text-foreground"
@@ -394,13 +458,13 @@ export function DownloadChaptersModal({
                   <Sparkles className="h-3.5 w-3.5" />
                   Next 10
                 </div>
-                <span className="text-[11px] text-muted-foreground mt-0.5">Quick batch</span>
+                <span className="text-[11px] text-muted-foreground mt-0.5">Quick 10 batch</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => setMode("range")}
-                className={`flex flex-col items-start p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                className={`flex flex-col items-start p-2.5 sm:p-3 rounded-xl border text-left transition-all cursor-pointer ${
                   mode === "range"
                     ? "border-emerald-500/60 bg-emerald-950/30 text-emerald-300 ring-1 ring-emerald-500/30"
                     : "border-border/40 bg-card/60 hover:bg-card text-muted-foreground hover:text-foreground"
@@ -410,13 +474,13 @@ export function DownloadChaptersModal({
                   <span>1 → 50</span>
                   Range
                 </div>
-                <span className="text-[11px] text-muted-foreground mt-0.5">Specify range</span>
+                <span className="text-[11px] text-muted-foreground mt-0.5">From Ch to Ch</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => setMode("custom")}
-                className={`flex flex-col items-start p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                className={`flex flex-col items-start p-2.5 sm:p-3 rounded-xl border text-left transition-all cursor-pointer ${
                   mode === "custom"
                     ? "border-emerald-500/60 bg-emerald-950/30 text-emerald-300 ring-1 ring-emerald-500/30"
                     : "border-border/40 bg-card/60 hover:bg-card text-muted-foreground hover:text-foreground"
@@ -424,17 +488,17 @@ export function DownloadChaptersModal({
               >
                 <div className="flex items-center gap-1.5 text-xs font-bold">
                   <CheckCircle2 className="h-3.5 w-3.5" />
-                  Custom Pick
+                  Manual Pick
                 </div>
                 <span className="text-[11px] text-muted-foreground mt-0.5">Checkbox pick</span>
               </button>
             </div>
 
-            {/* Range Mode Controls */}
+            {/* Range Controls */}
             {mode === "range" && (
-              <div className="flex items-center gap-3 p-3.5 rounded-xl border border-border/40 bg-zinc-900/50">
+              <div className="flex items-center gap-2 sm:gap-3 p-3 rounded-xl border border-border/40 bg-zinc-900/50">
                 <span className="text-xs font-semibold text-muted-foreground shrink-0">
-                  From Chapter:
+                  From:
                 </span>
                 <Input
                   type="number"
@@ -443,7 +507,7 @@ export function DownloadChaptersModal({
                   className="h-8 w-20 text-xs text-center font-mono bg-zinc-800"
                 />
                 <span className="text-xs font-semibold text-muted-foreground shrink-0">
-                  To Chapter:
+                  To:
                 </span>
                 <Input
                   type="number"
@@ -452,54 +516,113 @@ export function DownloadChaptersModal({
                   className="h-8 w-20 text-xs text-center font-mono bg-zinc-800"
                 />
                 <span className="text-xs text-emerald-400 font-mono ml-auto">
-                  {selectedIds.size} chapters matched
+                  {selectedIds.size} matched
                 </span>
               </div>
             )}
 
-            {/* Search and Bulk Toggle Bar */}
-            <div className="flex items-center justify-between gap-2">
-              <div className="relative flex-1">
-                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-                <Input
-                  type="text"
-                  placeholder="Filter chapters (e.g. 15 or title)..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="h-8 pl-8 text-xs bg-zinc-900 border-border/40"
-                />
+            {/* 🔍 FILTER TOOLBAR (Exact same filters as Chapter Table) */}
+            <div className="p-3 rounded-xl border border-border/40 bg-zinc-900/40 space-y-2.5">
+              <div className="flex items-center gap-1.5 text-xs font-semibold text-neutral-300">
+                <Filter className="h-3.5 w-3.5 text-emerald-400" />
+                <span>Chapter Table Filters</span>
               </div>
 
-              <div className="flex items-center gap-1 shrink-0">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                {/* 1. Group Selector (Same as table) */}
+                {scanlationGroups && scanlationGroups.length > 0 ? (
+                  <Select value={selectedGroup} onValueChange={setSelectedGroup}>
+                    <SelectTrigger className="h-8 text-xs bg-zinc-800/80 border-border/40">
+                      <SelectValue placeholder="All Groups" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Groups</SelectItem>
+                      {scanlationGroups.map((g) => (
+                        <SelectItem key={g} value={g}>
+                          {g}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <div className="text-xs text-muted-foreground flex items-center px-2">
+                    All Scanlation Groups
+                  </div>
+                )}
+
+                {/* 2. Read / Unread Filter */}
+                <Select value={readFilter} onValueChange={(val: any) => setReadFilter(val)}>
+                  <SelectTrigger className="h-8 text-xs bg-zinc-800/80 border-border/40">
+                    <SelectValue placeholder="All Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Chapters</SelectItem>
+                    <SelectItem value="unread">Unread Only</SelectItem>
+                    <SelectItem value="read">Already Read</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                {/* 3. Sort Order Toggle (Same as table) */}
                 <Button
-                  variant="ghost"
+                  variant="outline"
                   size="sm"
-                  onClick={selectAllVisible}
-                  className="h-8 text-xs cursor-pointer text-muted-foreground hover:text-foreground"
+                  onClick={() => setSortOrder((prev) => (prev === "desc" ? "asc" : "desc"))}
+                  className="h-8 gap-1.5 text-xs bg-zinc-800/80 border-border/40 cursor-pointer justify-start"
                 >
-                  Select All
+                  <ArrowUpDown className="h-3.5 w-3.5 shrink-0 text-neutral-400" />
+                  <span>{sortOrder === "desc" ? "Newest First" : "Oldest First"}</span>
                 </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={deselectAll}
-                  className="h-8 text-xs cursor-pointer text-muted-foreground hover:text-foreground"
-                >
-                  Clear
-                </Button>
+              </div>
+
+              {/* 4. Full Search (Same placeholder as table) */}
+              <div className="relative">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-neutral-400" />
+                <Input
+                  type="text"
+                  placeholder="Search chapters by number, title, uploader, or group..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="h-8 pl-8 text-xs bg-zinc-800/80 border-border/40"
+                />
               </div>
             </div>
 
-            {/* Scrollable Chapter Checkbox Grid */}
+            {/* Quick Bulk Actions */}
+            <div className="flex items-center justify-between text-xs text-muted-foreground px-1">
+              <span>
+                Showing <strong className="text-foreground">{filteredChapters.length}</strong>{" "}
+                chapters
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={selectAllVisible}
+                  className="text-xs text-emerald-400 hover:underline cursor-pointer font-medium"
+                >
+                  Select All Filtered
+                </button>
+                <span>•</span>
+                <button
+                  type="button"
+                  onClick={deselectAll}
+                  className="text-xs hover:text-foreground cursor-pointer"
+                >
+                  Clear Selection
+                </button>
+              </div>
+            </div>
+
+            {/* Scrollable Chapter List */}
             <div className="max-h-60 overflow-y-auto rounded-xl border border-border/40 divide-y divide-border/20 bg-zinc-900/30 p-1">
-              {visibleChapters.length === 0 ? (
-                <div className="p-6 text-center text-xs text-muted-foreground">
-                  No chapters found matching &quot;{searchQuery}&quot;
+              {filteredChapters.length === 0 ? (
+                <div className="p-8 text-center text-xs text-muted-foreground">
+                  No chapters match the current filters.
                 </div>
               ) : (
-                visibleChapters.map((c) => {
+                filteredChapters.map((c) => {
                   const isSaved = downloadedSet.has(c.id);
                   const isSelected = selectedIds.has(c.id);
+                  const isRead = readChapterIds?.has(c.id) ?? false;
 
                   return (
                     <div
@@ -507,34 +630,51 @@ export function DownloadChaptersModal({
                       onClick={() => !isSaved && toggleChapter(c.id)}
                       className={`flex items-center justify-between px-3 py-2 text-xs rounded-lg transition-colors cursor-pointer ${
                         isSaved
-                          ? "opacity-60 bg-zinc-900/50 cursor-default"
+                          ? "opacity-60 bg-zinc-900/40 cursor-default"
                           : isSelected
                           ? "bg-emerald-950/20 text-emerald-300"
                           : "hover:bg-zinc-800/40 text-foreground"
                       }`}
                     >
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-3 min-w-0">
                         <Checkbox
                           checked={isSelected || isSaved}
                           disabled={isSaved}
                           onCheckedChange={() => !isSaved && toggleChapter(c.id)}
                           className={isSaved ? "data-[state=checked]:bg-emerald-500/50" : ""}
                         />
-                        <div className="flex items-center gap-2">
-                          <span className="font-semibold">Chapter {c.chapter_number}</span>
-                          {c.title && (
-                            <span className="text-muted-foreground line-clamp-1 max-w-[200px] sm:max-w-[280px]">
-                              {c.title}
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span
+                              className="font-semibold"
+                              style={isRead ? { color: "#c084fc" } : undefined}
+                            >
+                              Chapter {c.chapter_number}
                             </span>
+                            {c.scanlation_group && (
+                              <span className="text-[10px] px-1.5 py-0.2 rounded bg-secondary text-muted-foreground">
+                                {c.scanlation_group}
+                              </span>
+                            )}
+                            {c.uploaded_by && (
+                              <span className="text-[10px] text-muted-foreground hidden sm:inline">
+                                by {c.uploaded_by}
+                              </span>
+                            )}
+                          </div>
+                          {c.title && (
+                            <p className="text-[11px] text-muted-foreground truncate max-w-[240px] sm:max-w-md">
+                              {c.title}
+                            </p>
                           )}
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 shrink-0 ml-2">
                         {isSaved ? (
                           <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-400">
                             <CheckCircle2 className="h-3.5 w-3.5" />
-                            Downloaded
+                            Saved
                           </span>
                         ) : (
                           <span className="text-[11px] text-muted-foreground font-mono">
@@ -548,11 +688,11 @@ export function DownloadChaptersModal({
               )}
             </div>
 
-            {/* Bottom Summary & Download Action Bar */}
+            {/* Bottom Bar */}
             <div className="pt-2 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-t border-border/40">
               <div className="flex items-center gap-3 text-xs text-muted-foreground">
                 <div className="flex items-center gap-1.5">
-                  <HardDrive className="h-4 w-4 text-emerald-400" />
+                  <HardDrive className="h-4 w-4 text-emerald-400 shrink-0" />
                   <span>
                     <strong className="text-foreground font-mono">{selectedIds.size}</strong>{" "}
                     Chapters Selected
