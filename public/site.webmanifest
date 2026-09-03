@@ -1,7 +1,21 @@
 {
-  "name": "vnrscans",
+  "id": "com.vnrscans.app",
+  "name": "vnrscans — Manga, Manhwa & Light Novels",
   "short_name": "vnrscans",
+  "description": "Read high quality manga, manhwa, manhua, and light novels online for free on vnrscans.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "theme_color": "#0c0d12",
+  "background_color": "#0c0d12",
   "icons": [
+    {
+      "src": "/web-app-manifest-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
     {
       "src": "/web-app-manifest-192x192.png",
       "sizes": "192x192",
@@ -12,10 +26,14 @@
       "src": "/web-app-manifest-512x512.png",
       "sizes": "512x512",
       "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/web-app-manifest-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
       "purpose": "maskable"
     }
   ],
-  "theme_color": "#ffffff",
-  "background_color": "#18181c",
-  "display": "standalone"
+  "categories": ["books", "entertainment"]
 }

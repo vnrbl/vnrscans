@@ -27,6 +27,8 @@ import { NavigationProgress } from "@/components/NavigationProgress";
 
 import { ProcessingTaskProvider } from "@/contexts/ProcessingTaskContext";
 import { LiveFpsHud } from "@/components/LiveFpsHud";
+import { CommandSearchModal } from "@/components/CommandSearchModal";
+import { PwaInstallPrompt } from "@/components/PwaInstallPrompt";
 
 export function Providers({ children }: { children: ReactNode }) {
   const [queryClient] = useState(
@@ -101,6 +103,8 @@ function AppShell({ children }: { children: ReactNode }) {
         <Toaster />
         <Analytics />
         <LiveFpsHud />
+        <CommandSearchModal />
+        <PwaInstallPrompt />
       </>
     );
   }
@@ -117,6 +121,8 @@ function AppShell({ children }: { children: ReactNode }) {
       <Toaster />
       <Analytics />
       <LiveFpsHud />
+      <CommandSearchModal />
+      <PwaInstallPrompt />
     </div>
   );
 }

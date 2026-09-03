@@ -29,6 +29,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useDragScroll, DRAG_SCROLL_CONTAINER_CLASS } from "@/hooks/useDragScroll";
 import { TITLE_CARD_WIDTH, TITLE_COVER_CLASS } from "@/components/titleCardStyles";
 import Link from "next/link";
+import { ReleaseScheduleCard } from "@/components/ReleaseScheduleCard";
 
 function SideWidgets({
   seriesId,
@@ -369,13 +370,20 @@ export default function TitleDetailPageContent({
 
         {/* Main layout grid: Chapters on Left, New Side Panel on Right */}
         <div className="mt-10 grid gap-8 xl:grid-cols-[1fr_340px]">
-          {/* Chapter list — owns ALL chapter interaction state */}
-          <ChapterList
-            slug={slug}
-            seriesId={s.id}
-            seriesStatus={s.status}
-            initialChaptersData={initialChaptersData}
-          />
+          {/* Chapter list & Release Schedule */}
+          <div className="space-y-6">
+            <ReleaseScheduleCard
+              chapters={initialChaptersData || []}
+              status={s.status}
+              seriesTitle={s.title}
+            />
+            <ChapterList
+              slug={slug}
+              seriesId={s.id}
+              seriesStatus={s.status}
+              initialChaptersData={initialChaptersData}
+            />
+          </div>
 
           {/* New Side Panel containing 3 features */}
           <TitleSidePanel

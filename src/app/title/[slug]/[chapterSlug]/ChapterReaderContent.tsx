@@ -40,6 +40,11 @@ import {
   X,
   Sparkles,
   Flame,
+  Download,
+  CheckCircle2,
+  Loader2,
+  SunMoon,
+  Search,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { renderCommentMarkdown, COMMENT_TEXT_COLORS } from "@/lib/bbcode";
@@ -48,6 +53,8 @@ import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { LiveWebGifPicker } from "@/components/comments/LiveWebGifPicker";
 import { saveChapterReadingPosition, getChapterReadingPosition } from "@/lib/reading-position";
+import { useReaderSettings } from "@/contexts/ReaderSettingsContext";
+import { isChapterSavedOffline, saveChapterOffline } from "@/lib/offlineStorage";
 import {
   Select,
   SelectContent,
@@ -132,6 +139,34 @@ export default function Reader({
   const [autoScrollSpeed, setAutoScrollSpeed] = useState(2);
   const lastScrollYRef = useRef(0);
   const autoScrollIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Eye-comfort filter sync
+  const { settings, updateSettings } = useReaderSettings();
+  const currentFilter = settings.readingFilter || "normal";
+
+  useEffect(() => {
+    const root = document.documentElement;
+    root.classList.remove("reader-filter-oled", "reader-filter-warm", "reader-filter-dim");
+    if (currentFilter !== "normal") {
+      root.classList.add(`reader-filter-${currentFilter}`);
+    }
+    return () => {
+      root.classList.remove("reader-filter-oled", "reader-filter-warm", "reader-filter-dim");
+    };
+  }, [currentFilter]);
+
+  const cycleFilter = () => {
+    const filters: Array<"normal" | "warm" | "oled" | "dim"> = ["normal", "warm", "oled", "dim"];
+    const nextIdx = (filters.indexOf(currentFilter) + 1) % filters.length;
+    const nextFilter = filters[nextIdx];
+    updateSettings({ readingFilter: nextFilter });
+    toast.info(`Eye Comfort: ${nextFilter.toUpperCase()}`, { duration: 1500 });
+  };
+
+  // Offline chapter download state
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [downloadProgress, setDownloadProgress] = useState(0);
+  const [isDownloaded, setIsDownloaded] = useState(false);
 
   const chapterQ = useQuery({
     queryKey: ["chapter", titleSlug, chapterSlug],
@@ -236,6 +271,34 @@ export default function Reader({
     staleTime: 1000 * 60 * 5,
     gcTime: 1000 * 60 * 20,
   });
+
+  useEffect(() => {
+    if (chapterQ.data?.id) {
+      setIsDownloaded(isChapterSavedOffline(chapterQ.data.id));
+    }
+  }, [chapterQ.data?.id]);
+
+  const handleDownload = async () => {
+    if (!chapterQ.data || !pagesQ.data || pagesQ.data.length === 0) {
+      toast.error("Chapter pages still loading. Please wait.");
+      return;
+    }
+    setIsDownloading(true);
+    setDownloadProgress(0);
+    try {
+      await saveChapterOffline(chapterQ.data, pagesQ.data, (percent) => {
+        setDownloadProgress(percent);
+      });
+      setIsDownloaded(true);
+      toast.success("💾 Chapter Saved Offline!", {
+        description: `All ${pagesQ.data.length} pages are ready for reading without internet.`,
+      });
+    } catch (err: any) {
+      toast.error("Failed to save chapter offline", { description: err?.message });
+    } finally {
+      setIsDownloading(false);
+    }
+  };
 
   // Top-level Scroll Management on Chapter Change:
   // - New/Unvisited chapters: start cleanly from top (0)
@@ -477,6 +540,18 @@ export default function Reader({
                     .eq("chapter_id", data.id)
                     .order("page_number");
                   if (pageError) throw pageError;
+
+                  // 🚀 Zero-Wait Smart Image Preloader:
+                  // Preload top 4 images into browser image cache so next chapter paints in 0ms!
+                  if (pageData && typeof window !== "undefined") {
+                    pageData.slice(0, 4).forEach((p) => {
+                      if (p.image_url) {
+                        const img = new window.Image();
+                        img.src = p.image_url;
+                      }
+                    });
+                  }
+
                   return pageData ?? [];
                 },
               });
@@ -723,6 +798,12 @@ export default function Reader({
           currentChapterSlug={chapterSlug}
           alternateGroups={alternateGroupsQ.data ?? []}
           currentGroup={activeScanlationGroup}
+          currentFilter={currentFilter}
+          onCycleFilter={cycleFilter}
+          isDownloading={isDownloading}
+          downloadProgress={downloadProgress}
+          isDownloaded={isDownloaded}
+          onDownload={handleDownload}
         />
       </div>
 
@@ -968,6 +1049,12 @@ function ReaderTopBar({
   currentChapterSlug,
   alternateGroups,
   currentGroup,
+  currentFilter,
+  onCycleFilter,
+  isDownloading,
+  downloadProgress,
+  isDownloaded,
+  onDownload,
 }: {
   title: string;
   seriesTitle: string;
@@ -982,21 +1069,27 @@ function ReaderTopBar({
     chapter_number: number;
   }>;
   currentGroup: string | null;
+  currentFilter?: string;
+  onCycleFilter?: () => void;
+  isDownloading?: boolean;
+  downloadProgress?: number;
+  isDownloaded?: boolean;
+  onDownload?: () => void;
 }) {
   const navigate = useNavigate();
   const showGroupSwitcher = alternateGroups.length > 1;
 
   return (
     <header className="sticky top-0 z-30 w-full border-b border-border/50 bg-background/95 backdrop-blur-md">
-      <div className="w-full max-w-7xl mx-auto flex items-center justify-between gap-2 px-3 sm:px-6 py-2 sm:py-3">
+      <div className="w-full max-w-7xl mx-auto flex items-center justify-between gap-1.5 sm:gap-2 px-2.5 sm:px-6 py-2 sm:py-2.5">
         <Link
           to="/title/$slug"
           params={{ slug: seriesSlug }}
-          className="flex min-w-0 items-center gap-2 text-sm hover:opacity-85 transition-opacity"
+          className="flex min-w-0 items-center gap-2 text-sm hover:opacity-85 transition-opacity shrink-0"
         >
           <ArrowLeft className="h-4 w-4 shrink-0 text-muted-foreground" />
           <div className="min-w-0">
-            <div className="truncate font-semibold text-xs sm:text-sm text-foreground max-w-[130px] min-[360px]:max-w-[170px] sm:max-w-md">
+            <div className="truncate font-semibold text-xs sm:text-sm text-foreground max-w-[105px] min-[360px]:max-w-[140px] sm:max-w-xs">
               {seriesTitle}
             </div>
             <div className="truncate text-[11px] text-muted-foreground">{title}</div>
@@ -1006,7 +1099,62 @@ function ReaderTopBar({
             </h1>
           </div>
         </Link>
-        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+        <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+          {/* Quick Search Shortcut */}
+          <button
+            type="button"
+            onClick={() => window.dispatchEvent(new Event("open-global-search"))}
+            title="Search (Ctrl+K)"
+            className="h-8 sm:h-9 w-8 sm:w-9 grid place-items-center rounded-lg border border-border/50 bg-background/50 hover:bg-secondary/60 text-muted-foreground hover:text-foreground transition-colors cursor-pointer shrink-0"
+          >
+            <Search className="h-3.5 w-3.5" />
+          </button>
+
+          {/* Eye Comfort Filter Toggle */}
+          {onCycleFilter && (
+            <button
+              type="button"
+              onClick={onCycleFilter}
+              title={`Eye Comfort Filter: ${currentFilter?.toUpperCase()}`}
+              className="flex items-center gap-1 text-xs h-8 sm:h-9 px-2 sm:px-2.5 rounded-lg border border-border/50 bg-background/50 hover:bg-secondary/60 text-muted-foreground hover:text-foreground transition-colors cursor-pointer shrink-0"
+            >
+              <SunMoon className="h-3.5 w-3.5 text-amber-400 shrink-0" />
+              <span className="hidden min-[500px]:inline capitalize text-[11px] font-medium">{currentFilter}</span>
+            </button>
+          )}
+
+          {/* Offline Download Button */}
+          {!isNovel && onDownload && (
+            <button
+              type="button"
+              onClick={onDownload}
+              disabled={isDownloading || isDownloaded}
+              title={isDownloaded ? "Saved Offline" : "Save Chapter Offline"}
+              className={`flex items-center gap-1 text-xs h-8 sm:h-9 px-2 sm:px-2.5 rounded-lg border transition-colors cursor-pointer shrink-0 ${
+                isDownloaded
+                  ? "border-emerald-500/50 bg-emerald-950/30 text-emerald-400"
+                  : "border-border/50 bg-background/50 hover:bg-secondary/60 text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {isDownloading ? (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 animate-spin text-primary shrink-0" />
+                  <span className="text-[11px] font-mono">{downloadProgress}%</span>
+                </>
+              ) : isDownloaded ? (
+                <>
+                  <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
+                  <span className="hidden min-[560px]:inline text-[11px] font-medium">Offline</span>
+                </>
+              ) : (
+                <>
+                  <Download className="h-3.5 w-3.5 shrink-0" />
+                  <span className="hidden min-[560px]:inline text-[11px] font-medium">Save</span>
+                </>
+              )}
+            </button>
+          )}
+
           {showGroupSwitcher && (
             <Select
               value={currentChapterSlug}
@@ -1017,8 +1165,8 @@ function ReaderTopBar({
                 })
               }
             >
-              <SelectTrigger className="w-[100px] sm:w-[150px] text-xs h-8 sm:h-9">
-                <SelectValue placeholder="Scan group" />
+              <SelectTrigger className="w-[85px] sm:w-[130px] text-xs h-8 sm:h-9">
+                <SelectValue placeholder="Group" />
               </SelectTrigger>
               <SelectContent>
                 {alternateGroups.map((ch) => (
@@ -1042,9 +1190,9 @@ function ReaderTopBar({
                 })
               }
             >
-              <SelectTrigger className="w-[115px] min-[360px]:w-[135px] sm:w-[175px] text-xs h-8 sm:h-9 px-2 sm:px-3">
+              <SelectTrigger className="w-[110px] min-[360px]:w-[125px] sm:w-[165px] text-xs h-8 sm:h-9 px-2 sm:px-2.5">
                 <List className="mr-1.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                <SelectValue placeholder="Select Chapter" />
+                <SelectValue placeholder="Chapter" />
               </SelectTrigger>
               <SelectContent className="max-h-72">
                 {allChapters.map((ch) => (

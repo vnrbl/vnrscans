@@ -5,14 +5,34 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { SeriesGrid } from "@/components/SeriesGrid";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Heart, BookOpen, CheckCircle2, Clock, XCircle } from "lucide-react";
+import { Heart, BookOpen, CheckCircle2, Clock, XCircle, Download, Trash2, HardDrive } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
+import Link from "next/link";
+import { getOfflineChapters, deleteOfflineChapter, type OfflineChapterMetadata } from "@/lib/offlineStorage";
 
 export default function LibraryPage() {
   const { user } = useAuth();
   const qc = useQueryClient();
   const [activeTab, setActiveTab] = useState("favorites");
+  const [offlineChapters, setOfflineChapters] = useState<OfflineChapterMetadata[]>([]);
+
+  useEffect(() => {
+    const loadOffline = () => {
+      setOfflineChapters(getOfflineChapters());
+    };
+    loadOffline();
+    window.addEventListener("vnr-offline-change", loadOffline);
+    return () => window.removeEventListener("vnr-offline-change", loadOffline);
+  }, []);
+
+  const handleDeleteOffline = async (e: React.MouseEvent, chapterId: string) => {
+    e.stopPropagation();
+    e.preventDefault();
+    await deleteOfflineChapter(chapterId);
+    setOfflineChapters(getOfflineChapters());
+    toast.success("Chapter removed from offline storage.");
+  };
 
   // Sync local favorites from guest mode if user just logged in
   useEffect(() => {
@@ -116,7 +136,7 @@ export default function LibraryPage() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-6">
-        <TabsList className="grid w-full max-w-3xl grid-cols-5 bg-card/60 border border-border/40 p-1 rounded-xl">
+        <TabsList className="grid w-full max-w-4xl grid-cols-3 sm:grid-cols-6 gap-1 bg-card/60 border border-border/40 p-1 rounded-xl">
           <TabsTrigger
             value="favorites"
             className="flex items-center justify-center gap-1.5 text-xs font-bold data-[state=active]:bg-rose-950/40 data-[state=active]:text-rose-400 data-[state=active]:border-rose-500/30 border border-transparent transition-all"
@@ -149,6 +169,19 @@ export default function LibraryPage() {
 
           <TabsTrigger value="dropped" className="text-xs font-semibold">
             Dropped
+          </TabsTrigger>
+
+          <TabsTrigger
+            value="offline"
+            className="flex items-center justify-center gap-1.5 text-xs font-bold data-[state=active]:bg-emerald-950/40 data-[state=active]:text-emerald-400 data-[state=active]:border-emerald-500/30 border border-transparent transition-all"
+          >
+            <Download className="h-3.5 w-3.5" />
+            <span>Offline</span>
+            {offlineChapters.length > 0 && (
+              <span className="ml-1 text-[10px] px-1.5 py-0.2 rounded-full bg-emerald-500/20 text-emerald-300 font-mono">
+                {offlineChapters.length}
+              </span>
+            )}
           </TabsTrigger>
         </TabsList>
 
@@ -190,6 +223,66 @@ export default function LibraryPage() {
             loading={library.isLoading}
             emptyMessage="No dropped series."
           />
+        </TabsContent>
+
+        <TabsContent value="offline" className="mt-6">
+          {offlineChapters.length === 0 ? (
+            <div className="flex min-h-[220px] flex-col items-center justify-center rounded-2xl border border-dashed border-border/60 p-8 text-center bg-card/30">
+              <Download className="h-10 w-10 text-muted-foreground/50 mb-3" />
+              <h3 className="text-base font-bold text-foreground">No Offline Chapters Saved</h3>
+              <p className="mt-1 text-xs text-muted-foreground max-w-sm">
+                Open any chapter and click the Save button in the reader top bar to download it for reading on flights or without internet!
+              </p>
+            </div>
+          ) : (
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {offlineChapters.map((ch) => (
+                <div
+                  key={ch.id}
+                  className="flex items-center justify-between gap-3 p-3 rounded-xl border border-border/60 bg-card/60 hover:border-emerald-500/40 hover:bg-card/90 transition-all shadow-sm group"
+                >
+                  <Link
+                    href={`/title/${ch.seriesSlug}/${ch.chapterSlug}`}
+                    className="flex items-center gap-3 min-w-0 flex-1"
+                  >
+                    {ch.seriesCoverUrl ? (
+                      <div className="relative h-14 w-10 shrink-0 overflow-hidden rounded-lg bg-neutral-900 border border-border/40">
+                        <img
+                          src={ch.seriesCoverUrl}
+                          alt={ch.seriesTitle}
+                          className="h-full w-full object-cover"
+                        />
+                      </div>
+                    ) : (
+                      <div className="grid h-14 w-10 shrink-0 place-items-center rounded-lg bg-secondary text-xs">
+                        📖
+                      </div>
+                    )}
+                    <div className="min-w-0">
+                      <div className="font-bold text-sm text-foreground truncate group-hover:text-primary transition-colors">
+                        {ch.seriesTitle}
+                      </div>
+                      <div className="text-xs text-primary font-semibold mt-0.5">
+                        Chapter {ch.chapterNumber}
+                      </div>
+                      <div className="text-[10px] text-muted-foreground mt-0.5">
+                        {ch.pageCount} pages • Ready offline
+                      </div>
+                    </div>
+                  </Link>
+
+                  <button
+                    type="button"
+                    onClick={(e) => handleDeleteOffline(e, ch.id)}
+                    title="Remove from offline storage"
+                    className="p-2 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors shrink-0 cursor-pointer"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
         </TabsContent>
       </Tabs>
     </div>

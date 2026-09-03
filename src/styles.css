@@ -705,6 +705,29 @@ html.data-saver video {
   display: none !important;
 }
 
+/* ==========================================================================
+   🌙 Eye Comfort & Night Reading Filters
+   ========================================================================== */
+html.reader-filter-oled,
+html.reader-filter-oled body,
+html.reader-filter-oled main,
+html.reader-filter-oled .reader-page-container {
+  background-color: #000000 !important;
+}
+
+html.reader-filter-oled .reader-page-container img {
+  filter: brightness(0.92) contrast(1.05) !important;
+}
+
+html.reader-filter-warm .reader-page-container img {
+  filter: sepia(0.24) saturate(0.92) hue-rotate(-8deg) brightness(0.94) !important;
+}
+
+html.reader-filter-dim .reader-page-container img {
+  filter: brightness(0.76) contrast(0.94) !important;
+}
+
+
 
 
 

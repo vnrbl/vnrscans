@@ -9,6 +9,7 @@ export interface ReaderSettings {
   imageQuality: "high" | "medium" | "low";
   autoScrollSpeed: number;
   showNovelsOnHome: boolean;
+  readingFilter: "normal" | "oled" | "warm" | "dim";
 }
 
 const defaultSettings: ReaderSettings = {
@@ -18,6 +19,7 @@ const defaultSettings: ReaderSettings = {
   imageQuality: "high",
   autoScrollSpeed: 50,
   showNovelsOnHome: false,
+  readingFilter: "normal",
 };
 
 interface ReaderSettingsContextType {
