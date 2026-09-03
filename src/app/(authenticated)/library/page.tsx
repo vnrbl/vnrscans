@@ -121,8 +121,14 @@ export default function LibraryPage() {
     });
   };
 
-  const favoritesCount = favorites.data?.length ?? 0;
-  const readingCount = filterByStatus("reading").length;
+  const counts = {
+    favorites: favorites.data?.length ?? 0,
+    reading: filterByStatus("reading").length,
+    completed: filterByStatus("completed").length,
+    plan_to_read: filterByStatus("plan_to_read").length,
+    dropped: filterByStatus("dropped").length,
+    offline: offlineChapters.length,
+  };
 
   return (
     <div className="container mx-auto px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16 py-8">
@@ -141,47 +147,50 @@ export default function LibraryPage() {
             value="favorites"
             className="flex items-center justify-center gap-1.5 text-xs font-bold data-[state=active]:bg-rose-950/40 data-[state=active]:text-rose-400 data-[state=active]:border-rose-500/30 border border-transparent transition-all"
           >
-            <Heart className="h-3.5 w-3.5 fill-rose-500 text-rose-500" />
+            <Heart className="h-3.5 w-3.5 fill-rose-500 text-rose-500 shrink-0" />
             <span>Favorites</span>
-            {favoritesCount > 0 && (
-              <span className="ml-1 text-[10px] px-1.5 py-0.2 rounded-full bg-rose-500/20 text-rose-300 font-mono">
-                {favoritesCount}
-              </span>
-            )}
+            <span className="ml-1 h-4 min-w-[18px] px-1 inline-flex items-center justify-center rounded-full bg-rose-500/20 text-rose-300 font-mono text-[10px] leading-none">
+              {counts.favorites}
+            </span>
           </TabsTrigger>
 
-          <TabsTrigger value="reading" className="text-xs font-semibold">
+          <TabsTrigger value="reading" className="flex items-center justify-center gap-1.5 text-xs font-semibold">
             <span>Reading</span>
-            {readingCount > 0 && (
-              <span className="ml-1 text-[10px] px-1.5 py-0.2 rounded-full bg-secondary text-foreground font-mono">
-                {readingCount}
-              </span>
-            )}
+            <span className="ml-1 h-4 min-w-[18px] px-1 inline-flex items-center justify-center rounded-full bg-secondary text-foreground font-mono text-[10px] leading-none">
+              {counts.reading}
+            </span>
           </TabsTrigger>
 
-          <TabsTrigger value="completed" className="text-xs font-semibold">
-            Completed
+          <TabsTrigger value="completed" className="flex items-center justify-center gap-1.5 text-xs font-semibold">
+            <span>Completed</span>
+            <span className="ml-1 h-4 min-w-[18px] px-1 inline-flex items-center justify-center rounded-full bg-secondary text-foreground font-mono text-[10px] leading-none">
+              {counts.completed}
+            </span>
           </TabsTrigger>
 
-          <TabsTrigger value="plan_to_read" className="text-xs font-semibold">
-            Plan to Read
+          <TabsTrigger value="plan_to_read" className="flex items-center justify-center gap-1.5 text-xs font-semibold">
+            <span>Plan to Read</span>
+            <span className="ml-1 h-4 min-w-[18px] px-1 inline-flex items-center justify-center rounded-full bg-secondary text-foreground font-mono text-[10px] leading-none">
+              {counts.plan_to_read}
+            </span>
           </TabsTrigger>
 
-          <TabsTrigger value="dropped" className="text-xs font-semibold">
-            Dropped
+          <TabsTrigger value="dropped" className="flex items-center justify-center gap-1.5 text-xs font-semibold">
+            <span>Dropped</span>
+            <span className="ml-1 h-4 min-w-[18px] px-1 inline-flex items-center justify-center rounded-full bg-secondary text-foreground font-mono text-[10px] leading-none">
+              {counts.dropped}
+            </span>
           </TabsTrigger>
 
           <TabsTrigger
             value="offline"
             className="flex items-center justify-center gap-1.5 text-xs font-bold data-[state=active]:bg-emerald-950/40 data-[state=active]:text-emerald-400 data-[state=active]:border-emerald-500/30 border border-transparent transition-all"
           >
-            <Download className="h-3.5 w-3.5" />
+            <Download className="h-3.5 w-3.5 shrink-0" />
             <span>Offline</span>
-            {offlineChapters.length > 0 && (
-              <span className="ml-1 text-[10px] px-1.5 py-0.2 rounded-full bg-emerald-500/20 text-emerald-300 font-mono">
-                {offlineChapters.length}
-              </span>
-            )}
+            <span className="ml-1 h-4 min-w-[18px] px-1 inline-flex items-center justify-center rounded-full bg-emerald-500/20 text-emerald-300 font-mono text-[10px] leading-none">
+              {counts.offline}
+            </span>
           </TabsTrigger>
         </TabsList>
 

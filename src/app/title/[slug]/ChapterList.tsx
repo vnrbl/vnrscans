@@ -12,6 +12,9 @@ import {
   Eye,
   Heart,
   Trash2,
+  Download,
+  CheckCircle2,
+  Loader2,
 } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -29,6 +32,11 @@ import {
 } from "@/components/ui/select";
 import { AddNewSeriesDialog } from "@/components/admin/AddNewSeriesDialog";
 import { XP_AMOUNTS } from "@/lib/xp";
+import {
+  saveChapterOffline,
+  getOfflineChapters,
+  deleteOfflineChapter,
+} from "@/lib/offlineStorage";
 
 /* ------------------------------------------------------------------ */
 /*  ChapterList — ALL chapter interaction state lives here.           */
@@ -39,6 +47,8 @@ import { XP_AMOUNTS } from "@/lib/xp";
 interface ChapterListProps {
   slug: string;
   seriesId: string;
+  seriesTitle?: string;
+  seriesCoverUrl?: string | null;
   seriesStatus?: string | null;
   initialChaptersData?: any[];
 }
@@ -46,6 +56,8 @@ interface ChapterListProps {
 export const ChapterList = React.memo(function ChapterList({
   slug,
   seriesId,
+  seriesTitle,
+  seriesCoverUrl,
   seriesStatus,
   initialChaptersData,
 }: ChapterListProps) {
@@ -158,6 +170,153 @@ export const ChapterList = React.memo(function ChapterList({
   }, [chaptersQ.data]);
 
   const isSeriesCompleted = seriesStatus === "completed";
+
+  // Offline chapter download state
+  const [savedOfflineIds, setSavedOfflineIds] = React.useState<Set<string>>(new Set());
+  const [downloadingChapterId, setDownloadingChapterId] = React.useState<string | null>(null);
+  const [downloadProgress, setDownloadProgress] = React.useState<number>(0);
+  const [isBatchDownloading, setIsBatchDownloading] = React.useState<boolean>(false);
+  const [batchStatus, setBatchStatus] = React.useState<string | null>(null);
+
+  const refreshOfflineStatus = React.useCallback(() => {
+    const offline = getOfflineChapters();
+    setSavedOfflineIds(new Set(offline.map((o) => o.chapterId || o.id)));
+  }, []);
+
+  React.useEffect(() => {
+    refreshOfflineStatus();
+    window.addEventListener("vnr-offline-change", refreshOfflineStatus);
+    return () => window.removeEventListener("vnr-offline-change", refreshOfflineStatus);
+  }, [refreshOfflineStatus]);
+
+  const handleDownloadSingleChapter = async (
+    e: React.MouseEvent,
+    chapter: { id: string; chapter_number: number; slug: string; title?: string | null }
+  ) => {
+    e.stopPropagation();
+    e.preventDefault();
+
+    if (savedOfflineIds.has(chapter.id)) {
+      if (window.confirm(`Chapter ${chapter.chapter_number} is already downloaded. Remove from offline storage?`)) {
+        await deleteOfflineChapter(chapter.id);
+        refreshOfflineStatus();
+        toast.info(`Chapter ${chapter.chapter_number} removed from offline storage.`);
+      }
+      return;
+    }
+
+    if (downloadingChapterId) {
+      toast.error("Another chapter is currently downloading. Please wait.");
+      return;
+    }
+
+    setDownloadingChapterId(chapter.id);
+    setDownloadProgress(0);
+
+    try {
+      const { data: pages, error } = await supabase
+        .from("chapter_pages")
+        .select("id, page_number, image_url")
+        .eq("chapter_id", chapter.id)
+        .order("page_number");
+
+      if (error) throw error;
+      if (!pages || pages.length === 0) {
+        throw new Error("No pages found for this chapter.");
+      }
+
+      const chapterMeta = {
+        id: chapter.id,
+        chapter_number: chapter.chapter_number,
+        slug: chapter.slug,
+        title: chapter.title,
+        series_id: seriesId,
+        series: {
+          id: seriesId,
+          slug: slug,
+          title: seriesTitle || slug,
+          cover_url: seriesCoverUrl,
+        },
+      };
+
+      await saveChapterOffline(chapterMeta, pages, (percent) => {
+        setDownloadProgress(percent);
+      });
+
+      refreshOfflineStatus();
+      toast.success(`💾 Chapter ${chapter.chapter_number} Saved Offline!`, {
+        description: `Available in your Library under Offline Downloads.`,
+      });
+    } catch (err: any) {
+      toast.error(`Failed to download Chapter ${chapter.chapter_number}: ${err?.message}`);
+    } finally {
+      setDownloadingChapterId(null);
+      setDownloadProgress(0);
+    }
+  };
+
+  const handleBatchDownload = async (count: number = 5) => {
+    if (isBatchDownloading || downloadingChapterId) {
+      toast.error("A download is already in progress.");
+      return;
+    }
+
+    const eligibleChapters = (filteredChapters || [])
+      .filter((c) => !savedOfflineIds.has(c.id))
+      .slice(0, count);
+
+    if (eligibleChapters.length === 0) {
+      toast.info("All selected chapters are already downloaded offline!");
+      return;
+    }
+
+    setIsBatchDownloading(true);
+
+    for (let i = 0; i < eligibleChapters.length; i++) {
+      const ch = eligibleChapters[i];
+      setBatchStatus(`Saving Ch. ${ch.chapter_number} (${i + 1}/${eligibleChapters.length})...`);
+      setDownloadingChapterId(ch.id);
+      setDownloadProgress(0);
+
+      try {
+        const { data: pages } = await supabase
+          .from("chapter_pages")
+          .select("id, page_number, image_url")
+          .eq("chapter_id", ch.id)
+          .order("page_number");
+
+        if (pages && pages.length > 0) {
+          await saveChapterOffline(
+            {
+              id: ch.id,
+              chapter_number: ch.chapter_number,
+              slug: ch.slug,
+              title: ch.title,
+              series_id: seriesId,
+              series: {
+                id: seriesId,
+                slug: slug,
+                title: seriesTitle || slug,
+                cover_url: seriesCoverUrl,
+              },
+            },
+            pages,
+            (percent) => setDownloadProgress(percent)
+          );
+          refreshOfflineStatus();
+        }
+      } catch (err) {
+        console.error(`Failed downloading chapter ${ch.chapter_number}`, err);
+      }
+    }
+
+    setIsBatchDownloading(false);
+    setBatchStatus(null);
+    setDownloadingChapterId(null);
+    toast.success(`💾 Batch Download Complete!`, {
+      description: `${eligibleChapters.length} chapters saved for offline reading.`,
+    });
+  };
 
   const scanlationGroups = useQuery({
     queryKey: ["scanlation-groups", slug],
@@ -293,6 +452,27 @@ export const ChapterList = React.memo(function ChapterList({
               <RefreshCw className={`h-4 w-4 ${(chaptersQ.isFetching || scanlationGroups.isFetching) ? "animate-spin" : ""}`} />
               Refresh
             </Button>
+
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handleBatchDownload(5)}
+              disabled={isBatchDownloading || !!downloadingChapterId}
+              title="Download next 5 un-saved chapters for offline reading"
+              className="w-full gap-2 sm:w-auto border-emerald-500/40 text-emerald-400 hover:bg-emerald-950/30 hover:border-emerald-500/60 transition-all cursor-pointer"
+            >
+              {isBatchDownloading ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin text-emerald-400" />
+                  <span className="text-xs">{batchStatus || "Saving..."}</span>
+                </>
+              ) : (
+                <>
+                  <Download className="h-4 w-4 text-emerald-400" />
+                  <span className="text-xs">Save 5 Offline</span>
+                </>
+              )}
+            </Button>
           </div>
         </div>
 
@@ -369,6 +549,27 @@ export const ChapterList = React.memo(function ChapterList({
                       )}
                     </div>
                     <div className="flex items-center gap-1.5 shrink-0">
+                      <button
+                        type="button"
+                        onClick={(e) => handleDownloadSingleChapter(e, c)}
+                        title={savedOfflineIds.has(c.id) ? "Saved Offline (Click to remove)" : "Save Chapter Offline"}
+                        className={`p-1.5 rounded-lg border text-xs transition-colors cursor-pointer shrink-0 ${
+                          savedOfflineIds.has(c.id)
+                            ? "border-emerald-500/50 bg-emerald-950/40 text-emerald-400"
+                            : "border-border/40 bg-secondary/50 hover:bg-secondary text-muted-foreground hover:text-foreground"
+                        }`}
+                      >
+                        {downloadingChapterId === c.id ? (
+                          <div className="flex items-center gap-1">
+                            <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
+                            <span className="text-[10px] font-mono">{downloadProgress}%</span>
+                          </div>
+                        ) : savedOfflineIds.has(c.id) ? (
+                          <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
+                        ) : (
+                          <Download className="h-3.5 w-3.5" />
+                        )}
+                      </button>
                       <Badge variant="outline" className="gap-1 text-xs badge-glass text-pink-400 border-pink-500/30">
                         <Heart className="h-3 w-3 fill-pink-500 text-pink-500" />
                         {chapterLikes}
@@ -417,6 +618,7 @@ export const ChapterList = React.memo(function ChapterList({
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-neutral-400">XP</th>
                 <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-neutral-400">Likes</th>
                 <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-neutral-400">Readers</th>
+                <th className="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider text-emerald-400">Offline</th>
                 {canManage && (
                   <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-red-400">Action</th>
                 )}
@@ -493,6 +695,35 @@ export const ChapterList = React.memo(function ChapterList({
                     </td>
                     <td className="px-4 py-3 text-right">
                       <ReaderCount count={readerCount} loading={readerCounts.isLoading} />
+                    </td>
+                    <td className="px-3 py-3 text-center">
+                      <button
+                        type="button"
+                        onClick={(e) => handleDownloadSingleChapter(e, c)}
+                        title={savedOfflineIds.has(c.id) ? "Saved Offline (Click to remove)" : "Save Chapter Offline"}
+                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs transition-colors cursor-pointer ${
+                          savedOfflineIds.has(c.id)
+                            ? "border-emerald-500/50 bg-emerald-950/40 text-emerald-400 hover:bg-emerald-950/60"
+                            : "border-border/40 bg-secondary/50 hover:bg-secondary text-muted-foreground hover:text-foreground"
+                        }`}
+                      >
+                        {downloadingChapterId === c.id ? (
+                          <>
+                            <Loader2 className="h-3.5 w-3.5 animate-spin text-primary shrink-0" />
+                            <span className="text-[10px] font-mono">{downloadProgress}%</span>
+                          </>
+                        ) : savedOfflineIds.has(c.id) ? (
+                          <>
+                            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
+                            <span className="text-[11px] font-medium hidden lg:inline">Saved</span>
+                          </>
+                        ) : (
+                          <>
+                            <Download className="h-3.5 w-3.5 shrink-0" />
+                            <span className="text-[11px] font-medium hidden lg:inline">Save</span>
+                          </>
+                        )}
+                      </button>
                     </td>
                     {canManage && (
                       <td className="px-4 py-3 text-right">

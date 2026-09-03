@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from "react";
-import { Clock, Calendar, Bell, Sparkles, CheckCircle2 } from "lucide-react";
+import { Clock, Calendar, Bell, Sparkles, CheckCircle2, Globe, Zap } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 
@@ -31,13 +32,34 @@ export function ReleaseScheduleCard({ chapters, status, seriesTitle }: ReleaseSc
     }
   }, [seriesTitle]);
 
+  const currentMaxChapter = useMemo(() => {
+    if (!chapters || chapters.length === 0) return 0;
+    return Math.max(...chapters.map((c) => c.chapter_number || 0));
+  }, [chapters]);
+
+  // Fetch live release schedule and chapter drops from Comick.dev & web scan sources
+  const liveScheduleQ = useQuery({
+    queryKey: ["live-release-schedule", seriesTitle, currentMaxChapter],
+    queryFn: async () => {
+      if (!seriesTitle) return null;
+      const res = await fetch(
+        `/api/series/release-schedule?title=${encodeURIComponent(seriesTitle)}&currentMaxChapter=${currentMaxChapter}`
+      );
+      if (!res.ok) return null;
+      const json = (await res.json()) as any;
+      return json.data;
+    },
+    enabled: !!seriesTitle,
+    staleTime: 1000 * 60 * 15,
+  });
+
+  const liveData = liveScheduleQ.data;
+
   // Determine schedule data
   const scheduleInfo = useMemo(() => {
-    if (!chapters || chapters.length === 0) return null;
-
-    // 1. Check for an upcoming scheduled chapter
+    // 1. Check for an upcoming confirmed scheduled chapter in database
     const now = new Date();
-    const scheduled = chapters.find(
+    const scheduled = chapters?.find(
       (c) => c.scheduled_at && new Date(c.scheduled_at) > now
     );
 
@@ -46,21 +68,55 @@ export function ReleaseScheduleCard({ chapters, status, seriesTitle }: ReleaseSc
         targetDate: new Date(scheduled.scheduled_at),
         chapterNumber: scheduled.chapter_number,
         cadenceText: "Official Schedule",
+        sourceName: "vnrscans Official",
         isScheduled: true,
+        isSourceAhead: false,
+        aheadBy: 0,
+        sourceLatestChapter: undefined,
       };
     }
 
     // 2. If status is completed, no upcoming countdown needed
-    if (status?.toLowerCase() === "completed") {
+    if (status?.toLowerCase() === "completed" || liveData?.sourceStatus === "completed") {
       return {
         targetDate: null,
         chapterNumber: null,
         cadenceText: "Series Completed",
+        sourceName: liveData?.sourceName || "Official",
         isScheduled: false,
+        isSourceAhead: false,
+        aheadBy: 0,
+        sourceLatestChapter: undefined,
       };
     }
 
-    // 3. Estimate cadence from recent 4 chapters
+    // 3. Priority: Live data imported from Comick.dev or other web scans!
+    if (liveData?.found && liveData?.nextExpectedDrop) {
+      const liveTarget = new Date(liveData.nextExpectedDrop);
+      // Ensure target is in future
+      while (liveTarget <= now) {
+        liveTarget.setTime(liveTarget.getTime() + 7 * 24 * 60 * 60 * 1000);
+      }
+
+      const nextChapterNum = liveData.isSourceAhead && liveData.sourceLatestChapter
+        ? liveData.sourceLatestChapter + 1
+        : (currentMaxChapter || 0) + 1;
+
+      return {
+        targetDate: liveTarget,
+        chapterNumber: nextChapterNum,
+        cadenceText: liveData.cadence || "Weekly",
+        sourceName: liveData.sourceName || "Comick.dev",
+        isScheduled: false,
+        isSourceAhead: liveData.isSourceAhead,
+        aheadBy: liveData.aheadBy,
+        sourceLatestChapter: liveData.sourceLatestChapter,
+      };
+    }
+
+    // 4. Fallback: Estimate cadence from local chapters history
+    if (!chapters || chapters.length === 0) return null;
+
     const published = chapters
       .filter((c) => c.status === "published" || !c.status)
       .slice(0, 5);
@@ -97,7 +153,6 @@ export function ReleaseScheduleCard({ chapters, status, seriesTitle }: ReleaseSc
         }
 
         const estimatedTarget = new Date(lastRelease.getTime() + addDays * 24 * 60 * 60 * 1000);
-        // If target already passed, push forward to next cadence
         while (estimatedTarget <= now) {
           estimatedTarget.setTime(estimatedTarget.getTime() + addDays * 24 * 60 * 60 * 1000);
         }
@@ -108,13 +163,17 @@ export function ReleaseScheduleCard({ chapters, status, seriesTitle }: ReleaseSc
           targetDate: estimatedTarget,
           chapterNumber: nextNum,
           cadenceText: cadence,
+          sourceName: "Local Cadence",
           isScheduled: false,
+          isSourceAhead: false,
+          aheadBy: 0,
+          sourceLatestChapter: undefined,
         };
       }
     }
 
     return null;
-  }, [chapters, status]);
+  }, [chapters, status, liveData, currentMaxChapter]);
 
   // Live ticking countdown
   useEffect(() => {
@@ -183,9 +242,17 @@ export function ReleaseScheduleCard({ chapters, status, seriesTitle }: ReleaseSc
           </div>
         </div>
 
-        <div className="flex items-center gap-1.5 rounded-full bg-secondary/80 px-2.5 py-0.5 text-[11px] font-medium text-muted-foreground border border-border/40">
-          <Calendar className="h-3 w-3 text-primary" />
-          <span>{scheduleInfo.cadenceText}</span>
+        <div className="flex items-center gap-1.5 flex-wrap">
+          {liveData?.found && (
+            <div className="flex items-center gap-1 rounded-full bg-emerald-950/40 px-2 py-0.5 text-[10px] font-semibold text-emerald-400 border border-emerald-500/30">
+              <Globe className="h-2.5 w-2.5" />
+              <span>{scheduleInfo.sourceName}</span>
+            </div>
+          )}
+          <div className="flex items-center gap-1.5 rounded-full bg-secondary/80 px-2.5 py-0.5 text-[11px] font-medium text-muted-foreground border border-border/40">
+            <Calendar className="h-3 w-3 text-primary" />
+            <span>{scheduleInfo.cadenceText}</span>
+          </div>
         </div>
       </div>
 
@@ -241,6 +308,15 @@ export function ReleaseScheduleCard({ chapters, status, seriesTitle }: ReleaseSc
           )}
         </Button>
       </div>
+
+      {scheduleInfo.isSourceAhead && scheduleInfo.sourceLatestChapter && (
+        <div className="mt-3 flex items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-950/20 px-3 py-1.5 text-xs text-amber-300">
+          <Zap className="h-3.5 w-3.5 shrink-0 text-amber-400 animate-pulse" />
+          <span>
+            <strong>Source Scans on Ch. {scheduleInfo.sourceLatestChapter}</strong> ({scheduleInfo.aheadBy} ahead) • Import / release expected soon!
+          </span>
+        </div>
+      )}
     </div>
   );
 }
