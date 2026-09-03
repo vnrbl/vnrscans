@@ -13,7 +13,7 @@ import {
   CommandSeparator,
 } from "@/components/ui/command";
 import { supabase } from "@/integrations/supabase/client";
-import { BookOpen, Search, Sparkles, Compass, Library, Dice5, Flame } from "lucide-react";
+import { BookOpen, Search, Sparkles, Compass, Library, Dice5, Flame, Crown } from "lucide-react";
 import Image from "next/image";
 
 interface SearchSeriesResult {
@@ -189,6 +189,13 @@ export function CommandSearchModal() {
           >
             <Flame className="h-4 w-4 text-amber-400" />
             <span>Top Rankings & Trending</span>
+          </CommandItem>
+          <CommandItem
+            onSelect={() => handleSelect("/leaderboard")}
+            className="flex items-center gap-2.5 p-2 rounded-lg cursor-pointer text-xs"
+          >
+            <Crown className="h-4 w-4 text-yellow-400" />
+            <span>User Leaderboard & Season Ranks</span>
           </CommandItem>
           <CommandItem
             onSelect={() => handleSelect("/library")}

@@ -41,6 +41,9 @@ export function Footer() {
                 <Link to="/rankings" className="hover:text-purple-300 transition-colors">Top Rankings</Link>
               </li>
               <li>
+                <Link to="/leaderboard" className="hover:text-purple-300 transition-colors">User Leaderboard</Link>
+              </li>
+              <li>
                 <Link to="/recommendations" className="hover:text-purple-300 transition-colors">Recommendations</Link>
               </li>
               <li>

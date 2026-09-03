@@ -1,6 +1,6 @@
 import { Link, useNavigate } from "@/lib/router-compat";
 import { useState, useEffect, lazy, Suspense } from "react";
-import { Menu, X, Search, BookOpen, User as UserIcon, LogOut, ShieldCheck, ShieldAlert, Library, Home, Sparkles, Trophy, Dice1, Dice2, Dice3, Dice4, Dice5, Dice6, Loader2, Users, Settings as SettingsIcon, Plus } from "lucide-react";
+import { Menu, X, Search, BookOpen, User as UserIcon, LogOut, ShieldCheck, ShieldAlert, Library, Home, Sparkles, Trophy, Crown, Dice1, Dice2, Dice3, Dice4, Dice5, Dice6, Loader2, Users, Settings as SettingsIcon, Plus } from "lucide-react";
 import type { DiceSeries } from "@/components/DiceRollOverlay";
 import { useReaderSettings } from "@/contexts/ReaderSettingsContext";
 import dynamic from "next/dynamic";
@@ -85,6 +85,7 @@ export function Navbar() {
     { to: "/home", label: "Home", icon: Home },
     { to: "/browse", label: "Browse", icon: BookOpen },
     { to: "/rankings", label: "Rankings", icon: Trophy },
+    { to: "/leaderboard", label: "Leaderboard", icon: Crown },
     { to: "/recommendations", label: "For You", icon: Sparkles },
     { to: "/novels", label: "Novels", icon: BookOpen },
   ];
