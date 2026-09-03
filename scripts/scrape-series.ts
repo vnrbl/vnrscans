@@ -117,7 +117,9 @@ const isQimanhwaReaderPageImage = (url: string): boolean => {
       lowercaseUrl.includes('/file/qiscans/upload/rezo/series/') ||
       lowercaseUrl.includes('/rezo/series/') ||
       lowercaseUrl.includes('/file/qiscans/upload/upload/series/') ||
-      lowercaseUrl.includes('/upload/upload/series/');
+      lowercaseUrl.includes('/upload/upload/series/') ||
+      lowercaseUrl.includes('/file/qiscans/upload/') ||
+      lowercaseUrl.includes('/file/qimanga/upload/');
 
     return isNumberedPage && isReaderPath;
   } catch {

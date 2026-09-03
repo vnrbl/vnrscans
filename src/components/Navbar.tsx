@@ -3,7 +3,11 @@ import { useState, useEffect, lazy, Suspense } from "react";
 import { Menu, X, Search, BookOpen, User as UserIcon, LogOut, ShieldCheck, ShieldAlert, Library, Home, Sparkles, Trophy, Dice1, Dice2, Dice3, Dice4, Dice5, Dice6, Loader2, Users, Settings as SettingsIcon, Plus } from "lucide-react";
 import type { DiceSeries } from "@/components/DiceRollOverlay";
 import { useReaderSettings } from "@/contexts/ReaderSettingsContext";
-import { AddNewSeriesDialog } from "@/components/admin/AddNewSeriesDialog";
+import dynamic from "next/dynamic";
+const AddNewSeriesDialog = dynamic(
+  () => import("@/components/admin/AddNewSeriesDialog").then((m) => m.AddNewSeriesDialog),
+  { ssr: false }
+);
 
 const DiceRollOverlay = lazy(() => import("@/components/DiceRollOverlay").then(m => ({ default: m.DiceRollOverlay })));
 const NavbarSearch = lazy(() => import("@/components/NavbarSearch").then(m => ({ default: m.NavbarSearch })));

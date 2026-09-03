@@ -51,6 +51,8 @@ export function useDragScroll<T extends HTMLElement>() {
       suppressClick.current = false;
 
       let axisLock: "x" | "y" | null = e.pointerType === "mouse" ? "x" : null;
+      let rafId: number | null = null;
+      let latestDx = 0;
 
       const onMove = (moveEvent: globalThis.PointerEvent) => {
         if (pointerId.current !== moveEvent.pointerId) return;
@@ -59,6 +61,7 @@ export function useDragScroll<T extends HTMLElement>() {
         if (!container) return;
 
         if (e.pointerType === "mouse" && moveEvent.buttons !== 1) {
+          if (rafId) cancelAnimationFrame(rafId);
           finishDrag(container, moveEvent.pointerId);
           document.removeEventListener("pointermove", onMove);
           document.removeEventListener("pointerup", onUp);
@@ -68,6 +71,7 @@ export function useDragScroll<T extends HTMLElement>() {
 
         const dx = moveEvent.clientX - startX.current;
         const dy = moveEvent.clientY - startY;
+        latestDx = dx;
 
         if (e.pointerType === "touch" && !axisLock) {
           if (Math.abs(dx) < DRAG_THRESHOLD && Math.abs(dy) < DRAG_THRESHOLD) return;
@@ -102,11 +106,22 @@ export function useDragScroll<T extends HTMLElement>() {
         }
 
         moveEvent.preventDefault();
-        container.scrollLeft = scrollLeftStart.current - dx;
+        if (!rafId) {
+          rafId = requestAnimationFrame(() => {
+            if (scrollRef.current) {
+              scrollRef.current.scrollLeft = scrollLeftStart.current - latestDx;
+            }
+            rafId = null;
+          });
+        }
       };
 
       const onUp = (upEvent: globalThis.PointerEvent) => {
         if (pointerId.current !== upEvent.pointerId) return;
+        if (rafId) {
+          cancelAnimationFrame(rafId);
+          rafId = null;
+        }
         finishDrag(scrollRef.current, upEvent.pointerId);
         document.removeEventListener("pointermove", onMove);
         document.removeEventListener("pointerup", onUp);

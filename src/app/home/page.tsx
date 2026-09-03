@@ -10,11 +10,11 @@ import HomeClient, {
 } from "./HomeClient";
 import { supabase } from "@/integrations/supabase/client";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 60; // ISR cache for 60s — instant edge delivery
 
 async function fetchHomeInitialData(): Promise<HomeInitialData> {
   const [latestRes, popularRes, highScoreRes] = await Promise.all([
-    supabase.rpc("get_series_with_latest_chapters", { limit_count: 100 }),
+    supabase.rpc("get_series_with_latest_chapters", { limit_count: 36 }),
     supabase
       .from("series")
       .select("id,slug,title,cover_url,type,rating_average,status,view_count")

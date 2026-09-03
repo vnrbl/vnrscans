@@ -1,6 +1,8 @@
 import type { NextConfig } from "next";
 import withBundleAnalyzer from "@next/bundle-analyzer";
 
+import path from "node:path";
+
 const withAnalyzer = withBundleAnalyzer({
   enabled: process.env.ANALYZE === "true",
   openAnalyzer: false,
@@ -8,6 +10,14 @@ const withAnalyzer = withBundleAnalyzer({
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  compress: true,
+  outputFileTracingRoot: path.resolve(__dirname),
+  compiler: {
+    removeConsole:
+      process.env.NODE_ENV === "production"
+        ? { exclude: ["error", "warn"] }
+        : false,
+  },
   eslint: {
     ignoreDuringBuilds: true,
   },
@@ -18,6 +28,8 @@ const nextConfig: NextConfig = {
     ],
   },
   images: {
+    formats: ["image/avif", "image/webp"],
+    minimumCacheTTL: 2592000,
     remotePatterns: [
       {
         protocol: "https",
@@ -62,6 +74,14 @@ const nextConfig: NextConfig = {
       {
         protocol: "https",
         hostname: "cdn.qiscans.org",
+      },
+      {
+        protocol: "https",
+        hostname: "media.qimanga.com",
+      },
+      {
+        protocol: "https",
+        hostname: "media.qiscans.org",
       },
       {
         protocol: "https",

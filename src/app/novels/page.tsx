@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import NovelsClient from "./NovelsClient";
 import { supabase } from "@/integrations/supabase/client";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 120; // ISR cache for 2 minutes — instant edge response
 
 export const metadata: Metadata = {
   title: "Read Light Novels & Web Novels Online Free — vnrscans",

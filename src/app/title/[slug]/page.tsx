@@ -1,28 +1,30 @@
+import { cache } from "react";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import TitleDetailPageContent from "./TitleDetailPageContent";
 import { supabase } from "@/integrations/supabase/client";
+
+export const revalidate = 60; // ISR edge caching for 60s
 
 type PageProps = {
   params: Promise<{ slug: string }>;
 };
 
 /* ------------------------------------------------------------------ */
-/*  Single server-side prefetch used by both generateMetadata + Page  */
-/*  React/Next.js auto-deduplicates this when the same async fn       */
-/*  is called in the same request.                                     */
+/*  Single server-side prefetch wrapped in React.cache to guarantee   */
+/*  deduplication between generateMetadata and Page render.           */
 /* ------------------------------------------------------------------ */
 
-async function getSeriesData(slug: string) {
+const getSeriesData = cache(async (slug: string) => {
   const { data } = await supabase
     .from("series")
     .select("*,series_genres(genre:genres(id,name,slug)),series_tags(tag:tags(id,name,slug,color,icon))")
     .eq("slug", slug)
     .maybeSingle();
   return data;
-}
+});
 
-async function getChaptersData(seriesId: string) {
+const getChaptersData = cache(async (seriesId: string) => {
   const { data } = await supabase
     .from("chapters")
     .select("id,slug,chapter_number,title,chapter_type,created_at,status,scheduled_at,uploaded_by,scanlation_group")
@@ -33,7 +35,7 @@ async function getChaptersData(seriesId: string) {
   return (data ?? []).filter(
     (c) => !c.scheduled_at || new Date(c.scheduled_at) <= new Date()
   );
-}
+});
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug } = await params;

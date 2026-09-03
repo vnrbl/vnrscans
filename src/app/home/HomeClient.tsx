@@ -177,15 +177,49 @@ function HomeContent({ initialData }: { initialData?: HomeInitialData }) {
         .limit(100);
       if (error) throw error;
 
-      const uniqueChapterUpdates = new Map<string, any>();
+      // Group by series so that mass updates (e.g. 5+ chapters) collapse into ONE cover card
+      const seriesMap = new Map<string, {
+        latestChapter: any;
+        chapters: any[];
+        minChapter: number;
+        maxChapter: number;
+        totalUpdated: number;
+      }>();
+
       (data ?? []).forEach((chapter: any) => {
-        const key = `${chapter.series_id}:${chapter.chapter_number}`;
-        if (!uniqueChapterUpdates.has(key)) {
-          uniqueChapterUpdates.set(key, chapter);
+        const sid = chapter.series_id;
+        if (!sid || !chapter.series) return;
+        const num = Number(chapter.chapter_number);
+
+        if (!seriesMap.has(sid)) {
+          seriesMap.set(sid, {
+            latestChapter: chapter,
+            chapters: [chapter],
+            minChapter: num,
+            maxChapter: num,
+            totalUpdated: 1,
+          });
+        } else {
+          const entry = seriesMap.get(sid)!;
+          entry.chapters.push(chapter);
+          entry.totalUpdated++;
+          if (num < entry.minChapter) entry.minChapter = num;
+          if (num > entry.maxChapter) entry.maxChapter = num;
+          if (num > Number(entry.latestChapter.chapter_number)) {
+            entry.latestChapter = chapter;
+          }
         }
       });
 
-      return Array.from(uniqueChapterUpdates.values()).slice(0, HOME_HORIZONTAL_CARD_LIMIT);
+      const groupedChapters = Array.from(seriesMap.values()).map((entry) => ({
+        ...entry.latestChapter,
+        massUpdateCount: entry.totalUpdated,
+        minChapterNumber: entry.minChapter,
+        maxChapterNumber: entry.maxChapter,
+        batchChapters: entry.chapters,
+      }));
+
+      return groupedChapters.slice(0, HOME_HORIZONTAL_CARD_LIMIT);
     },
     enabled: !!user,
     staleTime: 1000 * 60 * 2, // 2 minutes
@@ -230,7 +264,7 @@ function HomeContent({ initialData }: { initialData?: HomeInitialData }) {
     queryKey: ["latest-updates", settings.showNovelsOnHome],
     queryFn: async () => {
       const { data, error } = await supabase
-        .rpc("get_series_with_latest_chapters", { limit_count: 100 });
+        .rpc("get_series_with_latest_chapters", { limit_count: 50 });
 
       if (error) throw error;
       
@@ -930,6 +964,13 @@ function LatestUpdatesSection({
                           {item.type}
                         </Badge>
                       </div>
+                      {item.recent_chapters && item.recent_chapters.length >= 4 && (
+                        <div className="absolute top-2 right-2">
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded shadow-md uppercase tracking-wider text-white bg-gradient-to-r from-red-600 to-amber-500">
+                            🔥 Mass
+                          </span>
+                        </div>
+                      )}
                     </div>
                   </Link>
 
@@ -946,32 +987,59 @@ function LatestUpdatesSection({
                       </Link>
                     </div>
 
-                    {/* Recent Chapters List */}
+                    {/* Recent Chapters List — Groups mass updates cleanly under one cover */}
                     <div className="space-y-1.5">
-                      {item.recent_chapters.map((chapter) => {
-                        const isRead = readChapterIds.has(chapter.id);
+                      {(() => {
+                        const chapters = item.recent_chapters || [];
+                        const isMassUpdate = chapters.length >= 4;
+                        const displayedChapters = isMassUpdate ? chapters.slice(0, 2) : chapters.slice(0, 3);
+                        const hiddenCount = chapters.length - displayedChapters.length;
 
                         return (
-                          <Link
-                            key={chapter.id}
-                            to="/title/$titleSlug/$chapterSlug"
-                            params={{ titleSlug: item.slug, chapterSlug: chapter.slug }}
-                            className={`flex items-center justify-between text-xs px-2.5 py-1.5 rounded border border-white/10 bg-surface-1/60 hover:bg-surface-2 hover:border-purple-500/40 hover:text-white transition-all ${
-                              isRead ? 'text-neutral-500 opacity-75' : 'text-neutral-200'
-                            }`}
-                          >
-                            <div className="flex min-w-0 flex-1 items-center gap-1.5">
-                              <BookOpen className={`h-3 w-3 shrink-0 ${isRead ? 'text-neutral-500' : 'text-purple-400'}`} />
-                              <span className="truncate text-xs font-medium">
-                                Chapter {chapter.chapter_number}
-                              </span>
-                            </div>
-                            <span className="ml-1.5 shrink-0 text-xs text-neutral-400">
-                              {formatTimeAgo(chapter.created_at)}
-                            </span>
-                          </Link>
+                          <>
+                            {displayedChapters.map((chapter) => {
+                              const isRead = readChapterIds.has(chapter.id);
+
+                              return (
+                                <Link
+                                  key={chapter.id}
+                                  to="/title/$titleSlug/$chapterSlug"
+                                  params={{ titleSlug: item.slug, chapterSlug: chapter.slug }}
+                                  className={`flex items-center justify-between text-xs px-2.5 py-1.5 rounded border border-white/10 bg-surface-1/60 hover:bg-surface-2 hover:border-purple-500/40 hover:text-white transition-all ${
+                                    isRead ? 'text-neutral-500 opacity-75' : 'text-neutral-200'
+                                  }`}
+                                >
+                                  <div className="flex min-w-0 flex-1 items-center gap-1.5">
+                                    <BookOpen className={`h-3 w-3 shrink-0 ${isRead ? 'text-neutral-500' : 'text-purple-400'}`} />
+                                    <span className="truncate text-xs font-medium">
+                                      Chapter {chapter.chapter_number}
+                                    </span>
+                                  </div>
+                                  <span className="ml-1.5 shrink-0 text-xs text-neutral-400">
+                                    {formatTimeAgo(chapter.created_at)}
+                                  </span>
+                                </Link>
+                              );
+                            })}
+
+                            {hiddenCount > 0 && (
+                              <Link
+                                to="/title/$slug"
+                                params={{ slug: item.slug }}
+                                className="flex items-center justify-between text-xs px-2.5 py-1 rounded border border-purple-500/30 bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 font-medium transition-all group/mass"
+                              >
+                                <div className="flex items-center gap-1.5 truncate">
+                                  <span className="text-[11px]">🔥</span>
+                                  <span className="truncate">+{hiddenCount} more chapters ({isMassUpdate ? "Mass Update" : "new"})</span>
+                                </div>
+                                <span className="text-[10px] opacity-75 group-hover/mass:translate-x-0.5 transition-transform shrink-0 ml-1">
+                                  View all →
+                                </span>
+                              </Link>
+                            )}
+                          </>
                         );
-                      })}
+                      })()}
                     </div>
                   </div>
                 </div>
@@ -1069,6 +1137,11 @@ function FollowedChapterCard({ chapter }: { chapter: RecentChapter }) {
   const seriesSlug = chapter.series?.slug;
   if (!seriesSlug) return null;
 
+  const massUpdateCount = (chapter as any).massUpdateCount || 1;
+  const isMassUpdate = massUpdateCount > 1;
+  const minCh = (chapter as any).minChapterNumber;
+  const maxCh = (chapter as any).maxChapterNumber;
+
   return (
     <article className="group glass-card flex flex-col h-full rounded-lg overflow-hidden hover-lift transition-all relative">
       <Link
@@ -1084,6 +1157,19 @@ function FollowedChapterCard({ chapter }: { chapter: RecentChapter }) {
             seriesId={chapter.series?.id}
             className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
           />
+
+          {isMassUpdate && (
+            <div className="absolute top-2 right-2 z-10">
+              <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded shadow-lg uppercase tracking-wider text-white ${
+                massUpdateCount >= 5
+                  ? "bg-gradient-to-r from-red-600 via-orange-500 to-amber-500 shadow-red-500/30"
+                  : "bg-purple-600/95 shadow-purple-500/20"
+              }`}>
+                🔥 +{massUpdateCount} Chs
+              </span>
+            </div>
+          )}
+
           <div className="absolute bottom-2 left-2 flex items-center gap-1.5 rounded bg-black/80 border border-white/20 px-2 py-0.5 text-xs font-semibold text-white shadow-md backdrop-blur-md transition-opacity group-hover:opacity-0">
             <BookOpen className="h-3.5 w-3.5 text-purple-400" />
             <span>Ch. {chapter.chapter_number}</span>
@@ -1094,6 +1180,11 @@ function FollowedChapterCard({ chapter }: { chapter: RecentChapter }) {
             <p className="text-xs font-bold leading-tight text-white drop-shadow-md break-words">
               {chapter.series?.title}
             </p>
+            {isMassUpdate && (
+              <p className="text-[11px] text-amber-300 font-semibold mt-0.5">
+                Mass update: Ch. {minCh} – {maxCh}
+              </p>
+            )}
             {(chapter.series as any)?.type && (
               <span className="mt-1 text-[9px] uppercase font-semibold text-purple-400">
                 {(chapter.series as any).type}
@@ -1118,7 +1209,13 @@ function FollowedChapterCard({ chapter }: { chapter: RecentChapter }) {
           params={{ titleSlug: seriesSlug, chapterSlug: chapter.slug }}
           className="mt-1 flex items-center justify-between gap-2 text-xs text-neutral-400 hover:text-purple-300 transition-colors truncate"
         >
-          <span className="truncate">Chapter {chapter.chapter_number}</span>
+          <span className="truncate">
+            {isMassUpdate ? (
+              <span className="text-purple-300 font-medium">Ch. {minCh} – {maxCh}</span>
+            ) : (
+              `Chapter ${chapter.chapter_number}`
+            )}
+          </span>
           <span className="shrink-0">{formatTimeAgo(chapter.created_at)}</span>
         </Link>
       </div>

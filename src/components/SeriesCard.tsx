@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { Link } from "@/lib/router-compat";
 import { Star } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -15,7 +16,7 @@ type Series = {
   chapter_count?: number | null;
 };
 
-export function SeriesCard({ s, rank }: { s: Series; rank?: number }) {
+export const SeriesCard = memo(function SeriesCard({ s, rank }: { s: Series; rank?: number }) {
   return (
     <Link
       to="/title/$slug"
@@ -79,7 +80,7 @@ export function SeriesCard({ s, rank }: { s: Series; rank?: number }) {
       </div>
     </Link>
   );
-}
+});
 
 export function SeriesCardSkeleton() {
   return (

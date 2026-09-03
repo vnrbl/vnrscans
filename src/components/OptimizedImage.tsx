@@ -11,6 +11,29 @@ interface OptimizedImageProps {
   seriesId?: string;
 }
 
+// Shared singleton IntersectionObserver for all cards sitewide
+type ImageObserverCallback = (isIntersecting: boolean) => void;
+let sharedImageObserver: IntersectionObserver | null = null;
+const observerCallbacks = new WeakMap<Element, ImageObserverCallback>();
+
+function getSharedObserver(): IntersectionObserver | null {
+  if (typeof window === "undefined" || !("IntersectionObserver" in window)) return null;
+  if (!sharedImageObserver) {
+    sharedImageObserver = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          const cb = observerCallbacks.get(entry.target);
+          if (cb) cb(entry.isIntersecting);
+        }
+      },
+      { rootMargin: "300px" }
+    );
+  }
+  return sharedImageObserver;
+}
+
+const favCoverCache = new Map<string, string | null>();
+
 export function OptimizedImage({
   src,
   alt,
@@ -24,13 +47,23 @@ export function OptimizedImage({
   const [error, setError] = useState(false);
   const [isInView, setIsInView] = useState(priority);
   const [isIntersecting, setIsIntersecting] = useState(priority);
-  const [displaySrc, setDisplaySrc] = useState<string | null>(src);
+  const [displaySrc, setDisplaySrc] = useState<string | null>(() => {
+    if (seriesId && typeof window !== "undefined") {
+      if (favCoverCache.has(seriesId)) return favCoverCache.get(seriesId) ?? src;
+      try {
+        const fav = localStorage.getItem(`fav-cover-${seriesId}`);
+        favCoverCache.set(seriesId, fav);
+        if (fav) return fav;
+      } catch {}
+    }
+    return src;
+  });
   const containerRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
 
   const isVideo = displaySrc ? displaySrc.toLowerCase().split("?")[0].endsWith(".mp4") : false;
 
-  // Intersection Observer for both lazy loading and play/pause behavior for video
+  // Single shared observer eliminates 50-100 separate C++ observer instances per page
   useEffect(() => {
     if (priority || !containerRef.current) {
       setIsInView(true);
@@ -38,40 +71,49 @@ export function OptimizedImage({
       return;
     }
 
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (isVideo) {
-            setIsIntersecting(entry.isIntersecting);
-            if (entry.isIntersecting) {
-              setIsInView(true);
-            }
-          } else {
-            if (entry.isIntersecting) {
-              setIsInView(true);
-              observer.disconnect();
-            }
-          }
-        });
-      },
-      {
-        rootMargin: isVideo ? "350px" : "250px", // Generous margin for smooth 60fps scrolling
+    const el = containerRef.current;
+    const observer = getSharedObserver();
+
+    if (!observer) {
+      setIsInView(true);
+      setIsIntersecting(true);
+      return;
+    }
+
+    observerCallbacks.set(el, (intersecting) => {
+      setIsIntersecting(intersecting);
+      if (intersecting) {
+        setIsInView(true);
+        if (!isVideo) {
+          observer.unobserve(el);
+          observerCallbacks.delete(el);
+        }
       }
-    );
+    });
 
-    observer.observe(containerRef.current);
+    observer.observe(el);
 
-    return () => observer.disconnect();
+    return () => {
+      observer.unobserve(el);
+      observerCallbacks.delete(el);
+    };
   }, [priority, isVideo]);
 
-  // Update displaySrc based on favorite cover in localStorage if seriesId is provided
+  // Update displaySrc if src or seriesId prop changes
   useEffect(() => {
     if (seriesId && typeof window !== "undefined") {
-      const fav = localStorage.getItem(`fav-cover-${seriesId}`);
-      if (fav) {
-        setDisplaySrc(fav);
+      if (favCoverCache.has(seriesId)) {
+        setDisplaySrc(favCoverCache.get(seriesId) ?? src);
         return;
       }
+      try {
+        const fav = localStorage.getItem(`fav-cover-${seriesId}`);
+        favCoverCache.set(seriesId, fav);
+        if (fav) {
+          setDisplaySrc(fav);
+          return;
+        }
+      } catch {}
     }
     setDisplaySrc(src);
   }, [src, seriesId]);

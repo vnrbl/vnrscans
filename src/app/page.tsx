@@ -23,7 +23,7 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { HomeStats } from "./HomeStats";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 120; // ISR cache for 2 minutes — instant edge HTML response
 
 export const metadata: Metadata = {
   title: "vnrscans - Read Manga, Manhwa, Manhua & Novels Online Free",

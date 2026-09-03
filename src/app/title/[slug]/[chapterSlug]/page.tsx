@@ -1,13 +1,16 @@
+import { cache } from "react";
 import type { Metadata } from "next";
 import ChapterReaderContent from "./ChapterReaderContent";
 import { supabase } from "@/integrations/supabase/client";
+
+export const revalidate = 120; // Edge cached for 2 minutes — fast instant loading
 
 type PageProps = {
   params: Promise<{ slug: string; chapterSlug: string }>;
 };
 
-// Server-side helper to fetch series + chapter details for metadata
-async function getChapterMetadataDetails(seriesSlug: string, chapterSlug: string) {
+// Server-side helper to fetch series + chapter details for metadata, deduplicated in request scope
+const getChapterMetadataDetails = cache(async (seriesSlug: string, chapterSlug: string) => {
   const { data: chapter } = await supabase
     .from("chapters")
     .select(`
@@ -24,7 +27,7 @@ async function getChapterMetadataDetails(seriesSlug: string, chapterSlug: string
     .maybeSingle();
 
   return chapter;
-}
+});
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug, chapterSlug } = await params;

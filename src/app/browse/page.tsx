@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import BrowsePage, { type BrowseInitialData } from "./BrowseClient";
 import { supabase } from "@/integrations/supabase/client";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 120; // ISR cache for 2 minutes — fast edge response
 
 export const metadata: Metadata = {
   title: "Browse Manga, Manhwa, Manhua & Novels - vnrscans",

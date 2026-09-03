@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { Link } from "@/lib/router-compat";
 import { useQuery } from "@tanstack/react-query";
 import { Trophy, TrendingUp, Eye, Star, Heart, BookOpen } from "lucide-react";
@@ -9,6 +10,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card } from "@/components/ui/card";
 
 export default function RankingsPage() {
+  const [activeTab, setActiveTab] = useState("top-rated");
+
   const topRated = useQuery({
     queryKey: ["rankings", "top-rated"],
     queryFn: async () => {
@@ -22,6 +25,7 @@ export default function RankingsPage() {
       if (error) throw error;
       return data ?? [];
     },
+    enabled: activeTab === "top-rated",
     staleTime: 1000 * 60 * 15,
   });
 
@@ -36,6 +40,7 @@ export default function RankingsPage() {
       if (error) throw error;
       return data ?? [];
     },
+    enabled: activeTab === "most-viewed",
     staleTime: 1000 * 60 * 15,
   });
 
@@ -56,6 +61,7 @@ export default function RankingsPage() {
       }
       return data ?? [];
     },
+    enabled: activeTab === "most-followed",
     staleTime: 1000 * 60 * 15,
   });
 
@@ -90,6 +96,7 @@ export default function RankingsPage() {
         .sort((a, b) => b.recentChapters - a.recentChapters)
         .slice(0, 50);
     },
+    enabled: activeTab === "trending",
     staleTime: 1000 * 60 * 5,
   });
 
@@ -116,7 +123,7 @@ export default function RankingsPage() {
           </div>
         </div>
 
-        <Tabs defaultValue="top-rated" className="space-y-6">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <TabsList className="grid w-full grid-cols-2 lg:grid-cols-4 p-1 bg-secondary/30 border border-border/30 backdrop-blur-md rounded-xl">
             <TabsTrigger value="top-rated" className="rounded-lg data-[state=active]:bg-primary/25 data-[state=active]:text-primary data-[state=active]:shadow-sm">
               <Star className="mr-2 h-4 w-4" />

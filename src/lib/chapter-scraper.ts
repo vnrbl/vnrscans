@@ -1105,6 +1105,45 @@ export async function extractImagesFromChapterUrl(
 ): Promise<string[]> {
   assertSafePublicUrl(chapterUrl);
   try {
+    // 1. Direct Qi Scans / Qi Manga JSON API Extraction (instant & 100% reliable)
+    if (isQimanhwaLikeUrl(chapterUrl)) {
+      try {
+        const urlObj = new URL(chapterUrl);
+        const segments = urlObj.pathname.split('/').filter(Boolean);
+        // Usually /series/:seriesSlug/:chapterSlug
+        if (segments.length >= 2) {
+          const chapterSlug = segments[segments.length - 1];
+          const seriesSlug = segments[segments.length - 2];
+          const apiUrl = `https://api.qimanga.com/api/v1/series/${encodeURIComponent(seriesSlug)}/chapters/${encodeURIComponent(chapterSlug)}`;
+          const apiRes = await fetch(apiUrl, {
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+              'Accept': 'application/json',
+            },
+            signal: AbortSignal.timeout(15_000),
+          });
+
+          if (apiRes.ok) {
+            const apiData = (await apiRes.json()) as any;
+            const rawImages = apiData?.data?.images || apiData?.images;
+            if (Array.isArray(rawImages) && rawImages.length > 0) {
+              const sorted = [...rawImages].sort((a: any, b: any) => (Number(a.order) || 0) - (Number(b.order) || 0));
+              const imageUrls = sorted
+                .map((img: any) => (typeof img === 'string' ? img : img?.url))
+                .filter((url: any): url is string => typeof url === 'string' && url.length > 0);
+
+              if (imageUrls.length > 0) {
+                console.log(`[Scraper] Successfully extracted ${imageUrls.length} chapter images for Qi Scans via official API (${seriesSlug}/${chapterSlug})`);
+                return imageUrls;
+              }
+            }
+          }
+        }
+      } catch (qiErr) {
+        console.warn('[Scraper] Qi Scans direct API chapter extraction error, falling back to HTML/Puppeteer:', qiErr);
+      }
+    }
+
     let html = '';
     let usePuppeteerFallback = false;
     const imageUrlExample = options.imageUrlExample?.trim() || '';
@@ -2053,6 +2092,8 @@ function isQimanhwaReaderPageImage(url: string): boolean {
       lowercaseUrl.includes('/uploads/series/') ||
       lowercaseUrl.includes('quantumscans') ||
       lowercaseUrl.includes('/file/qimanga/upload/series/') ||
+      lowercaseUrl.includes('/file/qiscans/upload/') ||
+      lowercaseUrl.includes('/file/qimanga/upload/') ||
       lowercaseUrl.includes('/qimanga/rezo/series/');
 
     return isNumberedPage && isReaderPath;

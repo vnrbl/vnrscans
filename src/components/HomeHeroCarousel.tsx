@@ -96,72 +96,131 @@ export function HomeHeroCarousel() {
     return items.length > 0 ? shuffleArray(items) : [];
   }, [items.length]); // Only re-shuffle when items count changes
   
-  // Triple the shuffled items for infinite loop effect
-  const loopedItems = shuffledItems.length > 0 ? [...shuffledItems, ...shuffledItems, ...shuffledItems] : [];
+  // Cap carousel items to 12 max for ultra-smooth 60fps rendering without DOM bloat
+  const displayItems = useMemo(() => {
+    return shuffledItems.slice(0, 12);
+  }, [shuffledItems]);
 
-  const updateArrows = () => {
-    if (!scrollContainerRef.current) return;
-    const { scrollLeft, scrollWidth, clientWidth } = scrollContainerRef.current;
-    setShowLeftArrow(scrollLeft > 10);
-    setShowRightArrow(scrollLeft < scrollWidth - clientWidth - 10);
-  };
+  const loopedItems = displayItems.length > 0 ? [...displayItems, ...displayItems, ...displayItems] : [];
 
-  // Infinite loop scroll logic
+  const metricsRef = useRef({
+    itemWidth: 0,
+    sectionWidth: 0,
+    scrollWidth: 0,
+    clientWidth: 0,
+  });
+
+  const measureMetrics = useCallback(() => {
+    const container = scrollContainerRef.current;
+    if (!container || container.children.length === 0 || displayItems.length === 0) return;
+    const firstChild = container.children[0] as HTMLElement;
+    const gap = parseFloat(window.getComputedStyle(container).gap || "16") || 16;
+    const itemWidth = firstChild.offsetWidth + gap;
+    const sectionWidth = displayItems.length * itemWidth;
+    metricsRef.current = {
+      itemWidth,
+      sectionWidth,
+      scrollWidth: container.scrollWidth,
+      clientWidth: container.clientWidth,
+    };
+  }, [displayItems.length]);
+
+  const updateArrows = useCallback(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    const { scrollLeft, scrollWidth, clientWidth } = container;
+    const showLeft = scrollLeft > 10;
+    const showRight = scrollLeft < scrollWidth - clientWidth - 10;
+    setShowLeftArrow((prev) => (prev !== showLeft ? showLeft : prev));
+    setShowRightArrow((prev) => (prev !== showRight ? showRight : prev));
+  }, []);
+
+  // Update metrics on resize
+  useEffect(() => {
+    measureMetrics();
+    window.addEventListener("resize", measureMetrics, { passive: true });
+    return () => window.removeEventListener("resize", measureMetrics);
+  }, [measureMetrics]);
+
+  // Infinite loop scroll logic with cached metrics (zero layout thrashing)
   useEffect(() => {
     const container = scrollContainerRef.current;
-    if (!container || shuffledItems.length === 0) return;
+    if (!container || displayItems.length === 0) return;
 
+    measureMetrics();
+
+    let ticking = false;
     const handleScroll = () => {
-      if (container.children.length === 0) return;
-      const { scrollLeft, scrollWidth, clientWidth } = container;
-      const firstChild = container.children[0] as HTMLElement;
-      const itemWidth = firstChild.getBoundingClientRect().width + parseFloat(window.getComputedStyle(container).gap || "0");
-      const sectionWidth = shuffledItems.length * itemWidth;
-      
-      // Reset to middle section when reaching edges
-      if (scrollLeft <= itemWidth) {
-        container.scrollLeft = sectionWidth + itemWidth;
-      } else if (scrollLeft >= scrollWidth - clientWidth - itemWidth) {
-        container.scrollLeft = sectionWidth - clientWidth + itemWidth;
-      }
-      
-      updateArrows();
+      if (ticking) return;
+      ticking = true;
+
+      requestAnimationFrame(() => {
+        ticking = false;
+        const { itemWidth, sectionWidth } = metricsRef.current;
+        if (!itemWidth || !sectionWidth) {
+          measureMetrics();
+          return;
+        }
+
+        const scrollLeft = container.scrollLeft;
+        const scrollWidth = container.scrollWidth;
+        const clientWidth = container.clientWidth;
+
+        // Reset to middle section when reaching edges
+        if (scrollLeft <= itemWidth) {
+          container.scrollLeft = sectionWidth + itemWidth;
+        } else if (scrollLeft >= scrollWidth - clientWidth - itemWidth) {
+          container.scrollLeft = sectionWidth - clientWidth + itemWidth;
+        }
+
+        updateArrows();
+      });
     };
 
-    container.addEventListener('scroll', handleScroll);
-    return () => container.removeEventListener('scroll', handleScroll);
-  }, [shuffledItems.length]);
+    container.addEventListener("scroll", handleScroll, { passive: true });
+    return () => container.removeEventListener("scroll", handleScroll);
+  }, [displayItems.length, measureMetrics, updateArrows]);
 
   // Initialize scroll to middle section
   useEffect(() => {
     const container = scrollContainerRef.current;
-    if (container && shuffledItems.length > 0) {
+    if (container && displayItems.length > 0) {
       const timer = setTimeout(() => {
-        if (container.children.length === 0) return;
-        const firstChild = container.children[0] as HTMLElement;
-        const itemWidth = firstChild.getBoundingClientRect().width + parseFloat(window.getComputedStyle(container).gap || "0");
-        const sectionWidth = shuffledItems.length * itemWidth;
-        container.scrollLeft = sectionWidth;
+        measureMetrics();
+        const { sectionWidth } = metricsRef.current;
+        if (sectionWidth > 0) {
+          container.scrollLeft = sectionWidth;
+        }
         updateArrows();
       }, 50);
       return () => clearTimeout(timer);
     }
-  }, [shuffledItems.length]);
+  }, [displayItems.length, measureMetrics, updateArrows]);
 
-  // Auto-scroll animation — rAF based, time-normalized, throttled when tab hidden.
-  // setInterval(30ms) caused 33 layout-thrashing scrolls/sec, dominating INP and main thread.
+  // Auto-scroll animation: rAF based, pauses automatically when offscreen via IntersectionObserver
   useEffect(() => {
     const container = scrollContainerRef.current;
-    if (!container || shuffledItems.length === 0 || isPaused || !isAutoScrolling) return;
+    if (!container || displayItems.length === 0 || isPaused || !isAutoScrolling) return;
     if (prefersReducedMotion.current) return;
 
+    let isVisibleInViewport = true;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          isVisibleInViewport = entry.isIntersecting;
+        }
+      },
+      { rootMargin: "100px" }
+    );
+    observer.observe(container);
+
     let lastTime = performance.now();
-    const PX_PER_MS = 33 / 1000; // matches previous ~33 px/sec
+    const PX_PER_MS = 33 / 1000;
 
     const tick = (now: number) => {
-      const delta = now - lastTime;
+      const delta = Math.min(now - lastTime, 64); // Cap delta to prevent jump after long tab pause
       lastTime = now;
-      if (!isPaused && document.visibilityState === "visible") {
+      if (!isPaused && isVisibleInViewport && document.visibilityState === "visible") {
         container.scrollLeft += delta * PX_PER_MS;
       }
       autoScrollRafRef.current = requestAnimationFrame(tick);
@@ -169,12 +228,13 @@ export function HomeHeroCarousel() {
     autoScrollRafRef.current = requestAnimationFrame(tick);
 
     return () => {
+      observer.disconnect();
       if (autoScrollRafRef.current !== null) {
         cancelAnimationFrame(autoScrollRafRef.current);
         autoScrollRafRef.current = null;
       }
     };
-  }, [shuffledItems.length, isPaused, isAutoScrolling]);
+  }, [displayItems.length, isPaused, isAutoScrolling]);
 
   // rAF-throttled 3D tilt: previous handler ran on every mousemove (60+/sec)
   // and called getBoundingClientRect synchronously, forcing layout each event.

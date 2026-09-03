@@ -41,32 +41,21 @@ export function NavigationProgress() {
   }, [pathname]);
 
   function startProgress() {
-    // Clear any existing timers
-    if (timerRef.current) clearInterval(timerRef.current);
     if (completeTimer.current) clearTimeout(completeTimer.current);
-
     setProgress(0);
     setVisible(true);
-
-    let p = 0;
-    timerRef.current = setInterval(() => {
-      // Decelerate as we approach 85%
-      p += (85 - p) * 0.08;
-      setProgress(Math.min(p, 85));
-      if (p >= 84.9) {
-        if (timerRef.current) clearInterval(timerRef.current);
-      }
-    }, 30);
+    // Jump to 80% on next tick and let CSS ease it out smoothly without JS re-render loop
+    requestAnimationFrame(() => {
+      setProgress(80);
+    });
   }
 
   function completeProgress() {
-    if (timerRef.current) clearInterval(timerRef.current);
     setProgress(100);
-
     completeTimer.current = setTimeout(() => {
       setVisible(false);
       setProgress(0);
-    }, 400);
+    }, 350);
   }
 
   if (!visible && progress === 0) return null;
@@ -90,7 +79,7 @@ export function NavigationProgress() {
           width: `${progress}%`,
           background: `linear-gradient(90deg, oklch(0.68 0.22 305), oklch(0.78 0.16 200))`,
           boxShadow: `0 0 10px oklch(0.68 0.22 305 / 0.7)`,
-          transition: progress === 100 ? "width 0.2s ease-out, opacity 0.4s ease" : "width 0.08s linear",
+          transition: progress === 100 ? "width 0.2s ease-out, opacity 0.35s ease" : "width 1.2s cubic-bezier(0.1, 0.5, 0.1, 1)",
           opacity: visible ? 1 : 0,
           borderRadius: "0 2px 2px 0",
         }}
