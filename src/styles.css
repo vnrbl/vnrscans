@@ -591,3 +591,58 @@
   }
 }
 
+/* ==========================================================================
+   ⚡ Ultra Performance Mode (Hardware-Accelerated Zero-Lag Profile)
+   ========================================================================== */
+html.perf-mode {
+  scroll-behavior: auto !important;
+}
+
+html.perf-mode *,
+html.perf-mode *::before,
+html.perf-mode *::after {
+  /* Eliminate heavy GPU shader calculations from backdrop filters */
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  text-shadow: none !important;
+}
+
+/* Hide continuous decorative ambient blur orbs that cause compositing GPU lag */
+html.perf-mode [class*="blur-[80px]"],
+html.perf-mode [class*="blur-[100px]"],
+html.perf-mode [class*="blur-[120px]"],
+html.perf-mode [class*="blur-[140px]"],
+html.perf-mode .ambient-glow {
+  display: none !important;
+  opacity: 0 !important;
+}
+
+/* Turn off card lift transforms during fast scroll to keep frame rate pinned at 60/120 FPS */
+html.perf-mode .hover-lift:hover {
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+html.perf-mode .hover-scale:hover {
+  transform: none !important;
+}
+
+/* Streamline glass surfaces to solid opaque dark backgrounds for zero compositing load */
+html.perf-mode .glass-card,
+html.perf-mode .glass-panel {
+  background: #121217 !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+  box-shadow: none !important;
+}
+
+/* Simplify background animations and pulse effects */
+html.perf-mode .animate-pulse {
+  animation: none !important;
+}
+
+html.perf-mode .shimmer-dark {
+  animation: none !important;
+  background: #18181f !important;
+}
+
+

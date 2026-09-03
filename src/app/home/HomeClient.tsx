@@ -964,13 +964,6 @@ function LatestUpdatesSection({
                           {item.type}
                         </Badge>
                       </div>
-                      {item.recent_chapters && item.recent_chapters.length >= 4 && (
-                        <div className="absolute top-2 right-2">
-                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded shadow-md uppercase tracking-wider text-white bg-gradient-to-r from-red-600 to-amber-500">
-                            🔥 Mass
-                          </span>
-                        </div>
-                      )}
                     </div>
                   </Link>
 
@@ -987,59 +980,32 @@ function LatestUpdatesSection({
                       </Link>
                     </div>
 
-                    {/* Recent Chapters List — Groups mass updates cleanly under one cover */}
+                    {/* Recent Chapters List */}
                     <div className="space-y-1.5">
-                      {(() => {
-                        const chapters = item.recent_chapters || [];
-                        const isMassUpdate = chapters.length >= 4;
-                        const displayedChapters = isMassUpdate ? chapters.slice(0, 2) : chapters.slice(0, 3);
-                        const hiddenCount = chapters.length - displayedChapters.length;
+                      {item.recent_chapters.map((chapter) => {
+                        const isRead = readChapterIds.has(chapter.id);
 
                         return (
-                          <>
-                            {displayedChapters.map((chapter) => {
-                              const isRead = readChapterIds.has(chapter.id);
-
-                              return (
-                                <Link
-                                  key={chapter.id}
-                                  to="/title/$titleSlug/$chapterSlug"
-                                  params={{ titleSlug: item.slug, chapterSlug: chapter.slug }}
-                                  className={`flex items-center justify-between text-xs px-2.5 py-1.5 rounded border border-white/10 bg-surface-1/60 hover:bg-surface-2 hover:border-purple-500/40 hover:text-white transition-all ${
-                                    isRead ? 'text-neutral-500 opacity-75' : 'text-neutral-200'
-                                  }`}
-                                >
-                                  <div className="flex min-w-0 flex-1 items-center gap-1.5">
-                                    <BookOpen className={`h-3 w-3 shrink-0 ${isRead ? 'text-neutral-500' : 'text-purple-400'}`} />
-                                    <span className="truncate text-xs font-medium">
-                                      Chapter {chapter.chapter_number}
-                                    </span>
-                                  </div>
-                                  <span className="ml-1.5 shrink-0 text-xs text-neutral-400">
-                                    {formatTimeAgo(chapter.created_at)}
-                                  </span>
-                                </Link>
-                              );
-                            })}
-
-                            {hiddenCount > 0 && (
-                              <Link
-                                to="/title/$slug"
-                                params={{ slug: item.slug }}
-                                className="flex items-center justify-between text-xs px-2.5 py-1 rounded border border-purple-500/30 bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 font-medium transition-all group/mass"
-                              >
-                                <div className="flex items-center gap-1.5 truncate">
-                                  <span className="text-[11px]">🔥</span>
-                                  <span className="truncate">+{hiddenCount} more chapters ({isMassUpdate ? "Mass Update" : "new"})</span>
-                                </div>
-                                <span className="text-[10px] opacity-75 group-hover/mass:translate-x-0.5 transition-transform shrink-0 ml-1">
-                                  View all →
-                                </span>
-                              </Link>
-                            )}
-                          </>
+                          <Link
+                            key={chapter.id}
+                            to="/title/$titleSlug/$chapterSlug"
+                            params={{ titleSlug: item.slug, chapterSlug: chapter.slug }}
+                            className={`flex items-center justify-between text-xs px-2.5 py-1.5 rounded border border-white/10 bg-surface-1/60 hover:bg-surface-2 hover:border-purple-500/40 hover:text-white transition-all ${
+                              isRead ? 'text-neutral-500 opacity-75' : 'text-neutral-200'
+                            }`}
+                          >
+                            <div className="flex min-w-0 flex-1 items-center gap-1.5">
+                              <BookOpen className={`h-3 w-3 shrink-0 ${isRead ? 'text-neutral-500' : 'text-purple-400'}`} />
+                              <span className="truncate text-xs font-medium">
+                                Chapter {chapter.chapter_number}
+                              </span>
+                            </div>
+                            <span className="ml-1.5 shrink-0 text-xs text-neutral-400">
+                              {formatTimeAgo(chapter.created_at)}
+                            </span>
+                          </Link>
                         );
-                      })()}
+                      })}
                     </div>
                   </div>
                 </div>

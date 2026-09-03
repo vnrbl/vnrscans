@@ -12,6 +12,7 @@ const AddNewSeriesDialog = dynamic(
 const DiceRollOverlay = lazy(() => import("@/components/DiceRollOverlay").then(m => ({ default: m.DiceRollOverlay })));
 const NavbarSearch = lazy(() => import("@/components/NavbarSearch").then(m => ({ default: m.NavbarSearch })));
 import { Button } from "@/components/ui/button";
+import { PerformanceModeButton } from "@/components/PerformanceModeButton";
 import { useAuth, useIsAdmin } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
@@ -351,6 +352,9 @@ export function Navbar() {
               );
             })()}
 
+            {/* Performance Booster / Turbo Mode (Desktop) */}
+            <PerformanceModeButton />
+
             {/* Library Quick Access (Desktop) */}
             {user && (
               <Button
@@ -392,6 +396,9 @@ export function Navbar() {
                 </button>
               );
             })()}
+
+            {/* Mobile Performance Booster */}
+            <PerformanceModeButton isMobile={true} />
 
             {/* Notifications Bell */}
             <Suspense fallback={null}>
