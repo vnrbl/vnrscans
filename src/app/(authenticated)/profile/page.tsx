@@ -1494,11 +1494,11 @@ export default function ProfilePage() {
             </div>
             {isAdmin ? (
               <span className="text-sm font-semibold" style={{ color: accentColor }}>
-                Infinite XP & Aura
+                Infinite Qi & Boundless Dao Aura
               </span>
             ) : (
               <span className="text-sm text-muted-foreground">
-                {xp} / {xpForNextLevel} XP
+                {xp} / {xpForNextLevel} Qi
               </span>
             )}
           </div>
@@ -2196,12 +2196,12 @@ export default function ProfilePage() {
                     <h3 className="mb-3 font-semibold">Level Progress</h3>
                     <div className="space-y-3">
                       <StatRow icon={<Trophy className="h-4 w-4" style={{ color: accentColor }} />} label="Current Level" value={isAdmin ? "Maxed Out" : `Level ${level}`} />
-                      <StatRow icon={<TrendingUp className="h-4 w-4 text-blue-500" />} label="Total XP" value={isAdmin ? "Infinite Aura and XP" : xp} />
-                      <StatRow icon={<TrendingUp className="h-4 w-4 text-green-500" />} label="Next Level" value={isAdmin ? "∞" : `${xpForNextLevel - xp} XP needed`} />
+                      <StatRow icon={<TrendingUp className="h-4 w-4 text-blue-500" />} label="Total Spiritual Qi" value={isAdmin ? "Infinite Qi & Aura" : `${xp} Qi`} />
+                      <StatRow icon={<TrendingUp className="h-4 w-4 text-green-500" />} label="Next Level" value={isAdmin ? "∞" : `${xpForNextLevel - xp} Qi needed`} />
                       <div className="mt-2">
                         <Progress value={isAdmin ? 100 : xpProgress} className="h-2" />
                         <p className="mt-1 text-center text-xs text-muted-foreground">
-                          {isAdmin ? "Infinite Aura and XP — beyond all levels" : `${xpProgress.toFixed(1)}% to Level ${level + 1}`}
+                          {isAdmin ? "Infinite Qi & Boundless Dao Aura — beyond all realms" : `${xpProgress.toFixed(1)}% to Level ${level + 1}`}
                         </p>
                       </div>
                     </div>
@@ -2211,17 +2211,17 @@ export default function ProfilePage() {
             </div>
           </TabsContent>
 
-          {/* ─── XP History Tab ─── */}
+          {/* ─── Qi History Tab ─── */}
           <TabsContent value="xp">
             <Card className="p-4 sm:p-6">
               <div className="mb-4 flex items-center justify-between gap-3">
                 <div>
                   <h3 className="flex items-center gap-2 text-lg font-semibold">
                     <Sparkles className="h-5 w-5" style={{ color: accentColor }} />
-                    XP History
+                    Spiritual Qi History
                   </h3>
                   <p className="text-sm text-muted-foreground">
-                    Every XP grant, newest first.
+                    Every Spiritual Qi grant, newest first.
                   </p>
                 </div>
                 <Badge variant="outline" className="text-xs">
@@ -2303,7 +2303,7 @@ export default function ProfilePage() {
                           variant="outline"
                         >
                           {row.amount >= 0 ? "+" : ""}
-                          {row.amount} XP
+                          {row.amount} Qi
                         </Badge>
                       </div>
                     );
@@ -2312,9 +2312,9 @@ export default function ProfilePage() {
               ) : (
                 <div className="rounded-lg border border-dashed border-border/40 p-8 text-center">
                   <Sparkles className="mx-auto h-12 w-12 text-muted-foreground/50" />
-                  <p className="mt-2 text-sm text-muted-foreground">No XP earned yet</p>
+                  <p className="mt-2 text-sm text-muted-foreground">No Qi gathered yet</p>
                   <p className="mt-1 text-xs text-muted-foreground">
-                    Read a chapter, follow a series, or finish a title to start your ledger.
+                    Read a chapter, follow a series, or finish a title to gather Spiritual Qi.
                   </p>
                 </div>
               )}

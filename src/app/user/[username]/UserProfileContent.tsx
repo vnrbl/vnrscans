@@ -1201,11 +1201,11 @@ export default function UserProfileContent({ username }: { username: string }) {
               </div>
               {roles.includes("admin") ? (
                 <span className="text-sm font-semibold" style={{ color: accentColor }}>
-                  Infinite XP & Aura
+                  Infinite Qi & Boundless Dao Aura
                 </span>
               ) : (
                 <span className="text-sm text-muted-foreground">
-                  {xp} / {xpForNextLevel} XP
+                  {xp} / {xpForNextLevel} Qi
                 </span>
               )}
             </div>

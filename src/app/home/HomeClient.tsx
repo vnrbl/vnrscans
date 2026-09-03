@@ -137,7 +137,6 @@ function HomeContent({ initialData }: { initialData?: HomeInitialData }) {
           "id,updated_at,progress,series_id,series:series_id(id,slug,title,cover_url),chapters:chapter_id(slug,chapter_number,title)"
         )
         .eq("user_id", user!.id)
-        .gte("progress", 50)
         .order("updated_at", { ascending: false });
       if (error) throw error;
 
@@ -292,7 +291,7 @@ function HomeContent({ initialData }: { initialData?: HomeInitialData }) {
     queryKey: ["latest-updates", settings.showNovelsOnHome],
     queryFn: async () => {
       const { data, error } = await supabase
-        .rpc("get_series_with_latest_chapters", { limit_count: 50 });
+        .rpc("get_series_with_latest_chapters", { limit_count: 1000 });
 
       if (error) throw error;
       

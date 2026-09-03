@@ -21,10 +21,10 @@ export function LandingFaq() {
 
       <AccordionItem value="faq-2" className="glass-panel rounded-[4px] px-5 border-border/40 transition-colors data-[state=open]:border-purple-500/40">
         <AccordionTrigger className="text-sm font-bold uppercase tracking-[0.03em] hover:no-underline text-white hover:text-purple-300 transition-colors py-4.5">
-          How does the leveling and XP system work?
+          How does the cultivation realm and Spiritual Qi system work?
         </AccordionTrigger>
         <AccordionContent className="text-xs text-muted-foreground leading-relaxed font-light pb-4.5 pt-1">
-          As you read chapters, interact with comments, and keep up your reading streaks, you earn experience points (XP). Accumulating XP increases your User Level, which unlocks rare badges, exclusive profile accent customizers, and high-tier community ranks.
+          As you read chapters, interact with comments, and keep up your daily reading streaks, you gather Spiritual Qi. Accumulating Qi allows your soul to break through higher Cultivation Realms, unlocking rare badges, exclusive animated avatar frames, custom accent glows, and prestigious seasonal community ranks.
         </AccordionContent>
       </AccordionItem>
 

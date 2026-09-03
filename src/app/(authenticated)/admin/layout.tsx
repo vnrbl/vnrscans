@@ -22,6 +22,7 @@ import {
   TerminalSquare,
   Globe2,
   Book,
+  Trash2,
 } from "lucide-react";
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -121,6 +122,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { to: "/admin/users", label: "Users", icon: Users, roles: ["admin", "moderator"] },
     { to: "/admin/permissions", label: "Roles", icon: Shield, roles: ["admin", "moderator", "uploader"] },
     { to: "/admin/badges", label: "Realms & Badges", icon: Award, roles: ["admin", "moderator"] },
+    { to: "/admin/recycle-bin", label: "Recycle Bin", icon: Trash2, roles: ["admin", "moderator"] },
   ];
 
   const visibleItems = items.filter((item) =>

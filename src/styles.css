@@ -487,6 +487,16 @@
    * SpaceX nav: fixed overlay on full-bleed photography.
    * All-caps labels, button-cap size, zero background on dark sections.
    */
+  /* Apple / iOS Translucent Frosted Glass Navbar */
+  .navbar-ios-glass {
+    background-color: rgba(6, 6, 8, 0.72) !important;
+    -webkit-backdrop-filter: blur(24px) saturate(190%) contrast(95%) !important;
+    backdrop-filter: blur(24px) saturate(190%) contrast(95%) !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.09) !important;
+    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5) !important;
+    transform: translateZ(0); /* Promote to dedicated GPU compositor layer */
+  }
+
   .nav-spacex {
     background-color: oklch(0.04 0.002 270 / 0.70);
     backdrop-filter: blur(12px);
@@ -629,92 +639,6 @@
   100% {
     background-position: -200% 0;
   }
-}
-
-/* ==========================================================================
-   ⚡ Ultra Performance Mode (Hardware-Accelerated Zero-Lag Profile)
-   ========================================================================== */
-html.perf-mode {
-  scroll-behavior: auto !important;
-}
-
-html.perf-mode *,
-html.perf-mode *::before,
-html.perf-mode *::after {
-  /* Eliminate heavy GPU shader calculations from backdrop filters */
-  backdrop-filter: none !important;
-  -webkit-backdrop-filter: none !important;
-  text-shadow: none !important;
-}
-
-/* Hide continuous decorative ambient blur orbs that cause compositing GPU lag */
-html.perf-mode [class*="blur-[80px]"],
-html.perf-mode [class*="blur-[100px]"],
-html.perf-mode [class*="blur-[120px]"],
-html.perf-mode [class*="blur-[140px]"],
-html.perf-mode .ambient-glow {
-  display: none !important;
-  opacity: 0 !important;
-}
-
-/* Turn off card lift transforms during fast scroll to keep frame rate pinned at 60/120 FPS */
-html.perf-mode .hover-lift:hover {
-  transform: none !important;
-  box-shadow: none !important;
-}
-
-html.perf-mode .hover-scale:hover {
-  transform: none !important;
-}
-
-/* Streamline glass surfaces to solid opaque dark backgrounds for zero compositing load */
-html.perf-mode .glass-card,
-html.perf-mode .glass-panel {
-  background: #09090d !important;
-  border-color: rgba(255, 255, 255, 0.05) !important;
-  box-shadow: none !important;
-}
-
-/* Simplify background animations and pulse effects */
-html.perf-mode .animate-pulse {
-  animation: none !important;
-}
-
-html.perf-mode .shimmer-dark {
-  animation: none !important;
-  background: #101015 !important;
-}
-
-/* 🍃 Battery Saver / Eco Mode */
-html.eco-mode *,
-html.eco-mode *::before,
-html.eco-mode *::after {
-  animation-duration: 0.001s !important;
-  animation-iteration-count: 1 !important;
-  transition-duration: 0.001s !important;
-}
-
-html.eco-mode .animate-pulse,
-html.eco-mode .animate-spin,
-html.eco-mode .animate-bounce,
-html.eco-mode .shimmer-dark {
-  animation: none !important;
-}
-
-/* 📖 Aggressive Reader Turbo - Mobile Responsive Safe */
-html.reader-turbo .reader-page-container {
-  content-visibility: auto !important;
-  contain-intrinsic-size: auto 1200px !important;
-  width: 100% !important;
-  max-width: 100% !important;
-}
-
-/* ⚡ Hardware GPU Compositing Acceleration */
-html.gpu-accel main,
-html.gpu-accel .reader-page-container {
-  transform: translate3d(0, 0, 0);
-  backface-visibility: hidden;
-  perspective: 1000px;
 }
 
 /* Global Mobile Overflow & Full Responsiveness */

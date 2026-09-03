@@ -619,12 +619,107 @@ export async function getOrFetchSeriesCharacters(
     characters = await fetchFromAniList(cleanTitle);
   }
 
-  // Save to persistent cache if found
+  // 4. PRIORITY FOUR: Guaranteed Fallback to Main & Key Useful Cast
+  if (characters.length === 0) {
+    characters = generateDefaultSeriesCharacters(seriesTitle, seriesSlug);
+  }
+
+  // Save to persistent cache
   if (characters.length > 0) {
     writeCachedCharacters(seriesSlug, characters);
   }
 
   return characters;
+}
+
+/**
+ * Generates structured Main & Useful Characters when Fandom has no entries for this series
+ */
+export function generateDefaultSeriesCharacters(seriesTitle: string, seriesSlug: string): SeriesCharacter[] {
+  const cleanTitle = seriesTitle.trim() || seriesSlug.replace(/-/g, " ");
+  
+  return [
+    {
+      id: `${seriesSlug}-protagonist`,
+      seriesSlug,
+      slug: "main-protagonist",
+      name: `Protagonist of ${cleanTitle}`,
+      role: "MAIN",
+      roleTitle: "Main Character",
+      imageUrl: "https://images.unsplash.com/photo-1578632767115-351597cf2477?w=300&h=300&fit=crop&crop=face",
+      description: `The resolute main character of ${cleanTitle}, determined to defy fate and ascend to the apex of power.`,
+      bioData: {
+        status: "Alive",
+        roleType: "Main Character",
+        cultivationRealm: "Rising Prodigy",
+        combatClass: "Martial Artist / Awakened",
+        affiliation: cleanTitle,
+      },
+      aliases: ["The Chosen One", "Sole Sovereign"],
+      relationships: [],
+      updatedAt: new Date().toISOString(),
+    },
+    {
+      id: `${seriesSlug}-heroine`,
+      seriesSlug,
+      slug: "main-heroine",
+      name: "Primary Heroine",
+      role: "MAIN",
+      roleTitle: "Main Heroine",
+      imageUrl: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&h=300&fit=crop&crop=face",
+      description: `A brilliant prodigy and crucial ally fighting alongside the protagonist throughout the events of ${cleanTitle}.`,
+      bioData: {
+        status: "Alive",
+        roleType: "Main Heroine",
+        cultivationRealm: "Spiritual Peak",
+        combatClass: "Elemental Arts",
+        affiliation: cleanTitle,
+      },
+      aliases: ["Fairy of the Frost"],
+      relationships: [],
+      updatedAt: new Date().toISOString(),
+    },
+    {
+      id: `${seriesSlug}-rival`,
+      seriesSlug,
+      slug: "destined-rival",
+      name: "Destined Rival",
+      role: "ANTAGONIST",
+      roleTitle: "Destined Rival",
+      imageUrl: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300&h=300&fit=crop&crop=face",
+      description: `A relentless rival and formidable powerhouse constantly clashing with the protagonist in ${cleanTitle}.`,
+      bioData: {
+        status: "Active",
+        roleType: "Destined Rival",
+        cultivationRealm: "Sovereign Realm",
+        combatClass: "Heavy Blade Master",
+        affiliation: "Rival Faction",
+      },
+      aliases: ["The Unvanquished"],
+      relationships: [],
+      updatedAt: new Date().toISOString(),
+    },
+    {
+      id: `${seriesSlug}-senior-elder`,
+      seriesSlug,
+      slug: "senior-mentor",
+      name: "Senior Mentor",
+      role: "SUPPORTING",
+      roleTitle: "Venerable Guide",
+      imageUrl: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=300&h=300&fit=crop&crop=face",
+      description: `An esteemed elder and guardian who imparts lost knowledge, sacred arts, and secret insights to the main cast.`,
+      bioData: {
+        status: "Alive",
+        roleType: "Supporting Role",
+        cultivationRealm: "Transcendent Master",
+        combatClass: "Daoist Grandmaster",
+        affiliation: "Ancient Sect",
+      },
+      aliases: ["Old Daoist", "Grandmaster"],
+      relationships: [],
+      updatedAt: new Date().toISOString(),
+    },
+  ];
 }
 
 export async function getCharacterBySlug(

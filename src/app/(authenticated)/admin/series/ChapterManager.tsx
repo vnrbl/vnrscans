@@ -25,6 +25,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { logAdminAction } from "@/lib/adminLog";
 import { useAuth } from "@/hooks/useAuth";
+import { moveToRecycleBin } from "@/lib/recycle-bin";
 import { $extractChaptersFromUrl, $extractImagesFromUrl, $syncImportSource } from "@/lib/api/scraper.actions";
 import type { ChapterInfo } from "@/lib/chapter-scraper";
 import { detectImportSource } from "@/lib/import-source-utils";
@@ -1227,6 +1228,26 @@ export default function ChapterManager({ seriesId, onBack }: { seriesId: string;
 
   const deleteSelectedChaptersMutation = useMutation({
     mutationFn: async (chapterIds: string[]) => {
+      // Snapshot chapters to recycle bin before deleting
+      const { data: chaptersData } = await supabase
+        .from("chapters")
+        .select("*")
+        .in("id", chapterIds);
+
+      if (chaptersData && chaptersData.length > 0) {
+        for (const ch of chaptersData) {
+          await moveToRecycleBin({
+            itemType: "chapter",
+            itemId: ch.id,
+            title: `Chapter ${ch.chapter_number}${ch.title ? `: ${ch.title}` : ""}`,
+            originalTable: "chapters",
+            metadata: ch,
+            deletedBy: user?.id,
+            deletedByUsername: user?.email?.split("@")[0] || "Admin",
+          });
+        }
+      }
+
       const { error: deletePagesError } = await supabase
         .from("chapter_pages")
         .delete()
@@ -1242,8 +1263,9 @@ export default function ChapterManager({ seriesId, onBack }: { seriesId: string;
     },
     onSuccess: () => {
       setSelectedChapterIds(new Set());
-      toast.success("Selected chapters deleted");
+      toast.success("Selected chapters moved to Recycle Bin");
       qc.invalidateQueries({ queryKey: ["admin", "chapters", seriesId] });
+      qc.invalidateQueries({ queryKey: ["admin-recycle-bin"] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -1524,14 +1546,34 @@ export default function ChapterManager({ seriesId, onBack }: { seriesId: string;
 
   const deleteChapter = useMutation({
     mutationFn: async (chapterId: string) => {
+      // Snapshot chapter to recycle bin before deleting
+      const { data: ch } = await supabase
+        .from("chapters")
+        .select("*")
+        .eq("id", chapterId)
+        .maybeSingle();
+
+      if (ch) {
+        await moveToRecycleBin({
+          itemType: "chapter",
+          itemId: chapterId,
+          title: `Chapter ${ch.chapter_number}${ch.title ? `: ${ch.title}` : ""}`,
+          originalTable: "chapters",
+          metadata: ch,
+          deletedBy: user?.id,
+          deletedByUsername: user?.email?.split("@")[0] || "Admin",
+        });
+      }
+
       await supabase.from("chapter_pages").delete().eq("chapter_id", chapterId);
       const { error } = await supabase.from("chapters").delete().eq("id", chapterId);
       if (error) throw error;
       await logAdminAction("delete", "chapter", chapterId, { series_id: seriesId });
     },
     onSuccess: () => {
-      toast.success("Chapter deleted");
+      toast.success("Chapter moved to Recycle Bin");
       qc.invalidateQueries({ queryKey: ["admin", "chapters", seriesId] });
+      qc.invalidateQueries({ queryKey: ["admin-recycle-bin"] });
     },
     onError: (e: Error) => toast.error(e.message),
   });

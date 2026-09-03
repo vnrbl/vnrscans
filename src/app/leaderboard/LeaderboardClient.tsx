@@ -10,7 +10,6 @@ import {
   Sparkles,
   ArrowRight,
   BookOpen,
-  History,
   Shield,
   Clock,
 } from "lucide-react";
@@ -192,16 +191,6 @@ export function LeaderboardClient() {
               <Button className="bg-white hover:bg-neutral-200 text-black font-semibold text-xs h-9 px-4 rounded-lg gap-2 cursor-pointer transition-all">
                 <BookOpen className="h-4 w-4" />
                 <span>Explore Series</span>
-              </Button>
-            </Link>
-
-            <Link to="/history">
-              <Button 
-                variant="outline"
-                className="border-white/10 bg-neutral-900/60 hover:bg-neutral-800 hover:text-white text-neutral-300 text-xs h-9 px-4 rounded-lg gap-2 cursor-pointer transition-all"
-              >
-                <History className="h-4 w-4" />
-                <span>Reading History</span>
               </Button>
             </Link>
 

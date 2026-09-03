@@ -1,0 +1,92 @@
+[
+  {
+    "id": "custom-unlisted-manhwa-protagonist",
+    "seriesSlug": "custom-unlisted-manhwa",
+    "slug": "main-protagonist",
+    "name": "Protagonist of The Celestial Sword Emperor",
+    "role": "MAIN",
+    "roleTitle": "Main Character",
+    "imageUrl": "https://images.unsplash.com/photo-1578632767115-351597cf2477?w=300&h=300&fit=crop&crop=face",
+    "description": "The resolute main character of The Celestial Sword Emperor, determined to defy fate and ascend to the apex of power.",
+    "bioData": {
+      "status": "Alive",
+      "roleType": "Main Character",
+      "cultivationRealm": "Rising Prodigy",
+      "combatClass": "Martial Artist / Awakened",
+      "affiliation": "The Celestial Sword Emperor"
+    },
+    "aliases": [
+      "The Chosen One",
+      "Sole Sovereign"
+    ],
+    "relationships": [],
+    "updatedAt": "2026-09-03T16:28:23.568Z"
+  },
+  {
+    "id": "custom-unlisted-manhwa-heroine",
+    "seriesSlug": "custom-unlisted-manhwa",
+    "slug": "main-heroine",
+    "name": "Primary Heroine",
+    "role": "MAIN",
+    "roleTitle": "Main Heroine",
+    "imageUrl": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&h=300&fit=crop&crop=face",
+    "description": "A brilliant prodigy and crucial ally fighting alongside the protagonist throughout the events of The Celestial Sword Emperor.",
+    "bioData": {
+      "status": "Alive",
+      "roleType": "Main Heroine",
+      "cultivationRealm": "Spiritual Peak",
+      "combatClass": "Elemental Arts",
+      "affiliation": "The Celestial Sword Emperor"
+    },
+    "aliases": [
+      "Fairy of the Frost"
+    ],
+    "relationships": [],
+    "updatedAt": "2026-09-03T16:28:23.568Z"
+  },
+  {
+    "id": "custom-unlisted-manhwa-rival",
+    "seriesSlug": "custom-unlisted-manhwa",
+    "slug": "destined-rival",
+    "name": "Destined Rival",
+    "role": "ANTAGONIST",
+    "roleTitle": "Destined Rival",
+    "imageUrl": "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300&h=300&fit=crop&crop=face",
+    "description": "A relentless rival and formidable powerhouse constantly clashing with the protagonist in The Celestial Sword Emperor.",
+    "bioData": {
+      "status": "Active",
+      "roleType": "Destined Rival",
+      "cultivationRealm": "Sovereign Realm",
+      "combatClass": "Heavy Blade Master",
+      "affiliation": "Rival Faction"
+    },
+    "aliases": [
+      "The Unvanquished"
+    ],
+    "relationships": [],
+    "updatedAt": "2026-09-03T16:28:23.568Z"
+  },
+  {
+    "id": "custom-unlisted-manhwa-senior-elder",
+    "seriesSlug": "custom-unlisted-manhwa",
+    "slug": "senior-mentor",
+    "name": "Senior Mentor",
+    "role": "SUPPORTING",
+    "roleTitle": "Venerable Guide",
+    "imageUrl": "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=300&h=300&fit=crop&crop=face",
+    "description": "An esteemed elder and guardian who imparts lost knowledge, sacred arts, and secret insights to the main cast.",
+    "bioData": {
+      "status": "Alive",
+      "roleType": "Supporting Role",
+      "cultivationRealm": "Transcendent Master",
+      "combatClass": "Daoist Grandmaster",
+      "affiliation": "Ancient Sect"
+    },
+    "aliases": [
+      "Old Daoist",
+      "Grandmaster"
+    ],
+    "relationships": [],
+    "updatedAt": "2026-09-03T16:28:23.568Z"
+  }
+]

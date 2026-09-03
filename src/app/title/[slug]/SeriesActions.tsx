@@ -310,7 +310,7 @@ export const SeriesActions = React.memo(function SeriesActions({
       if (result?.wasFollowing) {
         toast.success("Unfollowed");
       } else {
-        toast.success(`Following — +${XP_AMOUNTS.follow_series} XP earned`);
+        toast.success(`Following — +${XP_AMOUNTS.follow_series} Qi gathered`);
       }
     },
     onError: (e: Error) => toast.error(e.message),

@@ -36,6 +36,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { logAdminAction } from "@/lib/adminLog";
 import { useAuth } from "@/hooks/useAuth";
+import { moveToRecycleBin } from "@/lib/recycle-bin";
 import { $extractChaptersFromUrl, $extractImagesFromUrl, $syncImportSource, $syncAllSeriesImportSources } from "@/lib/api/scraper.actions";
 import type { ChapterInfo } from "@/lib/chapter-scraper";
 import { detectImportSource } from "@/lib/import-source-utils";
@@ -647,13 +648,27 @@ export default function AdminSeries() {
 
   const del = useMutation({
     mutationFn: async (id: string) => {
+      // Snapshot series to recycle bin prior to deletion
+      const { data: item } = await supabase.from("series").select("*").eq("id", id).maybeSingle();
+      if (item) {
+        await moveToRecycleBin({
+          itemType: "series",
+          itemId: id,
+          title: item.title,
+          originalTable: "series",
+          metadata: item,
+          deletedBy: user?.id,
+          deletedByUsername: user?.email?.split("@")[0] || "Admin",
+        });
+      }
       const { error } = await supabase.from("series").delete().eq("id", id);
       if (error) throw error;
       await logAdminAction("delete", "series", id);
     },
     onSuccess: () => {
-      toast.success("Series deleted");
+      toast.success("Series moved to Recycle Bin");
       qc.invalidateQueries({ queryKey: ["admin", "series"] });
+      qc.invalidateQueries({ queryKey: ["admin-recycle-bin"] });
     },
     onError: (e: Error) => toast.error(e.message),
   });

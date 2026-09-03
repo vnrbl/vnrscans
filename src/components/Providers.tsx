@@ -26,7 +26,6 @@ import { AuthProvider } from "@/hooks/useAuth";
 import { NavigationProgress } from "@/components/NavigationProgress";
 
 import { ProcessingTaskProvider } from "@/contexts/ProcessingTaskContext";
-import { LiveFpsHud } from "@/components/LiveFpsHud";
 import { CommandSearchModal } from "@/components/CommandSearchModal";
 import { PwaInstallPrompt } from "@/components/PwaInstallPrompt";
 
@@ -102,7 +101,6 @@ function AppShell({ children }: { children: ReactNode }) {
         {children}
         <Toaster />
         <Analytics />
-        <LiveFpsHud />
         <CommandSearchModal />
         <PwaInstallPrompt />
       </>
@@ -120,7 +118,6 @@ function AppShell({ children }: { children: ReactNode }) {
       <Footer />
       <Toaster />
       <Analytics />
-      <LiveFpsHud />
       <PwaInstallPrompt />
     </div>
   );

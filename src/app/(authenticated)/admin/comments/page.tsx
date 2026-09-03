@@ -17,12 +17,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useState } from "react";
+import { useState, useMemo } from "react";
+import { useAuth } from "@/hooks/useAuth";
+import { moveToRecycleBin } from "@/lib/recycle-bin";
 
 
 type CommentFilter = "all" | "visible" | "hidden" | "media" | "spoilers" | "pinned";
 
 export default function AdminComments() {
+  const { user } = useAuth();
   const qc = useQueryClient();
   const [filter, setFilter] = useState<CommentFilter>("all");
   const [search, setSearch] = useState("");
@@ -39,7 +42,12 @@ export default function AdminComments() {
     },
   });
 
-  const userIds = Array.from(new Set((q.data ?? []).map((c: any) => c.user_id).filter(Boolean)));
+  const commentRows = q.data ?? [];
+  const userIds = useMemo(
+    () => Array.from(new Set(commentRows.map((c: any) => c.user_id).filter(Boolean))),
+    [commentRows]
+  );
+
   const profilesQ = useQuery({
     queryKey: ["admin", "comment-profiles", userIds.join(",")],
     queryFn: async () => {
@@ -67,13 +75,26 @@ export default function AdminComments() {
 
   const del = useMutation({
     mutationFn: async (id: string) => {
+      const commentItem = (q.data ?? []).find((c: any) => c.id === id);
+      if (commentItem) {
+        await moveToRecycleBin({
+          itemType: "comment",
+          itemId: id,
+          title: `Comment: "${(commentItem.content || "").slice(0, 45)}..."`,
+          originalTable: "comments",
+          metadata: commentItem,
+          deletedBy: user?.id,
+          deletedByUsername: user?.email?.split("@")[0] || "Moderator",
+        });
+      }
       const { error } = await supabase.from("comments").delete().eq("id", id);
       if (error) throw error;
       await logAdminAction("delete", "comment", id);
     },
     onSuccess: () => {
-      toast.success("Deleted");
+      toast.success("Comment moved to Recycle Bin");
       qc.invalidateQueries({ queryKey: ["admin", "comments"] });
+      qc.invalidateQueries({ queryKey: ["admin-recycle-bin"] });
     },
     onError: (error: Error) => toast.error(error.message),
   });

@@ -359,8 +359,8 @@ export default async function Home() {
                 icon: BookOpen,
               },
               {
-                title: "Gamified Reading",
-                desc: "Earn XP, unlock rare achievements, climb streaks, and customize your profile badges.",
+                title: "Cultivation & Progression",
+                desc: "Gather Spiritual Qi, break through cultivation realms, climb reading streaks, and customize your profile badges.",
                 icon: Trophy,
               },
               {

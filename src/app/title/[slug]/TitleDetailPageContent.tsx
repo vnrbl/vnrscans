@@ -35,10 +35,12 @@ function SideWidgets({
   seriesId,
   seriesStatus,
   totalChapters,
+  chapters,
 }: {
   seriesId: string;
   seriesStatus?: string | null;
   totalChapters: number;
+  chapters?: Array<{ id: string; chapter_number: number }>;
 }) {
   return (
     <aside className="space-y-6 min-w-0">
@@ -46,7 +48,7 @@ function SideWidgets({
       <ShareWidget />
 
       {/* Feature 2: Personal Reading Progress & XP Tracker */}
-      <ReadingProgressWidget seriesId={seriesId} totalChapters={totalChapters} />
+      <ReadingProgressWidget seriesId={seriesId} totalChapters={totalChapters} chapters={chapters} />
 
       {/* Feature 3: Series Top Readers & Supporters */}
       <SeriesLeaderboardWidget seriesId={seriesId} />
@@ -202,7 +204,6 @@ export default function TitleDetailPageContent({
         .select("chapter_id,chapters(slug,chapter_number)")
         .eq("user_id", user.id)
         .eq("series_id", seriesQ.data.id)
-        .gte("progress", 50)
         .order("updated_at", { ascending: false })
         .limit(1)
         .maybeSingle();
@@ -390,11 +391,12 @@ export default function TitleDetailPageContent({
             />
           </div>
 
-          {/* New Side Panel containing 3 features */}
-          <TitleSidePanel
+          {/* Side panel */}
+          <SideWidgets
             seriesId={s.id}
             seriesStatus={s.status}
             totalChapters={uniqueChapterCount || (initialChaptersData?.length ?? 0)}
+            chapters={initialChaptersData || []}
           />
         </div>
 
@@ -889,10 +891,12 @@ const TitleSidePanel = React.memo(function TitleSidePanel({
   seriesId,
   seriesStatus,
   totalChapters,
+  chapters,
 }: {
   seriesId: string;
   seriesStatus?: string | null;
   totalChapters: number;
+  chapters?: Array<{ id: string; chapter_number: number }>;
 }) {
   return (
     <aside className="space-y-6 min-w-0">
@@ -900,7 +904,7 @@ const TitleSidePanel = React.memo(function TitleSidePanel({
       <ShareWidget />
 
       {/* Feature 2: Personal Reading Progress & XP Tracker */}
-      <ReadingProgressWidget seriesId={seriesId} totalChapters={totalChapters} />
+      <ReadingProgressWidget seriesId={seriesId} totalChapters={totalChapters} chapters={chapters} />
 
       {/* Feature 3: Series Top Readers & Supporters */}
       <SeriesLeaderboardWidget seriesId={seriesId} />
@@ -961,37 +965,46 @@ function ShareWidget() {
 function ReadingProgressWidget({
   seriesId,
   totalChapters,
+  chapters,
 }: {
   seriesId: string;
   totalChapters: number;
+  chapters?: Array<{ id: string; chapter_number: number }>;
 }) {
   const { user } = useAuth();
 
   const progressQ = useQuery({
     queryKey: ["reading-progress-widget", seriesId, user?.id],
     queryFn: async () => {
-      if (!user) return { readCount: 0, totalEarnedXp: 0 };
+      if (!user) return new Set<string>();
 
       const { data, error } = await supabase
         .from("reading_history")
         .select("chapter_id")
         .eq("user_id", user.id)
-        .eq("series_id", seriesId)
-        .gte("progress", 50);
+        .eq("series_id", seriesId);
 
       if (error) throw error;
-
-      const readCount = data?.length || 0;
-      const totalEarnedXp = readCount * 10;
-
-      return { readCount, totalEarnedXp };
+      return new Set<string>((data || []).map((r) => r.chapter_id));
     },
     enabled: !!user,
     staleTime: 1000 * 60 * 2,
   });
 
-  const readCount = progressQ.data?.readCount || 0;
-  const earnedXp = progressQ.data?.totalEarnedXp || 0;
+  // Calculate unique chapter numbers read across all scan sources
+  const readChapterNumbers = React.useMemo(() => {
+    const numbers = new Set<number>();
+    if (!progressQ.data || !chapters) return numbers;
+    for (const ch of chapters) {
+      if (progressQ.data.has(ch.id)) {
+        numbers.add(Number(ch.chapter_number));
+      }
+    }
+    return numbers;
+  }, [progressQ.data, chapters]);
+
+  const readCount = readChapterNumbers.size;
+  const earnedXp = readCount * 50;
   const progressPercent = totalChapters > 0 ? Math.min(100, Math.round((readCount / totalChapters) * 100)) : 0;
 
   return (
@@ -1029,93 +1042,183 @@ function ReadingProgressWidget({
 }
 
 /* ------------------------------------------------------------------ */
-/*  Feature 3: Series Leaderboard Widget                               */
+/*  Feature 3: Series Leaderboard Widget (Top Cultivators)            */
 /* ------------------------------------------------------------------ */
 
 function SeriesLeaderboardWidget({ seriesId }: { seriesId: string }) {
   const leaderboardQ = useQuery({
-    queryKey: ["series-leaderboard-safe", seriesId],
+    queryKey: ["series-top-cultivators-v2", seriesId],
     queryFn: async () => {
       try {
+        // 1. Try dedicated RPC function first for high-performance DB sync
+        const { data: rpcData, error: rpcErr } = await (supabase as any).rpc(
+          "get_series_top_cultivators",
+          { _series_id: seriesId, _limit: 5 }
+        );
+
+        if (!rpcErr && rpcData && rpcData.length > 0) {
+          return rpcData.map((row: any) => ({
+            userId: row.user_id,
+            username: row.username,
+            avatarUrl: row.avatar_url,
+            avatarFrame: row.avatar_frame,
+            accentColor: row.accent_color,
+            userLevel: row.user_level || 1,
+            seriesQiCollected: Number(row.series_qi_collected) || 0,
+            chaptersRead: Number(row.chapters_read) || 0,
+          }));
+        }
+
+        // 2. Resilient fallback: calculate directly from reading_history & profiles
         const { data: historyData, error: historyErr } = await supabase
           .from("reading_history")
-          .select("user_id")
+          .select("user_id, progress, xp_awarded")
           .eq("series_id", seriesId)
-          .limit(100);
+          .limit(200);
 
         if (historyErr || !historyData || historyData.length === 0) return [];
 
         const userCounts = new Map<string, number>();
         historyData.forEach((row: any) => {
-          if (row.user_id) {
+          if (row.user_id && (row.progress >= 70 || row.xp_awarded)) {
             userCounts.set(row.user_id, (userCounts.get(row.user_id) || 0) + 1);
           }
         });
 
-        const userIds = Array.from(userCounts.keys()).slice(0, 10);
+        const userIds = Array.from(userCounts.keys()).slice(0, 15);
         if (userIds.length === 0) return [];
 
         const { data: profiles, error: profErr } = await supabase
           .from("profiles")
-          .select("user_id, username, avatar_url, experience_points")
+          .select("user_id, username, avatar_url, avatar_frame, accent_color, user_level, experience_points")
           .in("user_id", userIds);
 
         if (profErr || !profiles) return [];
 
         return profiles
-          .map((p: any) => ({
-            username: p.username,
-            avatar_url: p.avatar_url,
-            experience_points: p.experience_points,
-            chapters_read: userCounts.get(p.user_id) || 1,
-          }))
-          .sort((a, b) => b.chapters_read - a.chapters_read || (b.experience_points || 0) - (a.experience_points || 0))
-          .slice(0, 3);
+          .map((p: any) => {
+            const chRead = userCounts.get(p.user_id) || 1;
+            const qiGathered = chRead * 50;
+            return {
+              userId: p.user_id,
+              username: p.username,
+              avatarUrl: p.avatar_url,
+              avatarFrame: p.avatar_frame,
+              accentColor: p.accent_color,
+              userLevel: p.user_level || 1,
+              seriesQiCollected: qiGathered,
+              chaptersRead: chRead,
+            };
+          })
+          .sort((a, b) => b.seriesQiCollected - a.seriesQiCollected || b.chaptersRead - a.chaptersRead)
+          .slice(0, 5);
       } catch (err) {
         console.warn("[LeaderboardWidget] Error:", err);
         return [];
       }
     },
     enabled: !!seriesId,
-    staleTime: 1000 * 60 * 5,
+    staleTime: 1000 * 60 * 3,
   });
 
   const topReaders = leaderboardQ.data || [];
 
   return (
-    <div className="rounded-xl border border-white/10 bg-neutral-950 p-3.5 shadow-md space-y-2.5">
+    <div className="rounded-xl border border-white/10 bg-neutral-950 p-3.5 shadow-md space-y-3">
       <div className="flex items-center gap-2">
         <div className="p-1.5 rounded-lg bg-white/5 border border-white/10 text-amber-400">
           <Award className="h-3.5 w-3.5" />
         </div>
         <div>
           <h3 className="text-xs font-mono font-bold uppercase tracking-wider text-white">Top Cultivators</h3>
-          <p className="text-[10px] text-neutral-400 font-sans">Most dedicated readers for this series</p>
+          <p className="text-[10px] text-neutral-400 font-sans">Ranked by Spiritual Qi gathered from this series</p>
         </div>
       </div>
 
       {leaderboardQ.isLoading ? (
-        <div className="space-y-1.5 py-1">
+        <div className="space-y-2 py-1">
           {Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className="h-7 rounded-lg bg-neutral-900 animate-pulse" />
+            <div key={i} className="h-9 rounded-lg bg-neutral-900 animate-pulse" />
           ))}
         </div>
       ) : topReaders.length === 0 ? (
-        <p className="text-[11px] text-neutral-500 text-center py-1 font-sans">No top readers yet.</p>
+        <p className="text-[11px] text-neutral-500 text-center py-2 font-sans">No cultivators recorded for this series yet.</p>
       ) : (
         <div className="space-y-1.5">
-          {topReaders.map((reader: any, index: number) => (
-            <div key={reader.username} className="flex items-center justify-between p-2 rounded-lg bg-black/60 border border-white/5">
-              <div className="flex items-center gap-2">
-                <Avatar className="h-5 w-5">
-                  <AvatarImage src={reader.avatar_url} />
-                  <AvatarFallback className="text-[9px] font-mono">{reader.username?.slice(0, 2)}</AvatarFallback>
-                </Avatar>
-                <span className="text-xs font-bold text-neutral-200">{reader.username}</span>
+          {topReaders.map((reader: any, index: number) => {
+            const isTop1 = index === 0;
+            const isTop2 = index === 1;
+            const isTop3 = index === 2;
+            const isDaoAncestor = reader.username?.toLowerCase() === "vnr610" || reader.userLevel >= 100;
+
+            return (
+              <div
+                key={reader.userId || reader.username}
+                className={`flex items-center justify-between p-2 rounded-lg border transition-colors ${
+                  isTop1
+                    ? "bg-amber-950/20 border-amber-500/30"
+                    : isTop2
+                    ? "bg-slate-900/40 border-slate-700/30"
+                    : isTop3
+                    ? "bg-amber-950/10 border-amber-800/20"
+                    : "bg-black/60 border-white/5"
+                }`}
+              >
+                <div className="flex items-center gap-2 min-w-0">
+                  {/* Rank Position */}
+                  <span
+                    className={`text-[10px] font-mono font-bold w-4 text-center shrink-0 ${
+                      isTop1
+                        ? "text-amber-400"
+                        : isTop2
+                        ? "text-slate-300"
+                        : isTop3
+                        ? "text-amber-600"
+                        : "text-neutral-500"
+                    }`}
+                  >
+                    {isTop1 ? "👑" : `#${index + 1}`}
+                  </span>
+
+                  {/* Cultivator Avatar */}
+                  <Link href={`/user/${reader.username}`} className="shrink-0">
+                    <Avatar className="h-6 w-6 border border-white/10 hover:border-amber-400/60 transition-colors">
+                      <AvatarImage src={reader.avatarUrl} />
+                      <AvatarFallback className="text-[9px] font-mono bg-neutral-900 text-neutral-300">
+                        {reader.username?.slice(0, 2)?.toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                  </Link>
+
+                  {/* Cultivator Info */}
+                  <div className="min-w-0">
+                    <Link
+                      href={`/user/${reader.username}`}
+                      className="text-xs font-bold text-white hover:text-amber-300 transition-colors block truncate max-w-[120px] sm:max-w-[140px]"
+                    >
+                      {reader.username}
+                    </Link>
+                    <span className="text-[9px] font-mono text-neutral-400 block truncate">
+                      {isDaoAncestor ? "Lv. ∞ Dao Ancestor" : `Lv. ${reader.userLevel}`}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Qi Collected & Chapter Count */}
+                <div className="text-right shrink-0 pl-2">
+                  <div className="flex items-center justify-end gap-1">
+                    <span className="text-3xs text-amber-400">⚡</span>
+                    <span className="text-xs font-mono font-bold text-amber-300 tabular-nums">
+                      {isDaoAncestor ? "∞ Qi" : `${reader.seriesQiCollected.toLocaleString()} Qi`}
+                    </span>
+                  </div>
+                  <span className="text-[9px] font-mono text-neutral-500 block">
+                    {reader.chaptersRead} ch. read
+                  </span>
+                </div>
               </div>
-              <span className="text-[10px] font-mono font-bold text-amber-300">{reader.chapters_read} ch.</span>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

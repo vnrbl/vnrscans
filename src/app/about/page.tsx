@@ -61,7 +61,7 @@ export default function AboutPage() {
             </div>
             <h3 className="text-lg font-bold">Community Driven</h3>
             <p className="text-xs text-muted-foreground leading-relaxed">
-              We offer integrated social profiles, level customizers, XP progression, and interactive discussion systems so readers can discover stories together.
+              We offer integrated social profiles, level customizers, Spiritual Qi progression, and interactive discussion systems so readers can discover stories together.
             </p>
           </Card>
 

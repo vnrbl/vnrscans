@@ -12,7 +12,6 @@ const AddNewSeriesDialog = dynamic(
 const DiceRollOverlay = lazy(() => import("@/components/DiceRollOverlay").then(m => ({ default: m.DiceRollOverlay })));
 const NavbarSearch = lazy(() => import("@/components/NavbarSearch").then(m => ({ default: m.NavbarSearch })));
 import { Button } from "@/components/ui/button";
-import { PerformanceModeButton } from "@/components/PerformanceModeButton";
 import { useAuth, useIsAdmin } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
@@ -68,6 +67,15 @@ export function Navbar() {
     t = setTimeout(cycle, delay);
     return () => clearTimeout(t);
   }, [isRolling]);
+
+  // Clean up any residual performance mode classes from html
+  useEffect(() => {
+    try {
+      const root = document.documentElement;
+      root.classList.remove("perf-mode", "eco-mode", "reader-turbo", "data-saver", "gpu-accel");
+      ["vnr-perf-master", "vnr-perf-shaders", "vnr-perf-eco", "vnr-perf-reader-turbo", "vnr-perf-data-saver", "vnr-perf-gpu", "vnr-perf-fps-hud"].forEach((k) => localStorage.removeItem(k));
+    } catch (_) {}
+  }, []);
 
   const { user } = useAuth();
   const { settings } = useReaderSettings();
@@ -164,7 +172,7 @@ export function Navbar() {
 
   return (
     <>
-      <header className="sticky top-0 z-40 border-b border-border/50 bg-background/95 backdrop-blur-md supports-[backdrop-filter]:bg-background/60">
+      <header className="sticky top-0 z-40 navbar-ios-glass">
         <div className="container mx-auto flex h-16 items-center px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16 relative justify-between">
           {/* Left Side: YouTube-Style Menu Toggle + Logo */}
           <div className="flex items-center gap-3">
@@ -321,7 +329,7 @@ export function Navbar() {
             <button
               onClick={() => setSearchOpen(true)}
               title="Search (Ctrl+K)"
-              className="flex items-center gap-2.5 w-[200px] md:w-[260px] lg:w-[320px] h-9 rounded-[4px] border border-hairline bg-surface-1/80 px-3 text-xs text-muted-foreground transition-all hover:border-purple-500/50 hover:bg-surface-2 hover:text-white focus:outline-none shadow-sm"
+              className="flex items-center gap-2.5 w-[200px] md:w-[260px] lg:w-[320px] h-9 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 hover:border-purple-500/40 px-3 text-xs text-neutral-400 hover:text-white transition-all focus:outline-none shadow-sm cursor-pointer"
             >
               <Search className="h-3.5 w-3.5 shrink-0 text-neutral-400 stroke-[1.8]" />
               <span className="flex-1 truncate text-left font-sans font-normal tracking-normal text-neutral-400">
@@ -352,9 +360,6 @@ export function Navbar() {
                 </Button>
               );
             })()}
-
-            {/* Performance Booster / Turbo Mode (Desktop) */}
-            <PerformanceModeButton />
 
             {/* Library Quick Access (Desktop) */}
             {user && (
@@ -397,9 +402,6 @@ export function Navbar() {
                 </button>
               );
             })()}
-
-            {/* Mobile Performance Booster */}
-            <PerformanceModeButton isMobile={true} />
 
             {/* Notifications Bell */}
             <Suspense fallback={null}>

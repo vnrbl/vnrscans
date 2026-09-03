@@ -17,6 +17,7 @@ import {
   Loader2,
   Lock,
   ExternalLink,
+  Check,
 } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -360,18 +361,29 @@ export const ChapterList = React.memo(function ChapterList({
   const readChapters = useQuery({
     queryKey: ["read-chapters", slug, user?.id],
     queryFn: async () => {
-      if (!user) return new Set();
+      if (!user) return new Set<string>();
       const { data } = await supabase
         .from("reading_history")
         .select("chapter_id")
         .eq("user_id", user.id)
-        .eq("series_id", seriesId)
-        .gte("progress", 50);
-      return new Set(data?.map((r) => r.chapter_id) ?? []);
+        .eq("series_id", seriesId);
+      return new Set<string>(data?.map((r) => r.chapter_id) ?? []);
     },
     enabled: !!user,
     staleTime: 1000 * 60 * 2,
   });
+
+  // Set of all unique chapter numbers read across ANY scan source
+  const readChapterNumbers = React.useMemo(() => {
+    const set = new Set<number>();
+    if (!readChapters.data || !chaptersQ.data) return set;
+    for (const ch of chaptersQ.data) {
+      if (readChapters.data.has(ch.id)) {
+        set.add(Number(ch.chapter_number));
+      }
+    }
+    return set;
+  }, [readChapters.data, chaptersQ.data]);
 
   // Per-chapter reader counts (distinct users who have read each chapter).
   const readerCounts = useQuery({
@@ -520,7 +532,7 @@ export const ChapterList = React.memo(function ChapterList({
           {/* Mobile card layout */}
           <div className="space-y-2 md:hidden">
             {paginatedChapters.map((c) => {
-              const isRead = readChapters.data?.has(c.id) ?? false;
+              const isRead = (readChapters.data?.has(c.id) || readChapterNumbers.has(Number(c.chapter_number))) ?? false;
               const isNew = new Date(c.created_at) > new Date(Date.now() - 2 * 60 * 60 * 1000);
               const showNewBadge = isNew && !isRead;
               const uploadedBy = (c as { uploaded_by?: string }).uploaded_by;
@@ -544,10 +556,19 @@ export const ChapterList = React.memo(function ChapterList({
                       <div className="flex flex-wrap items-center gap-2">
                         <Link
                           href={`/title/${slug}/${c.slug}`}
-                          className="font-semibold text-sm text-white hover:text-purple-400 transition-colors"
-                          style={isRead ? { color: "#c084fc" } : undefined}
+                          className={`text-sm transition-colors flex items-center gap-1.5 ${
+                            isRead ? "text-neutral-500 font-medium hover:text-neutral-300" : "text-white font-semibold hover:text-purple-400"
+                          }`}
                         >
-                          Chapter {c.chapter_number}
+                          <span>Chapter {c.chapter_number}</span>
+                          {isRead && (
+                            <span
+                              className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-emerald-500/25 border border-emerald-400/80 text-emerald-300 shadow-[0_0_12px_rgba(16,185,129,0.5)] shrink-0 transition-transform duration-200 group-hover:scale-125 ml-1"
+                              title="Read & Completed (Qi Claimed)"
+                            >
+                              <Check className="h-3 w-3 stroke-[3.5]" />
+                            </span>
+                          )}
                         </Link>
                         {showNewBadge && (
                           <span className="shrink-0 rounded bg-purple-600 px-1.5 py-0.5 text-[10px] font-bold uppercase text-white">
@@ -650,7 +671,7 @@ export const ChapterList = React.memo(function ChapterList({
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-neutral-400">Uploaded By</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-neutral-400">Group</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-neutral-400">Upload Date</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-neutral-400">XP</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-neutral-400">QI</th>
                 <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-neutral-400">Likes</th>
                 <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-neutral-400">Readers</th>
                 <th className="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider text-emerald-400">Offline</th>
@@ -661,7 +682,7 @@ export const ChapterList = React.memo(function ChapterList({
             </thead>
             <tbody className="divide-y divide-border/20">
               {paginatedChapters.map((c) => {
-                const isRead = readChapters.data?.has(c.id) ?? false;
+                const isRead = (readChapters.data?.has(c.id) || readChapterNumbers.has(Number(c.chapter_number))) ?? false;
                 const isNew = new Date(c.created_at) > new Date(Date.now() - 2 * 60 * 60 * 1000);
                 const showNewBadge = isNew && !isRead;
                 const isLatest = latestChapterId === c.id;
@@ -679,11 +700,23 @@ export const ChapterList = React.memo(function ChapterList({
                       <div className="flex items-center gap-2 flex-wrap">
                         <Link
                           href={`/title/${slug}/${c.slug}`}
-                          className="flex items-center gap-2"
+                          className="flex items-center gap-1.5"
                         >
-                          <span className="font-semibold text-sm text-white group-hover:text-purple-400 transition-colors" style={isRead ? { color: "#c084fc" } : undefined}>
+                          <span
+                            className={`text-sm transition-colors ${
+                              isRead ? "text-neutral-500 font-medium group-hover:text-neutral-300" : "text-white font-semibold group-hover:text-purple-400"
+                            }`}
+                          >
                             Chapter {c.chapter_number}
                           </span>
+                          {isRead && (
+                            <span
+                              className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-emerald-500/25 border border-emerald-400/80 text-emerald-300 shadow-[0_0_12px_rgba(16,185,129,0.5)] shrink-0 transition-transform duration-200 group-hover:scale-125 ml-1"
+                              title="Read & Completed (Qi Claimed)"
+                            >
+                              <Check className="h-3 w-3 stroke-[3.5]" />
+                            </span>
+                          )}
                           {showNewBadge && (
                             <span className="shrink-0 rounded bg-purple-600 px-1.5 py-0.5 text-[10px] font-bold uppercase text-white">
                               NEW
@@ -915,14 +948,14 @@ function XpBadge({
   isLatest: boolean;
   isSeriesCompleted: boolean;
 }) {
-  const tooltipParts = [`+${XP_AMOUNTS.chapter_complete} XP for finishing this chapter`];
+  const tooltipParts = [`+${XP_AMOUNTS.chapter_complete} Qi for finishing this chapter`];
   if (isLatest) {
     tooltipParts.push(
-      `+${XP_AMOUNTS.caught_up} XP bonus for catching up to the latest chapter`,
+      `+${XP_AMOUNTS.caught_up} Qi bonus for catching up to the latest chapter`,
     );
     if (isSeriesCompleted) {
       tooltipParts.push(
-        `+${XP_AMOUNTS.series_complete} XP bonus for finishing the entire title`,
+        `+${XP_AMOUNTS.series_complete} Qi bonus for finishing the entire title`,
       );
     }
   }
@@ -940,10 +973,11 @@ function XpBadge({
     return (
       <Badge
         variant="outline"
-        title={`${tooltipParts.join("\n")}\n\nAlready earned.`}
-        className="border-zinc-800 bg-zinc-900/30 text-zinc-500 text-[10px] h-5 px-1.5 font-semibold cursor-default select-none line-through"
+        title={`${tooltipParts.join("\n")}\n\nAlready gathered & completed.`}
+        className="border-white/10 bg-white/5 text-neutral-500 text-[10px] h-5 px-1.5 font-medium cursor-default select-none line-through gap-1 inline-flex items-center"
       >
-        +{earnedXp} XP
+        <Check className="h-2.5 w-2.5 text-emerald-400/90" />
+        +{earnedXp} Qi
       </Badge>
     );
   }
@@ -955,7 +989,7 @@ function XpBadge({
         className="bg-gradient-to-r from-amber-500 via-yellow-500 to-amber-600 border-amber-400 text-black text-[10px] h-5 px-1.5 font-black uppercase tracking-wider animate-pulse shadow-[0_0_8px_rgba(245,158,11,0.5)] cursor-default select-none"
       >
         <Sparkles className="mr-0.5 h-2.5 w-2.5 fill-black" />
-        +{earnedXp} XP
+        +{earnedXp} Qi
       </Badge>
     );
   }
@@ -967,7 +1001,7 @@ function XpBadge({
         className="bg-gradient-to-r from-violet-600 via-fuchsia-600 to-pink-600 border-violet-500 text-white text-[10px] h-5 px-1.5 font-extrabold uppercase tracking-wide shadow-[0_0_8px_rgba(124,58,237,0.5)] cursor-default select-none"
       >
         <Sparkles className="mr-0.5 h-2.5 w-2.5 fill-white" />
-        +{earnedXp} XP
+        +{earnedXp} Qi
       </Badge>
     );
   }
@@ -979,7 +1013,7 @@ function XpBadge({
       className="border-emerald-500/30 bg-emerald-950/10 text-emerald-400 text-[10px] h-5 px-1.5 font-semibold cursor-default select-none"
     >
       <Sparkles className="mr-0.5 h-2.5 w-2.5 fill-emerald-400" />
-      +{earnedXp} XP
+      +{earnedXp} Qi
     </Badge>
   );
 }

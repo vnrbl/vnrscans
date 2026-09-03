@@ -434,8 +434,8 @@ export default function Reader({
             ? "Caught up to latest"
             : row.source === "series_complete"
             ? "Title finished"
-            : "XP earned";
-        toast.success(`+${row.xp_gained} XP — ${label}`, {
+            : "Qi gathered";
+        toast.success(`+${row.xp_gained} Qi — ${label}`, {
           description: row.description ?? undefined,
         });
       }
@@ -446,6 +446,34 @@ export default function Reader({
         qc.invalidateQueries({ queryKey: ["xp-history"] });
         qc.invalidateQueries({ queryKey: ["chapter-reader-counts"] });
         qc.invalidateQueries({ queryKey: ["read-chapters"] });
+      }
+
+      // Synchronize reading history to all sister scan sources with the same chapter number in this series
+      const chNum = chapterQ.data?.chapter_number;
+      const chSeriesId = chapterQ.data?.series_id;
+      if (chNum != null && chSeriesId) {
+        supabase
+          .from("chapters")
+          .select("id")
+          .eq("series_id", chSeriesId)
+          .eq("chapter_number", chNum)
+          .then(({ data: sisterChapters }) => {
+            if (sisterChapters && sisterChapters.length > 1) {
+              const sisterRows = sisterChapters
+                .filter((sc) => sc.id !== chapterId)
+                .map((sc) => ({
+                  user_id: user.id,
+                  series_id: chSeriesId,
+                  chapter_id: sc.id,
+                  progress: 100,
+                  xp_awarded: true,
+                  updated_at: new Date().toISOString(),
+                }));
+              if (sisterRows.length > 0) {
+                supabase.from("reading_history").upsert(sisterRows, { onConflict: "user_id,chapter_id" } as any).then(() => {});
+              }
+            }
+          });
       }
     };
 
