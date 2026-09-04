@@ -42,6 +42,7 @@ import {
   deleteOfflineChapter,
 } from "@/lib/offlineStorage";
 import { DownloadChaptersModal } from "@/components/DownloadChaptersModal";
+import { useReaderSettings } from "@/contexts/ReaderSettingsContext";
 
 /* ------------------------------------------------------------------ */
 /*  ChapterList — ALL chapter interaction state lives here.           */
@@ -58,75 +59,6 @@ interface ChapterListProps {
   initialChaptersData?: any[];
 }
 
-function ChapterUnlockCountdown({
-  scheduledAt,
-  canManage,
-}: {
-  scheduledAt?: string | null;
-  canManage: boolean;
-}) {
-  const [timeLeft, setTimeLeft] = React.useState<{
-    hours: number;
-    minutes: number;
-    seconds: number;
-    isExpired: boolean;
-  } | null>(null);
-
-  React.useEffect(() => {
-    if (!scheduledAt) return;
-    const calc = () => {
-      const diff = new Date(scheduledAt).getTime() - Date.now();
-      if (diff <= 0) {
-        setTimeLeft({ hours: 0, minutes: 0, seconds: 0, isExpired: true });
-        return;
-      }
-      const hours = Math.floor(diff / (1000 * 60 * 60));
-      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-      const seconds = Math.floor((diff % (1000 * 60)) / 1000);
-      setTimeLeft({ hours, minutes, seconds, isExpired: false });
-    };
-
-    calc();
-    const interval = setInterval(calc, 1000);
-    return () => clearInterval(interval);
-  }, [scheduledAt]);
-
-  if (!scheduledAt) return null;
-
-  if (timeLeft?.isExpired) {
-    return (
-      <span className="inline-flex items-center gap-1 shrink-0 rounded-md border border-emerald-500/40 bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-bold text-emerald-300">
-        <Unlock className="h-3 w-3 text-emerald-400" />
-        <span>Unlocked</span>
-      </span>
-    );
-  }
-
-  const timeStr = timeLeft
-    ? timeLeft.hours > 0
-      ? `${String(timeLeft.hours).padStart(2, "0")}:${String(timeLeft.minutes).padStart(2, "0")}:${String(timeLeft.seconds).padStart(2, "0")}`
-      : `${String(timeLeft.minutes).padStart(2, "0")}:${String(timeLeft.seconds).padStart(2, "0")}`
-    : "...";
-
-  return (
-    <span
-      className={`inline-flex items-center gap-1.5 shrink-0 rounded-md border px-2 py-0.5 text-[10px] font-mono font-bold tracking-tight transition-all shadow-sm ${
-        canManage
-          ? "bg-amber-500/15 border-amber-500/35 text-amber-400 hover:bg-amber-500/25"
-          : "bg-amber-950/40 border-amber-500/50 text-amber-300 hover:bg-amber-900/50 animate-pulse shadow-[0_0_8px_rgba(245,158,11,0.2)]"
-      }`}
-      title={
-        canManage
-          ? `Early access hold until ${new Date(scheduledAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}. As staff/admin, you can read directly.`
-          : `Locked chapter • Unlocks automatically in ${timeStr}`
-      }
-    >
-      <Lock className="h-3 w-3 text-amber-400 shrink-0" />
-      <span>{canManage ? `Hold (${timeStr})` : `Unlocks in ${timeStr}`}</span>
-    </span>
-  );
-}
-
 export const ChapterList = React.memo(function ChapterList({
   slug,
   seriesId,
@@ -139,6 +71,7 @@ export const ChapterList = React.memo(function ChapterList({
   const { isAdmin, isMod, isUploader } = useIsAdmin();
   const canManage = isAdmin || isMod || isUploader;
   const qc = useQueryClient();
+  const { settings } = useReaderSettings();
 
   const [deletingChapterId, setDeletingChapterId] = React.useState<string | null>(null);
   const [unlockingChapterId, setUnlockingChapterId] = React.useState<string | null>(null);
@@ -644,7 +577,7 @@ export const ChapterList = React.memo(function ChapterList({
               const isLatest = latestChapterId === c.id;
               const readerCount = readerCounts.data?.get(c.id) ?? 0;
               const chapterLikes = chapterLikeCounts.data?.get(c.id) ?? 0;
-              const isScheduledLock = c.status === "scheduled" || (!!c.scheduled_at && new Date(c.scheduled_at) > new Date());
+              const isScheduledLock = settings.enable30MinHold !== false && (c.status === "scheduled" || (!!c.scheduled_at && new Date(c.scheduled_at) > new Date()));
               const remainingMinutes = isScheduledLock
                 ? Math.max(1, Math.ceil((new Date(c.scheduled_at!).getTime() - Date.now()) / (1000 * 60)))
                 : 0;
@@ -682,23 +615,17 @@ export const ChapterList = React.memo(function ChapterList({
                         {isScheduledLock && (
                           <Link
                             href={`/title/${slug}/${c.slug}`}
-                            className="inline-flex items-center"
+                            className="inline-flex items-center text-amber-400 hover:text-amber-300 transition-colors"
+                            title={
+                              canManage
+                                ? "Early Access Hold (Staff/Admin access)"
+                                : "Early Access Hold (Locked chapter)"
+                            }
                           >
-                            <ChapterUnlockCountdown scheduledAt={c.scheduled_at} canManage={canManage} />
+                            <span className="inline-flex items-center justify-center h-5 w-5 rounded bg-amber-500/20 border border-amber-500/40 text-amber-400 shadow-sm transition-transform hover:scale-110">
+                              <Lock className="h-3 w-3 text-amber-400" />
+                            </span>
                           </Link>
-                        )}
-                        {isScheduledLock && sourceUrl && (
-                          <a
-                            href={sourceUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            onClick={(e) => e.stopPropagation()}
-                            className="inline-flex items-center gap-1 rounded bg-primary/20 hover:bg-primary/35 border border-primary/50 px-2 py-0.5 text-[11px] font-bold text-primary transition-all hover:scale-105"
-                            title="Read immediately on official scans source"
-                          >
-                            <span>(Read now)</span>
-                            <ExternalLink className="h-3 w-3" />
-                          </a>
                         )}
                         <XpBadge
                           isRead={isRead}
@@ -809,7 +736,7 @@ export const ChapterList = React.memo(function ChapterList({
                   const isLatest = latestChapterId === c.id;
                   const readerCount = readerCounts.data?.get(c.id) ?? 0;
                   const chapterLikes = chapterLikeCounts.data?.get(c.id) ?? 0;
-                  const isScheduledLock = c.status === "scheduled" || (!!c.scheduled_at && new Date(c.scheduled_at) > new Date());
+                  const isScheduledLock = settings.enable30MinHold !== false && (c.status === "scheduled" || (!!c.scheduled_at && new Date(c.scheduled_at) > new Date()));
                   const remainingMinutes = isScheduledLock
                     ? Math.max(1, Math.ceil((new Date(c.scheduled_at!).getTime() - Date.now()) / (1000 * 60)))
                     : 0;
@@ -849,23 +776,17 @@ export const ChapterList = React.memo(function ChapterList({
                           {isScheduledLock && (
                             <Link
                               href={`/title/${slug}/${c.slug}`}
-                              className="inline-flex items-center"
+                              className="inline-flex items-center text-amber-400 hover:text-amber-300 transition-colors"
+                              title={
+                                canManage
+                                  ? "Early Access Hold (Staff/Admin access)"
+                                  : "Early Access Hold (Locked chapter)"
+                              }
                             >
-                              <ChapterUnlockCountdown scheduledAt={c.scheduled_at} canManage={canManage} />
+                              <span className="inline-flex items-center justify-center h-5 w-5 rounded bg-amber-500/20 border border-amber-500/40 text-amber-400 shadow-sm transition-transform hover:scale-110">
+                                <Lock className="h-3 w-3 text-amber-400" />
+                              </span>
                             </Link>
-                          )}
-                          {isScheduledLock && sourceUrl && (
-                            <a
-                              href={sourceUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              onClick={(e) => e.stopPropagation()}
-                              className="inline-flex items-center gap-1 rounded bg-primary/20 hover:bg-primary/35 border border-primary/50 px-2 py-0.5 text-[11px] font-bold text-primary transition-all hover:scale-105"
-                              title="Read immediately on official scans source"
-                            >
-                              <span>(Read now)</span>
-                              <ExternalLink className="h-3 w-3" />
-                            </a>
                           )}
                         </div>
                         {/* Sub-row for small viewports where separate Group / Title column is collapsed */}

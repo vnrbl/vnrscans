@@ -1,6 +1,6 @@
 "use client";
 
-import { Settings as SettingsIcon, BookOpen, Menu } from "lucide-react";
+import { Settings as SettingsIcon, BookOpen, Menu, Clock, Lock } from "lucide-react";
 import { useReaderSettings } from "@/contexts/ReaderSettingsContext";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -177,6 +177,45 @@ export default function SettingsPage() {
                   id="show-novels"
                   checked={settings.showNovelsOnHome}
                   onCheckedChange={(checked) => updateSettings({ showNovelsOnHome: checked })}
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Chapter Release & Early Access Hold Settings */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Lock className="h-5 w-5 text-amber-500" />
+                Chapter Release & Early Access Settings
+              </CardTitle>
+              <CardDescription>
+                Configure early access hold policies and lock countdowns for newly released chapters
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="flex items-center justify-between gap-4">
+                <div className="min-w-0 space-y-1">
+                  <Label htmlFor="enable-30min-hold" className="cursor-pointer font-medium flex items-center gap-2">
+                    <span>30-Minute Early Access Hold</span>
+                    {settings.enable30MinHold !== false ? (
+                      <span className="rounded bg-amber-500/15 border border-amber-500/30 px-1.5 py-0.5 text-[10px] font-bold text-amber-400">
+                        Active
+                      </span>
+                    ) : (
+                      <span className="rounded bg-neutral-800 border border-neutral-700 px-1.5 py-0.5 text-[10px] font-bold text-neutral-400">
+                        Turned Off
+                      </span>
+                    )}
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    When enabled, newly imported chapters have a 30-minute early access hold with countdown timers before unlocking. When turned off, chapters are immediately unlocked for all readers with zero wait time.
+                  </p>
+                </div>
+                <Switch
+                  id="enable-30min-hold"
+                  checked={settings.enable30MinHold !== false}
+                  onCheckedChange={(checked) => updateSettings({ enable30MinHold: checked })}
                 />
               </div>
             </CardContent>

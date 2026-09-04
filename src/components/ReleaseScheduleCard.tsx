@@ -6,6 +6,7 @@ import { Clock, Calendar, Bell, Sparkles, CheckCircle2, Globe, Zap, Lock, Extern
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { useReaderSettings } from "@/contexts/ReaderSettingsContext";
 
 interface ReleaseScheduleProps {
   chapters: Array<{
@@ -32,6 +33,7 @@ export function ReleaseScheduleCard({
   estimatedNextReleaseAt,
   releaseCadence,
 }: ReleaseScheduleProps) {
+  const { settings } = useReaderSettings();
   const [timeLeft, setTimeLeft] = useState<{ days: number; hours: number; minutes: number; seconds: number } | null>(null);
   const [isTracking, setIsTracking] = useState(false);
 
@@ -93,7 +95,7 @@ export function ReleaseScheduleCard({
       .filter((c) => c.status === "scheduled" || (c.scheduled_at && new Date(c.scheduled_at) > now))
       .sort((a, b) => (a.chapter_number || 0) - (b.chapter_number || 0));
 
-    if (scheduled.length > 0) {
+    if (settings.enable30MinHold !== false && scheduled.length > 0) {
       const futureScheduled = scheduled.filter((c) => c.scheduled_at && new Date(c.scheduled_at) > now);
       const targetCh = futureScheduled[0] || scheduled[0];
       const targetDate = targetCh.scheduled_at ? new Date(targetCh.scheduled_at) : new Date(Date.now() + 30 * 60 * 1000);

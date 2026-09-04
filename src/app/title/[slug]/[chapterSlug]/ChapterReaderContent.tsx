@@ -176,6 +176,23 @@ export default function Reader({
   const { isAdmin, isMod, isUploader } = useIsAdmin();
   const canManage = isAdmin || isMod || isUploader;
 
+  const [adminViewBypassed, setAdminViewBypassed] = useState<boolean>(() => {
+    if (typeof window !== "undefined" && initialChapterData?.id) {
+      return sessionStorage.getItem(`admin-view-${initialChapterData.id}`) === "true";
+    }
+    return false;
+  });
+
+  const handleViewAsAdmin = useCallback((chapterId: string, chapterNumber: number) => {
+    if (typeof window !== "undefined" && chapterId) {
+      sessionStorage.setItem(`admin-view-${chapterId}`, "true");
+    }
+    setAdminViewBypassed(true);
+    toast.success(`Admin preview enabled for Chapter ${chapterNumber}!`, {
+      description: "You are viewing as admin. This chapter remains locked for regular visitors.",
+    });
+  }, []);
+
   const chapterQ = useQuery({
     queryKey: ["chapter", titleSlug, chapterSlug],
     queryFn: async () => {
@@ -855,10 +872,11 @@ export default function Reader({
       <div className="w-full max-w-full">
         {/* Main content */}
         <div className="w-full max-w-full">
-          {c.scheduled_at && new Date(c.scheduled_at) > new Date() && !canManage ? (
+          {c.scheduled_at && new Date(c.scheduled_at) > new Date() && settings.enable30MinHold !== false && !adminViewBypassed ? (
             <ScheduledChapterUnlockView
               chapter={c}
               seriesSlug={seriesSlug}
+              onViewAsAdmin={() => handleViewAsAdmin(c.id, c.chapter_number)}
               onUnlock={() => {
                 qc.invalidateQueries({ queryKey: ["pages", c.id] });
                 qc.invalidateQueries({ queryKey: ["chapter", slug, chapterSlug] });
@@ -867,13 +885,13 @@ export default function Reader({
             />
           ) : (
             <>
-              {c.scheduled_at && new Date(c.scheduled_at) > new Date() && canManage && (
+              {c.scheduled_at && new Date(c.scheduled_at) > new Date() && settings.enable30MinHold !== false && (
                 <div className="sticky top-16 z-30 mb-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-500/40 bg-amber-950/90 px-4 py-2.5 text-xs backdrop-blur-md shadow-lg">
                   <div className="flex items-center gap-2 text-amber-300">
                     <Lock className="h-4 w-4 shrink-0 text-amber-400 animate-pulse" />
                     <span>
-                      <strong>Admin Early Access:</strong> Chapter {c.chapter_number} is on hold for regular readers until{" "}
-                      {new Date(c.scheduled_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}. As admin, you have instant access.
+                      <strong>Viewing as Admin:</strong> Chapter {c.chapter_number} is on hold for regular readers until{" "}
+                      {new Date(c.scheduled_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}. Only you have bypass access.
                     </span>
                   </div>
                   <div className="flex items-center gap-2">
@@ -1320,10 +1338,12 @@ function ScheduledChapterUnlockView({
   chapter,
   seriesSlug,
   onUnlock,
+  onViewAsAdmin,
 }: {
   chapter: any;
   seriesSlug: string;
   onUnlock: () => void;
+  onViewAsAdmin?: () => void;
 }) {
   const { isAdmin, isMod, isUploader } = useIsAdmin();
   const canManage = isAdmin || isMod || isUploader;
@@ -1442,9 +1462,18 @@ function ScheduledChapterUnlockView({
               </span>
             </div>
             <p className="mt-1 text-xs text-neutral-300 leading-relaxed">
-              As a staff member or administrator, you can immediately unlock this chapter for all visitors, or preview it directly without waiting.
+              As an administrator or staff member, you can view and read this chapter immediately without unlocking it for visitors, or unlock it for all readers.
             </p>
             <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <Button
+                type="button"
+                onClick={onViewAsAdmin}
+                className="w-full bg-violet-600 hover:bg-violet-500 text-white font-bold text-xs gap-1.5 cursor-pointer shadow-md transition-all hover:scale-[1.02]"
+                title="Unlock and read this chapter immediately for you as admin without unlocking for regular visitors"
+              >
+                <Eye className="h-3.5 w-3.5" />
+                <span>View as Admin</span>
+              </Button>
               <Button
                 type="button"
                 onClick={async () => {
@@ -1471,7 +1500,7 @@ function ScheduledChapterUnlockView({
                   }
                 }}
                 disabled={isUnlocking}
-                className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs gap-1.5 cursor-pointer"
+                className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs gap-1.5 cursor-pointer shadow-md transition-all hover:scale-[1.02]"
               >
                 {isUnlocking ? (
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />

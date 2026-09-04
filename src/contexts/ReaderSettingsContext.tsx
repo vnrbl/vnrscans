@@ -10,6 +10,7 @@ export interface ReaderSettings {
   autoScrollSpeed: number;
   showNovelsOnHome: boolean;
   readingFilter: "normal" | "oled" | "warm" | "dim";
+  enable30MinHold: boolean;
 }
 
 const defaultSettings: ReaderSettings = {
@@ -20,6 +21,7 @@ const defaultSettings: ReaderSettings = {
   autoScrollSpeed: 50,
   showNovelsOnHome: false,
   readingFilter: "normal",
+  enable30MinHold: true,
 };
 
 interface ReaderSettingsContextType {
