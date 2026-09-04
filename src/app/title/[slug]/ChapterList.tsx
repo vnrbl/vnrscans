@@ -58,6 +58,75 @@ interface ChapterListProps {
   initialChaptersData?: any[];
 }
 
+function ChapterUnlockCountdown({
+  scheduledAt,
+  canManage,
+}: {
+  scheduledAt?: string | null;
+  canManage: boolean;
+}) {
+  const [timeLeft, setTimeLeft] = React.useState<{
+    hours: number;
+    minutes: number;
+    seconds: number;
+    isExpired: boolean;
+  } | null>(null);
+
+  React.useEffect(() => {
+    if (!scheduledAt) return;
+    const calc = () => {
+      const diff = new Date(scheduledAt).getTime() - Date.now();
+      if (diff <= 0) {
+        setTimeLeft({ hours: 0, minutes: 0, seconds: 0, isExpired: true });
+        return;
+      }
+      const hours = Math.floor(diff / (1000 * 60 * 60));
+      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+      setTimeLeft({ hours, minutes, seconds, isExpired: false });
+    };
+
+    calc();
+    const interval = setInterval(calc, 1000);
+    return () => clearInterval(interval);
+  }, [scheduledAt]);
+
+  if (!scheduledAt) return null;
+
+  if (timeLeft?.isExpired) {
+    return (
+      <span className="inline-flex items-center gap-1 shrink-0 rounded-md border border-emerald-500/40 bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-bold text-emerald-300">
+        <Unlock className="h-3 w-3 text-emerald-400" />
+        <span>Unlocked</span>
+      </span>
+    );
+  }
+
+  const timeStr = timeLeft
+    ? timeLeft.hours > 0
+      ? `${String(timeLeft.hours).padStart(2, "0")}:${String(timeLeft.minutes).padStart(2, "0")}:${String(timeLeft.seconds).padStart(2, "0")}`
+      : `${String(timeLeft.minutes).padStart(2, "0")}:${String(timeLeft.seconds).padStart(2, "0")}`
+    : "...";
+
+  return (
+    <span
+      className={`inline-flex items-center gap-1.5 shrink-0 rounded-md border px-2 py-0.5 text-[10px] font-mono font-bold tracking-tight transition-all shadow-sm ${
+        canManage
+          ? "bg-amber-500/15 border-amber-500/35 text-amber-400 hover:bg-amber-500/25"
+          : "bg-amber-950/40 border-amber-500/50 text-amber-300 hover:bg-amber-900/50 animate-pulse shadow-[0_0_8px_rgba(245,158,11,0.2)]"
+      }`}
+      title={
+        canManage
+          ? `Early access hold until ${new Date(scheduledAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}. As staff/admin, you can read directly.`
+          : `Locked chapter • Unlocks automatically in ${timeStr}`
+      }
+    >
+      <Lock className="h-3 w-3 text-amber-400 shrink-0" />
+      <span>{canManage ? `Hold (${timeStr})` : `Unlocks in ${timeStr}`}</span>
+    </span>
+  );
+}
+
 export const ChapterList = React.memo(function ChapterList({
   slug,
   seriesId,
@@ -147,7 +216,7 @@ export const ChapterList = React.memo(function ChapterList({
         .from("chapters")
         .select("id,slug,chapter_number,title,chapter_type,created_at,status,scheduled_at,uploaded_by,scanlation_group,source_url")
         .eq("series_id", seriesId)
-        .eq("status", "published");
+        .in("status", ["published", "scheduled"]);
 
       if (selectedGroup !== "all") {
         query = query.eq("scanlation_group", selectedGroup);
@@ -161,7 +230,7 @@ export const ChapterList = React.memo(function ChapterList({
           .from("chapters")
           .select("id,slug,chapter_number,title,chapter_type,created_at,status,scheduled_at,uploaded_by,scanlation_group")
           .eq("series_id", seriesId)
-          .eq("status", "published");
+          .in("status", ["published", "scheduled"]);
 
         if (selectedGroup !== "all") {
           fallbackQuery = fallbackQuery.eq("scanlation_group", selectedGroup);
@@ -381,7 +450,7 @@ export const ChapterList = React.memo(function ChapterList({
         .from("chapters")
         .select("scanlation_group")
         .eq("series_id", seriesId)
-        .eq("status", "published")
+        .in("status", ["published", "scheduled"])
         .not("scanlation_group", "is", null);
 
       if (error) throw error;
@@ -575,7 +644,7 @@ export const ChapterList = React.memo(function ChapterList({
               const isLatest = latestChapterId === c.id;
               const readerCount = readerCounts.data?.get(c.id) ?? 0;
               const chapterLikes = chapterLikeCounts.data?.get(c.id) ?? 0;
-              const isScheduledLock = !!c.scheduled_at && new Date(c.scheduled_at) > new Date();
+              const isScheduledLock = c.status === "scheduled" || (!!c.scheduled_at && new Date(c.scheduled_at) > new Date());
               const remainingMinutes = isScheduledLock
                 ? Math.max(1, Math.ceil((new Date(c.scheduled_at!).getTime() - Date.now()) / (1000 * 60)))
                 : 0;
@@ -613,19 +682,9 @@ export const ChapterList = React.memo(function ChapterList({
                         {isScheduledLock && (
                           <Link
                             href={`/title/${slug}/${c.slug}`}
-                            className={`inline-flex items-center gap-1 shrink-0 rounded-md border px-1.5 py-0.5 text-[10px] font-bold transition-colors cursor-pointer ${
-                              canManage
-                                ? "bg-amber-500/15 border-amber-500/30 text-amber-400 hover:bg-amber-500/25"
-                                : "bg-amber-500/20 hover:bg-amber-500/30 border-amber-500/40 text-amber-300 animate-pulse"
-                            }`}
-                            title={
-                              canManage
-                                ? `Early access hold until ${new Date(c.scheduled_at!).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}. As staff/admin, you can read directly.`
-                                : "Locked chapter - Click to open unlock timer page"
-                            }
+                            className="inline-flex items-center"
                           >
-                            <Lock className="h-3 w-3 text-amber-400" />
-                            {canManage ? `Hold (${remainingMinutes}m)` : `Unlocks in ${remainingMinutes}m`}
+                            <ChapterUnlockCountdown scheduledAt={c.scheduled_at} canManage={canManage} />
                           </Link>
                         )}
                         {isScheduledLock && sourceUrl && (
@@ -750,7 +809,7 @@ export const ChapterList = React.memo(function ChapterList({
                   const isLatest = latestChapterId === c.id;
                   const readerCount = readerCounts.data?.get(c.id) ?? 0;
                   const chapterLikes = chapterLikeCounts.data?.get(c.id) ?? 0;
-                  const isScheduledLock = !!c.scheduled_at && new Date(c.scheduled_at) > new Date();
+                  const isScheduledLock = c.status === "scheduled" || (!!c.scheduled_at && new Date(c.scheduled_at) > new Date());
                   const remainingMinutes = isScheduledLock
                     ? Math.max(1, Math.ceil((new Date(c.scheduled_at!).getTime() - Date.now()) / (1000 * 60)))
                     : 0;
@@ -790,19 +849,9 @@ export const ChapterList = React.memo(function ChapterList({
                           {isScheduledLock && (
                             <Link
                               href={`/title/${slug}/${c.slug}`}
-                              className={`inline-flex items-center gap-1 shrink-0 rounded-md border px-1.5 py-0.5 text-[10px] font-bold transition-colors cursor-pointer ${
-                                canManage
-                                  ? "bg-amber-500/15 border-amber-500/30 text-amber-400 hover:bg-amber-500/25"
-                                  : "bg-amber-500/20 hover:bg-amber-500/30 border-amber-500/40 text-amber-300 animate-pulse"
-                              }`}
-                              title={
-                                canManage
-                                  ? `Early access hold until ${new Date(c.scheduled_at!).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}. As staff/admin, you can read directly.`
-                                  : "Locked chapter - Click to open unlock timer page"
-                              }
+                              className="inline-flex items-center"
                             >
-                              <Lock className="h-3 w-3 text-amber-400" />
-                              {canManage ? `Hold (${remainingMinutes}m)` : `Unlocks in ${remainingMinutes}m`}
+                              <ChapterUnlockCountdown scheduledAt={c.scheduled_at} canManage={canManage} />
                             </Link>
                           )}
                           {isScheduledLock && sourceUrl && (

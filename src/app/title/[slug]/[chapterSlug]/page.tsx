@@ -40,7 +40,7 @@ const getChapterFullData = cache(async (seriesSlug: string, chapterSlug: string)
       .from("chapters")
       .select("id,slug,chapter_number,scanlation_group")
       .eq("series_id", chapter.series_id)
-      .eq("status", "published")
+      .in("status", ["published", "scheduled"])
       .order("chapter_number"),
   ]);
 

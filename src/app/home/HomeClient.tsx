@@ -1117,7 +1117,7 @@ function LatestUpdatesSection({
                                   ? `Chapter ${chapter.chapter_number} is on early-access hold${formattedRemaining ? ` (Unlocks in ${formattedRemaining})` : ""}`
                                   : `Chapter ${chapter.chapter_number}`
                               }
-                              className={`flex items-center justify-between text-xs px-2.5 py-1.5 rounded border transition-colors ${
+                              className={`flex items-center justify-between text-xs px-2 py-1.5 rounded border transition-colors ${
                                 isScheduledLock
                                   ? 'border-amber-500/40 bg-amber-950/25 hover:bg-amber-900/35 hover:border-amber-500/60 text-amber-200 shadow-sm'
                                   : isRead
@@ -1125,17 +1125,17 @@ function LatestUpdatesSection({
                                   : 'border-white/10 bg-surface-1/60 hover:bg-surface-2 hover:border-purple-500/40 text-neutral-200 hover:text-white'
                               }`}
                             >
-                              <div className="flex min-w-0 flex-1 items-center gap-1.5">
+                              <div className="flex items-center gap-1 shrink-0">
                                 {isScheduledLock ? (
-                                  <Lock className="h-3 w-3 shrink-0 text-amber-400 animate-pulse" />
+                                  <Lock className="h-3 w-3 shrink-0 text-amber-400" />
                                 ) : (
                                   <BookOpen className={`h-3 w-3 shrink-0 ${isRead ? 'text-neutral-500' : 'text-purple-400'}`} />
                                 )}
-                                <span className={`truncate text-xs ${isScheduledLock ? "font-semibold text-amber-300" : "font-medium"}`}>
-                                  Chapter {chapter.chapter_number}
+                                <span className={`whitespace-nowrap text-xs ${isScheduledLock ? "font-semibold text-amber-300" : "font-medium"}`}>
+                                  Ch. {chapter.chapter_number}
                                 </span>
                               </div>
-                              <span className={`ml-1.5 shrink-0 text-xs ${isScheduledLock ? "text-amber-400 font-medium font-mono" : "text-neutral-400"}`}>
+                              <span className={`ml-1 shrink-0 text-[11px] ${isScheduledLock ? "text-amber-400 font-medium font-mono" : "text-neutral-400"}`}>
                                 {isScheduledLock && formattedRemaining ? formattedRemaining : formatTimeAgo(chapter.created_at)}
                               </span>
                             </Link>

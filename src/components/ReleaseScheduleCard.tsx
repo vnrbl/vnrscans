@@ -88,7 +88,58 @@ export function ReleaseScheduleCard({
       };
     }
 
-    // 3. Priority: Live data imported from Comick.dev with update timings
+    // 1. Check for upcoming confirmed scheduled chapters in database (Early Access Hold)
+    const scheduled = (chapters || [])
+      .filter((c) => c.status === "scheduled" || (c.scheduled_at && new Date(c.scheduled_at) > now))
+      .sort((a, b) => (a.chapter_number || 0) - (b.chapter_number || 0));
+
+    if (scheduled.length > 0) {
+      const futureScheduled = scheduled.filter((c) => c.scheduled_at && new Date(c.scheduled_at) > now);
+      const targetCh = futureScheduled[0] || scheduled[0];
+      const targetDate = targetCh.scheduled_at ? new Date(targetCh.scheduled_at) : new Date(Date.now() + 30 * 60 * 1000);
+
+      // Group all chapters sharing the same unlock time (within 2 minutes)
+      const sameBatchChapters = scheduled.filter((c) => {
+        if (!c.scheduled_at) return true;
+        return Math.abs(new Date(c.scheduled_at).getTime() - targetDate.getTime()) < 2 * 60 * 1000;
+      });
+
+      const nums = sameBatchChapters
+        .map((c) => c.chapter_number)
+        .filter((n) => typeof n === "number" && !isNaN(n))
+        .sort((a, b) => a - b);
+
+      let chapterLabel = "";
+      if (nums.length === 1) {
+        chapterLabel = `Ch. ${nums[0]}`;
+      } else if (nums.length > 1) {
+        const minNum = Math.min(...nums);
+        const maxNum = Math.max(...nums);
+        if (maxNum - minNum + 1 === nums.length) {
+          chapterLabel = `Ch. ${minNum} - ${maxNum}`;
+        } else {
+          chapterLabel = `Ch. ${nums.join(", ")}`;
+        }
+      }
+
+      const sourceUrl = sameBatchChapters.slice().reverse().find((c) => c.source_url)?.source_url || null;
+
+      return {
+        targetDate,
+        chapterNumber: nums.length > 0 ? nums[nums.length - 1] : null,
+        chapterLabel: chapterLabel || (nums.length > 0 ? `Ch. ${nums[0]}` : null),
+        cadenceText: "30-Min Hold",
+        sourceName: "Early Access",
+        isScheduled: true,
+        isUnlockingSoon: true,
+        sourceUrl,
+        isSourceAhead: false,
+        aheadBy: 0,
+        sourceLatestChapter: undefined,
+      };
+    }
+
+    // 2. Priority: Live data imported from Comick.dev with update timings
     if (liveData?.found && liveData?.nextExpectedDrop) {
       let liveTarget = new Date(liveData.nextExpectedDrop);
       const sourceLatest = liveData.sourceLatestChapter || 0;
@@ -264,20 +315,28 @@ export function ReleaseScheduleCard({
           </div>
           <div>
             <span className="text-xs font-mono font-bold uppercase tracking-wider text-white">
-              {scheduleInfo.isScheduled
+              {(scheduleInfo as any).isUnlockingSoon
+                ? "Early Access Hold"
+                : scheduleInfo.isScheduled
                 ? "Confirmed Next Release"
                 : "Estimated Next Release"}
             </span>
-            {scheduleInfo.chapterNumber && (
+            {((scheduleInfo as any).chapterLabel || scheduleInfo.chapterNumber) && (
               <span className="ml-1.5 text-xs font-mono font-bold text-amber-300">
-                (Ch. {scheduleInfo.chapterNumber})
+                ({(scheduleInfo as any).chapterLabel || `Ch. ${scheduleInfo.chapterNumber}`})
               </span>
             )}
           </div>
         </div>
 
         <div className="flex items-center gap-1.5 flex-wrap">
-          {liveData?.found && (
+          {(scheduleInfo as any).isUnlockingSoon && (
+            <div className="flex items-center gap-1 rounded-full bg-amber-950/50 px-2 py-0.5 text-[10px] font-mono font-bold uppercase tracking-wider text-amber-400 border border-amber-500/30">
+              <Lock className="h-2.5 w-2.5" />
+              <span>Early Access</span>
+            </div>
+          )}
+          {liveData?.found && !(scheduleInfo as any).isUnlockingSoon && (
             <div className="flex items-center gap-1 rounded-full bg-emerald-950/40 px-2 py-0.5 text-[10px] font-mono font-bold uppercase tracking-wider text-emerald-400 border border-emerald-500/30">
               <Globe className="h-2.5 w-2.5" />
               <span>{scheduleInfo.sourceName}</span>
@@ -321,7 +380,35 @@ export function ReleaseScheduleCard({
         </div>
 
         {/* Action Buttons */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          {(scheduleInfo as any).isUnlockingSoon && (
+            <button
+              type="button"
+              onClick={() => {
+                const el = document.getElementById("chapters-section");
+                if (el) {
+                  el.scrollIntoView({ behavior: "smooth" });
+                }
+              }}
+              className="h-7.5 inline-flex items-center gap-1.5 rounded-lg border border-amber-500/40 bg-amber-950/40 hover:bg-amber-900/50 px-2.5 sm:px-3 py-1 text-xs font-mono font-bold text-amber-300 shadow-sm transition-all cursor-pointer"
+              title="Scroll to chapter unlock timers"
+            >
+              <Clock className="h-3 w-3 text-amber-400" />
+              <span>View Timer</span>
+            </button>
+          )}
+          {(scheduleInfo as any).isUnlockingSoon && (scheduleInfo as any).sourceUrl && (
+            <a
+              href={(scheduleInfo as any).sourceUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="h-7.5 inline-flex items-center gap-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 px-2.5 sm:px-3 py-1 text-xs font-mono font-bold text-white shadow-sm transition-all shrink-0"
+              title="Read immediately on official scans source"
+            >
+              <span>Read now</span>
+              <ExternalLink className="h-3 w-3" />
+            </a>
+          )}
           <Button
             size="sm"
             variant={isTracking ? "secondary" : "outline"}

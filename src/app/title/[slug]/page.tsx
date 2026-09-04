@@ -29,7 +29,7 @@ const getChaptersData = cache(async (seriesId: string) => {
     .from("chapters")
     .select("id,slug,chapter_number,title,chapter_type,created_at,status,scheduled_at,uploaded_by,scanlation_group,source_url")
     .eq("series_id", seriesId)
-    .eq("status", "published")
+    .in("status", ["published", "scheduled"])
     .order("chapter_number", { ascending: false });
 
   if (error && (error.code === "42703" || error.message?.includes("source_url"))) {
@@ -37,7 +37,7 @@ const getChaptersData = cache(async (seriesId: string) => {
       .from("chapters")
       .select("id,slug,chapter_number,title,chapter_type,created_at,status,scheduled_at,uploaded_by,scanlation_group")
       .eq("series_id", seriesId)
-      .eq("status", "published")
+      .in("status", ["published", "scheduled"])
       .order("chapter_number", { ascending: false });
     data = (fallback.data ?? []).map((c: any) => ({ ...c, source_url: null }));
   }

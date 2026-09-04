@@ -242,7 +242,7 @@ export default function Reader({
         .from("chapters")
         .select("id,slug,chapter_number,scanlation_group")
         .eq("series_id", chapterQ.data!.series!.id)
-        .eq("status", "published");
+        .in("status", ["published", "scheduled"]);
 
       if (activeScanlationGroup) {
         query = query.eq("scanlation_group", activeScanlationGroup);
@@ -270,7 +270,7 @@ export default function Reader({
         .select("id,slug,scanlation_group,chapter_number")
         .eq("series_id", chapterQ.data!.series_id)
         .eq("chapter_number", chapterQ.data!.chapter_number)
-        .eq("status", "published")
+        .in("status", ["published", "scheduled"])
         .order("scanlation_group", { ascending: true, nullsFirst: true });
       if (error) throw error;
       return data ?? [];
@@ -1320,17 +1320,15 @@ function ScheduledChapterUnlockView({
   chapter,
   seriesSlug,
   onUnlock,
-  onPreview,
 }: {
   chapter: any;
   seriesSlug: string;
   onUnlock: () => void;
-  onPreview?: () => void;
 }) {
   const { isAdmin, isMod, isUploader } = useIsAdmin();
   const canManage = isAdmin || isMod || isUploader;
   const [isUnlocking, setIsUnlocking] = useState(false);
-  const [timeLeft, setTimeLeft] = useState<{ minutes: number; seconds: number } | null>(null);
+  const [timeLeft, setTimeLeft] = useState<{ hours: number; minutes: number; seconds: number } | null>(null);
   const targetDate = useMemo(() => new Date(chapter.scheduled_at), [chapter.scheduled_at]);
 
   useEffect(() => {
@@ -1338,13 +1336,14 @@ function ScheduledChapterUnlockView({
       const now = Date.now();
       const diff = targetDate.getTime() - now;
       if (diff <= 0) {
-        setTimeLeft({ minutes: 0, seconds: 0 });
+        setTimeLeft({ hours: 0, minutes: 0, seconds: 0 });
         onUnlock();
         return;
       }
-      const minutes = Math.floor(diff / (1000 * 60));
+      const hours = Math.floor(diff / (1000 * 60 * 60));
+      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
       const seconds = Math.floor((diff % (1000 * 60)) / 1000);
-      setTimeLeft({ minutes, seconds });
+      setTimeLeft({ hours, minutes, seconds });
     };
 
     updateCountdown();
@@ -1381,6 +1380,17 @@ function ScheduledChapterUnlockView({
 
         {/* Live Timer Box */}
         <div className="mt-5 flex items-center justify-center gap-3">
+          {(timeLeft?.hours ?? 0) > 0 && (
+            <>
+              <div className="flex flex-col items-center rounded-xl bg-background/90 border border-amber-500/40 px-4 py-2 min-w-[70px]">
+                <span className="font-mono text-2xl font-black text-amber-300">
+                  {String(timeLeft?.hours ?? 0).padStart(2, "0")}
+                </span>
+                <span className="text-[10px] uppercase font-semibold text-neutral-400">Hours</span>
+              </div>
+              <span className="font-mono text-xl font-bold text-amber-400 animate-pulse">:</span>
+            </>
+          )}
           <div className="flex flex-col items-center rounded-xl bg-background/90 border border-amber-500/40 px-4 py-2 min-w-[70px]">
             <span className="font-mono text-2xl font-black text-amber-300">
               {String(timeLeft?.minutes ?? 0).padStart(2, "0")}
@@ -1470,18 +1480,6 @@ function ScheduledChapterUnlockView({
                 )}
                 <span>Unlock for Everyone</span>
               </Button>
-
-              {onPreview && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={onPreview}
-                  className="w-full border-white/20 bg-white/5 hover:bg-white/10 text-white font-bold text-xs gap-1.5 cursor-pointer"
-                >
-                  <Eye className="h-3.5 w-3.5 text-neutral-300" />
-                  <span>Preview as Admin</span>
-                </Button>
-              )}
             </div>
           </div>
         )}
