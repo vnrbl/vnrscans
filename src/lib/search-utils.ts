@@ -72,6 +72,7 @@ export function buildSeriesSearchOrFilter(terms: string[]): string {
     clauses.push(`slug.ilike.%${slugifySearchTerm(term)}%`);
     clauses.push(`author.ilike.%${term}%`);
     clauses.push(`artist.ilike.%${term}%`);
+    clauses.push(`description.ilike.%${term}%`);
   }
 
   // Also include individual token matching if multiple words
@@ -81,6 +82,8 @@ export function buildSeriesSearchOrFilter(terms: string[]): string {
       .filter((w) => w.length >= 3 && !STOP_WORDS.has(w));
     for (const w of words) {
       clauses.push(`title.ilike.%${sanitizeSupabasePattern(w)}%`);
+      clauses.push(`alternative_titles.ilike.%${sanitizeSupabasePattern(w)}%`);
+      clauses.push(`description.ilike.%${sanitizeSupabasePattern(w)}%`);
     }
   }
 
@@ -97,8 +100,9 @@ export function isGenuineSeriesMatch(
   const alternativeTitles = normalizeSearchText(item.alternative_titles ?? "");
   const author = normalizeSearchText(item.author ?? "");
   const artist = normalizeSearchText(item.artist ?? "");
+  const description = normalizeSearchText(item.description ?? "");
 
-  // 1. Direct phrase or prefix match in any main field
+  // 1. Direct phrase or prefix match in any main field (including description and alternative titles)
   for (const term of terms) {
     if (!term || term.length < 2) continue;
     if (
@@ -106,22 +110,17 @@ export function isGenuineSeriesMatch(
       slug.includes(term) ||
       alternativeTitles.includes(term) ||
       author.includes(term) ||
-      artist.includes(term)
+      artist.includes(term) ||
+      description.includes(term)
     ) {
       return true;
     }
   }
 
   // 2. Multi-token relevance check:
-  // If the query has multiple words (e.g. "Genius Archer's Streaming"):
-  // A candidate must contain a significant portion of the query words.
-  // - 2 words: BOTH words must be present in (title + slug + alternativeTitles).
-  // - 3+ words: at least 65% of words must be present.
-  // Matching ONLY 1 common word out of 3+ (e.g. "Genius" in "Drug-Eating Genius Mage")
-  // is a false positive and must be rejected.
   const significantTokens = tokens.filter((t) => t.length >= 3 && !STOP_WORDS.has(t));
   if (significantTokens.length >= 2) {
-    const searchTarget = `${title} ${slug} ${alternativeTitles} ${author} ${artist}`;
+    const searchTarget = `${title} ${slug} ${alternativeTitles} ${author} ${artist} ${description}`;
     const matchedTokens = significantTokens.filter((tok) => searchTarget.includes(tok));
     const minRequired = significantTokens.length === 2 ? 2 : Math.ceil(significantTokens.length * 0.65);
 
@@ -129,9 +128,14 @@ export function isGenuineSeriesMatch(
       return true;
     }
   } else if (significantTokens.length === 1) {
-    // Single word query: title, slug, or alt titles must contain it
+    // Single word query: title, slug, alt titles, or description must contain it
     const tok = significantTokens[0];
-    if (title.includes(tok) || slug.includes(tok) || alternativeTitles.includes(tok)) {
+    if (
+      title.includes(tok) ||
+      slug.includes(tok) ||
+      alternativeTitles.includes(tok) ||
+      description.includes(tok)
+    ) {
       return true;
     }
   }
@@ -306,16 +310,18 @@ function scoreSeriesResult(
     else if (slug.includes(term)) score += 150;
 
     // Alternative Title Matches
-    if (alternativeTitles === term) score += 600;
-    else if (alternativeTitles.startsWith(term)) score += 300;
-    else if (alternativeTitles.includes(term)) score += 140;
+    if (alternativeTitles === term) score += 700;
+    else if (alternativeTitles.startsWith(term)) score += 350;
+    else if (alternativeTitles.includes(` ${term} `) || alternativeTitles.startsWith(`${term} `) || alternativeTitles.endsWith(` ${term}`)) score += 250;
+    else if (alternativeTitles.includes(term)) score += 180;
 
     // Author / Artist
     if (author === term || artist === term) score += 200;
     else if (author.includes(term) || artist.includes(term)) score += 80;
 
     // Description match
-    if (description.includes(term)) score += 25;
+    if (description.includes(` ${term} `) || description.startsWith(`${term} `)) score += 150;
+    else if (description.includes(term)) score += 80;
   }
 
   // Multi-Token Precision Check

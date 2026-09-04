@@ -16,6 +16,7 @@ import {
   CheckCircle2,
   Loader2,
   Lock,
+  Unlock,
   ExternalLink,
   Check,
 } from "lucide-react";
@@ -71,6 +72,40 @@ export const ChapterList = React.memo(function ChapterList({
   const qc = useQueryClient();
 
   const [deletingChapterId, setDeletingChapterId] = React.useState<string | null>(null);
+  const [unlockingChapterId, setUnlockingChapterId] = React.useState<string | null>(null);
+
+  const handleUnlockChapter = async (e: React.MouseEvent, chapterId: string, chapterNumber: number) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!window.confirm(`Unlock Chapter ${chapterNumber} immediately for all readers?`)) {
+      return;
+    }
+    try {
+      setUnlockingChapterId(chapterId);
+      const toastId = toast.loading(`Unlocking Chapter ${chapterNumber}...`);
+
+      const { error: rpcError } = await (supabase as any).rpc("admin_unlock_chapter", {
+        _chapter_id: chapterId,
+      });
+
+      if (rpcError) {
+        const { error: updateError } = await supabase
+          .from("chapters")
+          .update({ scheduled_at: null, status: "published" })
+          .eq("id", chapterId);
+        if (updateError) throw updateError;
+      }
+
+      toast.success(`Chapter ${chapterNumber} unlocked successfully!`, { id: toastId });
+      qc.invalidateQueries({ queryKey: ["chapters", slug] });
+      qc.invalidateQueries({ queryKey: ["series", "detail", slug] });
+      qc.invalidateQueries({ queryKey: ["series"] });
+    } catch (err: any) {
+      toast.error(`Failed to unlock chapter: ${err.message}`);
+    } finally {
+      setUnlockingChapterId(null);
+    }
+  };
 
   // Chapter filtering and ordering state — scoped to this component only
   const [selectedGroup, setSelectedGroup] = React.useState<string>("all");
@@ -576,10 +611,22 @@ export const ChapterList = React.memo(function ChapterList({
                           </span>
                         )}
                         {isScheduledLock && (
-                          <span className="inline-flex items-center gap-1 shrink-0 rounded-md bg-amber-500/20 border border-amber-500/40 px-1.5 py-0.5 text-[10px] font-bold text-amber-300 animate-pulse">
+                          <Link
+                            href={`/title/${slug}/${c.slug}`}
+                            className={`inline-flex items-center gap-1 shrink-0 rounded-md border px-1.5 py-0.5 text-[10px] font-bold transition-colors cursor-pointer ${
+                              canManage
+                                ? "bg-amber-500/15 border-amber-500/30 text-amber-400 hover:bg-amber-500/25"
+                                : "bg-amber-500/20 hover:bg-amber-500/30 border-amber-500/40 text-amber-300 animate-pulse"
+                            }`}
+                            title={
+                              canManage
+                                ? `Early access hold until ${new Date(c.scheduled_at!).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}. As staff/admin, you can read directly.`
+                                : "Locked chapter - Click to open unlock timer page"
+                            }
+                          >
                             <Lock className="h-3 w-3 text-amber-400" />
-                            Unlocks in {remainingMinutes}m
-                          </span>
+                            {canManage ? `Hold (${remainingMinutes}m)` : `Unlocks in ${remainingMinutes}m`}
+                          </Link>
                         )}
                         {isScheduledLock && sourceUrl && (
                           <a
@@ -634,6 +681,21 @@ export const ChapterList = React.memo(function ChapterList({
                         <Eye className="h-3 w-3 text-neutral-400" />
                         {formatReaderCount(readerCount)}
                       </Badge>
+                      {canManage && isScheduledLock && (
+                        <button
+                          type="button"
+                          onClick={(e) => handleUnlockChapter(e, c.id, c.chapter_number)}
+                          disabled={unlockingChapterId === c.id}
+                          className="p-1 rounded text-amber-400 hover:text-amber-300 hover:bg-amber-500/10 transition-colors"
+                          title={`Unlock Chapter ${c.chapter_number} Immediately`}
+                        >
+                          {unlockingChapterId === c.id ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin text-amber-400" />
+                          ) : (
+                            <Unlock className="h-3.5 w-3.5" />
+                          )}
+                        </button>
+                      )}
                       {canManage && (
                         <button
                           type="button"
@@ -662,190 +724,236 @@ export const ChapterList = React.memo(function ChapterList({
             })}
           </div>
 
-          {/* Desktop table layout */}
+          {/* Desktop & Tablet responsive table layout */}
           <div className="hidden overflow-x-auto rounded-lg border border-hairline glass-panel md:block shadow-lg">
-            <table className="w-full min-w-[860px]">
-            <thead className="border-b border-border/40 bg-surface-1/90">
-              <tr>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-neutral-400">Chapter</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-neutral-400">Uploaded By</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-neutral-400">Group</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-neutral-400">Upload Date</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-neutral-400">QI</th>
-                <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-neutral-400">Likes</th>
-                <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-neutral-400">Readers</th>
-                <th className="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider text-emerald-400">Offline</th>
-                {canManage && (
-                  <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-red-400">Action</th>
-                )}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border/20">
-              {paginatedChapters.map((c) => {
-                const isRead = (readChapters.data?.has(c.id) || readChapterNumbers.has(Number(c.chapter_number))) ?? false;
-                const isNew = new Date(c.created_at) > new Date(Date.now() - 2 * 60 * 60 * 1000);
-                const showNewBadge = isNew && !isRead;
-                const isLatest = latestChapterId === c.id;
-                const readerCount = readerCounts.data?.get(c.id) ?? 0;
-                const chapterLikes = chapterLikeCounts.data?.get(c.id) ?? 0;
-                const isScheduledLock = !!c.scheduled_at && new Date(c.scheduled_at) > new Date();
-                const remainingMinutes = isScheduledLock
-                  ? Math.max(1, Math.ceil((new Date(c.scheduled_at!).getTime() - Date.now()) / (1000 * 60)))
-                  : 0;
-                const sourceUrl = (c as any).source_url;
+            <table className="w-full text-left border-collapse">
+              <thead className="border-b border-border/40 bg-surface-1/90 text-neutral-400 text-xs font-semibold uppercase tracking-wider">
+                <tr>
+                  <th className="px-3 sm:px-4 py-3 text-left">Chapter</th>
+                  <th className="px-3 py-3 text-left hidden 2xl:table-cell">Uploaded By</th>
+                  <th className="px-3 py-3 text-left hidden lg:table-cell">Group</th>
+                  <th className="px-3 py-3 text-left whitespace-nowrap">Upload Date</th>
+                  <th className="px-2 sm:px-3 py-3 text-center hidden xl:table-cell">QI</th>
+                  <th className="px-2 py-3 text-center hidden sm:table-cell">Likes</th>
+                  <th className="px-2 py-3 text-right hidden lg:table-cell">Readers</th>
+                  <th className="px-2 sm:px-3 py-3 text-center w-12 sm:w-16 text-emerald-400">Offline</th>
+                  {canManage && (
+                    <th className="px-3 py-3 text-right text-red-400 w-16 sm:w-20">Action</th>
+                  )}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border/20">
+                {paginatedChapters.map((c) => {
+                  const isRead = (readChapters.data?.has(c.id) || readChapterNumbers.has(Number(c.chapter_number))) ?? false;
+                  const isNew = new Date(c.created_at) > new Date(Date.now() - 2 * 60 * 60 * 1000);
+                  const showNewBadge = isNew && !isRead;
+                  const isLatest = latestChapterId === c.id;
+                  const readerCount = readerCounts.data?.get(c.id) ?? 0;
+                  const chapterLikes = chapterLikeCounts.data?.get(c.id) ?? 0;
+                  const isScheduledLock = !!c.scheduled_at && new Date(c.scheduled_at) > new Date();
+                  const remainingMinutes = isScheduledLock
+                    ? Math.max(1, Math.ceil((new Date(c.scheduled_at!).getTime() - Date.now()) / (1000 * 60)))
+                    : 0;
+                  const sourceUrl = (c as any).source_url;
+                  const scanlationGroup = (c as { scanlation_group?: string }).scanlation_group;
+                  const uploadedBy = (c as { uploaded_by?: string }).uploaded_by;
 
-                return (
-                  <tr key={c.id} className="transition-colors hover:bg-surface-2/60 group">
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <Link
-                          href={`/title/${slug}/${c.slug}`}
-                          className="flex items-center gap-1.5"
-                        >
-                          <span
-                            className={`text-sm transition-colors ${
-                              isRead ? "text-neutral-500 font-medium group-hover:text-neutral-300" : "text-white font-semibold group-hover:text-purple-400"
-                            }`}
+                  return (
+                    <tr key={c.id} className="transition-colors hover:bg-surface-2/60 group">
+                      <td className="px-3 sm:px-4 py-3">
+                        <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+                          <Link
+                            href={`/title/${slug}/${c.slug}`}
+                            className="flex items-center gap-1.5"
                           >
-                            Chapter {c.chapter_number}
-                          </span>
-                          {isRead && (
                             <span
-                              className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-emerald-500/25 border border-emerald-400/80 text-emerald-300 shadow-[0_0_12px_rgba(16,185,129,0.5)] shrink-0 transition-transform duration-200 group-hover:scale-125 ml-1"
-                              title="Read & Completed (Qi Claimed)"
+                              className={`text-sm transition-colors ${
+                                isRead ? "text-neutral-500 font-medium group-hover:text-neutral-300" : "text-white font-semibold group-hover:text-purple-400"
+                              }`}
                             >
-                              <Check className="h-3 w-3 stroke-[3.5]" />
+                              Chapter {c.chapter_number}
+                            </span>
+                            {isRead && (
+                              <span
+                                className="inline-flex items-center justify-center h-4.5 w-4.5 rounded-full bg-emerald-500/25 border border-emerald-400/80 text-emerald-300 shadow-[0_0_12px_rgba(16,185,129,0.5)] shrink-0 transition-transform duration-200 group-hover:scale-125 ml-0.5"
+                                title="Read & Completed (Qi Claimed)"
+                              >
+                                <Check className="h-3 w-3 stroke-[3.5]" />
+                              </span>
+                            )}
+                            {showNewBadge && (
+                              <span className="shrink-0 rounded bg-purple-600 px-1.5 py-0.5 text-[10px] font-bold uppercase text-white">
+                                NEW
+                              </span>
+                            )}
+                          </Link>
+                          {isScheduledLock && (
+                            <Link
+                              href={`/title/${slug}/${c.slug}`}
+                              className={`inline-flex items-center gap-1 shrink-0 rounded-md border px-1.5 py-0.5 text-[10px] font-bold transition-colors cursor-pointer ${
+                                canManage
+                                  ? "bg-amber-500/15 border-amber-500/30 text-amber-400 hover:bg-amber-500/25"
+                                  : "bg-amber-500/20 hover:bg-amber-500/30 border-amber-500/40 text-amber-300 animate-pulse"
+                              }`}
+                              title={
+                                canManage
+                                  ? `Early access hold until ${new Date(c.scheduled_at!).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}. As staff/admin, you can read directly.`
+                                  : "Locked chapter - Click to open unlock timer page"
+                              }
+                            >
+                              <Lock className="h-3 w-3 text-amber-400" />
+                              {canManage ? `Hold (${remainingMinutes}m)` : `Unlocks in ${remainingMinutes}m`}
+                            </Link>
+                          )}
+                          {isScheduledLock && sourceUrl && (
+                            <a
+                              href={sourceUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              className="inline-flex items-center gap-1 rounded bg-primary/20 hover:bg-primary/35 border border-primary/50 px-2 py-0.5 text-[11px] font-bold text-primary transition-all hover:scale-105"
+                              title="Read immediately on official scans source"
+                            >
+                              <span>(Read now)</span>
+                              <ExternalLink className="h-3 w-3" />
+                            </a>
+                          )}
+                        </div>
+                        {/* Sub-row for small viewports where separate Group / Title column is collapsed */}
+                        <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-neutral-400">
+                          {c.title && (
+                            <span className="line-clamp-1 text-neutral-400">{c.title}</span>
+                          )}
+                          {scanlationGroup && (
+                            <span className="lg:hidden text-[11px] font-medium text-violet-400">
+                              [{scanlationGroup}]
                             </span>
                           )}
-                          {showNewBadge && (
-                            <span className="shrink-0 rounded bg-purple-600 px-1.5 py-0.5 text-[10px] font-bold uppercase text-white">
-                              NEW
-                            </span>
-                          )}
-                        </Link>
-                        {isScheduledLock && (
-                          <span className="inline-flex items-center gap-1 shrink-0 rounded-md bg-amber-500/20 border border-amber-500/40 px-2 py-0.5 text-[10px] font-bold text-amber-300 animate-pulse">
-                            <Lock className="h-3 w-3 text-amber-400" />
-                            Unlocks in {remainingMinutes}m
-                          </span>
-                        )}
-                        {isScheduledLock && sourceUrl && (
-                          <a
-                            href={sourceUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            onClick={(e) => e.stopPropagation()}
-                            className="inline-flex items-center gap-1 rounded bg-primary/20 hover:bg-primary/35 border border-primary/50 px-2.5 py-0.5 text-xs font-bold text-primary transition-all hover:scale-105"
-                            title="Read immediately on official scans source"
-                          >
-                            <span>(Read now)</span>
-                            <ExternalLink className="h-3 w-3" />
-                          </a>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      {(c as { uploaded_by?: string }).uploaded_by ? (
-                        <Link
-                          href={`/user/${(c as { uploaded_by?: string }).uploaded_by!}`}
-                          className="text-sm text-muted-foreground transition-colors hover:text-violet-600"
-                        >
-                          {(c as { uploaded_by?: string }).uploaded_by}
-                        </Link>
-                      ) : (
-                        <span className="text-sm text-muted-foreground">—</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      {(c as { scanlation_group?: string }).scanlation_group ? (
-                        <Link
-                          href={`/browse?group=${(c as { scanlation_group?: string }).scanlation_group}`}
-                          className="text-sm font-medium text-violet-600 transition-colors hover:text-violet-400"
-                        >
-                          {(c as { scanlation_group?: string }).scanlation_group}
-                        </Link>
-                      ) : (
-                        <span className="text-sm text-muted-foreground">—</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="text-sm text-muted-foreground">
-                        <span>{new Date(c.created_at).toLocaleDateString()}</span>
-                        <span className="ml-2 text-xs">({formatChapterAge(c.created_at)})</span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <XpBadge
-                        isRead={isRead}
-                        isLatest={isLatest}
-                        isSeriesCompleted={isSeriesCompleted}
-                      />
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                      <span className="inline-flex items-center gap-1 text-xs font-semibold text-pink-400">
-                        <Heart className="h-3.5 w-3.5 fill-pink-500 text-pink-500" />
-                        {chapterLikes.toLocaleString()}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <ReaderCount count={readerCount} loading={readerCounts.isLoading} />
-                    </td>
-                    <td className="px-3 py-3 text-center">
-                      <button
-                        type="button"
-                        onClick={(e) => handleDownloadSingleChapter(e, c)}
-                        title={savedOfflineIds.has(c.id) ? "Saved Offline (Click to remove)" : "Save Chapter Offline"}
-                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs transition-colors cursor-pointer ${
-                          savedOfflineIds.has(c.id)
-                            ? "border-emerald-500/50 bg-emerald-950/40 text-emerald-400 hover:bg-emerald-950/60"
-                            : "border-border/40 bg-secondary/50 hover:bg-secondary text-muted-foreground hover:text-foreground"
-                        }`}
-                      >
-                        {downloadingChapterId === c.id ? (
-                          <>
-                            <Loader2 className="h-3.5 w-3.5 animate-spin text-primary shrink-0" />
-                            <span className="text-[10px] font-mono">{downloadProgress}%</span>
-                          </>
-                        ) : savedOfflineIds.has(c.id) ? (
-                          <>
-                            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
-                            <span className="text-[11px] font-medium hidden lg:inline">Saved</span>
-                          </>
-                        ) : (
-                          <>
-                            <Download className="h-3.5 w-3.5 shrink-0" />
-                            <span className="text-[11px] font-medium hidden lg:inline">Save</span>
-                          </>
-                        )}
-                      </button>
-                    </td>
-                    {canManage && (
-                      <td className="px-4 py-3 text-right">
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            handleDeleteChapter(c.id, c.chapter_number);
-                          }}
-                          disabled={deletingChapterId === c.id}
-                          className="h-7 w-7 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer"
-                          title={`Delete Chapter ${c.chapter_number}`}
-                        >
-                          {deletingChapterId === c.id ? (
-                            <RefreshCw className="h-3.5 w-3.5 animate-spin text-destructive" />
-                          ) : (
-                            <Trash2 className="h-3.5 w-3.5" />
-                          )}
-                        </Button>
+                        </div>
                       </td>
-                    )}
-                  </tr>
-                );
-              })}
-            </tbody>
+                      <td className="px-3 py-3 hidden 2xl:table-cell">
+                        {uploadedBy ? (
+                          <Link
+                            href={`/user/${uploadedBy}`}
+                            className="text-sm text-muted-foreground transition-colors hover:text-violet-600"
+                          >
+                            {uploadedBy}
+                          </Link>
+                        ) : (
+                          <span className="text-sm text-muted-foreground">—</span>
+                        )}
+                      </td>
+                      <td className="px-3 py-3 hidden lg:table-cell">
+                        {scanlationGroup ? (
+                          <Link
+                            href={`/browse?group=${scanlationGroup}`}
+                            className="text-sm font-medium text-violet-600 transition-colors hover:text-violet-400"
+                          >
+                            {scanlationGroup}
+                          </Link>
+                        ) : (
+                          <span className="text-sm text-muted-foreground">—</span>
+                        )}
+                      </td>
+                      <td className="px-3 py-3 whitespace-nowrap">
+                        <div className="text-xs text-muted-foreground" title={new Date(c.created_at).toLocaleString()}>
+                          <span className="font-medium text-neutral-300">{formatChapterAge(c.created_at)}</span>
+                          <span className="hidden 2xl:inline ml-1.5 text-neutral-500">
+                            ({new Date(c.created_at).toLocaleDateString()})
+                          </span>
+                        </div>
+                      </td>
+                      <td className="px-2 sm:px-3 py-3 text-center hidden xl:table-cell">
+                        <XpBadge
+                          isRead={isRead}
+                          isLatest={isLatest}
+                          isSeriesCompleted={isSeriesCompleted}
+                        />
+                      </td>
+                      <td className="px-2 py-3 text-center hidden sm:table-cell">
+                        <span className="inline-flex items-center gap-1 text-xs font-semibold text-pink-400">
+                          <Heart className="h-3.5 w-3.5 fill-pink-500 text-pink-500" />
+                          {chapterLikes.toLocaleString()}
+                        </span>
+                      </td>
+                      <td className="px-2 py-3 text-right hidden lg:table-cell">
+                        <ReaderCount count={readerCount} loading={readerCounts.isLoading} />
+                      </td>
+                      <td className="px-2 sm:px-3 py-3 text-center">
+                        <button
+                          type="button"
+                          onClick={(e) => handleDownloadSingleChapter(e, c)}
+                          title={savedOfflineIds.has(c.id) ? "Saved Offline (Click to remove)" : "Save Chapter Offline"}
+                          className={`inline-flex items-center justify-center p-1.5 sm:px-2 sm:py-1 rounded-lg border text-xs transition-colors cursor-pointer ${
+                            savedOfflineIds.has(c.id)
+                              ? "border-emerald-500/50 bg-emerald-950/40 text-emerald-400 hover:bg-emerald-950/60"
+                              : "border-border/40 bg-secondary/50 hover:bg-secondary text-muted-foreground hover:text-foreground"
+                          }`}
+                        >
+                          {downloadingChapterId === c.id ? (
+                            <div className="flex items-center gap-1">
+                              <Loader2 className="h-3.5 w-3.5 animate-spin text-primary shrink-0" />
+                              <span className="text-[10px] font-mono hidden sm:inline">{downloadProgress}%</span>
+                            </div>
+                          ) : savedOfflineIds.has(c.id) ? (
+                            <div className="flex items-center gap-1">
+                              <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
+                              <span className="text-[11px] font-medium hidden 2xl:inline">Saved</span>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-1">
+                              <Download className="h-3.5 w-3.5 shrink-0" />
+                              <span className="text-[11px] font-medium hidden 2xl:inline">Save</span>
+                            </div>
+                          )}
+                        </button>
+                      </td>
+                      {canManage && (
+                        <td className="px-3 py-3 text-right">
+                          <div className="flex items-center justify-end gap-1">
+                            {isScheduledLock && (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                onClick={(e) => handleUnlockChapter(e, c.id, c.chapter_number)}
+                                disabled={unlockingChapterId === c.id}
+                                className="h-7 w-7 text-amber-400 hover:text-amber-300 hover:bg-amber-500/10 transition-colors cursor-pointer"
+                                title={`Unlock Chapter ${c.chapter_number} Immediately`}
+                              >
+                                {unlockingChapterId === c.id ? (
+                                  <Loader2 className="h-3.5 w-3.5 animate-spin text-amber-400" />
+                                ) : (
+                                  <Unlock className="h-3.5 w-3.5" />
+                                )}
+                              </Button>
+                            )}
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                handleDeleteChapter(c.id, c.chapter_number);
+                              }}
+                              disabled={deletingChapterId === c.id}
+                              className="h-7 w-7 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer"
+                              title={`Delete Chapter ${c.chapter_number}`}
+                            >
+                              {deletingChapterId === c.id ? (
+                                <RefreshCw className="h-3.5 w-3.5 animate-spin text-destructive" />
+                              ) : (
+                                <Trash2 className="h-3.5 w-3.5" />
+                              )}
+                            </Button>
+                          </div>
+                        </td>
+                      )}
+                    </tr>
+                  );
+                })}
+              </tbody>
             </table>
           </div>
 

@@ -3,7 +3,7 @@
 import React, { type ReactNode } from "react";
 import { Link } from "@/lib/router-compat";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { BookOpen, Clock, History, ChevronLeft, ChevronRight, ChevronUp, Star, MoreVertical, EyeOff } from "lucide-react";
+import { BookOpen, Clock, History, ChevronLeft, ChevronRight, ChevronUp, Star, MoreVertical, EyeOff, Lock } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -29,6 +29,7 @@ const HomeHeroCarousel = dynamic(
 );
 import { OptimizedImage } from "@/components/OptimizedImage";
 import { useReaderSettings } from "@/contexts/ReaderSettingsContext";
+import { CountryFlag, getTypeLabel } from "@/components/CountryFlag";
 
 const LATEST_UPDATES_CHAPTER_LIMIT = 5;
 const LATEST_UPDATES_PAGE_SIZE = 1000;
@@ -62,6 +63,8 @@ export type HomeLatestUpdate = {
     chapter_number: number;
     title: string | null;
     created_at: string;
+    scheduled_at?: string | null;
+    status?: string | null;
   }[];
 };
 
@@ -111,7 +114,7 @@ function HomeContent({ initialData }: { initialData?: HomeInitialData }) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("chapters")
-        .select("id,slug,title,chapter_number,created_at,series:series_id(id,slug,title,cover_url,type)")
+        .select("id,slug,title,chapter_number,created_at,scheduled_at,series:series_id(id,slug,title,cover_url,type)")
         .eq("status", "published")
         .order("created_at", { ascending: false })
         .order("chapter_number", { ascending: false })
@@ -169,7 +172,7 @@ function HomeContent({ initialData }: { initialData?: HomeInitialData }) {
 
       const { data, error } = await supabase
         .from("chapters")
-        .select("id,slug,title,chapter_number,created_at,series_id,series:series_id(id,slug,title,cover_url)")
+        .select("id,slug,title,chapter_number,created_at,scheduled_at,series_id,series:series_id(id,slug,title,cover_url)")
         .in("series_id", seriesIds)
         .eq("status", "published")
         .order("created_at", { ascending: false })
@@ -217,7 +220,7 @@ function HomeContent({ initialData }: { initialData?: HomeInitialData }) {
       if (missingSeriesIds.length > 0) {
         const { data: olderChapters } = await supabase
           .from("chapters")
-          .select("id,slug,title,chapter_number,created_at,series_id,series:series_id(id,slug,title,cover_url)")
+          .select("id,slug,title,chapter_number,created_at,scheduled_at,series_id,series:series_id(id,slug,title,cover_url)")
           .in("series_id", missingSeriesIds)
           .eq("status", "published")
           .order("chapter_number", { ascending: false });
@@ -334,11 +337,14 @@ function HomeContent({ initialData }: { initialData?: HomeInitialData }) {
           chapter_number: Number(ch.chapter_number),
           title: ch.title,
           created_at: ch.created_at,
+          scheduled_at: ch.scheduled_at || null,
+          status: ch.status || (ch.scheduled_at && new Date(ch.scheduled_at) > new Date() ? "scheduled" : "published"),
         })),
       }));
     },
     initialData: latestUpdatesInitialData,
-    staleTime: 1000 * 60 * 5,
+    staleTime: 1000 * 30, // 30 seconds
+    refetchInterval: 1000 * 60, // Keep hold countdowns synced every minute
     gcTime: 1000 * 60 * 20,
   });
 
@@ -530,6 +536,7 @@ type RecentChapter = {
   title: string | null;
   chapter_number: number;
   created_at: string;
+  scheduled_at?: string | null;
   series: { id: string; slug: string; title: string; cover_url: string | null } | null;
 };
 
@@ -935,6 +942,8 @@ function LatestUpdatesSection({
       chapter_number: number;
       title: string | null;
       created_at: string;
+      scheduled_at?: string | null;
+      status?: string | null;
     }>;
   }>;
   loading: boolean;
@@ -1033,26 +1042,41 @@ function LatestUpdatesSection({
                 className="glass-card group rounded-lg p-3 hover-lift transition-[border-color,box-shadow] flex flex-col justify-between"
               >
                 <div className="flex gap-3">
-                  {/* Cover Image */}
-                  <Link
-                    to="/title/$slug"
-                    params={{ slug: item.slug }}
-                    className="shrink-0 block"
-                  >
-                    <div className="relative h-[160px] w-[105px] overflow-hidden rounded bg-neutral-950">
-                      <OptimizedImage
-                        src={item.cover_url}
-                        alt={item.title}
-                        seriesId={item.id}
-                        className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-                      />
-                      <div className="absolute top-2 left-2">
-                        <Badge variant="outline" className="badge-glass text-xs font-medium uppercase py-0.5 px-1.5">
-                          {item.type}
-                        </Badge>
+                  {/* Cover and Flag Column */}
+                  <div className="shrink-0 flex flex-col items-center">
+                    <Link
+                      to="/title/$slug"
+                      params={{ slug: item.slug }}
+                      className="shrink-0 block"
+                    >
+                      <div className="relative h-[160px] w-[105px] overflow-hidden rounded bg-neutral-950">
+                        <OptimizedImage
+                          src={item.cover_url}
+                          alt={item.title}
+                          seriesId={item.id}
+                          className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                        />
+                        {item.recent_chapters.some((c) => c.status === "scheduled" || (c.scheduled_at && new Date(c.scheduled_at) > new Date())) && (
+                          <div
+                            className="absolute top-2 right-2 rounded bg-amber-950/90 border border-amber-500/50 p-1 text-amber-300 shadow-md backdrop-blur-md"
+                            title="Has chapters currently on early-access hold"
+                          >
+                            <Lock className="h-2.5 w-2.5 text-amber-400 animate-pulse" />
+                          </div>
+                        )}
+                      </div>
+                    </Link>
+
+                    {/* Flag below the cover inside the card */}
+                    <div
+                      className="mt-2 flex items-center justify-center w-[105px]"
+                      title={getTypeLabel(item.type)}
+                    >
+                      <div className="flex items-center justify-center p-0.5 rounded bg-surface-1/90 border border-white/10 shadow-xs hover:border-purple-500/40 transition-colors">
+                        <CountryFlag type={item.type} className="h-3.5 w-5 rounded-[2px] shadow-xs overflow-hidden" />
                       </div>
                     </div>
-                  </Link>
+                  </div>
 
                   {/* Series Info and Chapters */}
                   <div className="flex min-w-0 flex-1 flex-col justify-between">
@@ -1072,24 +1096,47 @@ function LatestUpdatesSection({
                       {item.recent_chapters.length > 0 ? (
                         item.recent_chapters.map((chapter) => {
                           const isRead = readChapterIds.has(chapter.id);
+                          const isScheduledLock = chapter.status === "scheduled" || (!!chapter.scheduled_at && new Date(chapter.scheduled_at) > new Date());
+                          const remainingMinutes = isScheduledLock && chapter.scheduled_at
+                            ? Math.max(1, Math.ceil((new Date(chapter.scheduled_at).getTime() - Date.now()) / (1000 * 60)))
+                            : 0;
+
+                          const formattedRemaining = remainingMinutes > 0
+                            ? remainingMinutes >= 60
+                              ? `${Math.floor(remainingMinutes / 60)}h${remainingMinutes % 60 ? ` ${remainingMinutes % 60}m` : ""}`
+                              : `${remainingMinutes}m`
+                            : null;
 
                           return (
                             <Link
                               key={chapter.id}
                               to="/title/$titleSlug/$chapterSlug"
                               params={{ titleSlug: item.slug, chapterSlug: chapter.slug }}
-                              className={`flex items-center justify-between text-xs px-2.5 py-1.5 rounded border border-white/10 bg-surface-1/60 hover:bg-surface-2 hover:border-purple-500/40 hover:text-white transition-colors ${
-                                isRead ? 'text-neutral-500 opacity-75' : 'text-neutral-200'
+                              title={
+                                isScheduledLock
+                                  ? `Chapter ${chapter.chapter_number} is on early-access hold${formattedRemaining ? ` (Unlocks in ${formattedRemaining})` : ""}`
+                                  : `Chapter ${chapter.chapter_number}`
+                              }
+                              className={`flex items-center justify-between text-xs px-2.5 py-1.5 rounded border transition-colors ${
+                                isScheduledLock
+                                  ? 'border-amber-500/40 bg-amber-950/25 hover:bg-amber-900/35 hover:border-amber-500/60 text-amber-200 shadow-sm'
+                                  : isRead
+                                  ? 'border-white/10 bg-surface-1/60 hover:bg-surface-2 hover:border-purple-500/40 text-neutral-500 opacity-75'
+                                  : 'border-white/10 bg-surface-1/60 hover:bg-surface-2 hover:border-purple-500/40 text-neutral-200 hover:text-white'
                               }`}
                             >
                               <div className="flex min-w-0 flex-1 items-center gap-1.5">
-                                <BookOpen className={`h-3 w-3 shrink-0 ${isRead ? 'text-neutral-500' : 'text-purple-400'}`} />
-                                <span className="truncate text-xs font-medium">
+                                {isScheduledLock ? (
+                                  <Lock className="h-3 w-3 shrink-0 text-amber-400 animate-pulse" />
+                                ) : (
+                                  <BookOpen className={`h-3 w-3 shrink-0 ${isRead ? 'text-neutral-500' : 'text-purple-400'}`} />
+                                )}
+                                <span className={`truncate text-xs ${isScheduledLock ? "font-semibold text-amber-300" : "font-medium"}`}>
                                   Chapter {chapter.chapter_number}
                                 </span>
                               </div>
-                              <span className="ml-1.5 shrink-0 text-xs text-neutral-400">
-                                {formatTimeAgo(chapter.created_at)}
+                              <span className={`ml-1.5 shrink-0 text-xs ${isScheduledLock ? "text-amber-400 font-medium font-mono" : "text-neutral-400"}`}>
+                                {isScheduledLock && formattedRemaining ? formattedRemaining : formatTimeAgo(chapter.created_at)}
                               </span>
                             </Link>
                           );
@@ -1239,10 +1286,17 @@ function FollowedChapterCard({ chapter }: { chapter: RecentChapter }) {
             </div>
           )}
 
-          <div className="absolute bottom-2 left-2 flex items-center gap-1.5 rounded bg-black/80 border border-white/20 px-2 py-0.5 text-xs font-semibold text-white shadow-md backdrop-blur-md transition-opacity group-hover:opacity-0">
-            <BookOpen className="h-3.5 w-3.5 text-purple-400" />
-            <span>Ch. {chapter.chapter_number}</span>
-          </div>
+          {chapter.scheduled_at && new Date(chapter.scheduled_at) > new Date() ? (
+            <div className="absolute bottom-2 left-2 flex items-center gap-1.5 rounded bg-amber-950/80 border border-amber-500/40 px-2 py-0.5 text-xs font-bold text-amber-300 shadow-md backdrop-blur-md transition-opacity group-hover:opacity-0 animate-pulse">
+              <Lock className="h-3 w-3 text-amber-400" />
+              <span>Ch. {chapter.chapter_number}</span>
+            </div>
+          ) : (
+            <div className="absolute bottom-2 left-2 flex items-center gap-1.5 rounded bg-black/80 border border-white/20 px-2 py-0.5 text-xs font-semibold text-white shadow-md backdrop-blur-md transition-opacity group-hover:opacity-0">
+              <BookOpen className="h-3.5 w-3.5 text-purple-400" />
+              <span>Ch. {chapter.chapter_number}</span>
+            </div>
+          )}
 
           {/* Full Series Name Reveal On Hover */}
           <div className="absolute inset-0 z-20 flex flex-col justify-end bg-gradient-to-t from-black via-black/95 to-black/30 p-2.5 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none">
@@ -1339,6 +1393,8 @@ function RecentChapterCard({
     </div>
   );
 
+  const isScheduledLock = (chapter as any).status === "scheduled" || (!!chapter.scheduled_at && new Date(chapter.scheduled_at) > new Date());
+
   return (
     <article className="group glass-card flex flex-col h-full rounded-lg overflow-hidden hover-lift transition-[border-color,box-shadow]">
       <Link to="/title/$slug" params={{ slug: seriesSlug }} className="block shrink-0">
@@ -1367,13 +1423,19 @@ function RecentChapterCard({
                 asChild
                 variant="secondary"
                 size="sm"
-                className="mt-2 h-8 w-full text-xs font-semibold rounded bg-surface-2 hover:bg-purple-950/40 hover:text-purple-200 border border-border/40"
+                className={`mt-2 h-8 w-full text-xs font-semibold rounded border transition-colors ${
+                  isScheduledLock
+                    ? "bg-amber-950/40 text-amber-300 hover:bg-amber-900/60 border-amber-500/40"
+                    : "bg-surface-2 hover:bg-purple-950/40 hover:text-purple-200 border-border/40"
+                }`}
               >
                 <Link
                   to="/title/$titleSlug/$chapterSlug"
                   params={{ titleSlug: seriesSlug, chapterSlug: chapter.slug }}
+                  className="flex items-center justify-center gap-1.5"
                 >
-                  Chapter {chapter.chapter_number}
+                  {isScheduledLock && <Lock className="h-3 w-3 shrink-0 text-amber-400 animate-pulse" />}
+                  <span>Chapter {chapter.chapter_number}</span>
                 </Link>
               </Button>
               {timeRow}

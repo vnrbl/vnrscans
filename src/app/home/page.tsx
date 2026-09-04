@@ -61,6 +61,8 @@ async function fetchHomeInitialData(): Promise<HomeInitialData> {
       chapter_number: Number(ch.chapter_number),
       title: ch.title,
       created_at: ch.created_at,
+      scheduled_at: ch.scheduled_at || null,
+      status: ch.status || (ch.scheduled_at && new Date(ch.scheduled_at) > new Date() ? "scheduled" : "published"),
     })),
   }));
 

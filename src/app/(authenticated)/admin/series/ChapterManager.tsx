@@ -21,6 +21,8 @@ import {
   RefreshCw,
   Power,
   Heart,
+  Lock,
+  Unlock,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { logAdminAction } from "@/lib/adminLog";
@@ -1588,6 +1590,32 @@ export default function ChapterManager({ seriesId, onBack }: { seriesId: string;
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const unlockChapter = useMutation({
+    mutationFn: async (chapterId: string) => {
+      const { error: rpcErr } = await (supabase as any).rpc("admin_unlock_chapter", {
+        _chapter_id: chapterId,
+      });
+      if (rpcErr) {
+        const { error } = await supabase
+          .from("chapters")
+          .update({ scheduled_at: null, status: "published" })
+          .eq("id", chapterId);
+        if (error) throw error;
+      }
+      await logAdminAction("update", "chapter", chapterId, {
+        series_id: seriesId,
+        action: "early_access_unlocked",
+      });
+    },
+    onSuccess: () => {
+      toast.success("Chapter unlocked for all users!");
+      qc.invalidateQueries({ queryKey: ["admin", "chapters", seriesId] });
+      qc.invalidateQueries({ queryKey: ["chapters"] });
+      qc.invalidateQueries({ queryKey: ["series"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   // Handle loading and error states
   if (series.isLoading) {
     return (
@@ -2356,6 +2384,12 @@ export default function ChapterManager({ seriesId, onBack }: { seriesId: string;
                   <Heart className="h-2.5 w-2.5 fill-pink-500 text-pink-500" />
                   {chapterLikeCounts.data?.get(ch.id) || 0}
                 </Badge>
+                {ch.scheduled_at && new Date(ch.scheduled_at) > new Date() && (
+                  <Badge variant="outline" className="text-[10px] gap-1 text-amber-400 border-amber-500/40 bg-amber-500/10 font-bold px-1.5 py-0 animate-pulse">
+                    <Lock className="h-2.5 w-2.5 text-amber-400" />
+                    Hold ({new Date(ch.scheduled_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })})
+                  </Badge>
+                )}
               </div>
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 <span>{new Date(ch.created_at).toLocaleDateString()}</span>
@@ -2373,6 +2407,22 @@ export default function ChapterManager({ seriesId, onBack }: { seriesId: string;
                 )}
               </div>
             </div>
+            {ch.scheduled_at && new Date(ch.scheduled_at) > new Date() && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => {
+                  if (window.confirm(`Unlock Chapter ${ch.chapter_number} immediately for all users?`)) {
+                    unlockChapter.mutate(ch.id);
+                  }
+                }}
+                disabled={unlockChapter.isPending}
+                className="text-amber-400 hover:text-amber-300 hover:bg-amber-500/10 cursor-pointer"
+                title={`Unlock Chapter ${ch.chapter_number} immediately`}
+              >
+                <Unlock className="h-4 w-4" />
+              </Button>
+            )}
             <Button
               variant="ghost"
               size="icon"

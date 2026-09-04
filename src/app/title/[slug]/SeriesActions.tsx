@@ -615,6 +615,7 @@ export const SeriesActions = React.memo(function SeriesActions({
               seriesId={seriesId}
               slug={slug}
               currentCoverUrl={coverUrl}
+              seriesTitle={title}
               trigger={
                 <Button
                   variant="outline"
@@ -670,6 +671,7 @@ export const SeriesActions = React.memo(function SeriesActions({
                       seriesId={seriesId}
                       slug={slug}
                       currentCoverUrl={coverUrl}
+                      seriesTitle={title}
                       trigger={
                         <Button
                           variant="ghost"

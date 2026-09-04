@@ -89,10 +89,20 @@ export function ScanCoverImporter({
   }, [existingSourceQ.data, scanUrl]);
 
   useEffect(() => {
-    if (open && seriesTitle && !comickQuery) {
+    if (open && seriesTitle) {
       setComickQuery(seriesTitle);
     }
-  }, [open, seriesTitle, comickQuery]);
+  }, [open, seriesTitle]);
+
+  // Auto-search ComicK covers when switching to comick tab if we have a title and haven't searched yet
+  useEffect(() => {
+    if (open && sourceType === "comick" && (seriesTitle || comickQuery) && extractedCovers.length === 0 && !isExtracting) {
+      const q = (comickQuery || seriesTitle || "").trim();
+      if (q) {
+        void handleExtractFromComick(q);
+      }
+    }
+  }, [open, sourceType, seriesTitle]);
 
   // 1-Click Auto Import from Scan Source
   const handleAutoImport = async () => {
@@ -164,8 +174,8 @@ export function ScanCoverImporter({
   };
 
   // Extract Covers from Comick.dev
-  const handleExtractFromComick = async () => {
-    const q = comickQuery.trim() || seriesTitle?.trim();
+  const handleExtractFromComick = async (customQ?: string) => {
+    const q = (typeof customQ === "string" ? customQ : comickQuery || seriesTitle || "").trim();
     if (!q) {
       toast.error("Please enter a series title to search Comick");
       return;
@@ -430,7 +440,7 @@ export function ScanCoverImporter({
                   />
                   <Button
                     type="button"
-                    onClick={handleExtractFromComick}
+                    onClick={() => void handleExtractFromComick()}
                     disabled={isExtracting || !comickQuery.trim()}
                     className="shrink-0 text-xs h-9 font-bold bg-emerald-600 hover:bg-emerald-500 text-white gap-1.5 cursor-pointer"
                   >

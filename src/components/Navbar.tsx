@@ -23,12 +23,6 @@ import {
   DropdownMenuTrigger,
   DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
-import {
-  Sheet,
-  SheetContent,
-  SheetTrigger,
-  SheetClose,
-} from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
 const NotificationBell = lazy(() => import("@/components/notifications/NotificationBell").then(m => ({ default: m.NotificationBell })));
 
@@ -53,6 +47,18 @@ export function Navbar() {
   const [diceResult, setDiceResult] = useState<number | null>(null);
   const [diceSeries, setDiceSeries] = useState<DiceSeries[]>([]);
   const [navDiceFace, setNavDiceFace] = useState(6);
+
+  // Escape key closes menu drawer
+  useEffect(() => {
+    if (!menuDrawerOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setMenuDrawerOpen(false);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [menuDrawerOpen]);
 
   // Cycle dice face icon in navbar button while rolling
   useEffect(() => {
@@ -172,133 +178,21 @@ export function Navbar() {
 
   return (
     <>
-      <header className="sticky top-0 z-40 navbar-ios-glass">
+      <header className="sticky top-0 z-50 navbar-ios-glass">
         <div className="container mx-auto flex h-16 items-center px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16 relative justify-between">
           {/* Left Side: YouTube-Style Menu Toggle + Logo */}
           <div className="flex items-center gap-3">
-            <Sheet open={menuDrawerOpen} onOpenChange={setMenuDrawerOpen}>
-              <SheetTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-9 w-9 text-foreground hover:bg-secondary/60 transition-colors"
-                  title="Menu"
-                >
-                  <Menu className="h-5 w-5" />
-                </Button>
-              </SheetTrigger>
-              <SheetContent side="left" className="w-[240px] sm:w-[260px] bg-[#0f0f0f] border-r border-border/40 p-3 flex flex-col justify-between shadow-2xl [&>button]:text-white">
-                <div className="space-y-3">
-                  {/* Drawer Top Header (Logo & Title like YouTube) */}
-                  <div className="flex items-center gap-3 px-3 py-2">
-                    <img src="/favicon.svg" alt="vnrscans logo" width={32} height={32} className="h-8 w-8 rounded-lg object-contain" />
-                    <span className="font-black text-sm tracking-wider text-white uppercase">VNR SCANS</span>
-                  </div>
-
-                  <div className="h-px bg-neutral-800/80 my-1" />
-
-                  {/* Main Navigation Links List (YouTube Style) */}
-                  <div className="space-y-1">
-                    {links.map((l) => (
-                      <Link
-                        key={l.to}
-                        to={l.to}
-                        onClick={() => setMenuDrawerOpen(false)}
-                        className="flex items-center gap-4 w-full px-3 py-2.5 rounded-xl text-sm font-medium text-neutral-300 hover:text-white hover:bg-neutral-800/80 transition-colors"
-                        activeProps={{ className: "text-white bg-neutral-800 font-bold" }}
-                      >
-                        <l.icon className="h-5 w-5 stroke-[1.8] text-neutral-400" />
-                        <span>{l.label}</span>
-                      </Link>
-                    ))}
-                  </div>
-
-                  <div className="h-px bg-neutral-800/80 my-1" />
-
-                  {/* Library & More Section */}
-                  <div className="space-y-1">
-                    <p className="px-3 text-[11px] font-semibold text-neutral-500 uppercase tracking-wider mb-1 mt-2">Explore</p>
-                    {user && (
-                      <Link
-                        to="/library"
-                        onClick={() => setMenuDrawerOpen(false)}
-                        className="flex items-center gap-4 w-full px-3 py-2.5 rounded-xl text-sm font-medium text-neutral-300 hover:text-white hover:bg-neutral-800/80 transition-colors"
-                        activeProps={{ className: "text-white bg-neutral-800 font-bold" }}
-                      >
-                        <Library className="h-5 w-5 stroke-[1.8] text-neutral-400" />
-                        <span>Bookmarks & Library</span>
-                      </Link>
-                    )}
-
-                    {user && (
-                      <Link
-                        to="/settings"
-                        onClick={() => setMenuDrawerOpen(false)}
-                        className="flex items-center gap-4 w-full px-3 py-2.5 rounded-xl text-sm font-medium text-neutral-300 hover:text-white hover:bg-neutral-800/80 transition-colors"
-                        activeProps={{ className: "text-white bg-neutral-800 font-bold" }}
-                      >
-                        <SettingsIcon className="h-5 w-5 stroke-[1.8] text-neutral-400" />
-                        <span>Settings</span>
-                      </Link>
-                    )}
-
-                    {showPanel && (
-                      <Link
-                        to="/admin"
-                        onClick={() => setMenuDrawerOpen(false)}
-                        className="flex items-center gap-4 w-full px-3 py-2.5 rounded-xl text-sm font-medium text-primary hover:bg-primary/10 transition-colors"
-                      >
-                        <ShieldCheck className="h-5 w-5 stroke-[1.8]" />
-                        <span>{panelLabel}</span>
-                      </Link>
-                    )}
-
-                    {isAdmin && (
-                      <Link
-                        to="/security"
-                        onClick={() => setMenuDrawerOpen(false)}
-                        className="flex items-center gap-4 w-full px-3.5 py-2.5 rounded-xl text-sm font-bold text-emerald-400 hover:text-emerald-300 hover:bg-emerald-950/60 border border-emerald-500/30 bg-emerald-950/20 shadow-md transition-all duration-200"
-                      >
-                        <ShieldAlert className="h-5 w-5 text-emerald-400 stroke-[2.2]" />
-                        <div className="flex items-center justify-between flex-1">
-                          <span>Cyber Security SOC</span>
-                          <span className="flex h-2 w-2 relative">
-                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
-                          </span>
-                        </div>
-                      </Link>
-                    )}
-                  </div>
-                </div>
-
-                {/* Bottom Action Button (No Profile Info as requested) */}
-                <div className="p-2 border-t border-neutral-800/80">
-                  {!user ? (
-                    <Button
-                      className="w-full bg-red-600 hover:bg-red-700 text-white font-bold h-9 rounded-full text-xs"
-                      onClick={() => {
-                        setMenuDrawerOpen(false);
-                        navigate({ to: "/auth" });
-                      }}
-                    >
-                      Sign In
-                    </Button>
-                  ) : (
-                    <Button
-                      variant="ghost"
-                      className="w-full text-xs font-medium text-neutral-400 hover:text-white hover:bg-neutral-800 h-9 justify-start px-3 rounded-xl"
-                      onClick={() => {
-                        setMenuDrawerOpen(false);
-                        signOut();
-                      }}
-                    >
-                      <LogOut className="mr-3 h-4 w-4" /> Sign Out
-                    </Button>
-                  )}
-                </div>
-              </SheetContent>
-            </Sheet>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setMenuDrawerOpen((prev) => !prev)}
+              className="h-9 w-9 text-foreground hover:bg-secondary/60 transition-colors cursor-pointer select-none active:scale-95"
+              title={menuDrawerOpen ? "Close Menu" : "Menu"}
+              aria-label={menuDrawerOpen ? "Close Menu" : "Open Menu"}
+              aria-expanded={menuDrawerOpen}
+            >
+              {menuDrawerOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            </Button>
 
             <Link to="/home" className="flex shrink-0 items-center gap-2 transition-transform hover:scale-105">
               <img src="/favicon.svg" alt="vnrscans logo" width={36} height={36} className="h-9 w-9 rounded-lg object-contain" />
@@ -499,6 +393,126 @@ export function Navbar() {
           />
         </Suspense>
       </header>
+
+      {/* ─── Fast GPU-accelerated YouTube-style Drawer ─────────────────── */}
+      {/* Backdrop: placed below header (top-16) so navbar stays 100% visible */}
+      <div
+        className={`fixed inset-0 top-16 z-40 bg-black/60 backdrop-blur-[2px] transition-opacity duration-200 ${
+          menuDrawerOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+        }`}
+        onClick={() => setMenuDrawerOpen(false)}
+        aria-hidden="true"
+      />
+
+      {/* Slide-out Drawer: instant 200ms GPU transform, zero layout lag */}
+      <aside
+        className={`fixed top-16 left-0 bottom-14 sm:bottom-0 z-50 w-[240px] sm:w-[260px] bg-[#0f0f0f] border-r border-border/40 p-3 flex flex-col justify-between shadow-2xl transition-transform duration-200 ease-out will-change-transform ${
+          menuDrawerOpen ? "translate-x-0" : "-translate-x-full pointer-events-none"
+        }`}
+        aria-label="Navigation Drawer"
+      >
+        <div className="space-y-3 overflow-y-auto pr-1">
+          {/* Main Navigation Links List */}
+          <div className="space-y-1">
+            {links.map((l) => (
+              <Link
+                key={l.to}
+                to={l.to}
+                onClick={() => setMenuDrawerOpen(false)}
+                className="flex items-center gap-4 w-full px-3 py-2.5 rounded-xl text-sm font-medium text-neutral-300 hover:text-white hover:bg-neutral-800/80 transition-colors cursor-pointer"
+                activeProps={{ className: "text-white bg-neutral-800 font-bold" }}
+              >
+                <l.icon className="h-5 w-5 stroke-[1.8] text-neutral-400" />
+                <span>{l.label}</span>
+              </Link>
+            ))}
+          </div>
+
+          <div className="h-px bg-neutral-800/80 my-1" />
+
+          {/* Library & Explore Section */}
+          <div className="space-y-1">
+            <p className="px-3 text-[11px] font-semibold text-neutral-500 uppercase tracking-wider mb-1 mt-2">Explore</p>
+            {user && (
+              <Link
+                to="/library"
+                onClick={() => setMenuDrawerOpen(false)}
+                className="flex items-center gap-4 w-full px-3 py-2.5 rounded-xl text-sm font-medium text-neutral-300 hover:text-white hover:bg-neutral-800/80 transition-colors cursor-pointer"
+                activeProps={{ className: "text-white bg-neutral-800 font-bold" }}
+              >
+                <Library className="h-5 w-5 stroke-[1.8] text-neutral-400" />
+                <span>Bookmarks & Library</span>
+              </Link>
+            )}
+
+            {user && (
+              <Link
+                to="/settings"
+                onClick={() => setMenuDrawerOpen(false)}
+                className="flex items-center gap-4 w-full px-3 py-2.5 rounded-xl text-sm font-medium text-neutral-300 hover:text-white hover:bg-neutral-800/80 transition-colors cursor-pointer"
+                activeProps={{ className: "text-white bg-neutral-800 font-bold" }}
+              >
+                <SettingsIcon className="h-5 w-5 stroke-[1.8] text-neutral-400" />
+                <span>Settings</span>
+              </Link>
+            )}
+
+            {showPanel && (
+              <Link
+                to="/admin"
+                onClick={() => setMenuDrawerOpen(false)}
+                className="flex items-center gap-4 w-full px-3 py-2.5 rounded-xl text-sm font-medium text-primary hover:bg-primary/10 transition-colors cursor-pointer"
+              >
+                <ShieldCheck className="h-5 w-5 stroke-[1.8]" />
+                <span>{panelLabel}</span>
+              </Link>
+            )}
+
+            {isAdmin && (
+              <Link
+                to="/security"
+                onClick={() => setMenuDrawerOpen(false)}
+                className="flex items-center gap-4 w-full px-3.5 py-2.5 rounded-xl text-sm font-bold text-emerald-400 hover:text-emerald-300 hover:bg-emerald-950/60 border border-emerald-500/30 bg-emerald-950/20 shadow-md transition-all duration-200 cursor-pointer"
+              >
+                <ShieldAlert className="h-5 w-5 text-emerald-400 stroke-[2.2]" />
+                <div className="flex items-center justify-between flex-1">
+                  <span>Cyber Security SOC</span>
+                  <span className="flex h-2 w-2 relative">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+                  </span>
+                </div>
+              </Link>
+            )}
+          </div>
+        </div>
+
+        {/* Bottom Action Button */}
+        <div className="p-2 border-t border-neutral-800/80 mt-2">
+          {!user ? (
+            <Button
+              className="w-full bg-red-600 hover:bg-red-700 text-white font-bold h-9 rounded-full text-xs cursor-pointer"
+              onClick={() => {
+                setMenuDrawerOpen(false);
+                navigate({ to: "/auth" });
+              }}
+            >
+              Sign In
+            </Button>
+          ) : (
+            <Button
+              variant="ghost"
+              className="w-full text-xs font-medium text-neutral-400 hover:text-white hover:bg-neutral-800 h-9 justify-start px-3 rounded-xl cursor-pointer"
+              onClick={() => {
+                setMenuDrawerOpen(false);
+                signOut();
+              }}
+            >
+              <LogOut className="mr-3 h-4 w-4" /> Sign Out
+            </Button>
+          )}
+        </div>
+      </aside>
 
       {/* Mobile Bottom Navigation Bar */}
       <nav className="fixed bottom-0 left-0 right-0 z-50 flex sm:hidden h-14 items-center justify-around border-t border-border/60 bg-[#111115] px-2 shadow-2xl">

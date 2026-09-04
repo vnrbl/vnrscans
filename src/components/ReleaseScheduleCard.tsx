@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from "react";
+import Link from "next/link";
 import { Clock, Calendar, Bell, Sparkles, CheckCircle2, Globe, Zap, Lock, ExternalLink } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -14,9 +15,11 @@ interface ReleaseScheduleProps {
     scheduled_at?: string | null;
     status?: string;
     source_url?: string | null;
+    slug?: string;
   }>;
   status?: string | null;
   seriesTitle?: string;
+  seriesSlug?: string;
   estimatedNextReleaseAt?: string | null;
   releaseCadence?: string | null;
 }
@@ -25,6 +28,7 @@ export function ReleaseScheduleCard({
   chapters,
   status,
   seriesTitle,
+  seriesSlug,
   estimatedNextReleaseAt,
   releaseCadence,
 }: ReleaseScheduleProps) {
@@ -64,30 +68,11 @@ export function ReleaseScheduleCard({
 
   const liveData = liveScheduleQ.data;
 
-  // Determine schedule data
+  // Determine schedule data for upcoming/next chapter
   const scheduleInfo = useMemo(() => {
-    // 1. Check for an upcoming confirmed scheduled chapter in database (e.g. 30-min unlock hold)
     const now = new Date();
-    const scheduled = chapters?.find(
-      (c) => c.scheduled_at && new Date(c.scheduled_at) > now
-    );
 
-    if (scheduled && scheduled.scheduled_at) {
-      return {
-        targetDate: new Date(scheduled.scheduled_at),
-        chapterNumber: scheduled.chapter_number,
-        cadenceText: "30-Min Hold",
-        sourceName: "Early Access",
-        isScheduled: true,
-        isUnlockingSoon: true,
-        sourceUrl: scheduled.source_url || null,
-        isSourceAhead: false,
-        aheadBy: 0,
-        sourceLatestChapter: undefined,
-      };
-    }
-
-    // 2. If status is completed, no upcoming countdown needed
+    // 1. If status is completed, no upcoming countdown needed
     if (status?.toLowerCase() === "completed" || liveData?.sourceStatus === "completed") {
       return {
         targetDate: null,
@@ -279,9 +264,7 @@ export function ReleaseScheduleCard({
           </div>
           <div>
             <span className="text-xs font-mono font-bold uppercase tracking-wider text-white">
-              {(scheduleInfo as any).isUnlockingSoon
-                ? "Early Access Hold"
-                : scheduleInfo.isScheduled
+              {scheduleInfo.isScheduled
                 ? "Confirmed Next Release"
                 : "Estimated Next Release"}
             </span>
@@ -339,18 +322,6 @@ export function ReleaseScheduleCard({
 
         {/* Action Buttons */}
         <div className="flex items-center gap-2">
-          {(scheduleInfo as any).isUnlockingSoon && (scheduleInfo as any).sourceUrl && (
-            <a
-              href={(scheduleInfo as any).sourceUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="h-7.5 inline-flex items-center gap-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 px-3 py-1 text-xs font-mono font-bold text-white shadow-sm transition-all shrink-0"
-              title="Read immediately on official scans source"
-            >
-              <span>Read now</span>
-              <ExternalLink className="h-3 w-3" />
-            </a>
-          )}
           <Button
             size="sm"
             variant={isTracking ? "secondary" : "outline"}

@@ -47,12 +47,13 @@ import {
   SunMoon,
   Search,
   Lock,
+  Unlock,
   ExternalLink,
   Clock,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { renderCommentMarkdown, COMMENT_TEXT_COLORS } from "@/lib/bbcode";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth, useIsAdmin } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { LiveWebGifPicker } from "@/components/comments/LiveWebGifPicker";
@@ -171,6 +172,9 @@ export default function Reader({
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState(0);
   const [isDownloaded, setIsDownloaded] = useState(false);
+  // Admin & staff role check
+  const { isAdmin, isMod, isUploader } = useIsAdmin();
+  const canManage = isAdmin || isMod || isUploader;
 
   const chapterQ = useQuery({
     queryKey: ["chapter", titleSlug, chapterSlug],
@@ -851,16 +855,61 @@ export default function Reader({
       <div className="w-full max-w-full">
         {/* Main content */}
         <div className="w-full max-w-full">
-          {c.scheduled_at && new Date(c.scheduled_at) > new Date() ? (
+          {c.scheduled_at && new Date(c.scheduled_at) > new Date() && !canManage ? (
             <ScheduledChapterUnlockView
               chapter={c}
               seriesSlug={seriesSlug}
               onUnlock={() => {
                 qc.invalidateQueries({ queryKey: ["pages", c.id] });
                 qc.invalidateQueries({ queryKey: ["chapter", slug, chapterSlug] });
+                qc.invalidateQueries({ queryKey: ["chapters"] });
               }}
             />
-          ) : isNovel ? (
+          ) : (
+            <>
+              {c.scheduled_at && new Date(c.scheduled_at) > new Date() && canManage && (
+                <div className="sticky top-16 z-30 mb-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-500/40 bg-amber-950/90 px-4 py-2.5 text-xs backdrop-blur-md shadow-lg">
+                  <div className="flex items-center gap-2 text-amber-300">
+                    <Lock className="h-4 w-4 shrink-0 text-amber-400 animate-pulse" />
+                    <span>
+                      <strong>Admin Early Access:</strong> Chapter {c.chapter_number} is on hold for regular readers until{" "}
+                      {new Date(c.scheduled_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}. As admin, you have instant access.
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      size="sm"
+                      onClick={async () => {
+                        if (!window.confirm(`Unlock Chapter ${c.chapter_number} immediately for all public readers?`)) return;
+                        try {
+                          const toastId = toast.loading("Unlocking chapter for everyone...");
+                          const { error: rpcErr } = await (supabase as any).rpc("admin_unlock_chapter", {
+                            _chapter_id: c.id,
+                          });
+                          if (rpcErr) {
+                            const { error: updateErr } = await supabase
+                              .from("chapters")
+                              .update({ scheduled_at: null, status: "published" })
+                              .eq("id", c.id);
+                            if (updateErr) throw updateErr;
+                          }
+                          toast.success("Chapter unlocked for everyone!", { id: toastId });
+                          qc.invalidateQueries({ queryKey: ["pages", c.id] });
+                          qc.invalidateQueries({ queryKey: ["chapter", slug, chapterSlug] });
+                          qc.invalidateQueries({ queryKey: ["chapters"] });
+                        } catch (err: any) {
+                          toast.error(`Unlock failed: ${err.message}`);
+                        }
+                      }}
+                      className="h-7 bg-amber-600 hover:bg-amber-500 text-white text-[11px] font-bold border-none cursor-pointer"
+                    >
+                      <Unlock className="h-3.5 w-3.5 mr-1" />
+                      Unlock for Everyone Now
+                    </Button>
+                  </div>
+                </div>
+              )}
+              {isNovel ? (
             <NovelView
               content={c.novel_content ?? ""}
               chapterId={c.id}
@@ -917,8 +966,10 @@ export default function Reader({
               chapterNumber={c.chapter_number}
             />
           )}
-        </div>
-      </div>
+        </>
+      )}
+    </div>
+  </div>
 
       {/* Floating Controls Sidebar - Scroll-based visibility */}
       <div
@@ -1269,11 +1320,16 @@ function ScheduledChapterUnlockView({
   chapter,
   seriesSlug,
   onUnlock,
+  onPreview,
 }: {
   chapter: any;
   seriesSlug: string;
   onUnlock: () => void;
+  onPreview?: () => void;
 }) {
+  const { isAdmin, isMod, isUploader } = useIsAdmin();
+  const canManage = isAdmin || isMod || isUploader;
+  const [isUnlocking, setIsUnlocking] = useState(false);
   const [timeLeft, setTimeLeft] = useState<{ minutes: number; seconds: number } | null>(null);
   const targetDate = useMemo(() => new Date(chapter.scheduled_at), [chapter.scheduled_at]);
 
@@ -1361,6 +1417,72 @@ function ScheduledChapterUnlockView({
               <span>(Read now) on {sourceName}</span>
               <ExternalLink className="h-4 w-4" />
             </a>
+          </div>
+        )}
+
+        {/* Admin Superpowers Box */}
+        {canManage && (
+          <div className="mt-6 rounded-xl border border-amber-500/50 bg-amber-950/40 p-4 text-left shadow-lg">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold uppercase tracking-wider text-amber-300">
+                Staff / Admin Override
+              </span>
+              <span className="text-[10px] font-mono rounded bg-amber-500/20 px-2 py-0.5 text-amber-300 font-semibold border border-amber-500/30">
+                Privileged Access
+              </span>
+            </div>
+            <p className="mt-1 text-xs text-neutral-300 leading-relaxed">
+              As a staff member or administrator, you can immediately unlock this chapter for all visitors, or preview it directly without waiting.
+            </p>
+            <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <Button
+                type="button"
+                onClick={async () => {
+                  if (!window.confirm(`Unlock Chapter ${chapter.chapter_number} immediately for all readers?`)) return;
+                  try {
+                    setIsUnlocking(true);
+                    const toastId = toast.loading("Unlocking chapter...");
+                    const { error: rpcErr } = await (supabase as any).rpc("admin_unlock_chapter", {
+                      _chapter_id: chapter.id,
+                    });
+                    if (rpcErr) {
+                      const { error: updateErr } = await supabase
+                        .from("chapters")
+                        .update({ scheduled_at: null, status: "published" })
+                        .eq("id", chapter.id);
+                      if (updateErr) throw updateErr;
+                    }
+                    toast.success("Chapter unlocked successfully!", { id: toastId });
+                    onUnlock();
+                  } catch (err: any) {
+                    toast.error(`Unlock failed: ${err.message}`);
+                  } finally {
+                    setIsUnlocking(false);
+                  }
+                }}
+                disabled={isUnlocking}
+                className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs gap-1.5 cursor-pointer"
+              >
+                {isUnlocking ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Unlock className="h-3.5 w-3.5" />
+                )}
+                <span>Unlock for Everyone</span>
+              </Button>
+
+              {onPreview && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={onPreview}
+                  className="w-full border-white/20 bg-white/5 hover:bg-white/10 text-white font-bold text-xs gap-1.5 cursor-pointer"
+                >
+                  <Eye className="h-3.5 w-3.5 text-neutral-300" />
+                  <span>Preview as Admin</span>
+                </Button>
+              )}
+            </div>
           </div>
         )}
 

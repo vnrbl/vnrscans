@@ -373,11 +373,12 @@ export default function TitleDetailPageContent({
         {/* Main layout grid: Chapters on Left, New Side Panel on Right */}
         <div className="mt-8 grid gap-8 xl:grid-cols-[1fr_340px]">
           {/* Chapter list & Release Schedule */}
-          <div className="space-y-6">
+          <div className="space-y-6 min-w-0">
             <ReleaseScheduleCard
               chapters={initialChaptersData || []}
               status={s.status}
               seriesTitle={s.title}
+              seriesSlug={slug}
               estimatedNextReleaseAt={(s as any).estimated_next_release_at}
               releaseCadence={(s as any).release_cadence}
             />

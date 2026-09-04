@@ -98,10 +98,10 @@ export function NavbarSearch({ open, onOpenChange }: NavbarSearchProps) {
         try {
           if (activeSearchTab === "comics") {
             const seriesFilter = buildSeriesSearchOrFilter(prepared.terms);
-            // Ultra-lean select without heavy descriptions for lightning response
+            // Lean select including description and alternative_titles for smart multi-field matching
             const { data: seriesData, error } = await supabase
               .from("series")
-              .select("id,slug,title,alternative_titles,cover_url,type")
+              .select("id,slug,title,alternative_titles,description,cover_url,type")
               .eq("is_hidden", false)
               .or(seriesFilter)
               .limit(30);
