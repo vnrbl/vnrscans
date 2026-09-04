@@ -43,6 +43,13 @@ import {
 } from "@/lib/offlineStorage";
 import { DownloadChaptersModal } from "@/components/DownloadChaptersModal";
 import { useReaderSettings } from "@/contexts/ReaderSettingsContext";
+import { UserAvatarFrame } from "@/components/UserAvatarFrame";
+import {
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+  TooltipProvider,
+} from "@/components/ui/tooltip";
 
 /* ------------------------------------------------------------------ */
 /*  ChapterList — ALL chapter interaction state lives here.           */
@@ -193,6 +200,62 @@ export const ChapterList = React.memo(function ChapterList({
     placeholderData: selectedGroup === "all" && sortOrder === "desc" ? initialChaptersData : undefined,
     staleTime: 1000 * 60 * 2,
     gcTime: 1000 * 60 * 10,
+  });
+
+  // Fetch profiles for all distinct uploaders in the chapter list
+  const uploaderNames = React.useMemo(() => {
+    if (!chaptersQ.data) return [];
+    const set = new Set<string>();
+    chaptersQ.data.forEach((c: any) => {
+      const uploader = c.uploaded_by;
+      if (uploader && typeof uploader === "string" && uploader.trim()) {
+        set.add(uploader.trim());
+      }
+    });
+    return Array.from(set);
+  }, [chaptersQ.data]);
+
+  const uploaderProfilesQ = useQuery({
+    queryKey: ["chapter-uploader-profiles", uploaderNames],
+    queryFn: async () => {
+      if (uploaderNames.length === 0) return {};
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("user_id, username, avatar_url, avatar_frame, accent_color")
+        .in("username", uploaderNames);
+
+      if (error) {
+        console.warn("Failed to fetch uploader profiles:", error);
+        return {};
+      }
+
+      const map: Record<
+        string,
+        {
+          user_id: string;
+          username: string | null;
+          avatar_url: string | null;
+          avatar_frame: string | null;
+          accent_color: string | null;
+        }
+      > = {};
+
+      (data || []).forEach((p) => {
+        if (p.username) {
+          map[p.username.toLowerCase()] = p;
+          map[p.username] = p;
+        }
+      });
+
+      // Special fallback for legacy username mapping if needed
+      if (!map["the love venerable 0"] && map["vnr610"]) {
+        map["the love venerable 0"] = map["vnr610"];
+      }
+
+      return map;
+    },
+    enabled: uploaderNames.length > 0,
+    staleTime: 1000 * 60 * 5,
   });
 
   const filteredChapters = React.useMemo(() => {
@@ -607,27 +670,44 @@ export const ChapterList = React.memo(function ChapterList({
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
-                        <Link
-                          href={`/title/${slug}/${c.slug}`}
-                          className={`text-sm transition-colors flex items-center gap-1.5 ${
-                            isRead ? "text-neutral-500 font-medium hover:text-neutral-300" : "text-white font-semibold hover:text-purple-400"
-                          }`}
-                        >
-                          <span>Chapter {c.chapter_number}</span>
-                          {isRead && (
-                            <span
-                              className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-emerald-500/25 border border-emerald-400/80 text-emerald-300 shadow-[0_0_12px_rgba(16,185,129,0.5)] shrink-0 transition-transform duration-200 group-hover:scale-125 ml-1"
-                              title="Read & Completed (Qi Claimed)"
-                            >
-                              <Check className="h-3 w-3 stroke-[3.5]" />
-                            </span>
-                          )}
-                        </Link>
-                        {showNewBadge && (
-                          <span className="shrink-0 rounded bg-purple-600 px-1.5 py-0.5 text-[10px] font-bold uppercase text-white">
-                            NEW
-                          </span>
-                        )}
+                        <TooltipProvider delayDuration={100}>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Link
+                                href={`/title/${slug}/${c.slug}`}
+                                className={`text-sm transition-colors flex items-center gap-1.5 ${
+                                  isRead ? "text-neutral-500 font-medium hover:text-neutral-300" : "text-white font-semibold hover:text-purple-400"
+                                }`}
+                                title={c.title ? `Chapter ${c.chapter_number}: ${c.title}` : `Chapter ${c.chapter_number}`}
+                              >
+                                <span>Chapter {c.chapter_number}</span>
+                                {isRead && (
+                                  <span
+                                    className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-emerald-500/25 border border-emerald-400/80 text-emerald-300 shadow-[0_0_12px_rgba(16,185,129,0.5)] shrink-0 transition-transform duration-200 group-hover:scale-125 ml-1"
+                                    title="Read & Completed (Qi Claimed)"
+                                  >
+                                    <Check className="h-3 w-3 stroke-[3.5]" />
+                                  </span>
+                                )}
+                                {showNewBadge && (
+                                  <span className="shrink-0 rounded bg-purple-600 px-1.5 py-0.5 text-[10px] font-bold uppercase text-white">
+                                    NEW
+                                  </span>
+                                )}
+                              </Link>
+                            </TooltipTrigger>
+                            {c.title && (
+                              <TooltipContent
+                                side="top"
+                                align="start"
+                                className="max-w-xs border border-purple-500/30 bg-neutral-950 text-neutral-100 shadow-xl backdrop-blur-md px-3 py-2 z-50"
+                              >
+                                <p className="text-xs font-bold text-purple-300">Chapter {c.chapter_number}</p>
+                                <p className="text-xs text-neutral-300 mt-0.5 leading-snug">{c.title}</p>
+                              </TooltipContent>
+                            )}
+                          </Tooltip>
+                        </TooltipProvider>
                         {isScheduledLock && (
                           <Link
                             href={`/title/${slug}/${c.slug}`}
@@ -649,9 +729,6 @@ export const ChapterList = React.memo(function ChapterList({
                           isSeriesCompleted={isSeriesCompleted}
                         />
                       </div>
-                      {c.title && (
-                        <p className="mt-1 line-clamp-1 text-xs text-neutral-400">{c.title}</p>
-                      )}
                     </div>
                     <div className="flex items-center gap-1.5 shrink-0">
                       <button
@@ -715,9 +792,28 @@ export const ChapterList = React.memo(function ChapterList({
                       )}
                     </div>
                   </div>
-                  <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-neutral-400">
+                  <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-neutral-400">
                     {scanlationGroup && <span className="font-semibold text-purple-400">{scanlationGroup}</span>}
-                    {uploadedBy && <span>by {uploadedBy}</span>}
+                    {uploadedBy && (() => {
+                      const prof =
+                        uploaderProfilesQ.data?.[uploadedBy] ||
+                        uploaderProfilesQ.data?.[uploadedBy.toLowerCase()];
+                      return (
+                        <Link
+                          href={`/user/${encodeURIComponent(uploadedBy)}`}
+                          className="inline-flex items-center gap-1.5 text-xs text-neutral-300 hover:text-purple-400 transition-colors"
+                        >
+                          <UserAvatarFrame
+                            avatarUrl={prof?.avatar_url}
+                            avatarFrame={prof?.avatar_frame || (prof ? "none" : null)}
+                            accentColor={prof?.accent_color || "#8B5CF6"}
+                            username={uploadedBy}
+                            size={18}
+                          />
+                          <span>by {uploadedBy}</span>
+                        </Link>
+                      );
+                    })()}
                     <span>{new Date(c.created_at).toLocaleDateString()}</span>
                     <span>{formatChapterAge(c.created_at)}</span>
                   </div>
@@ -732,7 +828,7 @@ export const ChapterList = React.memo(function ChapterList({
               <thead className="border-b border-border/40 bg-surface-1/90 text-neutral-400 text-xs font-semibold uppercase tracking-wider">
                 <tr>
                   <th className="px-3 sm:px-4 py-3 text-left">Chapter</th>
-                  <th className="px-3 py-3 text-left hidden 2xl:table-cell">Uploaded By</th>
+                  <th className="px-3 py-3 text-left hidden xl:table-cell">Uploaded By</th>
                   <th className="px-3 py-3 text-left hidden lg:table-cell">Group</th>
                   <th className="px-3 py-3 text-left whitespace-nowrap">Upload Date</th>
                   <th className="px-2 sm:px-3 py-3 text-center hidden xl:table-cell">QI</th>
@@ -767,31 +863,51 @@ export const ChapterList = React.memo(function ChapterList({
                     <tr key={c.id} className="transition-colors hover:bg-surface-2/60 group">
                       <td className="px-3 sm:px-4 py-3">
                         <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
-                          <Link
-                            href={`/title/${slug}/${c.slug}`}
-                            className="flex items-center gap-1.5"
-                          >
-                            <span
-                              className={`text-sm transition-colors ${
-                                isRead ? "text-neutral-500 font-medium group-hover:text-neutral-300" : "text-white font-semibold group-hover:text-purple-400"
-                              }`}
-                            >
-                              Chapter {c.chapter_number}
-                            </span>
-                            {isRead && (
-                              <span
-                                className="inline-flex items-center justify-center h-4.5 w-4.5 rounded-full bg-emerald-500/25 border border-emerald-400/80 text-emerald-300 shadow-[0_0_12px_rgba(16,185,129,0.5)] shrink-0 transition-transform duration-200 group-hover:scale-125 ml-0.5"
-                                title="Read & Completed (Qi Claimed)"
-                              >
-                                <Check className="h-3 w-3 stroke-[3.5]" />
-                              </span>
-                            )}
-                            {showNewBadge && (
-                              <span className="shrink-0 rounded bg-purple-600 px-1.5 py-0.5 text-[10px] font-bold uppercase text-white">
-                                NEW
-                              </span>
-                            )}
-                          </Link>
+                          <TooltipProvider delayDuration={100}>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Link
+                                  href={`/title/${slug}/${c.slug}`}
+                                  className="flex items-center gap-1.5"
+                                  title={c.title ? `Chapter ${c.chapter_number}: ${c.title}` : `Chapter ${c.chapter_number}`}
+                                >
+                                  <span
+                                    className={`text-sm transition-colors ${
+                                      isRead ? "text-neutral-500 font-medium group-hover:text-neutral-300" : "text-white font-semibold group-hover:text-purple-400"
+                                    }`}
+                                  >
+                                    Chapter {c.chapter_number}
+                                  </span>
+                                  {isRead && (
+                                    <span
+                                      className="inline-flex items-center justify-center h-4.5 w-4.5 rounded-full bg-emerald-500/25 border border-emerald-400/80 text-emerald-300 shadow-[0_0_12px_rgba(16,185,129,0.5)] shrink-0 transition-transform duration-200 group-hover:scale-125 ml-0.5"
+                                      title="Read & Completed (Qi Claimed)"
+                                    >
+                                      <Check className="h-3 w-3 stroke-[3.5]" />
+                                    </span>
+                                  )}
+                                  {showNewBadge && (
+                                    <span className="shrink-0 rounded bg-purple-600 px-1.5 py-0.5 text-[10px] font-bold uppercase text-white">
+                                      NEW
+                                    </span>
+                                  )}
+                                </Link>
+                              </TooltipTrigger>
+                              {c.title && (
+                                <TooltipContent
+                                  side="top"
+                                  align="start"
+                                  className="max-w-xs border border-purple-500/30 bg-neutral-950 text-neutral-100 shadow-xl backdrop-blur-md px-3 py-2 z-50"
+                                >
+                                  <p className="text-xs font-bold text-purple-300">Chapter {c.chapter_number}</p>
+                                  <p className="text-xs text-neutral-300 mt-0.5 leading-snug">{c.title}</p>
+                                  {scanlationGroup && (
+                                    <p className="text-[10px] text-purple-400/80 mt-1">Group: {scanlationGroup}</p>
+                                  )}
+                                </TooltipContent>
+                              )}
+                            </Tooltip>
+                          </TooltipProvider>
                           {isScheduledLock && (
                             <Link
                               href={`/title/${slug}/${c.slug}`}
@@ -808,26 +924,35 @@ export const ChapterList = React.memo(function ChapterList({
                             </Link>
                           )}
                         </div>
-                        {/* Sub-row for small viewports where separate Group / Title column is collapsed */}
-                        <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-neutral-400">
-                          {c.title && (
-                            <span className="line-clamp-1 text-neutral-400">{c.title}</span>
-                          )}
-                          {scanlationGroup && (
-                            <span className="lg:hidden text-[11px] font-medium text-violet-400">
-                              [{scanlationGroup}]
-                            </span>
-                          )}
-                        </div>
                       </td>
-                      <td className="px-3 py-3 hidden 2xl:table-cell">
+                      <td className="px-3 py-3 hidden xl:table-cell">
                         {uploadedBy ? (
-                          <Link
-                            href={`/user/${uploadedBy}`}
-                            className="text-sm text-muted-foreground transition-colors hover:text-violet-600"
-                          >
-                            {uploadedBy}
-                          </Link>
+                          (() => {
+                            const prof =
+                              uploaderProfilesQ.data?.[uploadedBy] ||
+                              uploaderProfilesQ.data?.[uploadedBy.toLowerCase()];
+                            return (
+                              <Link
+                                href={`/user/${encodeURIComponent(uploadedBy)}`}
+                                className="inline-flex items-center gap-2 group/uploader max-w-[210px] rounded-lg py-1 px-1.5 -ml-1.5 transition-all duration-200 hover:bg-surface-3/60"
+                                title={`Uploaded by ${uploadedBy}`}
+                              >
+                                <UserAvatarFrame
+                                  avatarUrl={prof?.avatar_url}
+                                  avatarFrame={prof?.avatar_frame || (prof ? "none" : null)}
+                                  accentColor={prof?.accent_color || "#8B5CF6"}
+                                  username={uploadedBy}
+                                  size={26}
+                                />
+                                <span
+                                  className="truncate text-xs font-semibold text-neutral-300 transition-colors group-hover/uploader:text-purple-400 group-hover/uploader:underline"
+                                  style={{ color: prof?.accent_color || undefined }}
+                                >
+                                  {uploadedBy}
+                                </span>
+                              </Link>
+                            );
+                          })()
                         ) : (
                           <span className="text-sm text-muted-foreground">—</span>
                         )}

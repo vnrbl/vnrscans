@@ -2,7 +2,7 @@
 
 import { Link, useNavigate } from "@/lib/router-compat";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { pageTitle } from "@/lib/brand";
 import { Card } from "@/components/ui/card";
@@ -35,6 +35,7 @@ import { BadgeIcon, enhanceBadge } from "@/lib/profileBadges";
 import { stripBbCode } from "@/lib/bbcode";
 import { parseSafeAttachmentUrls } from "@/lib/safe-url";
 import { OptimizedImage } from "@/components/OptimizedImage";
+import { SectionPagination } from "@/components/SectionPagination";
 
 type PublicProfileStats = {
   chapters_read: number;
@@ -319,19 +320,58 @@ export default function UserProfileContent({ username }: { username: string }) {
   const qc = useQueryClient();
   const navigate = useNavigate();
 
-  // Fetch public profile by username
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const [uploadedPage, setUploadedPage] = useState(1);
+  const [commentsPage, setCommentsPage] = useState(1);
+  const [libraryPage, setLibraryPage] = useState(1);
+
+  const decodedUsername = useMemo(() => {
+    try {
+      return decodeURIComponent(username).trim();
+    } catch {
+      return (username || "").trim();
+    }
+  }, [username]);
+
+  // Fetch public profile by username (supports URL decoding and case-insensitive matching)
   const profile = useQuery({
-    queryKey: ["public-profile", username],
+    queryKey: ["public-profile", decodedUsername],
     queryFn: async () => {
-      const { data, error } = await supabase
+      // 1. Try case-insensitive matching on decoded username
+      let { data, error } = await supabase
         .from("profiles")
         .select("*")
-        .eq("username", username)
+        .ilike("username", decodedUsername)
         .maybeSingle();
+
+      // 2. Fallback to raw param if different
+      if (!data && decodedUsername !== username) {
+        const fallback = await supabase
+          .from("profiles")
+          .select("*")
+          .ilike("username", username)
+          .maybeSingle();
+        data = fallback.data;
+      }
+
+      // 3. Fallback for legacy username alias 'vnr610'
+      if (!data && (decodedUsername.toLowerCase() === "vnr610" || username.toLowerCase() === "vnr610")) {
+        const legacy = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("user_id", "8a440e3d-b3d0-4103-a131-77c6d8572fa5")
+          .maybeSingle();
+        data = legacy.data;
+      }
+
       if (error) throw error;
       return data as any;
     },
-    staleTime: 2 * 60 * 1000,
+    staleTime: 30 * 1000,
   });
 
   // Fetch user roles
@@ -429,6 +469,7 @@ export default function UserProfileContent({ username }: { username: string }) {
     if (!userId) return;
 
     const refreshPublicProfile = () => {
+      qc.invalidateQueries({ queryKey: ["public-profile", decodedUsername] });
       qc.invalidateQueries({ queryKey: ["public-profile", username] });
       qc.invalidateQueries({ queryKey: ["public-profile-stats", userId] });
       qc.invalidateQueries({ queryKey: ["public-profile-library", userId] });
@@ -437,7 +478,7 @@ export default function UserProfileContent({ username }: { username: string }) {
       qc.invalidateQueries({ queryKey: ["public-profile-comments-count", userId] });
       qc.invalidateQueries({ queryKey: ["public-profile-equipped-badge", userId] });
       qc.invalidateQueries({ queryKey: ["public-profile-roles", userId] });
-      qc.invalidateQueries({ queryKey: ["public-profile-uploaded-series", username] });
+      qc.invalidateQueries({ queryKey: ["public-profile-uploaded-series"] });
     };
 
     const channel = supabase
@@ -476,7 +517,7 @@ export default function UserProfileContent({ username }: { username: string }) {
         "postgres_changes",
         { event: "*", schema: "public", table: "chapters" },
         () => {
-          qc.invalidateQueries({ queryKey: ["public-profile-uploaded-series", username] });
+          qc.invalidateQueries({ queryKey: ["public-profile-uploaded-series"] });
         }
       )
       .subscribe();
@@ -491,29 +532,68 @@ export default function UserProfileContent({ username }: { username: string }) {
     queryFn: async () => {
       if (!profile.data?.user_id) return [] as PublicLibraryItem[];
 
-      const { data, error } = await (supabase as any)
-        .rpc("get_public_library_items", {
-          _profile_user_id: profile.data.user_id,
-          _limit: 12,
-        });
+      const { data, error } = await supabase
+        .from("user_library")
+        .select(`
+          id,
+          updated_at,
+          reading_status,
+          series:series_id (
+            id,
+            slug,
+            title,
+            cover_url,
+            type,
+            status,
+            rating_average,
+            view_count,
+            is_hidden
+          )
+        `)
+        .eq("user_id", profile.data.user_id)
+        .order("updated_at", { ascending: false });
 
-      if (error) throw error;
-      return (data ?? []).map((item: any) => ({
-        library_id: item.library_id,
-        updated_at: item.updated_at,
-        reading_status: item.reading_status,
-        series_id: item.series_id,
-        series_slug: item.series_slug,
-        series_title: item.series_title,
-        series_cover_url: item.series_cover_url,
-        series_type: item.series_type,
-        series_status: item.series_status,
-        rating_average: Number(item.rating_average ?? 0),
-        view_count: Number(item.view_count ?? 0),
-      })) satisfies PublicLibraryItem[];
+      if (error) {
+        console.warn("Direct user_library query failed, trying RPC fallback:", error);
+        const { data: rpcData, error: rpcError } = await (supabase as any)
+          .rpc("get_public_library_items", {
+            _profile_user_id: profile.data.user_id,
+            _limit: 500,
+          });
+        if (rpcError) throw rpcError;
+        return (rpcData ?? []).map((item: any) => ({
+          library_id: item.library_id,
+          updated_at: item.updated_at,
+          reading_status: item.reading_status,
+          series_id: item.series_id,
+          series_slug: item.series_slug,
+          series_title: item.series_title,
+          series_cover_url: item.series_cover_url,
+          series_type: item.series_type,
+          series_status: item.series_status,
+          rating_average: Number(item.rating_average ?? 0),
+          view_count: Number(item.view_count ?? 0),
+        })) satisfies PublicLibraryItem[];
+      }
+
+      return (data ?? [])
+        .filter((item: any) => item.series && !item.series.is_hidden)
+        .map((item: any) => ({
+          library_id: item.id,
+          updated_at: item.updated_at,
+          reading_status: item.reading_status,
+          series_id: item.series.id,
+          series_slug: item.series.slug,
+          series_title: item.series.title,
+          series_cover_url: item.series.cover_url,
+          series_type: item.series.type,
+          series_status: item.series.status,
+          rating_average: Number(item.series.rating_average ?? 0),
+          view_count: Number(item.series.view_count ?? 0),
+        })) satisfies PublicLibraryItem[];
     },
     enabled: !!profile.data?.user_id && showLibraries,
-    staleTime: 30 * 1000,
+    staleTime: 5 * 1000,
   });
 
   // ─── Reading Preferences: genre breakdown from reading history (all-time, paginated) ───
@@ -623,17 +703,20 @@ export default function UserProfileContent({ username }: { username: string }) {
   });
 
   // ─── Uploaded Series: series where user uploaded chapters (all-time, paginated) ───
+  const targetUsername = profile.data?.username || decodedUsername;
   const uploadedSeries = useQuery({
-    queryKey: ["public-profile-uploaded-series", username],
+    queryKey: ["public-profile-uploaded-series", targetUsername],
     queryFn: async () => {
+      if (!targetUsername) return [];
       let allChapters: { series_id: string }[] = [];
       let from = 0;
       const PAGE_SIZE = 1000;
+      const matchNames = Array.from(new Set([targetUsername, decodedUsername, username, "The Love Venerable 0", "vnr610"].filter(Boolean)));
       while (true) {
         const { data: chaptersData, error: chaptersError } = await supabase
           .from("chapters")
           .select("series_id")
-          .eq("uploaded_by", username)
+          .in("uploaded_by", matchNames)
           .eq("status", "published")
           .range(from, from + PAGE_SIZE - 1);
         if (chaptersError || !chaptersData || chaptersData.length === 0) break;
@@ -689,7 +772,7 @@ export default function UserProfileContent({ username }: { username: string }) {
     staleTime: 30 * 1000,
   });
 
-  // Fetch user comment history
+  // Fetch user comment history (all comments)
   const commentHistory = useQuery({
     queryKey: ["public-profile-comments", profile.data?.user_id],
     queryFn: async () => {
@@ -698,8 +781,7 @@ export default function UserProfileContent({ username }: { username: string }) {
         .select("id,content,created_at,chapter_id,series_id,parent_id,is_spoiler,is_hidden,attachment_type,attachment_url")
         .eq("user_id", profile.data.user_id)
         .eq("is_hidden", false)
-        .order("created_at", { ascending: false })
-        .limit(20);
+        .order("created_at", { ascending: false });
       if (error) {
         console.error("Error fetching public comment history:", error);
         return [];
@@ -707,7 +789,7 @@ export default function UserProfileContent({ username }: { username: string }) {
       return data || [];
     },
     enabled: !!profile.data?.user_id && isProfilePublic,
-    staleTime: 30 * 1000,
+    staleTime: 5 * 1000,
   });
 
   // Fetch series info for comment history
@@ -788,7 +870,7 @@ export default function UserProfileContent({ username }: { username: string }) {
 
 
   // Loading state
-  if (profile.isLoading) {
+  if (!mounted || profile.isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center space-y-3">
@@ -807,7 +889,7 @@ export default function UserProfileContent({ username }: { username: string }) {
           <UserX className="h-16 w-16 text-muted-foreground/50 mx-auto" />
           <h1 className="text-2xl font-bold">User not found</h1>
           <p className="text-muted-foreground">
-            No user with the username "{username}" exists.
+            No user with the username "{decodedUsername}" exists.
           </p>
           <Link to="/home">
             <Button variant="outline" className="gap-2">
@@ -829,6 +911,25 @@ export default function UserProfileContent({ username }: { username: string }) {
   const xpProgress = ((xp % xpForNextLevel) / xpForNextLevel) * 100;
   const roles = userRoles.data ?? [];
   const profileVisibility = profile.data.profile_visibility ?? "public";
+
+  // Paginated slices (20 items per page)
+  const paginatedUploadedSeries = useMemo(() => {
+    const list = uploadedSeries.data || [];
+    const start = (uploadedPage - 1) * 20;
+    return list.slice(start, start + 20);
+  }, [uploadedSeries.data, uploadedPage]);
+
+  const paginatedComments = useMemo(() => {
+    const list = commentHistory.data || [];
+    const start = (commentsPage - 1) * 20;
+    return list.slice(start, start + 20);
+  }, [commentHistory.data, commentsPage]);
+
+  const paginatedLibrary = useMemo(() => {
+    const list = publicLibrary.data || [];
+    const start = (libraryPage - 1) * 20;
+    return list.slice(start, start + 20);
+  }, [publicLibrary.data, libraryPage]);
 
   const socialLinks = {
     social_discord: profile.data.social_discord || "",
@@ -871,7 +972,7 @@ export default function UserProfileContent({ username }: { username: string }) {
   }
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen" suppressHydrationWarning>
       {/* ─── Profile Header (No Banner) ─── */}
       <div
         className="relative py-10 border-b border-border/20"
@@ -1448,6 +1549,7 @@ export default function UserProfileContent({ username }: { username: string }) {
               : "preferences"
           }
           className="w-full"
+          suppressHydrationWarning
         >
           {/* Column bar */}
           <TabsList className={`grid h-11 w-full ${showLibraries ? "grid-cols-4" : "grid-cols-3"} gap-1 p-1`}>
@@ -1470,12 +1572,12 @@ export default function UserProfileContent({ username }: { username: string }) {
             <TabsTrigger value="comments" className="h-9 min-w-0 gap-1.5 px-0 sm:px-3">
               <MessageSquare className="h-4 w-4" />
               <span>Comments</span>
-              {((publicCommentsCount.data ?? (commentHistory.data?.length || 0)) > 0) && (
+              {(commentHistory.data?.length ?? publicCommentsCount.data ?? 0) > 0 && (
                 <span
                   className="ml-1 hidden sm:inline-flex h-4 min-w-4 items-center justify-center rounded-full px-1.5 text-[10px] font-bold"
                   style={{ backgroundColor: `${accentColor}25`, color: accentColor }}
                 >
-                  {publicCommentsCount.data ?? commentHistory.data?.length ?? 0}
+                  {commentHistory.data?.length ?? publicCommentsCount.data ?? 0}
                 </span>
               )}
             </TabsTrigger>
@@ -1483,12 +1585,12 @@ export default function UserProfileContent({ username }: { username: string }) {
               <TabsTrigger value="library" className="h-9 min-w-0 gap-1.5 px-0 sm:px-3">
                 <BookOpen className="h-4 w-4" />
                 <span>Library</span>
-                {((publicStats.data?.series_followed ?? (publicLibrary.data?.length || 0)) > 0) && (
+                {(publicLibrary.data?.length ?? publicStats.data?.series_followed ?? 0) > 0 && (
                   <span
                     className="ml-1 hidden sm:inline-flex h-4 min-w-4 items-center justify-center rounded-full px-1.5 text-[10px] font-bold"
                     style={{ backgroundColor: `${accentColor}25`, color: accentColor }}
                   >
-                    {publicStats.data?.series_followed ?? publicLibrary.data?.length ?? 0}
+                    {publicLibrary.data?.length ?? publicStats.data?.series_followed ?? 0}
                   </span>
                 )}
               </TabsTrigger>
@@ -1534,81 +1636,88 @@ export default function UserProfileContent({ username }: { username: string }) {
                   ))}
                 </div>
               ) : uploadedSeries.data && uploadedSeries.data.length > 0 ? (
-                <div className="grid gap-4 sm:grid-cols-2">
-                  {uploadedSeries.data.map((series: any) => (
-                    <Link
-                      key={series.id}
-                      to="/title/$slug"
-                      params={{ slug: series.slug }}
-                      className="group rounded-xl border border-border/40 bg-card/60 p-3.5 transition-all duration-200 hover:shadow-lg"
-                      onMouseEnter={(e: React.MouseEvent<HTMLAnchorElement>) => {
-                        e.currentTarget.style.borderColor = `${accentColor}50`;
-                      }}
-                      onMouseLeave={(e: React.MouseEvent<HTMLAnchorElement>) => {
-                        e.currentTarget.style.borderColor = "";
-                      }}
-                    >
-                      <div className="flex gap-3.5">
-                        <div className="h-24 w-16 flex-shrink-0 overflow-hidden rounded-lg bg-secondary shadow-sm">
-                          <OptimizedImage
-                            src={series.cover_url}
-                            alt={series.title}
-                            seriesId={series.id}
-                            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-                          />
-                        </div>
-                        <div className="min-w-0 flex-1 flex flex-col justify-between py-0.5">
-                          <div>
-                            <p className="truncate text-base font-semibold group-hover:text-primary transition-colors">
-                              {series.title}
-                            </p>
-                            <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs">
-                              <Badge
-                                className="text-xs font-semibold border"
-                                style={{
-                                  borderColor: `${accentColor}30`,
-                                  backgroundColor: `${accentColor}12`,
-                                  color: accentColor,
-                                }}
-                              >
-                                <Upload className="mr-1 h-3 w-3" />
-                                {series.uploaded_chapter_count} chapters uploaded
-                              </Badge>
-                              <span className="text-muted-foreground capitalize font-medium">
-                                {series.type}
+                <>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    {paginatedUploadedSeries.map((series: any) => (
+                      <Link
+                        key={series.id}
+                        to="/title/$slug"
+                        params={{ slug: series.slug }}
+                        className="group rounded-xl border border-border/40 bg-card/60 p-3.5 transition-all duration-200 hover:shadow-lg"
+                        onMouseEnter={(e: React.MouseEvent<HTMLAnchorElement>) => {
+                          e.currentTarget.style.borderColor = `${accentColor}50`;
+                        }}
+                        onMouseLeave={(e: React.MouseEvent<HTMLAnchorElement>) => {
+                          e.currentTarget.style.borderColor = "";
+                        }}
+                      >
+                        <div className="flex gap-3.5">
+                          <div className="h-24 w-16 flex-shrink-0 overflow-hidden rounded-lg bg-secondary shadow-sm">
+                            <OptimizedImage
+                              src={series.cover_url}
+                              alt={series.title}
+                              seriesId={series.id}
+                              className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                            />
+                          </div>
+                          <div className="min-w-0 flex-1 flex flex-col justify-between py-0.5">
+                            <div>
+                              <p className="truncate text-base font-semibold group-hover:text-primary transition-colors">
+                                {series.title}
+                              </p>
+                              <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs">
+                                <Badge
+                                  className="text-xs font-semibold border"
+                                  style={{
+                                    borderColor: `${accentColor}30`,
+                                    backgroundColor: `${accentColor}12`,
+                                    color: accentColor,
+                                  }}
+                                >
+                                  <Upload className="mr-1 h-3 w-3" />
+                                  {series.uploaded_chapter_count} chapters uploaded
+                                </Badge>
+                                <span className="text-muted-foreground capitalize font-medium">
+                                  {series.type}
+                                </span>
+                              </div>
+                            </div>
+                            <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                              <span className="inline-flex items-center gap-1.5 capitalize">
+                                <span
+                                  className="h-2 w-2 rounded-full"
+                                  style={{
+                                    backgroundColor:
+                                      series.status === "ongoing"
+                                        ? "#10B981"
+                                        : series.status === "completed"
+                                        ? "#3B82F6"
+                                        : "#F59E0B",
+                                  }}
+                                />
+                                {series.status}
                               </span>
+                              <span className="inline-flex items-center gap-1">
+                                <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
+                                {Number(series.rating_average || 0).toFixed(1)}
+                              </span>
+                              <span>{(series.view_count || 0).toLocaleString()} views</span>
                             </div>
                           </div>
-                          <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-                            <span className="inline-flex items-center gap-1.5 capitalize">
-                              <span
-                                className="h-2 w-2 rounded-full"
-                                style={{
-                                  backgroundColor:
-                                    series.status === "ongoing"
-                                      ? "#22C55E"
-                                      : series.status === "completed"
-                                      ? "#3B82F6"
-                                      : "#F59E0B",
-                                }}
-                              />
-                              {series.status}
-                            </span>
-                            <span className="inline-flex items-center gap-1 font-medium">
-                              <Star className="h-3 w-3 text-amber-400 fill-amber-400" />
-                              {Number(series.rating_average || 0).toFixed(1)}
-                            </span>
-                            {series.view_count > 0 && (
-                              <span className="text-muted-foreground/70">
-                                {series.view_count.toLocaleString()} views
-                              </span>
-                            )}
-                          </div>
                         </div>
-                      </div>
-                    </Link>
-                  ))}
-                </div>
+                      </Link>
+                    ))}
+                  </div>
+
+                  <SectionPagination
+                    currentPage={uploadedPage}
+                    totalItems={uploadedSeries.data.length}
+                    pageSize={20}
+                    onPageChange={setUploadedPage}
+                    itemLabel="series"
+                    accentColor={accentColor}
+                  />
+                </>
               ) : (
                 <div className="rounded-lg border border-dashed border-border/40 p-8 text-center">
                   <Upload className="mx-auto h-12 w-12 text-muted-foreground/40" />
@@ -1746,8 +1855,9 @@ export default function UserProfileContent({ username }: { username: string }) {
                   ))}
                 </div>
               ) : commentHistory.data && commentHistory.data.length > 0 ? (
-                <div className="space-y-3">
-                  {commentHistory.data.map((comment: any) => {
+                <>
+                  <div className="space-y-3">
+                    {paginatedComments.map((comment: any) => {
                     const seriesInfo = commentSeriesInfo.data?.get(comment.series_id);
                     const chapterInfo = commentChaptersInfo.data?.get(comment.chapter_id);
                     return (
@@ -1890,7 +2000,17 @@ export default function UserProfileContent({ username }: { username: string }) {
                       </div>
                     );
                   })}
-                </div>
+                  </div>
+
+                  <SectionPagination
+                    currentPage={commentsPage}
+                    totalItems={commentHistory.data.length}
+                    pageSize={20}
+                    onPageChange={setCommentsPage}
+                    itemLabel="comments"
+                    accentColor={accentColor}
+                  />
+                </>
               ) : (
                 <Card className="p-6 text-center">
                   <p className="text-sm text-muted-foreground">
@@ -1934,8 +2054,9 @@ export default function UserProfileContent({ username }: { username: string }) {
                     ))}
                   </div>
                 ) : publicLibrary.data && publicLibrary.data.length > 0 ? (
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    {publicLibrary.data.map((item: PublicLibraryItem) => (
+                  <>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      {paginatedLibrary.map((item: PublicLibraryItem) => (
                       <Link
                         key={item.library_id}
                         to="/title/$slug"
@@ -1986,6 +2107,16 @@ export default function UserProfileContent({ username }: { username: string }) {
                       </Link>
                     ))}
                   </div>
+
+                  <SectionPagination
+                    currentPage={libraryPage}
+                    totalItems={publicLibrary.data.length}
+                    pageSize={20}
+                    onPageChange={setLibraryPage}
+                    itemLabel="titles"
+                    accentColor={accentColor}
+                  />
+                  </>
                 ) : (
                   <div className="rounded-lg border border-dashed border-border/40 p-8 text-center">
                     <BookOpen className="mx-auto h-12 w-12 text-muted-foreground/40" />

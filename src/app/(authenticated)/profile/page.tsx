@@ -48,6 +48,7 @@ import { ReadingHeatmap } from "@/components/profile/ReadingHeatmap";
 import { ProfileWidgets } from "@/components/profile/ProfileWidgets";
 import { AccentColorPicker } from "@/components/profile/AccentColorPicker";
 import { OptimizedImage } from "@/components/OptimizedImage";
+import { SectionPagination } from "@/components/SectionPagination";
 
 import { SocialLinksEditor, SocialLinksDisplay, type SocialLinksData } from "@/components/profile/SocialLinks";
 import { xpSourceLabel } from "@/lib/xp";
@@ -376,9 +377,11 @@ const FRAME_REQUIREMENTS: Record<string, {
 export default function ProfilePage() {
   const qc = useQueryClient();
   const navigate = useNavigate();
+  const [mounted, setMounted] = useState(false);
   
-  // Inject keyframes once
+  // Inject keyframes once and set mounted
   useEffect(() => {
+    setMounted(true);
     const style = document.createElement("style");
     style.textContent = keyframeStyles;
     document.head.appendChild(style);
@@ -848,11 +851,12 @@ export default function ProfilePage() {
       let allChapters: { series_id: string }[] = [];
       let from = 0;
       const PAGE_SIZE = 1000;
+      const matchNames = Array.from(new Set([activeUsername, "vnr610"].filter(Boolean)));
       while (true) {
         const { data: chaptersData, error: chaptersError } = await supabase
           .from("chapters")
           .select("series_id")
-          .eq("uploaded_by", activeUsername)
+          .in("uploaded_by", matchNames)
           .eq("status", "published")
           .range(from, from + PAGE_SIZE - 1);
         if (chaptersError || !chaptersData || chaptersData.length === 0) break;
@@ -983,6 +987,28 @@ export default function ProfilePage() {
     social_website: "",
   });
 
+  const [uploadsPage, setUploadsPage] = useState(1);
+  const [commentsPage, setCommentsPage] = useState(1);
+  const [xpPage, setXpPage] = useState(1);
+
+  const paginatedUploadedSeries = useMemo(() => {
+    const list = uploadedSeries.data || [];
+    const start = (uploadsPage - 1) * 20;
+    return list.slice(start, start + 20);
+  }, [uploadedSeries.data, uploadsPage]);
+
+  const paginatedComments = useMemo(() => {
+    const list = commentHistory.data || [];
+    const start = (commentsPage - 1) * 20;
+    return list.slice(start, start + 20);
+  }, [commentHistory.data, commentsPage]);
+
+  const paginatedXp = useMemo(() => {
+    const list = xpHistory.data || [];
+    const start = (xpPage - 1) * 20;
+    return list.slice(start, start + 20);
+  }, [xpHistory.data, xpPage]);
+
   useEffect(() => {
     if (profile.data) {
       setUsername(profile.data.username ?? "");
@@ -1032,6 +1058,7 @@ export default function ProfilePage() {
 
       const { data: u } = await supabase.auth.getUser();
       if (!u.user) throw new Error("No user");
+      const oldUsername = profile.data?.username;
       const { error } = await supabase
         .from("profiles")
         .update({ 
@@ -1049,6 +1076,18 @@ export default function ProfilePage() {
         } as any)
         .eq("user_id", u.user.id);
       if (error) throw error;
+
+      // Keep chapters uploaded_by in sync with new username
+      if (oldUsername && oldUsername !== username) {
+        try {
+          await supabase
+            .from("chapters")
+            .update({ uploaded_by: username })
+            .eq("uploaded_by", oldUsername);
+        } catch (syncErr) {
+          console.error("Failed to sync chapters uploaded_by:", syncErr);
+        }
+      }
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["profile"] });
@@ -1057,6 +1096,17 @@ export default function ProfilePage() {
     },
     onError: (e: Error) => toast.error(e.message),
   });
+
+  if (!mounted || profile.isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center space-y-3">
+          <div className="h-10 w-10 animate-spin rounded-full border-4 border-primary border-t-transparent mx-auto" />
+          <p className="text-sm text-muted-foreground">Loading profile...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen">
@@ -1821,6 +1871,14 @@ export default function ProfilePage() {
             <TabsTrigger value="comments" className="h-9 min-w-0 gap-1.5 px-0 sm:px-2">
               <MessageSquare className="h-4 w-4" />
               <span className="hidden sm:inline">Comments</span>
+              {(commentHistory.data?.length ?? 0) > 0 && (
+                <span
+                  className="ml-1 hidden md:inline-flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-bold"
+                  style={{ backgroundColor: `${accentColor}25`, color: accentColor }}
+                >
+                  {commentHistory.data?.length}
+                </span>
+              )}
             </TabsTrigger>
             <TabsTrigger value="stats" className="h-9 min-w-0 gap-1.5 px-0 sm:px-2">
               <TrendingUp className="h-4 w-4" />
@@ -2267,17 +2325,15 @@ export default function ProfilePage() {
                 </Badge>
               </div>
               {commentHistory.isLoading ? (
-                <div className="space-y-3">
-                  {[1,2,3].map(i => (
-                    <div key={i} className="rounded-lg border border-border/40 bg-card p-4 animate-pulse">
-                      <div className="h-4 w-3/4 bg-secondary/60 rounded" />
-                      <div className="mt-2 h-3 w-1/2 bg-secondary/40 rounded" />
-                    </div>
+                <div className="space-y-4">
+                  {[...Array(3)].map((_, i) => (
+                    <div key={i} className="h-24 rounded-lg bg-secondary/40 animate-pulse" />
                   ))}
                 </div>
               ) : commentHistory.data && commentHistory.data.length > 0 ? (
-                <div className="space-y-3">
-                  {commentHistory.data.map((comment: any) => {
+                <>
+                  <div className="space-y-3">
+                    {paginatedComments.map((comment: any) => {
                     const seriesInfo = commentSeriesInfo.data?.get(comment.series_id);
                     const chapterInfo = commentChaptersInfo.data?.get(comment.chapter_id);
                     return (
@@ -2427,7 +2483,17 @@ export default function ProfilePage() {
                       </div>
                     );
                   })}
-                </div>
+                  </div>
+
+                  <SectionPagination
+                    currentPage={commentsPage}
+                    totalItems={commentHistory.data.length}
+                    pageSize={20}
+                    onPageChange={setCommentsPage}
+                    itemLabel="comments"
+                    accentColor={accentColor}
+                  />
+                </>
               ) : (
                 <div className="rounded-lg border border-dashed border-border/40 p-8 text-center">
                   <MessageSquare className="mx-auto h-12 w-12 text-muted-foreground/50" />
@@ -2588,8 +2654,9 @@ export default function ProfilePage() {
                   ))}
                 </div>
               ) : uploadedSeries.data && uploadedSeries.data.length > 0 ? (
-                <div className="grid gap-4 sm:grid-cols-2">
-                  {uploadedSeries.data.map((series: any) => (
+                <>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    {paginatedUploadedSeries.map((series: any) => (
                     <Link
                       key={series.id}
                       to="/title/$slug"
@@ -2662,7 +2729,17 @@ export default function ProfilePage() {
                       </div>
                     </Link>
                   ))}
-                </div>
+                  </div>
+
+                  <SectionPagination
+                    currentPage={uploadsPage}
+                    totalItems={uploadedSeries.data.length}
+                    pageSize={20}
+                    onPageChange={setUploadsPage}
+                    itemLabel="series"
+                    accentColor={accentColor}
+                  />
+                </>
               ) : (
                 <div className="rounded-lg border border-dashed border-border/40 p-8 text-center">
                   <Upload className="mx-auto h-12 w-12 text-muted-foreground/40" />
@@ -2700,8 +2777,9 @@ export default function ProfilePage() {
                   ))}
                 </div>
               ) : xpHistory.data && xpHistory.data.length > 0 ? (
-                <div className="divide-y divide-border/40 overflow-hidden rounded-lg border border-border/40 bg-card">
-                  {xpHistory.data.map((row) => {
+                <>
+                  <div className="divide-y divide-border/40 overflow-hidden rounded-lg border border-border/40 bg-card">
+                    {paginatedXp.map((row) => {
                     const series =
                       row.reference_type === "series" && row.reference_id
                         ? xpSeriesLookup.data?.get(row.reference_id)
@@ -2772,7 +2850,17 @@ export default function ProfilePage() {
                       </div>
                     );
                   })}
-                </div>
+                  </div>
+
+                  <SectionPagination
+                    currentPage={xpPage}
+                    totalItems={xpHistory.data.length}
+                    pageSize={20}
+                    onPageChange={setXpPage}
+                    itemLabel="entries"
+                    accentColor={accentColor}
+                  />
+                </>
               ) : (
                 <div className="rounded-lg border border-dashed border-border/40 p-8 text-center">
                   <Sparkles className="mx-auto h-12 w-12 text-muted-foreground/50" />
