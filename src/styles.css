@@ -494,7 +494,6 @@
     backdrop-filter: blur(24px) saturate(190%) contrast(95%) !important;
     border-bottom: 1px solid rgba(255, 255, 255, 0.09) !important;
     box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5) !important;
-    transform: translateZ(0); /* Promote to dedicated GPU compositor layer */
   }
 
   /* Apple / iOS Translucent Frosted Glass Sidebar Drawer */
@@ -661,10 +660,9 @@
   }
 }
 
-/* Global Mobile Overflow & Full Responsiveness */
-html, body {
-  max-width: 100vw;
-  overflow-x: clip;
+/* Global Body Layout & Full Responsiveness */
+body {
+  min-height: 100vh;
 }
 
 /* Ensure reader images fit 100% screen width naturally without crop or zoom */

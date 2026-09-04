@@ -323,37 +323,40 @@ export default function TitleDetailPageContent({
       : readButtonLabel;
 
   return (
-    <div className="min-h-screen bg-background relative overflow-hidden">
-      {/* Background cover image */}
-      {s.cover_url && (
-        <div className="absolute top-0 left-0 w-full h-[480px] pointer-events-none overflow-hidden z-0 select-none">
-          {s.cover_url.toLowerCase().split("?")[0].endsWith(".mp4") ? (
-            <video
-              src={s.cover_url}
-              autoPlay
-              loop
-              muted
-              playsInline
-              className="w-full h-full object-cover opacity-[0.22] saturate-[1.1]"
-            />
-          ) : (
-            <Image
-              src={s.cover_url}
-              alt=""
-              fill
-              priority
-              unoptimized
-              sizes="100vw"
-              className="object-cover opacity-[0.22] saturate-[1.1]"
-              referrerPolicy="no-referrer"
-            />
-          )}
-          <div className="absolute inset-0 bg-gradient-to-b from-transparent via-background/40 to-background" />
-        </div>
-      )}
+    <div className="min-h-screen bg-background relative">
+      {/* Background decorations container (clipped internally without breaking page scroll) */}
+      <div className="absolute inset-0 pointer-events-none overflow-hidden select-none z-0">
+        {/* Background cover image */}
+        {s.cover_url && (
+          <div className="absolute top-0 left-0 w-full h-[480px]">
+            {s.cover_url.toLowerCase().split("?")[0].endsWith(".mp4") ? (
+              <video
+                src={s.cover_url}
+                autoPlay
+                loop
+                muted
+                playsInline
+                className="w-full h-full object-cover opacity-[0.22] saturate-[1.1]"
+              />
+            ) : (
+              <Image
+                src={s.cover_url}
+                alt=""
+                fill
+                priority
+                unoptimized
+                sizes="100vw"
+                className="object-cover opacity-[0.22] saturate-[1.1]"
+                referrerPolicy="no-referrer"
+              />
+            )}
+            <div className="absolute inset-0 bg-gradient-to-b from-transparent via-background/40 to-background" />
+          </div>
+        )}
 
-      {/* Background glow */}
-      <div className="absolute bottom-[-10%] right-[-10%] h-[400px] w-[400px] rounded-full bg-primary/5 blur-[80px] pointer-events-none" />
+        {/* Background glow */}
+        <div className="absolute bottom-[-10%] right-[-10%] h-[400px] w-[400px] rounded-full bg-primary/5 blur-[80px]" />
+      </div>
 
       <div className="container mx-auto px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16 py-6 lg:py-8 relative z-10">
         <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:gap-8 lg:gap-10">

@@ -329,7 +329,7 @@ async function main() {
   console.log("=== STEP 1: Fetching all series ===");
   const { data: allSeries, error: seriesError } = await supabase
     .from("series")
-    .select("id, title, slug, type")
+    .select("id, title, slug, type, series_tags(tag_id)")
     .order("title");
 
   if (seriesError || !allSeries) {
@@ -339,22 +339,7 @@ async function main() {
 
   console.log(`Found ${allSeries.length} series in database.`);
 
-  console.log("\n=== STEP 2: Clearing existing series_tags & series_genres ===");
-  const { error: delTagsErr } = await supabase
-    .from("series_tags")
-    .delete()
-    .neq("series_id", "00000000-0000-0000-0000-000000000000");
-  if (delTagsErr) console.error("Error clearing series_tags:", delTagsErr);
-  else console.log("Cleared series_tags.");
-
-  const { error: delGenresErr } = await supabase
-    .from("series_genres")
-    .delete()
-    .neq("series_id", "00000000-0000-0000-0000-000000000000");
-  if (delGenresErr) console.error("Error clearing series_genres:", delGenresErr);
-  else console.log("Cleared series_genres.");
-
-  console.log("\n=== STEP 3: Importing clean genres & tags from Comick ===");
+  console.log("\n=== STEP 2: Pre-populating genre and tag caches ===");
 
   // Cache for genre and tag database IDs
   const genreIdMap = new Map<string, string>(); // name.toLowerCase() -> id
@@ -396,7 +381,6 @@ async function main() {
       .single();
 
     if (error || !inserted) {
-      // Try to find if already inserted
       const { data: found } = await supabase
         .from("genres")
         .select("id")
@@ -456,9 +440,20 @@ async function main() {
 
   let successCount = 0;
 
+  console.log("\n=== STEP 3: Scraping & importing rich tags from Comick.dev ===");
+
   for (let i = 0; i < allSeries.length; i++) {
-    const s = allSeries[i];
-    console.log(`[${i + 1}/${allSeries.length}] Fetching metadata for: "${s.title}"...`);
+    const s = allSeries[i] as any;
+    const existingTagCount = s.series_tags?.length || 0;
+
+    // If series already has rich tags (> 15 tags), skip unless it's a known title needing refresh
+    if (existingTagCount >= 15 && s.slug !== "the-infinite-mage") {
+      console.log(`[${i + 1}/${allSeries.length}] "${s.title}" already has ${existingTagCount} tags. Skipping.`);
+      successCount++;
+      continue;
+    }
+
+    console.log(`[${i + 1}/${allSeries.length}] Scraping metadata for: "${s.title}" (current tags: ${existingTagCount})...`);
 
     const meta = await fetchMetadataForTitle(s.title);
     if (!meta || (meta.genres.length === 0 && meta.tags.length === 0)) {
@@ -468,30 +463,34 @@ async function main() {
       if (gId) {
         await supabase
           .from("series_genres")
-          .insert({ series_id: s.id, genre_id: gId });
+          .upsert({ series_id: s.id, genre_id: gId }, { onConflict: "series_id,genre_id" });
       }
-      await sleep(200);
+      await sleep(100);
       continue;
     }
 
-    // Attach genres
+    // Clear old tags and genres for this series
+    await supabase.from("series_tags").delete().eq("series_id", s.id);
+    await supabase.from("series_genres").delete().eq("series_id", s.id);
+
+    // Batch insert genres
+    const genreRows: { series_id: string; genre_id: string }[] = [];
     for (const gName of meta.genres) {
       const gId = await getOrCreateGenreId(gName);
-      if (gId) {
-        await supabase
-          .from("series_genres")
-          .upsert({ series_id: s.id, genre_id: gId }, { onConflict: "series_id,genre_id" });
-      }
+      if (gId) genreRows.push({ series_id: s.id, genre_id: gId });
+    }
+    if (genreRows.length > 0) {
+      await supabase.from("series_genres").insert(genreRows);
     }
 
-    // Attach tags
+    // Batch insert tags
+    const tagRows: { series_id: string; tag_id: string }[] = [];
     for (const tName of meta.tags) {
       const tId = await getOrCreateTagId(tName);
-      if (tId) {
-        await supabase
-          .from("series_tags")
-          .upsert({ series_id: s.id, tag_id: tId }, { onConflict: "series_id,tag_id" });
-      }
+      if (tId) tagRows.push({ series_id: s.id, tag_id: tId });
+    }
+    if (tagRows.length > 0) {
+      await supabase.from("series_tags").insert(tagRows);
     }
 
     console.log(
@@ -499,8 +498,7 @@ async function main() {
     );
     successCount++;
 
-    // Small delay to prevent rate limits
-    await sleep(250);
+    await sleep(150);
   }
 
   console.log(`\nImport completed: ${successCount}/${allSeries.length} matched from Comick.`);
