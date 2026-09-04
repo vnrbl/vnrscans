@@ -241,6 +241,7 @@ export function ComickMetadataImporter({
         onMetadataImported(res.metadata);
       }
       qc.invalidateQueries({ queryKey: ["series"] });
+      qc.invalidateQueries({ queryKey: ["browse-manhwa"] });
       if (slug) qc.invalidateQueries({ queryKey: ["series", "detail", slug] });
       qc.invalidateQueries({ queryKey: ["admin", "series"] });
       qc.invalidateQueries({ queryKey: ["admin", "genres"] });

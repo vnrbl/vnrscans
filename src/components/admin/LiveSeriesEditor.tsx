@@ -558,6 +558,7 @@ export function LiveSeriesEditor({ series: initialSeries, slug, trigger }: LiveS
     onSuccess: (newRow) => {
       toast.success("New series created successfully!");
       qc.invalidateQueries({ queryKey: ["series"] });
+      qc.invalidateQueries({ queryKey: ["browse-manhwa"] });
       setOpen(false);
       if (newRow?.slug) {
         router.push(`/title/${newRow.slug}`);
@@ -621,6 +622,7 @@ export function LiveSeriesEditor({ series: initialSeries, slug, trigger }: LiveS
     onSuccess: () => {
       toast.success("Series updated in real time!");
       qc.invalidateQueries({ queryKey: ["series"] });
+      qc.invalidateQueries({ queryKey: ["browse-manhwa"] });
       qc.invalidateQueries({ queryKey: ["series", "detail", slug] });
       qc.invalidateQueries({ queryKey: ["series", "covers", initialSeries?.id] });
       setOpen(false);

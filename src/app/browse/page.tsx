@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import BrowsePage, { type BrowseInitialData } from "./BrowseClient";
 import { supabase } from "@/integrations/supabase/client";
 
-export const revalidate = 120; // ISR cache for 2 minutes — fast edge response
+export const revalidate = 0; // Dynamic server fetch to ensure newly added series appear immediately
 
 export const metadata: Metadata = {
   title: "Browse Manga, Manhwa, Manhua & Novels - vnrscans",
@@ -36,8 +36,7 @@ async function fetchInitialData(): Promise<BrowseInitialData> {
         "id,slug,title,alternative_titles,description,cover_url,type,rating_average,status,author,artist,release_year,created_at,updated_at,view_count,content_rating,chapter_count,series_genres(genre:genres(id,name,slug)),series_tags(tag:tags(id,name,slug))"
       )
       .eq("is_hidden", false)
-      .order("updated_at", { ascending: false })
-      .limit(60),
+      .order("updated_at", { ascending: false }),
   ]);
 
   if (genresRes.error) throw genresRes.error;

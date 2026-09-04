@@ -1,6 +1,6 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Search, LayoutGrid, List, Star, X, BookOpen, Check } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { SeriesGrid } from "@/components/SeriesGrid";
@@ -37,10 +37,31 @@ export type BrowseInitialData = {
 };
 
 function BrowsePageContent({ initialData }: { initialData?: BrowseInitialData }) {
+  const qc = useQueryClient();
   const { settings } = useReaderSettings();
   const router = useRouter();
   const searchParams = useSearchParams();
   const pathname = usePathname();
+
+  // Real-time synchronization: automatically update the catalog when any series is added, updated, or removed in the DB
+  useEffect(() => {
+    const channel = supabase
+      .channel("browse-catalog-realtime")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "series" },
+        () => {
+          qc.invalidateQueries({ queryKey: ["browse-manhwa"] });
+          qc.invalidateQueries({ queryKey: ["genres"] });
+          qc.invalidateQueries({ queryKey: ["tags"] });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [qc]);
 
   const urlSearch = searchParams.get("search") || "";
   const urlGroup = searchParams.get("group") || "";
@@ -303,12 +324,11 @@ function BrowsePageContent({ initialData }: { initialData?: BrowseInitialData })
         case "oldest":
           query = query.order("created_at", { ascending: true });
           break;
-        default:
+          default:
           query = query.order("updated_at", { ascending: false });
       }
 
-      query = query.limit(100);
-
+      // Fetch all series from DB without artificial small limits
       const { data, error } = await query;
       if (error) throw error;
       
@@ -363,7 +383,7 @@ function BrowsePageContent({ initialData }: { initialData?: BrowseInitialData })
       
       return searchQuery ? rankSeriesResults(filtered, preparedSearch) : filtered;
     },
-    staleTime: 1000 * 60 * 5,
+    staleTime: 1000 * 30, // 30s stale time for snappy browsing with fast cache updates
     gcTime: 1000 * 60 * 20,
   });
 
