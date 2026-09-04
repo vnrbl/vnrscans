@@ -441,7 +441,8 @@ export async function $runCloudScrape(args: {
   const missing = discovered.filter((chapter) => {
     const num = Number(chapter.chapterNumber);
     const key = chapterScanKey(num, scanlationGroup);
-    if (existingChapterNumbers.has(num) || existingKeys.has(key) || seenKeys.has(key)) {
+    // Skip ONLY if a chapter with this number already exists for this scanlation group
+    if (existingKeys.has(key) || seenKeys.has(key)) {
       exactDuplicateCount++;
       return false;
     }
@@ -526,15 +527,52 @@ export async function $runCloudScrape(args: {
   let imported = 0;
 
   if (chapterRows.length > 0) {
-    const { data: insertedChapters, error: chapterInsertError } = await admin
+    let insertedChapters: any[] = [];
+    const { data: bulkInserted, error: chapterInsertError } = await admin
       .from("chapters")
       .insert(chapterRows)
       .select("id,chapter_number,scanlation_group");
 
     if (chapterInsertError) {
+      console.warn("[CloudScrape] Bulk insert failed, retrying row-by-row:", chapterInsertError.message);
+      for (const row of chapterRows) {
+        let finalRow = { ...row };
+        let { data: singleCh, error: singleErr } = await admin
+          .from("chapters")
+          .insert(finalRow)
+          .select("id,chapter_number,scanlation_group")
+          .single();
+
+        if (singleErr && (singleErr.message?.includes("slug") || singleErr.code === "23505")) {
+          finalRow.slug = `${finalRow.slug}-${Math.random().toString(36).substring(2, 7)}`;
+          const retryRes = await admin
+            .from("chapters")
+            .insert(finalRow)
+            .select("id,chapter_number,scanlation_group")
+            .single();
+          singleCh = retryRes.data;
+          singleErr = retryRes.error;
+        }
+
+        if (singleErr || !singleCh) {
+          failed++;
+          details.push({
+            chapter: Number(row.chapter_number),
+            status: "failed",
+            message: singleErr?.message || "Failed to insert chapter",
+          });
+        } else {
+          insertedChapters.push(singleCh);
+        }
+      }
+    } else {
+      insertedChapters = bulkInserted ?? [];
+    }
+
+    if (insertedChapters.length === 0 && chapterRows.length > 0) {
       return {
         success: false,
-        error: chapterInsertError.message,
+        error: chapterInsertError?.message || "All chapter inserts failed",
         chaptersFound: discovered.length,
         imported: 0,
         skipped: exactDuplicateCount,
@@ -701,11 +739,12 @@ export async function $syncImportSource(args: {
       .filter((chapter) => {
         const num = Number(chapter.chapterNumber);
         const key = chapterScanKey(num, scanlationGroup);
-        if (existingChapterNumbers.has(num) || existingKeys.has(key) || seenKeys.has(key)) {
+        // Skip ONLY if already exists for this scanlation group
+        if (existingKeys.has(key) || seenKeys.has(key)) {
           details.push({
             chapter: chapter.chapterNumber,
             status: "skipped",
-            message: "Already imported",
+            message: "Already imported for this scanlation group",
             series_title: seriesTitle || undefined,
           });
           return false;

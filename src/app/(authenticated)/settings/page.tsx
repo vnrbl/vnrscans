@@ -8,9 +8,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Slider } from "@/components/ui/slider";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
+import { useIsAdmin } from "@/hooks/useAuth";
 
 export default function SettingsPage() {
   const { settings, updateSettings } = useReaderSettings();
+  const { isAdmin } = useIsAdmin();
 
   return (
     <div className="min-h-screen bg-background">
@@ -182,44 +184,51 @@ export default function SettingsPage() {
             </CardContent>
           </Card>
 
-          {/* Chapter Release & Early Access Hold Settings */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Lock className="h-5 w-5 text-amber-500" />
-                Chapter Release & Early Access Settings
-              </CardTitle>
-              <CardDescription>
-                Configure early access hold policies and lock countdowns for newly released chapters
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="flex items-center justify-between gap-4">
-                <div className="min-w-0 space-y-1">
-                  <Label htmlFor="enable-30min-hold" className="cursor-pointer font-medium flex items-center gap-2">
-                    <span>30-Minute Early Access Hold</span>
-                    {settings.enable30MinHold !== false ? (
-                      <span className="rounded bg-amber-500/15 border border-amber-500/30 px-1.5 py-0.5 text-[10px] font-bold text-amber-400">
-                        Active
-                      </span>
-                    ) : (
-                      <span className="rounded bg-neutral-800 border border-neutral-700 px-1.5 py-0.5 text-[10px] font-bold text-neutral-400">
-                        Turned Off
-                      </span>
-                    )}
-                  </Label>
-                  <p className="text-xs text-muted-foreground">
-                    When enabled, newly imported chapters have a 30-minute early access hold with countdown timers before unlocking. When turned off, chapters are immediately unlocked for all readers with zero wait time.
-                  </p>
+          {/* Chapter Release & Early Access Hold Settings - Admin Only */}
+          {isAdmin && (
+            <Card className="border-amber-500/30 bg-gradient-to-b from-card to-amber-950/10 shadow-lg">
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center gap-2 text-amber-400">
+                    <Lock className="h-5 w-5 text-amber-500" />
+                    Chapter Release & Early Access Settings
+                  </CardTitle>
+                  <span className="rounded bg-amber-500/15 border border-amber-500/30 px-2 py-0.5 text-xs font-mono font-bold text-amber-400">
+                    Admin Only
+                  </span>
                 </div>
-                <Switch
-                  id="enable-30min-hold"
-                  checked={settings.enable30MinHold !== false}
-                  onCheckedChange={(checked) => updateSettings({ enable30MinHold: checked })}
-                />
-              </div>
-            </CardContent>
-          </Card>
+                <CardDescription>
+                  Configure early access hold policies and lock countdowns for newly released chapters
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="flex items-center justify-between gap-4">
+                  <div className="min-w-0 space-y-1">
+                    <Label htmlFor="enable-30min-hold" className="cursor-pointer font-medium flex items-center gap-2">
+                      <span>30-Minute Early Access Hold</span>
+                      {settings.enable30MinHold !== false ? (
+                        <span className="rounded bg-amber-500/15 border border-amber-500/30 px-1.5 py-0.5 text-[10px] font-bold text-amber-400">
+                          Active
+                        </span>
+                      ) : (
+                        <span className="rounded bg-neutral-800 border border-neutral-700 px-1.5 py-0.5 text-[10px] font-bold text-neutral-400">
+                          Turned Off
+                        </span>
+                      )}
+                    </Label>
+                    <p className="text-xs text-muted-foreground">
+                      When enabled, newly imported chapters have a 30-minute early access hold with countdown timers before unlocking. When turned off, chapters are immediately unlocked for all readers with zero wait time.
+                    </p>
+                  </div>
+                  <Switch
+                    id="enable-30min-hold"
+                    checked={settings.enable30MinHold !== false}
+                    onCheckedChange={(checked) => updateSettings({ enable30MinHold: checked })}
+                  />
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Info */}
           <Card>

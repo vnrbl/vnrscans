@@ -517,9 +517,6 @@ export async function $processNextSiteImportItem(args: {
 
       const sourcePreset = detectImportSource(item.source_url);
       const scanlationGroup = sourcePreset.scanlationGroup || "Asura Scans";
-      const existingChapterNumbers = new Set(
-        (existingChapters ?? []).map((chapter: any) => Number(chapter.chapter_number)),
-      );
       const existingKeys = new Set(
         (existingChapters ?? []).map(
           (chapter: { chapter_number: number; scanlation_group: string | null }) =>
@@ -528,7 +525,6 @@ export async function $processNextSiteImportItem(args: {
       );
       const missing = eligible.filter(
         (chapter) =>
-          !existingChapterNumbers.has(Number(chapter.chapterNumber)) &&
           !existingKeys.has(chapterScanKey(chapter.chapterNumber, scanlationGroup)),
       );
 
@@ -565,16 +561,29 @@ export async function $processNextSiteImportItem(args: {
             }));
           if (images.length === 0) throw new Error("No reader images found");
 
+          let finalSlug = buildChapterSlug(chapter.chapterNumber, {
+            title: chapter.title || null,
+            scanlationGroup,
+          });
+
+          const { data: existingSlugRow } = await admin
+            .from("chapters")
+            .select("id")
+            .eq("series_id", seriesId)
+            .eq("slug", finalSlug)
+            .maybeSingle();
+
+          if (existingSlugRow) {
+            finalSlug = `${finalSlug}-${Math.random().toString(36).substring(2, 7)}`;
+          }
+
           const { data: chapterRow, error: chapterError } = await admin
             .from("chapters")
             .insert({
               series_id: seriesId,
               chapter_number: chapter.chapterNumber,
               title: chapter.title || null,
-              slug: buildChapterSlug(chapter.chapterNumber, {
-                title: chapter.title || null,
-                scanlationGroup,
-              }),
+              slug: finalSlug,
               chapter_type: "image",
               status: item.auto_publish ? "published" : "draft",
               uploaded_by: sourcePreset.sourceSite || "Site Import",

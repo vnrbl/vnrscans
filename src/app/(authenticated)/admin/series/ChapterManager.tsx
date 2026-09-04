@@ -775,20 +775,20 @@ export default function ChapterManager({ seriesId, onBack }: { seriesId: string;
     chapterNumber: number,
     scanlationGroup: string | null,
   ) => {
-    let query = (supabase as any)
+    const { data, error } = await (supabase as any)
       .from("chapters")
-      .select("id")
+      .select("id, scanlation_group")
       .eq("series_id", seriesId)
-      .eq("chapter_number", chapterNumber)
-      .limit(1);
+      .eq("chapter_number", chapterNumber);
 
-    query = scanlationGroup
-      ? query.eq("scanlation_group", scanlationGroup)
-      : query.is("scanlation_group", null);
-
-    const { data, error } = await query.maybeSingle();
     if (error) throw error;
-    return data;
+    if (!data || data.length === 0) return null;
+
+    const targetGroup = (scanlationGroup || "").trim().toLowerCase();
+    const match = data.find(
+      (c: any) => (c.scanlation_group || "").trim().toLowerCase() === targetGroup,
+    );
+    return match || null;
   };
 
   // Get user profile for username
@@ -974,6 +974,20 @@ export default function ChapterManager({ seriesId, onBack }: { seriesId: string;
 
     try {
       setExtracting(true);
+
+      // Auto-detect scanlation group from seriesUrl if not already specified
+      if (groupSelect === SCANLATION_GROUP_NONE && !groupNewName.trim()) {
+        const detected = detectImportSource(seriesUrl);
+        if (detected.scanlationGroup && detected.scanlationGroup !== "Custom Source") {
+          if (scanlationGroups.data?.includes(detected.scanlationGroup)) {
+            setGroupSelect(detected.scanlationGroup);
+          } else {
+            setGroupSelect(SCANLATION_GROUP_NEW);
+            setGroupNewName(detected.scanlationGroup);
+          }
+        }
+      }
+
       const result = await $extractChaptersFromUrl({
         data: { url: seriesUrl, accessToken: await requireAccessToken() },
       });
@@ -1301,15 +1315,25 @@ export default function ChapterManager({ seriesId, onBack }: { seriesId: string;
 
     try {
       setBulkUploading(true);
-      const scanlation_group = getScanlationGroupForUpload();
+      const selectedGroup = getScanlationGroupForUpload();
+      const detectedPreset = seriesUrl ? detectImportSource(seriesUrl) : null;
+      const scanlation_group =
+        selectedGroup ||
+        (detectedPreset?.scanlationGroup && detectedPreset.scanlationGroup !== "Custom Source"
+          ? detectedPreset.scanlationGroup
+          : null);
+      const targetGroupNorm = (scanlation_group || "").trim().toLowerCase();
       const uploadableList: ChapterInfo[] = [];
       let skippedExistingCount = 0;
 
       for (const chapter of selectedList) {
         const num = Number(chapter.chapterNumber);
-        const existingInLocal = (chapters.data ?? []).some(
-          (c) => Number(c.chapter_number) === num,
-        );
+        // Only skip if the chapter already exists FOR THE SAME SCANLATION GROUP
+        const existingInLocal = (chapters.data ?? []).some((c) => {
+          if (Number(c.chapter_number) !== num) return false;
+          const cGroupNorm = (c.scanlation_group || "").trim().toLowerCase();
+          return cGroupNorm === targetGroupNorm;
+        });
         const existingChapter =
           existingInLocal ||
           (await findExistingChapterByNumberAndGroup(
@@ -1320,7 +1344,7 @@ export default function ChapterManager({ seriesId, onBack }: { seriesId: string;
         if (existingChapter) {
           skippedExistingCount++;
           console.info(
-            `Skipped Chapter ${chapter.chapterNumber}: already exists in series.`,
+            `Skipped Chapter ${chapter.chapterNumber}: already exists in series for scan group "${scanlation_group || "none"}".`,
           );
         } else {
           uploadableList.push(chapter);
@@ -1421,6 +1445,18 @@ export default function ChapterManager({ seriesId, onBack }: { seriesId: string;
             scanlation_group,
           );
 
+          let finalSlug = targetSlug;
+          const { data: existingSlugRow } = await supabase
+            .from("chapters")
+            .select("id")
+            .eq("series_id", seriesId)
+            .eq("slug", finalSlug)
+            .maybeSingle();
+
+          if (existingSlugRow) {
+            finalSlug = `${targetSlug}-${Math.random().toString(36).substring(2, 7)}`;
+          }
+
           if (existingChapter) {
             skippedExistingCount++;
           } else {
@@ -1431,7 +1467,7 @@ export default function ChapterManager({ seriesId, onBack }: { seriesId: string;
                 series_id: seriesId,
                 chapter_number: chapter.chapterNumber,
                 title: null,
-                slug: targetSlug,
+                slug: finalSlug,
                 chapter_type: "image",
                 status: "published",
                 uploaded_by: form.uploaded_by || null,
@@ -1892,7 +1928,28 @@ export default function ChapterManager({ seriesId, onBack }: { seriesId: string;
                     <Input
                       placeholder="https://example.com/manga/title-name"
                       value={seriesUrl}
-                      onChange={(e) => setSeriesUrl(e.target.value)}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setSeriesUrl(val);
+                        if (
+                          val.trim() &&
+                          groupSelect === SCANLATION_GROUP_NONE &&
+                          !groupNewName.trim()
+                        ) {
+                          const detected = detectImportSource(val);
+                          if (
+                            detected.scanlationGroup &&
+                            detected.scanlationGroup !== "Custom Source"
+                          ) {
+                            if (scanlationGroups.data?.includes(detected.scanlationGroup)) {
+                              setGroupSelect(detected.scanlationGroup);
+                            } else {
+                              setGroupSelect(SCANLATION_GROUP_NEW);
+                              setGroupNewName(detected.scanlationGroup);
+                            }
+                          }
+                        }
+                      }}
                       className="flex-1"
                     />
                     <Button
