@@ -722,7 +722,7 @@ function SeriesList({ items, loading }: { items?: any[]; loading: boolean }) {
 
             {/* Badges */}
             <div className="flex flex-wrap items-center gap-1.5">
-              <Badge variant="outline" className="badge-glass text-xs font-medium uppercase py-0.5 px-2">{s.type}</Badge>
+              <Badge variant="outline" className="badge-glass text-3xs font-semibold uppercase tracking-wider py-0.5 px-1.5 leading-none rounded-[3px]">{s.type}</Badge>
               <Badge variant="outline" className="text-xs capitalize py-0.5 px-2 bg-surface-1 border-border/40 text-neutral-300">{s.status}</Badge>
               {s.content_rating && (
                 <Badge 

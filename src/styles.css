@@ -576,6 +576,16 @@
     color: #ffffff !important;
   }
 
+  .text-2xs {
+    font-size: 0.6875rem !important; /* 11px */
+    line-height: 0.875rem !important;
+  }
+
+  .text-3xs {
+    font-size: 0.5625rem !important; /* 9px */
+    line-height: 0.75rem !important;
+  }
+
   /* Shimmer effect for loaders */
   @keyframes shimmerSweep {
     0% { background-position: -200% 0; }

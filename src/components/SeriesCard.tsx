@@ -41,8 +41,8 @@ export const SeriesCard = memo(function SeriesCard({ s, rank }: { s: Series; ran
           </div>
         )}
         
-        <div className={rank !== undefined ? "absolute right-2.5 top-2.5" : "absolute left-2.5 top-2.5"}>
-          <Badge variant="outline" className="badge-glass text-neutral-300 text-3xs uppercase tracking-[0.08em] py-0.5 px-2 font-semibold">
+        <div className={rank !== undefined ? "absolute right-2 top-2" : "absolute left-2 top-2"}>
+          <Badge variant="outline" className="badge-glass text-neutral-200 text-3xs uppercase tracking-wider py-0.5 px-1.5 font-bold leading-none rounded-[3px]">
             {s.type}
           </Badge>
         </div>

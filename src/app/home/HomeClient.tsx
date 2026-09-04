@@ -890,8 +890,8 @@ function SeriesCarouselSection({
                   className="h-full w-full object-cover transition-transform duration-300 ease-out group-hover:scale-105"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-transparent to-transparent pointer-events-none" />
-                <div className="absolute left-2.5 top-2.5">
-                  <Badge variant="outline" className="badge-glass text-xs font-medium uppercase py-0.5 px-2">
+                <div className="absolute left-2 top-2">
+                  <Badge variant="outline" className="badge-glass text-3xs font-semibold uppercase tracking-wider py-0.5 px-1.5 leading-none rounded-[3px]">
                     {item.type}
                   </Badge>
                 </div>
