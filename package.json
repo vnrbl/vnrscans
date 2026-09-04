@@ -16,6 +16,8 @@
     "scrape": "npx tsx scripts/scrape-series.ts",
     "scrape:edk": "edk run -- npx tsx scripts/scrape-series.ts",
     "auto-import": "npx tsx scripts/auto-import-sources.ts",
+    "auto-import:watch": "npx tsx scripts/auto-import-sources.ts --watch",
+    "auto-import:30m": "npx tsx scripts/auto-import-sources.ts --watch --interval 30",
     "auto-import:edk": "edk run -- npx tsx scripts/auto-import-sources.ts",
     "sync-chapters": "npx tsx scripts/sync-all-chapters.ts",
     "sync-scheduled": "npx tsx scripts/auto-import-sources.ts",

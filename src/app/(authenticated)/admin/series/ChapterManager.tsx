@@ -738,17 +738,27 @@ export default function ChapterManager({ seriesId, onBack }: { seriesId: string;
       if (!accessToken) throw new Error("Please sign in again before running auto import.");
 
       const result = await $syncImportSource({
-        data: { sourceId, accessToken, maxChapters: 10 },
+        data: { sourceId, accessToken, maxChapters: 50 },
       });
 
       if (!result.success) {
         throw new Error(result.error || "Auto import failed.");
       }
 
-      toast.success(
-        `Auto import complete: ${result.imported} imported, ${result.failed} failed.`,
-      );
+      if ((result.imported ?? 0) === 0) {
+        toast.info(
+          `Checked source: already up to date (${result.skipped ?? 0} existing chapters verified).`,
+        );
+      } else {
+        toast.success(
+          `Sync complete: ${result.imported} new chapter(s) imported, ${result.skipped ?? 0} skipped.`,
+        );
+      }
       qc.invalidateQueries({ queryKey: ["admin", "chapters", seriesId] });
+      qc.invalidateQueries({ queryKey: ["admin", "series-editor-chapters", seriesId] });
+      qc.invalidateQueries({ queryKey: ["chapters"] });
+      qc.invalidateQueries({ queryKey: ["chapters", seriesId] });
+      qc.invalidateQueries({ queryKey: ["series"] });
       qc.invalidateQueries({ queryKey: ["admin", "scanlation-groups", seriesId] });
       qc.invalidateQueries({ queryKey: ["admin", "series-import-sources", seriesId] });
       qc.invalidateQueries({ queryKey: ["admin", "series-import-logs", seriesId] });

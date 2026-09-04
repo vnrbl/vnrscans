@@ -176,25 +176,38 @@ async function syncAllSeriesChapters() {
             // Set 30-minute unlock delay and direct source link
             const scheduledAt = new Date(Date.now() + 30 * 60 * 1000).toISOString();
 
-            const { data: chapterRecord, error: insertError } = await supabase
+            const chapterPayload: any = {
+              series_id: series.id,
+              chapter_number: chapter.chapterNumber,
+              title: chapter.title || null,
+              slug,
+              chapter_type: 'image',
+              status: 'published',
+              scheduled_at: scheduledAt,
+              source_url: chapter.url,
+              uploaded_by: source.source_site || preset.sourceSite,
+              scanlation_group: scanlationGroup,
+            };
+
+            let { data: chapterRecord, error: insertError } = await supabase
               .from('chapters')
-              .insert({
-                series_id: series.id,
-                chapter_number: chapter.chapterNumber,
-                title: chapter.title || null,
-                slug,
-                chapter_type: 'image',
-                status: 'published',
-                scheduled_at: scheduledAt,
-                source_url: chapter.url,
-                uploaded_by: source.source_site || preset.sourceSite,
-                scanlation_group: scanlationGroup,
-              })
+              .insert(chapterPayload)
               .select('id')
               .single();
 
-            if (insertError) {
-              console.error(`❌ Failed to insert chapter ${chapter.chapterNumber}:`, insertError.message);
+            if (insertError && (insertError.code === '42703' || insertError.message?.includes('source_url'))) {
+              delete chapterPayload.source_url;
+              const retryRes = await supabase
+                .from('chapters')
+                .insert(chapterPayload)
+                .select('id')
+                .single();
+              chapterRecord = retryRes.data;
+              insertError = retryRes.error;
+            }
+
+            if (insertError || !chapterRecord) {
+              console.error(`❌ Failed to insert chapter ${chapter.chapterNumber}:`, insertError?.message || 'Unknown insert error');
               continue;
             }
 

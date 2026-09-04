@@ -33,40 +33,87 @@ const supabase = createClient(supabaseUrl, serviceKey, {
 });
 
 const maxChaptersPerSource = Number.parseInt(process.env.AUTO_IMPORT_MAX_CHAPTERS || '10', 10);
+const isWatchMode = process.argv.includes('--watch') || process.argv.includes('--daemon');
+const forceAll = process.argv.includes('--force') || process.argv.includes('--all');
+const intervalMinutes = (() => {
+  const argIdx = process.argv.findIndex((a) => a === '--interval' || a === '-i');
+  if (argIdx !== -1 && process.argv[argIdx + 1]) {
+    const val = Number.parseInt(process.argv[argIdx + 1], 10);
+    if (Number.isFinite(val) && val > 0) return val;
+  }
+  const envVal = Number.parseInt(process.env.AUTO_IMPORT_INTERVAL_MINUTES || '', 10);
+  if (Number.isFinite(envVal) && envVal > 0) return envVal;
+  return 30; // Default: 30 minutes
+})();
 
-async function main() {
-  const { data: sources, error } = await supabase
-    .from('series_import_sources')
-    .select('*')
-    .eq('enabled', true)
-    .order('last_checked_at', { ascending: true, nullsFirst: true });
+async function runCycle() {
+  const cycleStart = new Date();
+  console.log(`\n======================================================`);
+  console.log(`[AutoImport] Starting scan cycle at ${cycleStart.toLocaleTimeString()}...`);
 
-  if (error) throw error;
+  try {
+    const { data: sources, error } = await supabase
+      .from('series_import_sources')
+      .select('*, series:series(id, title, slug)')
+      .eq('enabled', true)
+      .order('last_checked_at', { ascending: true, nullsFirst: true });
 
-  const now = Date.now();
-  const dueSources = (sources ?? []).filter((source: any) => {
-    // 1. If never checked, it is due
-    if (!source.last_checked_at) return true;
+    if (error) throw error;
 
-    // 2. Scheduled scraping: Check if Estimated Next Release time has arrived (with 5 min grace)
-    if (source.estimated_next_release_at) {
-      const releaseTime = new Date(source.estimated_next_release_at).getTime();
-      if (releaseTime <= now + 5 * 60 * 1000) {
-        return true;
+    const now = Date.now();
+    const dueSources = forceAll
+      ? (sources ?? [])
+      : (sources ?? []).filter((source: any) => {
+          // 1. If never checked, it is due
+          if (!source.last_checked_at) return true;
+
+          // 2. Scheduled scraping: Check if Estimated Next Release time has arrived (with 5 min grace)
+          if (source.estimated_next_release_at) {
+            const releaseTime = new Date(source.estimated_next_release_at).getTime();
+            if (releaseTime <= now + 5 * 60 * 1000) {
+              return true;
+            }
+          }
+
+          // 3. Fallback interval
+          const lastChecked = new Date(source.last_checked_at).getTime();
+          const intervalMs = Number(source.check_interval_minutes || intervalMinutes) * 60 * 1000;
+          return now - lastChecked >= intervalMs;
+        });
+
+    console.log(`[AutoImport] Found ${sources?.length ?? 0} enabled source(s). ${dueSources.length} due for checking.`);
+
+    for (let i = 0; i < dueSources.length; i++) {
+      const source = dueSources[i];
+      const seriesTitle = (source as any)?.series?.title || 'Unknown';
+      console.log(`\n[${i + 1}/${dueSources.length}] Checking "${seriesTitle}": ${source.source_url}`);
+      try {
+        await syncSource(source);
+      } catch (srcErr: any) {
+        console.error(`[AutoImport] Error on source ${source.id}:`, srcErr.message || srcErr);
       }
     }
-
-    // 3. Fallback interval
-    const lastChecked = new Date(source.last_checked_at).getTime();
-    const intervalMs = Number(source.check_interval_minutes || 120) * 60 * 1000;
-    return now - lastChecked >= intervalMs;
-  });
-
-  console.log(`Auto import: ${dueSources.length} due source(s).`);
-
-  for (const source of dueSources) {
-    await syncSource(source);
+  } catch (cycleErr: any) {
+    console.error('[AutoImport] Cycle error:', cycleErr.message || cycleErr);
   }
+
+  const cycleEnd = new Date();
+  const elapsedSec = Math.round((cycleEnd.getTime() - cycleStart.getTime()) / 1000);
+  console.log(`\n[AutoImport] Cycle completed in ${elapsedSec}s.`);
+
+  if (isWatchMode) {
+    const nextCheck = new Date(Date.now() + intervalMinutes * 60 * 1000);
+    console.log(`⏳ Next automated scan scheduled in ${intervalMinutes} minutes (at ${nextCheck.toLocaleTimeString()})...`);
+    console.log(`Press Ctrl+C to stop daemon.`);
+    setTimeout(runCycle, intervalMinutes * 60 * 1000);
+  }
+}
+
+async function main() {
+  if (isWatchMode) {
+    console.log(`🚀 Starting Auto-Import Daemon (continuous mode: every ${intervalMinutes} min)`);
+  }
+  await runCycle();
 }
 
 async function syncSource(source: any) {
@@ -151,23 +198,42 @@ async function syncSource(source: any) {
         // Hold newly imported chapter with 30-minute unlock delay & direct source link
         const scheduledAt = new Date(Date.now() + 30 * 60 * 1000).toISOString();
 
-        const { data: chapterRecord, error: chapterError } = await supabase
+        const chapterPayload: any = {
+          series_id: source.series_id,
+          chapter_number: chapter.chapterNumber,
+          title: chapter.title || null,
+          slug,
+          chapter_type: 'image',
+          status: 'published',
+          scheduled_at: scheduledAt,
+          source_url: chapter.url,
+          uploaded_by: source.source_site || preset.sourceSite,
+          scanlation_group: scanlationGroup,
+        };
+
+        let chapterRecord: any;
+        const { data: insertedRecord, error: chapterError } = await supabase
           .from('chapters')
-          .insert({
-            series_id: source.series_id,
-            chapter_number: chapter.chapterNumber,
-            title: chapter.title || null,
-            slug,
-            chapter_type: 'image',
-            status: 'published',
-            scheduled_at: scheduledAt,
-            source_url: chapter.url,
-            uploaded_by: source.source_site || preset.sourceSite,
-            scanlation_group: scanlationGroup,
-          })
+          .insert(chapterPayload)
           .select('id')
           .single();
-        if (chapterError) throw chapterError;
+
+        if (chapterError) {
+          if (chapterError.code === '42703' || chapterError.message?.includes('source_url')) {
+            delete chapterPayload.source_url;
+            const { data: retryData, error: retryError } = await supabase
+              .from('chapters')
+              .insert(chapterPayload)
+              .select('id')
+              .single();
+            if (retryError) throw retryError;
+            chapterRecord = retryData;
+          } else {
+            throw chapterError;
+          }
+        } else {
+          chapterRecord = insertedRecord;
+        }
 
         const { error: pagesError } = await supabase.from('chapter_pages').insert(
           images.map((imageUrl, index) => ({

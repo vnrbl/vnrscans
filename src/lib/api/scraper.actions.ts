@@ -783,27 +783,78 @@ export async function $syncImportSource(args: {
       }
     }
 
-    // Bulk insert all chapters at once
+    // Bulk insert all chapters with resilient fallback
     if (chapterRows.length > 0) {
+      let insertedList: any[] = [];
       const { data: insertedChapters, error: chapterInsertError } = await admin
         .from("chapters")
         .insert(chapterRows)
         .select("id,chapter_number,scanlation_group");
 
-      if (chapterInsertError) {
-        // Bulk insert failed — fall back to counting all prepared rows as failed
-        for (const row of chapterRows) {
-          failed++;
-          details.push({
-            chapter: row.chapter_number,
-            status: "failed",
-            message: chapterInsertError.message,
-            series_title: seriesTitle || undefined,
-          });
+      let insertErr = chapterInsertError;
+
+      if (insertErr && (insertErr.code === "42703" || insertErr.message?.includes("source_url"))) {
+        console.warn("[SyncImport] source_url column error on chapters table, retrying without source_url...");
+        const fallbackRows = chapterRows.map(({ source_url, ...rest }) => rest);
+        const retryRes = await admin
+          .from("chapters")
+          .insert(fallbackRows)
+          .select("id,chapter_number,scanlation_group");
+        if (!retryRes.error) {
+          insertedList = retryRes.data ?? [];
+          insertErr = null;
+        } else {
+          insertErr = retryRes.error;
         }
-      } else {
-        // Bulk insert all pages at once
-        const pageRows = (insertedChapters ?? []).flatMap((chapter: any) => {
+      } else if (!insertErr) {
+        insertedList = insertedChapters ?? [];
+      }
+
+      // If bulk insert still failed, retry row-by-row so valid chapters succeed even if one fails
+      if (insertErr && insertedList.length === 0) {
+        console.warn("[SyncImport] Bulk insert failed, attempting row-by-row fallback:", insertErr.message);
+        for (const row of chapterRows) {
+          const { data: singleCh, error: singleErr } = await admin
+            .from("chapters")
+            .insert(row)
+            .select("id,chapter_number,scanlation_group")
+            .single();
+
+          if (singleErr && (singleErr.code === "42703" || singleErr.message?.includes("source_url"))) {
+            const { source_url, ...fallbackRow } = row;
+            const { data: retrySingle, error: retrySingleErr } = await admin
+              .from("chapters")
+              .insert(fallbackRow)
+              .select("id,chapter_number,scanlation_group")
+              .single();
+            if (!retrySingleErr && retrySingle) {
+              insertedList.push(retrySingle);
+            } else {
+              failed++;
+              details.push({
+                chapter: row.chapter_number,
+                status: "failed",
+                message: retrySingleErr?.message || singleErr.message,
+                series_title: seriesTitle || undefined,
+              });
+            }
+          } else if (!singleErr && singleCh) {
+            insertedList.push(singleCh);
+          } else {
+            failed++;
+            details.push({
+              chapter: row.chapter_number,
+              status: "failed",
+              message: singleErr?.message || "Insert failed",
+              series_title: seriesTitle || undefined,
+            });
+          }
+        }
+      }
+
+      if (insertedList.length > 0) {
+        // Bulk insert all pages in chunks of 500
+        const pageRows = insertedList.flatMap((chapter: any) => {
           const key = chapterScanKey(Number(chapter.chapter_number), chapter.scanlation_group);
           const images = chapterImages.get(key) ?? [];
           return images.map((imageUrl, index) => ({
@@ -813,20 +864,32 @@ export async function $syncImportSource(args: {
           }));
         });
 
-        const { error: pagesError } = await admin.from("chapter_pages").insert(pageRows);
-        if (pagesError) {
-          for (const chapter of insertedChapters ?? []) {
+        const CHUNK_SIZE = 500;
+        let pagesFailed = false;
+        let pagesErrMsg = "";
+        for (let i = 0; i < pageRows.length; i += CHUNK_SIZE) {
+          const chunk = pageRows.slice(i, i + CHUNK_SIZE);
+          const { error: pagesError } = await admin.from("chapter_pages").insert(chunk);
+          if (pagesError) {
+            pagesFailed = true;
+            pagesErrMsg = pagesError.message;
+            break;
+          }
+        }
+
+        if (pagesFailed) {
+          for (const chapter of insertedList) {
             failed++;
             details.push({
               chapter: Number(chapter.chapter_number),
               status: "failed",
-              message: pagesError.message,
+              message: pagesErrMsg,
               series_title: seriesTitle || undefined,
             });
           }
         } else {
-          imported = insertedChapters?.length ?? 0;
-          for (const chapter of insertedChapters ?? []) {
+          imported += insertedList.length;
+          for (const chapter of insertedList) {
             const key = chapterScanKey(Number(chapter.chapter_number), chapter.scanlation_group);
             const images = chapterImages.get(key) ?? [];
             details.push({

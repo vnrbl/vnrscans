@@ -410,65 +410,133 @@ async function main() {
       process.exit(0);
     }
 
-    console.log('Available Series in database:');
-    seriesList.forEach((s, idx) => {
-      console.log(`  [${idx + 1}] ${s.title}`);
-    });
-    console.log('  [S] Search by Title');
-    console.log('  [M] Enter UUID manually');
+    console.log(`\n📚 Total series in database: ${seriesList.length}`);
 
-    const choice = (await askQuestion('\nChoose a series option: ')).trim().toLowerCase();
+    while (!seriesId) {
+      const query = (
+        await askQuestion(
+          '\n🔎 Search series by title or slug (type to search, "all" to list all, "m" for UUID): ',
+        )
+      ).trim();
 
-    if (choice === 'm') {
-      seriesId = (await askQuestion('Enter Series UUID: ')).trim();
-      const { data: match } = await supabase.from('series').select('title').eq('id', seriesId).single();
-      seriesTitle = match?.title || 'Manual UUID Series';
-    } else if (choice === 's') {
-      const search = (await askQuestion('Enter title to search: ')).trim().toLowerCase();
-      const matches = seriesList.filter(s => s.title.toLowerCase().includes(search));
-      
+      if (!query) continue;
+
+      if (query.toLowerCase() === 'm') {
+        const manualId = (await askQuestion('Enter Series UUID: ')).trim();
+        const { data: match } = await supabase
+          .from('series')
+          .select('id, title')
+          .eq('id', manualId)
+          .maybeSingle();
+
+        if (match) {
+          seriesId = match.id;
+          seriesTitle = match.title;
+          break;
+        } else {
+          console.log('❌ Series with that UUID not found in database. Try again.');
+          continue;
+        }
+      }
+
+      const qLower = query.toLowerCase();
+      const matches =
+        qLower === 'all'
+          ? seriesList
+          : seriesList.filter(
+              (s) =>
+                s.title.toLowerCase().includes(qLower) ||
+                (s.slug && s.slug.toLowerCase().includes(qLower)),
+            );
+
       if (matches.length === 0) {
-        console.log('❌ No matching series found.');
-        process.exit(1);
+        console.log(`❌ No series matched "${query}". Please try another search term.`);
+        continue;
       }
 
-      console.log('\nMatching Series:');
-      matches.forEach((s, idx) => {
-        console.log(`  [${idx + 1}] ${s.title}`);
+      if (matches.length === 1 && qLower !== 'all') {
+        console.log(`\n✨ Found exact match: "${matches[0].title}" (slug: ${matches[0].slug})`);
+        const confirmMatch = (await askQuestion('Use this series? (Y/n): ')).trim().toLowerCase();
+        if (confirmMatch !== 'n' && confirmMatch !== 'no') {
+          seriesId = matches[0].id;
+          seriesTitle = matches[0].title;
+          break;
+        }
+      }
+
+      console.log(`\nMatching Series (${matches.length}):`);
+      matches.slice(0, 30).forEach((s, idx) => {
+        console.log(`  [${idx + 1}] ${s.title} (${s.slug})`);
       });
-      const matchIdx = parseInt(await askQuestion('\nSelect a series number: '), 10) - 1;
-      if (isNaN(matchIdx) || matchIdx < 0 || matchIdx >= matches.length) {
-        console.log('❌ Invalid selection.');
-        process.exit(1);
+      if (matches.length > 30) {
+        console.log(`  ... and ${matches.length - 30} more. Refine your search to narrow down.`);
       }
-      seriesId = matches[matchIdx].id;
-      seriesTitle = matches[matchIdx].title;
-    } else {
-      const idx = parseInt(choice, 10) - 1;
-      if (isNaN(idx) || idx < 0 || idx >= seriesList.length) {
-        console.log('❌ Invalid selection.');
-        process.exit(1);
+
+      const selectChoice = (
+        await askQuestion('\nEnter number to select (or press Enter to search again): ')
+      ).trim();
+
+      if (!selectChoice) continue;
+
+      const idx = parseInt(selectChoice, 10) - 1;
+      if (!isNaN(idx) && idx >= 0 && idx < matches.length) {
+        seriesId = matches[idx].id;
+        seriesTitle = matches[idx].title;
+        break;
+      } else {
+        console.log('Invalid number. Try again.');
       }
-      seriesId = seriesList[idx].id;
-      seriesTitle = seriesList[idx].title;
     }
   } catch (error) {
     console.error('❌ Failed to fetch series list:', error);
     process.exit(1);
   }
 
-  console.log(`\nSelected Series: "${seriesTitle}"`);
+  console.log(`\n✅ Selected Series: "${seriesTitle}"`);
+
+  // Check if series has existing linked scan sources
+  let defaultSourceUrl = '';
+  let defaultGroup = '';
+  let defaultImageExample = '';
+
+  try {
+    const { data: linkedSources } = await supabase
+      .from('series_import_sources')
+      .select('*')
+      .eq('series_id', seriesId);
+
+    if (linkedSources && linkedSources.length > 0) {
+      console.log(`\n🔗 Found ${linkedSources.length} linked scan source(s) for "${seriesTitle}":`);
+      linkedSources.forEach((src: any, idx: number) => {
+        console.log(
+          `  [${idx + 1}] [${src.source_site || 'Source'}] ${src.source_url} (group: ${src.scanlation_group || 'none'})`,
+        );
+      });
+      defaultSourceUrl = linkedSources[0].source_url || '';
+      defaultGroup = linkedSources[0].scanlation_group || '';
+      defaultImageExample = linkedSources[0].image_url_example || '';
+    }
+  } catch {}
 
   // Ask for Series Page URL
-  const seriesUrl = (await askQuestion('\nEnter Series URL to scrape (e.g., https://site.com/manga/title): ')).trim();
+  const urlPrompt = defaultSourceUrl
+    ? `\nEnter Series URL to scrape (press Enter for ${defaultSourceUrl}): `
+    : '\nEnter Series URL to scrape (e.g., https://site.com/manga/title): ';
+
+  const urlInput = (await askQuestion(urlPrompt)).trim();
+  const seriesUrl = urlInput || defaultSourceUrl;
+
   if (!seriesUrl) {
     console.log('❌ URL is required.');
     process.exit(1);
   }
 
-  const imageTypeExample = (await askQuestion(
-    'Enter Image URL Example (optional, press Enter to skip): '
-  )).trim();
+  const examplePrompt = defaultImageExample
+    ? `Enter Image URL Example (press Enter for ${defaultImageExample}): `
+    : 'Enter Image URL Example (optional, press Enter to skip): ';
+
+  const imageTypeExampleInput = (await askQuestion(examplePrompt)).trim();
+  const imageTypeExample = imageTypeExampleInput || defaultImageExample;
   const imageUrlPrefix = imageTypeExample ? getImageUrlTypePrefix(imageTypeExample) : null;
 
   if (imageTypeExample && !imageUrlPrefix) {
@@ -484,17 +552,21 @@ async function main() {
     }
   }
 
-  let sourceGroupFallback = '';
-  try {
-    sourceGroupFallback = new URL(seriesUrl).hostname.replace(/^www\./, '');
-  } catch {
-    sourceGroupFallback = '';
+  let sourceGroupFallback = defaultGroup;
+  if (!sourceGroupFallback) {
+    try {
+      sourceGroupFallback = new URL(seriesUrl).hostname.replace(/^www\./, '');
+    } catch {
+      sourceGroupFallback = '';
+    }
   }
 
   // Ask for scanlation group
-  const scanlationGroupInput = (await askQuestion(
-    `Enter Scanlation Group name (optional, press Enter to use ${sourceGroupFallback || 'source URL'}): `
-  )).trim();
+  const scanlationGroupInput = (
+    await askQuestion(
+      `Enter Scanlation Group name (press Enter to use "${sourceGroupFallback || 'source URL'}"): `,
+    )
+  ).trim();
   const scanlationGroup = scanlationGroupInput || sourceGroupFallback;
 
   if (scanlationGroup) {
@@ -733,6 +805,21 @@ async function main() {
 
   console.log('Closing browser...');
   await browser.close();
+
+  if (successCount > 0) {
+    try {
+      const { count } = await supabase
+        .from('chapters')
+        .select('*', { count: 'exact', head: true })
+        .eq('series_id', seriesId)
+        .eq('status', 'published');
+
+      if (typeof count === 'number') {
+        await supabase.from('series').update({ chapter_count: count }).eq('id', seriesId);
+        console.log(`Updated series chapter_count to ${count}.`);
+      }
+    } catch {}
+  }
 
   console.log('📊 --- Import Complete --- 📊');
   console.log(`✅ Success: ${successCount}`);

@@ -353,12 +353,16 @@ export function LiveSeriesEditor({ series: initialSeries, slug, trigger }: LiveS
       processing.setStepStatus("index", "active", "Refreshing chapter index...");
       qc.invalidateQueries({ queryKey: ["series"] });
       qc.invalidateQueries({ queryKey: ["series", "detail", slug] });
+      qc.invalidateQueries({ queryKey: ["chapters"] });
       qc.invalidateQueries({ queryKey: ["chapters", initialSeries?.id] });
+      qc.invalidateQueries({ queryKey: ["chapters", slug] });
+      qc.invalidateQueries({ queryKey: ["admin", "chapters", initialSeries?.id] });
       qc.invalidateQueries({ queryKey: ["admin", "series-editor-chapters", initialSeries?.id] });
+      qc.invalidateQueries({ queryKey: ["admin", "series-import-sources", initialSeries?.id] });
 
       processing.setStepStatus("index", "done");
       await processing.completeTask("Chapters Synchronized Successfully! ✓");
-      toast.success(`Sync complete! Imported ${res.imported ?? 0} new chapter(s).`);
+      toast.success(`Sync complete! Imported ${res.imported ?? 0} new chapter(s), ${res.skipped ?? 0} skipped.`);
     } catch (err: any) {
       processing.failTask(err.message || "Sync failed");
       toast.error(err.message || "Sync failed");
@@ -1104,6 +1108,34 @@ export function LiveSeriesEditor({ series: initialSeries, slug, trigger }: LiveS
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                         <span>Delete Selected ({selectedChapterIds.size})</span>
+                      </Button>
+                    )}
+                    {(importSourcesQ.data || []).length > 0 ? (
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={() => {
+                          const srcId = importSourcesQ.data?.[0]?.id;
+                          if (srcId) handleSyncThisSeries(srcId);
+                        }}
+                        disabled={isSyncingSeries}
+                        className="h-8 text-xs font-bold bg-purple-600 hover:bg-purple-500 text-white gap-1.5 cursor-pointer shadow-sm"
+                        title="Check scan source and auto-import latest chapters"
+                      >
+                        <RefreshCw className={`h-3.5 w-3.5 ${isSyncingSeries ? "animate-spin" : ""}`} />
+                        <span>{isSyncingSeries ? "Syncing..." : "Sync Chapters"}</span>
+                      </Button>
+                    ) : (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setActiveTab("sources")}
+                        className="h-8 text-xs font-medium gap-1.5 cursor-pointer border-dashed text-muted-foreground hover:text-foreground"
+                        title="Configure a scan source to enable 1-click syncing"
+                      >
+                        <Globe className="h-3.5 w-3.5 text-purple-400" />
+                        <span>Link Scan Source</span>
                       </Button>
                     )}
                     <a
