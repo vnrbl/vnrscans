@@ -215,6 +215,9 @@ async function fetchMetadataForTitle(title: string): Promise<ExtractedMetadata |
     .replace(/[?!:;]/g, " ")
     .trim();
 
+  let slug: string | null = null;
+  let fallbackItem: any = null;
+
   const searchEndpoints = [
     `https://api.comick.dev/v1.0/search?q=${encodeURIComponent(cleanTitle)}&limit=5`,
     `https://api.comick.cc/v1.0/search?q=${encodeURIComponent(cleanTitle)}&limit=5`,
@@ -224,17 +227,69 @@ async function fetchMetadataForTitle(title: string): Promise<ExtractedMetadata |
     try {
       const res = await fetch(endpoint, {
         headers: { "User-Agent": userAgent, Accept: "application/json" },
-        signal: AbortSignal.timeout(4000),
+        signal: AbortSignal.timeout(5000),
       });
       if (res.ok) {
         const data = (await res.json()) as any[];
         if (Array.isArray(data) && data.length > 0) {
-          return parseComickItem(data[0]);
+          slug = data[0].slug;
+          fallbackItem = data[0];
+          break;
         }
       }
     } catch {
       // try next
     }
+  }
+
+  // If Comick slug found, scrape the dedicated Tags section directly from the comic page via Jina reader
+  if (slug) {
+    try {
+      const jinaRes = await fetch(`https://r.jina.ai/https://comick.dev/comic/${slug}`, {
+        signal: AbortSignal.timeout(12000),
+      });
+      if (jinaRes.ok) {
+        const text = await jinaRes.text();
+        // 1. Tags matching * [TagName](https://comick.dev/search?tags=...)
+        const tagMatches = [...text.matchAll(/\*\s+\[(.*?)\]\(https:\/\/comick\.dev\/search\?tags=[^)]+\)/g)];
+        const tags = tagMatches.map((m) => m[1].trim()).filter(Boolean);
+
+        // 2. Genres matching Genres: [Action](...), ...
+        const genreLine = text.match(/Genres:\s*([^\n]+)/);
+        const genres = genreLine
+          ? [...genreLine[1].matchAll(/\[(.*?)\]/g)].map((x) => x[1].trim()).filter(Boolean)
+          : [];
+
+        // 3. Theme & Format lines (can supplement tags if not already present)
+        const themeLine = text.match(/Theme:\s*([^\n]+)/);
+        if (themeLine) {
+          const themes = [...themeLine[1].matchAll(/\[(.*?)\]/g)].map((x) => x[1].trim()).filter(Boolean);
+          tags.push(...themes);
+        }
+
+        const formatLine = text.match(/Format:\s*([^\n]+)/);
+        if (formatLine) {
+          const formats = [...formatLine[1].matchAll(/\[(.*?)\]/g)].map((x) => x[1].trim()).filter(Boolean);
+          tags.push(...formats);
+        }
+
+        if (tags.length > 0 || genres.length > 0) {
+          console.log(`    Scraped ${slug} -> ${tags.length} tags, ${genres.length} genres`);
+          return {
+            genres: Array.from(new Set(genres)),
+            tags: Array.from(new Set(tags)),
+          };
+        }
+      } else {
+        console.log(`    (Jina status ${jinaRes.status} for ${slug})`);
+      }
+    } catch (err: any) {
+      console.log(`    (Jina error for ${slug}: ${err?.message || err})`);
+    }
+  }
+
+  if (fallbackItem) {
+    return parseComickItem(fallbackItem);
   }
 
   // MangaDex fallback
@@ -303,21 +358,37 @@ async function main() {
 
   // Cache for genre and tag database IDs
   const genreIdMap = new Map<string, string>(); // name.toLowerCase() -> id
+  const genreSlugMap = new Map<string, string>(); // slug -> id
   const tagIdMap = new Map<string, string>(); // name.toLowerCase() -> id
+  const tagSlugMap = new Map<string, string>(); // slug -> id
 
   // Prepopulate existing genres & tags map
-  const { data: existingGenres } = await supabase.from("genres").select("id, name");
-  existingGenres?.forEach((g) => genreIdMap.set(g.name.toLowerCase().trim(), g.id));
+  const { data: existingGenres } = await supabase.from("genres").select("id, name, slug");
+  existingGenres?.forEach((g) => {
+    genreIdMap.set(g.name.toLowerCase().trim(), g.id);
+    if (g.slug) genreSlugMap.set(g.slug, g.id);
+  });
 
-  const { data: existingTags } = await supabase.from("tags").select("id, name");
-  existingTags?.forEach((t) => tagIdMap.set(t.name.toLowerCase().trim(), t.id));
+  const { data: existingTags } = await supabase.from("tags").select("id, name, slug");
+  existingTags?.forEach((t) => {
+    tagIdMap.set(t.name.toLowerCase().trim(), t.id);
+    if (t.slug) tagSlugMap.set(t.slug, t.id);
+  });
 
   async function getOrCreateGenreId(name: string): Promise<string | null> {
     const clean = name.trim();
+    if (!clean) return null;
     const key = clean.toLowerCase();
     if (genreIdMap.has(key)) return genreIdMap.get(key)!;
 
     const genreSlug = slugify(clean);
+    if (!genreSlug) return null;
+    if (genreSlugMap.has(genreSlug)) {
+      const id = genreSlugMap.get(genreSlug)!;
+      genreIdMap.set(key, id);
+      return id;
+    }
+
     const { data: inserted, error } = await supabase
       .from("genres")
       .insert({ name: clean, slug: genreSlug })
@@ -333,21 +404,31 @@ async function main() {
         .maybeSingle();
       if (found) {
         genreIdMap.set(key, found.id);
+        genreSlugMap.set(genreSlug, found.id);
         return found.id;
       }
       return null;
     }
 
     genreIdMap.set(key, inserted.id);
+    genreSlugMap.set(genreSlug, inserted.id);
     return inserted.id;
   }
 
   async function getOrCreateTagId(name: string): Promise<string | null> {
     const clean = name.trim();
+    if (!clean) return null;
     const key = clean.toLowerCase();
     if (tagIdMap.has(key)) return tagIdMap.get(key)!;
 
     const tagSlug = slugify(clean);
+    if (!tagSlug) return null;
+    if (tagSlugMap.has(tagSlug)) {
+      const id = tagSlugMap.get(tagSlug)!;
+      tagIdMap.set(key, id);
+      return id;
+    }
+
     const { data: inserted, error } = await supabase
       .from("tags")
       .insert({ name: clean, slug: tagSlug })
@@ -362,12 +443,14 @@ async function main() {
         .maybeSingle();
       if (found) {
         tagIdMap.set(key, found.id);
+        tagSlugMap.set(tagSlug, found.id);
         return found.id;
       }
       return null;
     }
 
     tagIdMap.set(key, inserted.id);
+    tagSlugMap.set(tagSlug, inserted.id);
     return inserted.id;
   }
 
