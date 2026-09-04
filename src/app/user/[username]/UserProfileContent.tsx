@@ -432,6 +432,12 @@ export default function UserProfileContent({ username }: { username: string }) {
       qc.invalidateQueries({ queryKey: ["public-profile", username] });
       qc.invalidateQueries({ queryKey: ["public-profile-stats", userId] });
       qc.invalidateQueries({ queryKey: ["public-profile-library", userId] });
+      qc.invalidateQueries({ queryKey: ["public-profile-reading-preferences", userId] });
+      qc.invalidateQueries({ queryKey: ["public-profile-comments", userId] });
+      qc.invalidateQueries({ queryKey: ["public-profile-comments-count", userId] });
+      qc.invalidateQueries({ queryKey: ["public-profile-equipped-badge", userId] });
+      qc.invalidateQueries({ queryKey: ["public-profile-roles", userId] });
+      qc.invalidateQueries({ queryKey: ["public-profile-uploaded-series", username] });
     };
 
     const channel = supabase
@@ -453,8 +459,25 @@ export default function UserProfileContent({ username }: { username: string }) {
       )
       .on(
         "postgres_changes",
+        { event: "*", schema: "public", table: "series_follows", filter: `user_id=eq.${userId}` },
+        refreshPublicProfile
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "comments", filter: `user_id=eq.${userId}` },
+        refreshPublicProfile
+      )
+      .on(
+        "postgres_changes",
         { event: "*", schema: "public", table: "user_badges", filter: `user_id=eq.${userId}` },
         refreshPublicProfile
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "chapters" },
+        () => {
+          qc.invalidateQueries({ queryKey: ["public-profile-uploaded-series", username] });
+        }
       )
       .subscribe();
 
@@ -490,38 +513,55 @@ export default function UserProfileContent({ username }: { username: string }) {
       })) satisfies PublicLibraryItem[];
     },
     enabled: !!profile.data?.user_id && showLibraries,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 30 * 1000,
   });
 
-  // ─── Reading Preferences: genre breakdown from reading history ───
+  // ─── Reading Preferences: genre breakdown from reading history (all-time, paginated) ───
   const readingPreferences = useQuery({
     queryKey: ["public-profile-reading-preferences", profile.data?.user_id],
     queryFn: async () => {
       if (!profile.data?.user_id) return [];
 
-      // Step 1: Get all reading history entries → series_id + chapter count
-      const { data: historyData, error: historyError } = await supabase
-        .from("reading_history")
-        .select("series_id,chapter_id")
-        .eq("user_id", profile.data.user_id);
-      if (historyError || !historyData || historyData.length === 0) return [];
+      // Step 1: Get ALL reading history entries via pagination
+      let allHistory: { series_id: string; chapter_id: string }[] = [];
+      let from = 0;
+      const PAGE_SIZE = 1000;
+      while (true) {
+        const { data: historyData, error: historyError } = await supabase
+          .from("reading_history")
+          .select("series_id,chapter_id")
+          .eq("user_id", profile.data.user_id)
+          .range(from, from + PAGE_SIZE - 1);
+        if (historyError || !historyData || historyData.length === 0) break;
+        allHistory.push(...historyData);
+        if (historyData.length < PAGE_SIZE) break;
+        from += PAGE_SIZE;
+      }
+      if (allHistory.length === 0) return [];
 
       // Aggregate chapters per series
       const seriesChapterMap = new Map<string, number>();
-      for (const h of historyData) {
+      for (const h of allHistory) {
         seriesChapterMap.set(h.series_id, (seriesChapterMap.get(h.series_id) || 0) + 1);
       }
       const seriesIds = Array.from(seriesChapterMap.keys());
 
-      // Step 2: Get genre links for those series
-      const { data: sgData, error: sgError } = await supabase
-        .from("series_genres")
-        .select("series_id,genre_id")
-        .in("series_id", seriesIds);
-      if (sgError || !sgData) return [];
+      // Step 2: Get genre links for those series (batch in chunks of 50)
+      const allSgData: any[] = [];
+      for (let i = 0; i < seriesIds.length; i += 50) {
+        const batchIds = seriesIds.slice(i, i + 50);
+        const { data: sgData, error: sgError } = await supabase
+          .from("series_genres")
+          .select("series_id,genre_id")
+          .in("series_id", batchIds);
+        if (!sgError && sgData) {
+          allSgData.push(...sgData);
+        }
+      }
+      if (allSgData.length === 0) return [];
 
       // Step 3: Get genre names
-      const genreIds = Array.from(new Set(sgData.map((sg: any) => sg.genre_id)));
+      const genreIds = Array.from(new Set(allSgData.map((sg: any) => sg.genre_id)));
       if (genreIds.length === 0) return [];
       const { data: genresData, error: genresError } = await supabase
         .from("genres")
@@ -533,23 +573,26 @@ export default function UserProfileContent({ username }: { username: string }) {
       // Step 4: Reading session durations per series
       let seriesDurationMap = new Map<string, number>();
       try {
-        const { data: sessionsData } = await supabase
-          .from("reading_sessions")
-          .select("series_id,duration_seconds")
-          .eq("user_id", profile.data!.user_id)
-          .in("series_id", seriesIds);
-        if (sessionsData) {
-          for (const s of sessionsData) {
-            seriesDurationMap.set(s.series_id, (seriesDurationMap.get(s.series_id) || 0) + (s.duration_seconds || 0));
+        for (let i = 0; i < seriesIds.length; i += 50) {
+          const batchIds = seriesIds.slice(i, i + 50);
+          const { data: sessionsData } = await supabase
+            .from("reading_sessions")
+            .select("series_id,duration_seconds")
+            .eq("user_id", profile.data!.user_id)
+            .in("series_id", batchIds);
+          if (sessionsData) {
+            for (const s of sessionsData) {
+              seriesDurationMap.set(s.series_id, (seriesDurationMap.get(s.series_id) || 0) + (s.duration_seconds || 0));
+            }
           }
         }
       } catch {
-        // reading_sessions may not have data
+        // reading_sessions optional
       }
 
       // Step 5: Build genre → { seriesCount, chapterCount, totalMinutes }
       const genreAgg = new Map<string, { name: string; seriesSet: Set<string>; chapters: number; minutes: number }>();
-      for (const sg of sgData) {
+      for (const sg of allSgData) {
         const gName = genreNameMap.get(sg.genre_id);
         if (!gName) continue;
         if (!genreAgg.has(sg.genre_id)) {
@@ -576,40 +619,74 @@ export default function UserProfileContent({ username }: { username: string }) {
       return result;
     },
     enabled: !!profile.data?.user_id && showStatistics,
-    staleTime: 10 * 60 * 1000,
+    staleTime: 30 * 1000,
   });
 
-  // ─── Uploaded Series: series where user uploaded chapters ───
+  // ─── Uploaded Series: series where user uploaded chapters (all-time, paginated) ───
   const uploadedSeries = useQuery({
     queryKey: ["public-profile-uploaded-series", username],
     queryFn: async () => {
-      const { data: chaptersData, error: chaptersError } = await supabase
-        .from("chapters")
-        .select("series_id")
-        .eq("uploaded_by", username)
-        .eq("status", "published");
-      if (chaptersError || !chaptersData || chaptersData.length === 0) return [];
+      let allChapters: { series_id: string }[] = [];
+      let from = 0;
+      const PAGE_SIZE = 1000;
+      while (true) {
+        const { data: chaptersData, error: chaptersError } = await supabase
+          .from("chapters")
+          .select("series_id")
+          .eq("uploaded_by", username)
+          .eq("status", "published")
+          .range(from, from + PAGE_SIZE - 1);
+        if (chaptersError || !chaptersData || chaptersData.length === 0) break;
+        allChapters.push(...chaptersData);
+        if (chaptersData.length < PAGE_SIZE) break;
+        from += PAGE_SIZE;
+      }
+      if (allChapters.length === 0) return [];
 
       const seriesChapterCount = new Map<string, number>();
-      for (const c of chaptersData) {
+      for (const c of allChapters) {
         seriesChapterCount.set(c.series_id, (seriesChapterCount.get(c.series_id) || 0) + 1);
       }
       const seriesIds = Array.from(seriesChapterCount.keys());
 
-      const { data: seriesData, error: seriesError } = await supabase
-        .from("series")
-        .select("id,slug,title,cover_url,type,status,rating_average,view_count")
-        .in("id", seriesIds)
-        .eq("is_hidden", false);
-      if (seriesError || !seriesData) return [];
+      // Fetch series details in batches of 50
+      const allSeries: any[] = [];
+      for (let i = 0; i < seriesIds.length; i += 50) {
+        const batchIds = seriesIds.slice(i, i + 50);
+        const { data: seriesData, error: seriesError } = await supabase
+          .from("series")
+          .select("id,slug,title,cover_url,type,status,rating_average,view_count")
+          .in("id", batchIds)
+          .eq("is_hidden", false);
+        if (!seriesError && seriesData) {
+          allSeries.push(...seriesData);
+        }
+      }
 
-      return seriesData.map((s: any) => ({
+      return allSeries.map((s: any) => ({
         ...s,
         uploaded_chapter_count: seriesChapterCount.get(s.id) || 0,
       })).sort((a: any, b: any) => b.uploaded_chapter_count - a.uploaded_chapter_count);
     },
     enabled: !!username && isProfilePublic,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 30 * 1000,
+  });
+
+  // Fetch total comments count accurately from DB
+  const publicCommentsCount = useQuery({
+    queryKey: ["public-profile-comments-count", profile.data?.user_id],
+    queryFn: async () => {
+      if (!profile.data?.user_id) return 0;
+      const { count, error } = await supabase
+        .from("comments")
+        .select("*", { count: "exact", head: true })
+        .eq("user_id", profile.data.user_id)
+        .eq("is_hidden", false);
+      if (error) return 0;
+      return count ?? 0;
+    },
+    enabled: !!profile.data?.user_id && isProfilePublic,
+    staleTime: 30 * 1000,
   });
 
   // Fetch user comment history
@@ -630,7 +707,7 @@ export default function UserProfileContent({ username }: { username: string }) {
       return data || [];
     },
     enabled: !!profile.data?.user_id && isProfilePublic,
-    staleTime: 2 * 60 * 1000,
+    staleTime: 30 * 1000,
   });
 
   // Fetch series info for comment history
@@ -1393,12 +1470,12 @@ export default function UserProfileContent({ username }: { username: string }) {
             <TabsTrigger value="comments" className="h-9 min-w-0 gap-1.5 px-0 sm:px-3">
               <MessageSquare className="h-4 w-4" />
               <span>Comments</span>
-              {commentHistory.data && commentHistory.data.length > 0 && (
+              {((publicCommentsCount.data ?? (commentHistory.data?.length || 0)) > 0) && (
                 <span
                   className="ml-1 hidden sm:inline-flex h-4 min-w-4 items-center justify-center rounded-full px-1.5 text-[10px] font-bold"
                   style={{ backgroundColor: `${accentColor}25`, color: accentColor }}
                 >
-                  {commentHistory.data.length}
+                  {publicCommentsCount.data ?? commentHistory.data?.length ?? 0}
                 </span>
               )}
             </TabsTrigger>
@@ -1406,12 +1483,12 @@ export default function UserProfileContent({ username }: { username: string }) {
               <TabsTrigger value="library" className="h-9 min-w-0 gap-1.5 px-0 sm:px-3">
                 <BookOpen className="h-4 w-4" />
                 <span>Library</span>
-                {publicLibrary.data && publicLibrary.data.length > 0 && (
+                {((publicStats.data?.series_followed ?? (publicLibrary.data?.length || 0)) > 0) && (
                   <span
                     className="ml-1 hidden sm:inline-flex h-4 min-w-4 items-center justify-center rounded-full px-1.5 text-[10px] font-bold"
                     style={{ backgroundColor: `${accentColor}25`, color: accentColor }}
                   >
-                    {publicLibrary.data.length}
+                    {publicStats.data?.series_followed ?? publicLibrary.data?.length ?? 0}
                   </span>
                 )}
               </TabsTrigger>

@@ -27,17 +27,25 @@ export function ReadingHeatmap() {
       const { data: u } = await supabase.auth.getUser();
       if (!u.user) return {};
 
-      // Fetch ALL reading history (no date filter) so stats match the top cards
-      const { data, error } = await supabase
-        .from("reading_history")
-        .select("updated_at")
-        .eq("user_id", u.user.id);
-
-      if (error) throw error;
+      // Fetch ALL reading history (paginated) so stats match the top cards accurately
+      let allItems: { updated_at: string }[] = [];
+      let from = 0;
+      const PAGE_SIZE = 1000;
+      while (true) {
+        const { data, error } = await supabase
+          .from("reading_history")
+          .select("updated_at")
+          .eq("user_id", u.user.id)
+          .range(from, from + PAGE_SIZE - 1);
+        if (error || !data || data.length === 0) break;
+        allItems.push(...data);
+        if (data.length < PAGE_SIZE) break;
+        from += PAGE_SIZE;
+      }
 
       // Group by date
       const dateCounts: Record<string, number> = {};
-      data?.forEach((item) => {
+      allItems.forEach((item) => {
         const dateStr = toLocalYYYYMMDD(new Date(item.updated_at));
         dateCounts[dateStr] = (dateCounts[dateStr] || 0) + 1;
       });
