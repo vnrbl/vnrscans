@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { Clock, Calendar, Bell, Sparkles, CheckCircle2, Globe, Zap, Lock, ExternalLink } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { useReaderSettings } from "@/contexts/ReaderSettingsContext";
@@ -33,6 +33,7 @@ export function ReleaseScheduleCard({
   estimatedNextReleaseAt,
   releaseCadence,
 }: ReleaseScheduleProps) {
+  const qc = useQueryClient();
   const { settings } = useReaderSettings();
   const [timeLeft, setTimeLeft] = useState<{ days: number; hours: number; minutes: number; seconds: number } | null>(null);
   const [isTracking, setIsTracking] = useState(false);
@@ -92,13 +93,12 @@ export function ReleaseScheduleCard({
 
     // 1. Check for upcoming confirmed scheduled chapters in database (Early Access Hold)
     const scheduled = (chapters || [])
-      .filter((c) => c.status === "scheduled" || (c.scheduled_at && new Date(c.scheduled_at) > now))
+      .filter((c) => !!c.scheduled_at && new Date(c.scheduled_at).getTime() > now.getTime())
       .sort((a, b) => (a.chapter_number || 0) - (b.chapter_number || 0));
 
     if (settings.enable30MinHold !== false && scheduled.length > 0) {
-      const futureScheduled = scheduled.filter((c) => c.scheduled_at && new Date(c.scheduled_at) > now);
-      const targetCh = futureScheduled[0] || scheduled[0];
-      const targetDate = targetCh.scheduled_at ? new Date(targetCh.scheduled_at) : new Date(Date.now() + 30 * 60 * 1000);
+      const targetCh = scheduled[0];
+      const targetDate = new Date(targetCh.scheduled_at!);
 
       // Group all chapters sharing the same unlock time (within 2 minutes)
       const sameBatchChapters = scheduled.filter((c) => {
@@ -268,11 +268,21 @@ export function ReleaseScheduleCard({
     }
 
     const updateTimer = () => {
-      const now = new Date().getTime();
+      const now = Date.now();
       const diff = scheduleInfo.targetDate!.getTime() - now;
 
       if (diff <= 0) {
-        setTimeLeft({ days: 0, hours: 0, minutes: 0, seconds: 0 });
+        setTimeLeft(null);
+        // Chapter has unlocked! Auto-unlock in database and invalidate queries
+        fetch("/api/chapters/auto-unlock", { method: "POST" })
+          .then((res) => res.json())
+          .then((data: any) => {
+            if (data?.unlockedCount > 0) {
+              qc.invalidateQueries({ queryKey: ["chapters"] });
+              qc.invalidateQueries({ queryKey: ["live-release-schedule"] });
+            }
+          })
+          .catch(() => {});
         return;
       }
 
@@ -351,29 +361,26 @@ export function ReleaseScheduleCard({
         </div>
       </div>
 
-      <div className="mt-3 flex items-center justify-between gap-3">
-        {/* Live Countdown Display */}
-        <div className="flex items-center gap-1.5 sm:gap-2 text-center">
-          <div className="flex flex-col items-center rounded-lg bg-black border border-white/10 px-2 sm:px-2.5 py-1 min-w-[38px] sm:min-w-[42px]">
+      <div className="mt-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        {/* Live Countdown Display: Responsive Grid on Mobile */}
+        <div className="grid grid-cols-4 sm:flex sm:items-center gap-1.5 sm:gap-2 text-center w-full sm:w-auto">
+          <div className="flex flex-col items-center justify-center rounded-lg bg-black/90 border border-white/10 px-2 sm:px-2.5 py-1.5 sm:py-1 min-w-[38px] sm:min-w-[44px]">
             <span className="font-mono text-sm sm:text-base font-bold text-white tabular-nums">{timeLeft.days}</span>
             <span className="text-[8px] sm:text-[9px] font-mono uppercase tracking-widest text-neutral-400">Days</span>
           </div>
-          <span className="font-mono text-xs text-neutral-600">:</span>
-          <div className="flex flex-col items-center rounded-lg bg-black border border-white/10 px-2 sm:px-2.5 py-1 min-w-[38px] sm:min-w-[42px]">
+          <div className="flex flex-col items-center justify-center rounded-lg bg-black/90 border border-white/10 px-2 sm:px-2.5 py-1.5 sm:py-1 min-w-[38px] sm:min-w-[44px]">
             <span className="font-mono text-sm sm:text-base font-bold text-white tabular-nums">
               {String(timeLeft.hours).padStart(2, "0")}
             </span>
             <span className="text-[8px] sm:text-[9px] font-mono uppercase tracking-widest text-neutral-400">Hours</span>
           </div>
-          <span className="font-mono text-xs text-neutral-600">:</span>
-          <div className="flex flex-col items-center rounded-lg bg-black border border-white/10 px-2 sm:px-2.5 py-1 min-w-[38px] sm:min-w-[42px]">
+          <div className="flex flex-col items-center justify-center rounded-lg bg-black/90 border border-white/10 px-2 sm:px-2.5 py-1.5 sm:py-1 min-w-[38px] sm:min-w-[44px]">
             <span className="font-mono text-sm sm:text-base font-bold text-white tabular-nums">
               {String(timeLeft.minutes).padStart(2, "0")}
             </span>
             <span className="text-[8px] sm:text-[9px] font-mono uppercase tracking-widest text-neutral-400">Mins</span>
           </div>
-          <span className="font-mono text-xs text-neutral-600">:</span>
-          <div className="flex flex-col items-center rounded-lg bg-black border border-white/10 px-2 sm:px-2.5 py-1 min-w-[38px] sm:min-w-[42px]">
+          <div className="flex flex-col items-center justify-center rounded-lg bg-black/90 border border-white/10 px-2 sm:px-2.5 py-1.5 sm:py-1 min-w-[38px] sm:min-w-[44px]">
             <span className="font-mono text-sm sm:text-base font-bold text-purple-400 tabular-nums">
               {String(timeLeft.seconds).padStart(2, "0")}
             </span>
@@ -381,8 +388,8 @@ export function ReleaseScheduleCard({
           </div>
         </div>
 
-        {/* Action Buttons */}
-        <div className="flex items-center gap-2 flex-wrap">
+        {/* Action Buttons: Responsive Grid on Mobile */}
+        <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 w-full sm:w-auto">
           {(scheduleInfo as any).isUnlockingSoon && (
             <button
               type="button"
@@ -392,7 +399,7 @@ export function ReleaseScheduleCard({
                   el.scrollIntoView({ behavior: "smooth" });
                 }
               }}
-              className="h-7.5 inline-flex items-center gap-1.5 rounded-lg border border-amber-500/40 bg-amber-950/40 hover:bg-amber-900/50 px-2.5 sm:px-3 py-1 text-xs font-mono font-bold text-amber-300 shadow-sm transition-all cursor-pointer"
+              className="h-8 inline-flex items-center justify-center gap-1.5 rounded-lg border border-amber-500/40 bg-amber-950/40 hover:bg-amber-900/50 px-2.5 sm:px-3 py-1 text-xs font-mono font-bold text-amber-300 shadow-sm transition-all cursor-pointer"
               title="Scroll to chapter unlock timers"
             >
               <Clock className="h-3 w-3 text-amber-400" />
@@ -404,7 +411,7 @@ export function ReleaseScheduleCard({
               href={(scheduleInfo as any).sourceUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="h-7.5 inline-flex items-center gap-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 px-2.5 sm:px-3 py-1 text-xs font-mono font-bold text-white shadow-sm transition-all shrink-0"
+              className="h-8 inline-flex items-center justify-center gap-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 px-2.5 sm:px-3 py-1 text-xs font-mono font-bold text-white shadow-sm transition-all"
               title="Read immediately on official scans source"
             >
               <span>Read now</span>
@@ -415,7 +422,7 @@ export function ReleaseScheduleCard({
             size="sm"
             variant={isTracking ? "secondary" : "outline"}
             onClick={handleToggleTrack}
-            className={`h-7.5 text-xs font-mono font-bold gap-1.5 rounded-lg transition-all cursor-pointer ${
+            className={`h-8 text-xs font-mono font-bold gap-1.5 rounded-lg transition-all cursor-pointer ${(scheduleInfo as any).isUnlockingSoon && (scheduleInfo as any).sourceUrl ? "col-span-2 sm:col-span-1" : ""} ${
               isTracking ? "border-purple-500/50 text-purple-300 bg-purple-950/40" : "border-white/10 bg-neutral-900/80 hover:bg-neutral-800 text-neutral-300"
             }`}
           >

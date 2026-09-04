@@ -73,6 +73,19 @@ export const ChapterList = React.memo(function ChapterList({
   const qc = useQueryClient();
   const { settings } = useReaderSettings();
 
+  // Auto-sync database if any chapter's scheduled unlock time has passed
+  React.useEffect(() => {
+    fetch("/api/chapters/auto-unlock", { method: "POST" })
+      .then((res) => res.json())
+      .then((data: any) => {
+        if (data?.unlockedCount > 0) {
+          qc.invalidateQueries({ queryKey: ["chapters"] });
+          qc.invalidateQueries({ queryKey: ["live-release-schedule"] });
+        }
+      })
+      .catch(() => {});
+  }, [qc]);
+
   const [deletingChapterId, setDeletingChapterId] = React.useState<string | null>(null);
   const [unlockingChapterId, setUnlockingChapterId] = React.useState<string | null>(null);
 
@@ -577,7 +590,10 @@ export const ChapterList = React.memo(function ChapterList({
               const isLatest = latestChapterId === c.id;
               const readerCount = readerCounts.data?.get(c.id) ?? 0;
               const chapterLikes = chapterLikeCounts.data?.get(c.id) ?? 0;
-              const isScheduledLock = settings.enable30MinHold !== false && (c.status === "scheduled" || (!!c.scheduled_at && new Date(c.scheduled_at) > new Date()));
+              const isScheduledLock =
+                settings.enable30MinHold !== false &&
+                !!c.scheduled_at &&
+                new Date(c.scheduled_at).getTime() > Date.now();
               const remainingMinutes = isScheduledLock
                 ? Math.max(1, Math.ceil((new Date(c.scheduled_at!).getTime() - Date.now()) / (1000 * 60)))
                 : 0;
@@ -736,7 +752,10 @@ export const ChapterList = React.memo(function ChapterList({
                   const isLatest = latestChapterId === c.id;
                   const readerCount = readerCounts.data?.get(c.id) ?? 0;
                   const chapterLikes = chapterLikeCounts.data?.get(c.id) ?? 0;
-                  const isScheduledLock = settings.enable30MinHold !== false && (c.status === "scheduled" || (!!c.scheduled_at && new Date(c.scheduled_at) > new Date()));
+                  const isScheduledLock =
+                    settings.enable30MinHold !== false &&
+                    !!c.scheduled_at &&
+                    new Date(c.scheduled_at).getTime() > Date.now();
                   const remainingMinutes = isScheduledLock
                     ? Math.max(1, Math.ceil((new Date(c.scheduled_at!).getTime() - Date.now()) / (1000 * 60)))
                     : 0;
