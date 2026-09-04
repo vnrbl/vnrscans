@@ -497,6 +497,15 @@
     transform: translateZ(0); /* Promote to dedicated GPU compositor layer */
   }
 
+  /* Apple / iOS Translucent Frosted Glass Sidebar Drawer */
+  .sidebar-ios-glass {
+    background-color: rgba(6, 6, 8, 0.78) !important;
+    -webkit-backdrop-filter: blur(24px) saturate(190%) contrast(95%) !important;
+    backdrop-filter: blur(24px) saturate(190%) contrast(95%) !important;
+    border-right: 1px solid rgba(255, 255, 255, 0.09) !important;
+    box-shadow: 4px 0 30px rgba(0, 0, 0, 0.5) !important;
+  }
+
   .nav-spacex {
     background-color: oklch(0.04 0.002 270 / 0.70);
     backdrop-filter: blur(12px);

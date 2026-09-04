@@ -397,16 +397,16 @@ export function Navbar() {
       {/* ─── Fast GPU-accelerated YouTube-style Drawer ─────────────────── */}
       {/* Backdrop: placed below header (top-16) so navbar stays 100% visible */}
       <div
-        className={`fixed inset-0 top-16 z-40 bg-black/60 backdrop-blur-[2px] transition-opacity duration-200 ${
+        className={`fixed inset-0 top-16 z-40 bg-black/40 backdrop-blur-sm transition-opacity duration-200 ${
           menuDrawerOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
         }`}
         onClick={() => setMenuDrawerOpen(false)}
         aria-hidden="true"
       />
 
-      {/* Slide-out Drawer: instant 200ms GPU transform, zero layout lag */}
+      {/* Slide-out Drawer: instant 200ms GPU transform with translucent frosted glass matching navbar */}
       <aside
-        className={`fixed top-16 left-0 bottom-14 sm:bottom-0 z-50 w-[240px] sm:w-[260px] bg-[#0f0f0f] border-r border-border/40 p-3 flex flex-col justify-between shadow-2xl transition-transform duration-200 ease-out will-change-transform ${
+        className={`fixed top-16 left-0 bottom-14 sm:bottom-0 z-50 w-[240px] sm:w-[260px] sidebar-ios-glass p-3 flex flex-col justify-between shadow-2xl transition-transform duration-200 ease-out will-change-transform ${
           menuDrawerOpen ? "translate-x-0" : "-translate-x-full pointer-events-none"
         }`}
         aria-label="Navigation Drawer"
@@ -515,7 +515,7 @@ export function Navbar() {
       </aside>
 
       {/* Mobile Bottom Navigation Bar */}
-      <nav className="fixed bottom-0 left-0 right-0 z-50 flex sm:hidden h-14 items-center justify-around border-t border-border/60 bg-[#111115] px-2 shadow-2xl">
+      <nav className="fixed bottom-0 left-0 right-0 z-50 flex sm:hidden h-14 items-center justify-around navbar-ios-glass border-t border-white/10 px-2 shadow-2xl">
         <Link
           to="/home"
           className="flex flex-col items-center justify-center gap-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground hover:text-primary transition-colors py-1 flex-1"

@@ -50,6 +50,7 @@ import {
   Unlock,
   ExternalLink,
   Clock,
+  ShieldCheck,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { renderCommentMarkdown, COMMENT_TEXT_COLORS } from "@/lib/bbcode";
@@ -886,45 +887,12 @@ export default function Reader({
           ) : (
             <>
               {c.scheduled_at && new Date(c.scheduled_at) > new Date() && settings.enable30MinHold !== false && (
-                <div className="sticky top-16 z-30 mb-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-500/40 bg-amber-950/90 px-4 py-2.5 text-xs backdrop-blur-md shadow-lg">
-                  <div className="flex items-center gap-2 text-amber-300">
-                    <Lock className="h-4 w-4 shrink-0 text-amber-400 animate-pulse" />
-                    <span>
-                      <strong>Viewing as Admin:</strong> Chapter {c.chapter_number} is on hold for regular readers until{" "}
-                      {new Date(c.scheduled_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}. Only you have bypass access.
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      size="sm"
-                      onClick={async () => {
-                        if (!window.confirm(`Unlock Chapter ${c.chapter_number} immediately for all public readers?`)) return;
-                        try {
-                          const toastId = toast.loading("Unlocking chapter for everyone...");
-                          const { error: rpcErr } = await (supabase as any).rpc("admin_unlock_chapter", {
-                            _chapter_id: c.id,
-                          });
-                          if (rpcErr) {
-                            const { error: updateErr } = await supabase
-                              .from("chapters")
-                              .update({ scheduled_at: null, status: "published" })
-                              .eq("id", c.id);
-                            if (updateErr) throw updateErr;
-                          }
-                          toast.success("Chapter unlocked for everyone!", { id: toastId });
-                          qc.invalidateQueries({ queryKey: ["pages", c.id] });
-                          qc.invalidateQueries({ queryKey: ["chapter", slug, chapterSlug] });
-                          qc.invalidateQueries({ queryKey: ["chapters"] });
-                        } catch (err: any) {
-                          toast.error(`Unlock failed: ${err.message}`);
-                        }
-                      }}
-                      className="h-7 bg-amber-600 hover:bg-amber-500 text-white text-[11px] font-bold border-none cursor-pointer"
-                    >
-                      <Unlock className="h-3.5 w-3.5 mr-1" />
-                      Unlock for Everyone Now
-                    </Button>
-                  </div>
+                <div className="sticky top-16 z-30 mb-3 flex items-center gap-2.5 rounded-lg border border-amber-500/40 bg-amber-950/90 px-4 py-2.5 text-xs backdrop-blur-md shadow-lg text-amber-300">
+                  <Lock className="h-4 w-4 shrink-0 text-amber-400 animate-pulse" />
+                  <span>
+                    <strong>Viewing as Admin:</strong> Chapter {c.chapter_number} is currently on hold for regular readers until{" "}
+                    {new Date(c.scheduled_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}. Only you have bypass access.
+                  </span>
                 </div>
               )}
               {isNovel ? (
@@ -1347,9 +1315,54 @@ function ScheduledChapterUnlockView({
 }) {
   const { isAdmin, isMod, isUploader } = useIsAdmin();
   const canManage = isAdmin || isMod || isUploader;
-  const [isUnlocking, setIsUnlocking] = useState(false);
+  const [isVerifyingAdmin, setIsVerifyingAdmin] = useState(false);
   const [timeLeft, setTimeLeft] = useState<{ hours: number; minutes: number; seconds: number } | null>(null);
   const targetDate = useMemo(() => new Date(chapter.scheduled_at), [chapter.scheduled_at]);
+
+  const handleAdminVerificationAndView = async () => {
+    setIsVerifyingAdmin(true);
+    try {
+      const { data: authData, error: authErr } = await supabase.auth.getUser();
+      if (authErr || !authData.user) {
+        toast.error("Access denied: Please sign in with an administrator or staff account.");
+        return;
+      }
+
+      // Query roles from user_roles table
+      const { data: rolesData, error: rolesError } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", authData.user.id);
+
+      if (rolesError) {
+        throw rolesError;
+      }
+
+      const roles = (rolesData ?? []).map((r: any) => r.role);
+      const isStaff =
+        isAdmin ||
+        isMod ||
+        isUploader ||
+        roles.includes("admin") ||
+        roles.includes("moderator") ||
+        roles.includes("uploader");
+
+      if (!isStaff) {
+        toast.error("Access denied: You do not have administrator or staff permissions.");
+        return;
+      }
+
+      toast.success("Administrator verified! Opening chapter reader...");
+      if (typeof window !== "undefined") {
+        sessionStorage.setItem(`admin-view-${chapter.id}`, "true");
+      }
+      onViewAsAdmin?.();
+    } catch (err: any) {
+      toast.error(`Verification error: ${err.message || "Failed to verify administrator status"}`);
+    } finally {
+      setIsVerifyingAdmin(false);
+    }
+  };
 
   useEffect(() => {
     const updateCountdown = () => {
@@ -1450,68 +1463,42 @@ function ScheduledChapterUnlockView({
           </div>
         )}
 
-        {/* Admin Superpowers Box */}
-        {canManage && (
-          <div className="mt-6 rounded-xl border border-amber-500/50 bg-amber-950/40 p-4 text-left shadow-lg">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold uppercase tracking-wider text-amber-300">
-                Staff / Admin Override
-              </span>
-              <span className="text-[10px] font-mono rounded bg-amber-500/20 px-2 py-0.5 text-amber-300 font-semibold border border-amber-500/30">
-                Privileged Access
-              </span>
-            </div>
-            <p className="mt-1 text-xs text-neutral-300 leading-relaxed">
-              As an administrator or staff member, you can view and read this chapter immediately without unlocking it for visitors, or unlock it for all readers.
-            </p>
-            <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
-              <Button
-                type="button"
-                onClick={onViewAsAdmin}
-                className="w-full bg-violet-600 hover:bg-violet-500 text-white font-bold text-xs gap-1.5 cursor-pointer shadow-md transition-all hover:scale-[1.02]"
-                title="Unlock and read this chapter immediately for you as admin without unlocking for regular visitors"
-              >
-                <Eye className="h-3.5 w-3.5" />
-                <span>View as Admin</span>
-              </Button>
-              <Button
-                type="button"
-                onClick={async () => {
-                  if (!window.confirm(`Unlock Chapter ${chapter.chapter_number} immediately for all readers?`)) return;
-                  try {
-                    setIsUnlocking(true);
-                    const toastId = toast.loading("Unlocking chapter...");
-                    const { error: rpcErr } = await (supabase as any).rpc("admin_unlock_chapter", {
-                      _chapter_id: chapter.id,
-                    });
-                    if (rpcErr) {
-                      const { error: updateErr } = await supabase
-                        .from("chapters")
-                        .update({ scheduled_at: null, status: "published" })
-                        .eq("id", chapter.id);
-                      if (updateErr) throw updateErr;
-                    }
-                    toast.success("Chapter unlocked successfully!", { id: toastId });
-                    onUnlock();
-                  } catch (err: any) {
-                    toast.error(`Unlock failed: ${err.message}`);
-                  } finally {
-                    setIsUnlocking(false);
-                  }
-                }}
-                disabled={isUnlocking}
-                className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs gap-1.5 cursor-pointer shadow-md transition-all hover:scale-[1.02]"
-              >
-                {isUnlocking ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <Unlock className="h-3.5 w-3.5" />
-                )}
-                <span>Unlock for Everyone</span>
-              </Button>
-            </div>
+        {/* Staff / Admin Section with "View as Admin" */}
+        <div className="mt-6 rounded-xl border border-amber-500/40 bg-amber-950/30 p-4 text-left shadow-lg backdrop-blur-sm">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold uppercase tracking-wider text-amber-300 flex items-center gap-1.5">
+              <ShieldCheck className="h-3.5 w-3.5 text-amber-400" />
+              Staff / Admin Access
+            </span>
+            <span className="text-[10px] font-mono rounded bg-amber-500/20 px-2 py-0.5 text-amber-300 font-semibold border border-amber-500/30">
+              Admin Only
+            </span>
           </div>
-        )}
+          <p className="mt-1 text-xs text-neutral-300 leading-relaxed">
+            Staff and administrators can verify privileges to immediately read this chapter without unlocking it for regular visitors.
+          </p>
+          <div className="mt-3">
+            <Button
+              type="button"
+              onClick={handleAdminVerificationAndView}
+              disabled={isVerifyingAdmin}
+              className="w-full bg-gradient-to-r from-amber-600 via-amber-500 to-amber-600 hover:from-amber-500 hover:to-amber-400 text-white font-bold text-xs sm:text-sm py-2.5 gap-2 cursor-pointer shadow-md transition-all hover:scale-[1.01] active:scale-[0.99]"
+              title="Verify administrator status and view chapter immediately"
+            >
+              {isVerifyingAdmin ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin text-white" />
+                  <span>Verifying Admin Access...</span>
+                </>
+              ) : (
+                <>
+                  <Eye className="h-4 w-4" />
+                  <span>View as Admin</span>
+                </>
+              )}
+            </Button>
+          </div>
+        </div>
 
         <div className="mt-6 flex items-center justify-center gap-3">
           <NextLink
