@@ -28,6 +28,7 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { FormattedText } from "@/components/FormattedText";
 import type { SeriesCharacter } from "@/lib/character-fetcher";
 
 interface CharacterProfileClientProps {
@@ -415,7 +416,7 @@ export default function CharacterProfileClient({
                 <span>Character Dossier & Biography</span>
               </h3>
               <div className="text-sm leading-relaxed text-neutral-300 space-y-3 bg-neutral-950/60 p-6 rounded-2xl border border-white/5 shadow-lg">
-                <p className="whitespace-pre-line">{character.description}</p>
+                {character.description && <FormattedText text={character.description} />}
                 {character.background && (
                   <div className="pt-3 border-t border-white/5 space-y-1">
                     <strong className="text-purple-400 text-xs font-black uppercase tracking-wider block">

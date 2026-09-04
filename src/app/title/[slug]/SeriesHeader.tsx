@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Star, BookOpen, Trophy, Users, Heart } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { LiveSeriesEditor } from "@/components/admin/LiveSeriesEditor";
+import { FormattedText } from "@/components/FormattedText";
 
 import { useAuth } from "@/hooks/useAuth";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -464,16 +465,36 @@ function ExpandableSynopsis({ text }: { text: string }) {
   const [expanded, setExpanded] = React.useState(false);
   const isLong = text.length > 320;
 
-  const displayText = expanded || !isLong ? text : `${text.slice(0, 320).trim()}…`;
+  const displayText = React.useMemo(() => {
+    if (expanded || !isLong) return text;
+    let cut = text.slice(0, 320);
+
+    // If truncation cuts inside an open markdown link [label](url), slice before the link starts
+    const lastOpenBracket = cut.lastIndexOf("[");
+    const lastCloseParen = cut.lastIndexOf(")");
+    if (lastOpenBracket > lastCloseParen) {
+      cut = cut.slice(0, lastOpenBracket);
+    }
+
+    // If truncation cuts inside a plain URL, slice before the URL starts
+    const lastHttp = cut.lastIndexOf("http://");
+    const lastHttps = cut.lastIndexOf("https://");
+    const maxUrlStart = Math.max(lastHttp, lastHttps);
+    if (maxUrlStart !== -1 && !/\s/.test(cut.slice(maxUrlStart))) {
+      cut = cut.slice(0, maxUrlStart);
+    }
+
+    return cut.trimEnd() + "…";
+  }, [text, expanded, isLong]);
 
   return (
-    <div className="text-[13px] sm:text-sm leading-relaxed text-neutral-300 whitespace-pre-line font-sans">
-      <span>{displayText}</span>
+    <div className="text-[13px] sm:text-sm leading-relaxed text-neutral-300 font-sans">
+      <FormattedText text={displayText} />
       {isLong && (
         <button
           type="button"
           onClick={() => setExpanded((prev) => !prev)}
-          className="ml-2 inline-flex items-center text-xs font-mono font-bold uppercase tracking-wider text-purple-400 hover:text-purple-300 cursor-pointer"
+          className="mt-1.5 inline-flex items-center text-xs font-mono font-bold uppercase tracking-wider text-purple-400 hover:text-purple-300 cursor-pointer transition-colors"
         >
           [{expanded ? "less" : "more"}]
         </button>
