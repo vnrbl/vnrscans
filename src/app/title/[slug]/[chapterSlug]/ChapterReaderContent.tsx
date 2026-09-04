@@ -51,6 +51,7 @@ import {
   ExternalLink,
   Clock,
   ShieldCheck,
+  RefreshCw,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { renderCommentMarkdown, COMMENT_TEXT_COLORS } from "@/lib/bbcode";
@@ -189,10 +190,13 @@ export default function Reader({
       sessionStorage.setItem(`admin-view-${chapterId}`, "true");
     }
     setAdminViewBypassed(true);
-    toast.success(`Admin preview enabled for Chapter ${chapterNumber}!`, {
+    // Force immediate refetch of chapter pages for admin preview
+    qc.invalidateQueries({ queryKey: ["pages"] });
+    qc.refetchQueries({ queryKey: ["pages", chapterId] });
+    toast.success(`Admin view enabled for Chapter ${chapterNumber}!`, {
       description: "You are viewing as admin. This chapter remains locked for regular visitors.",
     });
-  }, []);
+  }, [qc]);
 
   const chapterQ = useQuery({
     queryKey: ["chapter", titleSlug, chapterSlug],
@@ -237,19 +241,27 @@ export default function Reader({
   const pagesQ = useQuery({
     queryKey: ["pages", chapterQ.data?.id],
     queryFn: async () => {
+      if (!chapterQ.data?.id) return [];
       const { data, error } = await supabase
         .from("chapter_pages")
         .select("id,page_number,image_url")
-        .eq("chapter_id", chapterQ.data!.id)
+        .eq("chapter_id", chapterQ.data.id)
         .order("page_number");
       if (error) throw error;
       return data ?? [];
     },
-    enabled: !!chapterQ.data,
-    initialData: initialPagesData,
-    staleTime: 1000 * 60 * 30,
-    gcTime: 1000 * 60 * 60,
+    enabled: !!chapterQ.data?.id,
+    initialData: initialPagesData && initialPagesData.length > 0 ? initialPagesData : undefined,
+    staleTime: 1000 * 60 * 5,
+    gcTime: 1000 * 60 * 30,
   });
+
+  // Automatically trigger refetch if chapter is loaded but pages array is empty
+  useEffect(() => {
+    if (chapterQ.data?.id && !pagesQ.isLoading && (!pagesQ.data || pagesQ.data.length === 0)) {
+      pagesQ.refetch();
+    }
+  }, [chapterQ.data?.id, pagesQ.data, pagesQ.isLoading, pagesQ.refetch]);
 
   const activeScanlationGroup = chapterQ.data?.scanlation_group ?? null;
 
@@ -927,6 +939,7 @@ export default function Reader({
             <ImageView
               pages={pagesQ.data}
               loading={pagesQ.isLoading}
+              onRefresh={() => pagesQ.refetch()}
               chapterId={c.id}
               seriesId={c.series_id}
               hasPrev={!!prev}
@@ -1517,6 +1530,7 @@ function ScheduledChapterUnlockView({
 function ImageView({
   pages,
   loading,
+  onRefresh,
   chapterId,
   seriesId,
   hasPrev,
@@ -1529,6 +1543,7 @@ function ImageView({
 }: {
   pages?: any[];
   loading: boolean;
+  onRefresh?: () => void;
   chapterId: string;
   seriesId: string;
   hasPrev: boolean;
@@ -1757,8 +1772,24 @@ function ImageView({
   }
   if (!pages || pages.length === 0) {
     return (
-      <div className="grid min-h-[50vh] place-items-center text-muted-foreground">
-        No pages uploaded for this chapter yet.
+      <div className="grid min-h-[50vh] place-items-center text-muted-foreground p-6 text-center">
+        <div className="max-w-md space-y-4">
+          <p className="text-base text-neutral-300 font-medium">No pages loaded for this chapter yet.</p>
+          <p className="text-xs text-neutral-400">
+            Pages may be loading or finalizing from the server. Click below to load pages.
+          </p>
+          {onRefresh && (
+            <Button
+              onClick={onRefresh}
+              variant="outline"
+              size="sm"
+              className="gap-2 border-primary/40 hover:bg-primary/20 cursor-pointer"
+            >
+              <RefreshCw className="h-4 w-4" />
+              <span>Load / Refresh Pages</span>
+            </Button>
+          )}
+        </div>
       </div>
     );
   }
