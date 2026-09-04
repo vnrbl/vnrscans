@@ -916,7 +916,10 @@ export function isPremiumOrLockedChapter(chapter: {
   }
 
   // 2. Price / currency / lock patterns
-  if (/\b(?:cost|price|buy|\d+\s*(?:coins?|points?|gems?|diamonds?|tickets?))\b/i.test(titleLower) || /\b(?:cost|price|buy|\d+\s*(?:coins?|points?|gems?|diamonds?|tickets?))\b/i.test(rawLower)) {
+  if (
+    /\b(?:\d+\s*(?:coins?|points?|gems?|diamonds?|tickets?)|(?:price|cost)\s*[:=]?\s*\d+)\b/i.test(titleLower) ||
+    /\b(?:cost|price|buy|\d+\s*(?:coins?|points?|gems?|diamonds?|tickets?))\b/i.test(rawLower)
+  ) {
     return true;
   }
   if (/\b(?:locked|unlock\s*with|subscriber\s*only|paid\s*chapter|early\s*access)\b/i.test(titleLower) || /\b(?:locked|unlock\s*with|subscriber\s*only|paid\s*chapter|early\s*access)\b/i.test(rawLower)) {
@@ -1069,6 +1072,56 @@ export function extractChapterLinks(html: string, baseUrl: string): ChapterInfo[
         title: title || undefined,
         url: url,
       });
+    }
+  }
+
+  // Support Hivetoons embedded JSON data (Hivetoons stores the entire chapter catalog in page script data, SSR only pre-renders top 20 links)
+  if (isHivetoonUrl(baseUrl) || (html.includes('storage.hivetoon.com') && html.includes('&quot;slug&quot;:'))) {
+    try {
+      let hivetoonOrigin = 'https://hivetoons.org';
+      let hivetoonSeriesSlug = '';
+      try {
+        const u = new URL(baseUrl);
+        hivetoonOrigin = u.origin;
+        const parts = u.pathname.split('/').filter(Boolean);
+        if (parts.length >= 2 && parts[0] === 'series') {
+          hivetoonSeriesSlug = parts[1];
+        } else {
+          hivetoonSeriesSlug = parts[parts.length - 1] || '';
+        }
+      } catch {}
+
+      const blockRegex = /\[0,\{&quot;id&quot;:\[0,\d+\],&quot;number&quot;:\[0,([0-9.]+)\],&quot;slug&quot;:\[0,&quot;([^&]+)&quot;\](?:,&quot;title&quot;:\[0,&quot;([^&]*)&quot;\])?[\s\S]*?&quot;isAccessible&quot;:\[0,(true|false)\]/g;
+      let match: RegExpExecArray | null;
+      while ((match = blockRegex.exec(html)) !== null) {
+        const chapterNumber = parseFloat(match[1]);
+        const chapterSlug = match[2];
+        const rawTitle = match[3] || '';
+        const isAccessible = match[4] === 'true';
+
+        if (!isAccessible) continue;
+        if (isNaN(chapterNumber)) continue;
+
+        const title = rawTitle
+          .replace(/&#39;/g, "'")
+          .replace(/&quot;/g, '"')
+          .replace(/&amp;/g, '&')
+          .replace(/&lt;/g, '<')
+          .replace(/&gt;/g, '>')
+          .trim();
+
+        const chapterUrl = `${hivetoonOrigin}/series/${hivetoonSeriesSlug}/${chapterSlug}`;
+        if (!seenUrls.has(chapterUrl)) {
+          seenUrls.add(chapterUrl);
+          chapters.push({
+            chapterNumber,
+            title: title || undefined,
+            url: chapterUrl,
+          });
+        }
+      }
+    } catch (hivetoonErr) {
+      console.warn('[Scraper] Failed parsing Hivetoons embedded chapter JSON:', hivetoonErr);
     }
   }
 
@@ -2226,7 +2279,7 @@ function isHivetoonReaderPageImage(url: string): boolean {
     const lowercaseUrl = url.toLowerCase();
     const filename = parsed.pathname.split('/').pop() ?? '';
     const isHivetoonStorage = lowercaseUrl.includes('storage.hivetoon.com');
-    const isSeriesPath = lowercaseUrl.includes('/public/upload/series/');
+    const isSeriesPath = lowercaseUrl.includes('/upload/series/');
     const isReaderImage = 
       /^(?:image|page|\d+)/i.test(filename) && 
       /\.(?:jpe?g|png|webp)$/i.test(filename);
