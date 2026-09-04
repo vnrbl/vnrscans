@@ -22,6 +22,7 @@ import { useAuth, useIsAdmin } from "@/hooks/useAuth";
 import {
   $previewComickMetadata,
   $searchComickList,
+  $enrichComickItemDetails,
   $importComickMetadataToSeries,
   type ComickExtractedMetadata,
 } from "@/lib/api/comick-import.actions";
@@ -89,6 +90,37 @@ export function ComickMetadataImporter({
     }
   }, [open, seriesTitle]);
 
+  // Select comic & enrich with full tags if not already loaded
+  const handleSelectComic = async (item: ComickExtractedMetadata) => {
+    setSelectedComic(item);
+    if (item.tags.length <= 5 && item.slug) {
+      try {
+        const session = (await supabase.auth.getSession()).data.session;
+        if (session?.access_token) {
+          const res = await $enrichComickItemDetails({
+            data: {
+              slug: item.slug,
+              accessToken: session.access_token,
+            },
+          });
+          if (res.success && res.tags.length > 0) {
+            const updated: ComickExtractedMetadata = {
+              ...item,
+              tags: Array.from(new Set([...item.tags, ...res.tags])),
+              genres: res.genres.length > 0 ? Array.from(new Set([...item.genres, ...res.genres])) : item.genres,
+            };
+            setSelectedComic((curr) => (curr?.slug === item.slug ? updated : curr));
+            setSearchResults((prev) =>
+              prev.map((p) => (p.slug === item.slug ? updated : p))
+            );
+          }
+        }
+      } catch {
+        // Fallback to existing tags
+      }
+    }
+  };
+
   // Search Comick by Name or URL
   const handleSearch = async (overrideQuery?: string) => {
     const q = (overrideQuery ?? comickQuery).trim() || seriesTitle?.trim();
@@ -123,7 +155,7 @@ export function ComickMetadataImporter({
 
         if (prevRes.success && prevRes.metadata) {
           setSearchResults([prevRes.metadata]);
-          setSelectedComic(prevRes.metadata);
+          void handleSelectComic(prevRes.metadata);
         } else {
           setSearchResults([]);
           setSelectedComic(null);
@@ -131,7 +163,7 @@ export function ComickMetadataImporter({
         }
       } else {
         setSearchResults(res.results);
-        setSelectedComic(res.results[0]);
+        void handleSelectComic(res.results[0]);
       }
     } catch (err: any) {
       toast.error(err.message || "Failed to search Comick");
@@ -353,7 +385,7 @@ export function ComickMetadataImporter({
                     <button
                       key={idx}
                       type="button"
-                      onClick={() => setSelectedComic(item)}
+                      onClick={() => void handleSelectComic(item)}
                       className={`flex items-start gap-2.5 p-2 rounded-xl border text-left transition-all cursor-pointer ${
                         isSelected
                           ? "border-emerald-500 bg-emerald-500/15 shadow-sm"
@@ -440,16 +472,27 @@ export function ComickMetadataImporter({
 
                   {/* Tags Preview */}
                   {selectedComic.tags.length > 0 && (
-                    <div className="flex flex-wrap gap-1">
-                      {selectedComic.tags.slice(0, 6).map((t, idx) => (
+                    <div className="flex flex-wrap items-center gap-1 pt-1">
+                      <span className="text-[10px] text-emerald-400 font-bold mr-1">
+                        Tags ({selectedComic.tags.length}):
+                      </span>
+                      {selectedComic.tags.slice(0, 18).map((t, idx) => (
                         <Badge
                           key={idx}
                           variant="outline"
-                          className="text-[10px] px-1.5 py-0 text-muted-foreground border-border/40"
+                          className="text-[10px] px-1.5 py-0 text-muted-foreground border-border/40 bg-secondary/30"
                         >
                           #{t}
                         </Badge>
                       ))}
+                      {selectedComic.tags.length > 18 && (
+                        <Badge
+                          variant="outline"
+                          className="text-[10px] px-1.5 py-0 text-emerald-400 border-emerald-500/30 bg-emerald-500/10 font-bold"
+                        >
+                          +{selectedComic.tags.length - 18} more
+                        </Badge>
+                      )}
                     </div>
                   )}
                 </div>

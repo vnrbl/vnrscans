@@ -38,6 +38,7 @@ import {
   $deleteChapter,
   $bulkDeleteChapters,
 } from "@/lib/api/scraper.actions";
+import { $importComickMetadataToSeries } from "@/lib/api/comick-import.actions";
 import { detectImportSource } from "@/lib/import-source-utils";
 import { ComickMetadataImporter } from "@/components/admin/ComickMetadataImporter";
 import { Button } from "@/components/ui/button";
@@ -107,6 +108,8 @@ export function LiveSeriesEditor({ series: initialSeries, slug, trigger }: LiveS
   const [isTrending, setIsTrending] = useState(Boolean(initialSeries?.is_trending));
   const [isHidden, setIsHidden] = useState(Boolean(initialSeries?.is_hidden));
   const [coverUrl, setCoverUrl] = useState(initialSeries?.cover_url || "");
+  const [importedGenres, setImportedGenres] = useState<string[]>([]);
+  const [importedTags, setImportedTags] = useState<string[]>([]);
 
   // Chapter Management in Modal
   const [chapterSearch, setChapterSearch] = useState("");
@@ -133,20 +136,20 @@ export function LiveSeriesEditor({ series: initialSeries, slug, trigger }: LiveS
         .from("series_import_sources")
         .select("*")
         .eq("series_id", initialSeries?.id)
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: true });
       if (error) throw error;
       return (data || []) as any[];
     },
     enabled: open && !isCreatingNew && !!initialSeries?.id,
   });
 
-  // Query all chapters for chapter table
+  // Query series chapters for editor
   const chaptersQ = useQuery({
     queryKey: ["admin", "series-editor-chapters", initialSeries?.id],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("chapters")
-        .select("id, slug, chapter_number, title, created_at, status, scanlation_group")
+        .select("id, chapter_number, title, release_date, view_count, is_locked, price_coins, created_at, scanlation_group")
         .eq("series_id", initialSeries?.id)
         .order("chapter_number", { ascending: false });
       if (error) throw error;
@@ -172,6 +175,8 @@ export function LiveSeriesEditor({ series: initialSeries, slug, trigger }: LiveS
       setIsTrending(Boolean(initialSeries.is_trending));
       setIsHidden(Boolean(initialSeries.is_hidden));
       setCoverUrl(initialSeries.cover_url || "");
+      setImportedGenres([]);
+      setImportedTags([]);
       setSelectedChapterIds(new Set());
     }
   }, [open, initialSeries, isCreatingNew]);
@@ -192,6 +197,8 @@ export function LiveSeriesEditor({ series: initialSeries, slug, trigger }: LiveS
     setIsTrending(false);
     setIsHidden(false);
     setCoverUrl("");
+    setImportedGenres([]);
+    setImportedTags([]);
     setActiveTab("general");
   };
 
@@ -518,6 +525,31 @@ export function LiveSeriesEditor({ series: initialSeries, slug, trigger }: LiveS
           image_url: coverUrl.trim(),
           position: 0,
         });
+      }
+
+      if ((importedGenres.length > 0 || importedTags.length > 0) && newRow?.id) {
+        try {
+          const session = (await supabase.auth.getSession()).data.session;
+          if (session?.access_token) {
+            await $importComickMetadataToSeries({
+              data: {
+                seriesId: newRow.id,
+                accessToken: session.access_token,
+                importCover: false,
+                importSynopsis: false,
+                importAlternativeTitles: false,
+                importGenresAndTags: true,
+                overrideMetadata: {
+                  slug: generatedSlug,
+                  genres: importedGenres,
+                  tags: importedTags,
+                },
+              },
+            });
+          }
+        } catch (tagErr) {
+          console.warn("Failed to attach imported tags to new series:", tagErr);
+        }
       }
 
       await logAdminAction("create", "series", newRow.id, { title });
@@ -902,6 +934,7 @@ export function LiveSeriesEditor({ series: initialSeries, slug, trigger }: LiveS
                     <ComickMetadataImporter
                       seriesId={initialSeries?.id}
                       seriesTitle={title || initialSeries?.title}
+                      slug={slug || initialSeries?.slug}
                       onMetadataImported={(meta: any) => {
                         if (meta.title && (!title || isCreatingNew)) setTitle(meta.title);
                         if (meta.description) setDescription(meta.description);
@@ -909,6 +942,8 @@ export function LiveSeriesEditor({ series: initialSeries, slug, trigger }: LiveS
                         if (meta.coverUrl) setCoverUrl(meta.coverUrl);
                         if (meta.status) setStatus(meta.status);
                         if (meta.releaseYear) setReleaseYear(String(meta.releaseYear));
+                        if (meta.genres) setImportedGenres(meta.genres);
+                        if (meta.tags) setImportedTags(meta.tags);
                       }}
                     />
                   </div>
