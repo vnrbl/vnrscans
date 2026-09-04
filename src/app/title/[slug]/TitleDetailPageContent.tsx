@@ -292,7 +292,22 @@ export default function TitleDetailPageContent({
     | { slug: string; chapter_number: number }
     | null
     | undefined;
-  const lastReadChapter = dbLastRead || localLastRead;
+  const rawLastRead = dbLastRead || localLastRead;
+
+  // Resolve matching chapter from initialChaptersData if possible to guarantee canonical slug
+  const matchedChapter = rawLastRead
+    ? initialChaptersData?.find(
+        (c) =>
+          c.slug === rawLastRead.slug ||
+          c.chapter_number === rawLastRead.chapter_number ||
+          c.slug === `chapter-${rawLastRead.chapter_number}`
+      )
+    : null;
+
+  const lastReadChapter = matchedChapter
+    ? { slug: matchedChapter.slug, chapter_number: matchedChapter.chapter_number }
+    : rawLastRead;
+
   const firstChapter = initialChaptersData?.[initialChaptersData.length - 1];
   const isContinue = !!lastReadChapter;
   const readChapterSlug = isContinue

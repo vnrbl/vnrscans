@@ -6,7 +6,7 @@ import { EyeOff, Eye, Trash2, Pin, PinOff, Search, Image as ImageIcon, AlertTria
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { logAdminAction } from "@/lib/adminLog";
-import { safeUrlOrNull } from "@/lib/safe-url";
+import { safeUrlOrNull, parseSafeAttachmentUrls } from "@/lib/safe-url";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -169,22 +169,40 @@ export default function AdminComments() {
                       Spoiler
                     </Badge>
                   )}
-                  {c.attachment_url && (
-                    <Badge variant="outline" className="gap-1">
-                      <ImageIcon className="h-3 w-3" />
-                      {c.attachment_type ?? "media"}
-                    </Badge>
-                  )}
+                  {c.attachment_url && (() => {
+                    const urls = parseSafeAttachmentUrls(c.attachment_url);
+                    return (
+                      <Badge variant="outline" className="gap-1">
+                        <ImageIcon className="h-3 w-3" />
+                        {urls.length > 1 ? `${urls.length} images` : (c.attachment_type ?? "media")}
+                      </Badge>
+                    );
+                  })()}
                 </div>
 
                 <div className="whitespace-pre-wrap text-sm">{c.content}</div>
                 {c.attachment_url && (() => {
-                  const safeUrl = safeUrlOrNull(c.attachment_url);
-                  if (!safeUrl) return null;
+                  const urls = parseSafeAttachmentUrls(c.attachment_url);
+                  if (urls.length === 0) return null;
                   return (
-                  <a href={safeUrl} target="_blank" rel="noreferrer" className="mt-3 block w-fit overflow-hidden rounded-md border border-border/50">
-                    <img src={safeUrl} alt={c.attachment_alt ?? "Comment media"} className="h-24 max-w-48 object-cover" loading="lazy" />
-                  </a>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {urls.map((url, idx) => (
+                        <a
+                          key={idx}
+                          href={url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="block overflow-hidden rounded-md border border-border/50 hover:opacity-80 transition-opacity"
+                        >
+                          <img
+                            src={url}
+                            alt={c.attachment_alt ?? `Comment attachment ${idx + 1}`}
+                            className="h-20 w-20 object-cover"
+                            loading="lazy"
+                          />
+                        </a>
+                      ))}
+                    </div>
                   );
                 })()}
 

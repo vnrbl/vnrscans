@@ -181,6 +181,17 @@ export async function $extractCoversFromScanUrl(args: {
             candidateCovers.push(match[1]);
           }
         }
+
+        // Match Next.js /uploads/series cover images for Kayn Scans
+        if (isKaynScansUrl(targetUrl)) {
+          const coverMatch = html.match(/\/uploads\/series\/[^\/&"']+\/cover\.(?:jpe?g|png|webp|avif)/i) ||
+            html.match(/url=(?:%2F|\/)uploads(?:%2F|\/)series(?:%2F|\/)[^&"']+/i);
+          if (coverMatch) {
+            const rawCover = decodeURIComponent(coverMatch[0].replace(/^url=/, ''));
+            const fullCover = rawCover.startsWith('http') ? rawCover : `https://kaynscans.com${rawCover.startsWith('/') ? '' : '/'}${rawCover}`;
+            candidateCovers.unshift(fullCover);
+          }
+        }
       }
     } catch (fetchErr) {
       console.warn("[CoverExtractor] HTML cover fetch error:", fetchErr);
@@ -1197,6 +1208,13 @@ function filterImagesByExampleUrl(images: string[], exampleUrl: string) {
     if (numberedImages.length > 0) return numberedImages;
   }
 
+  if (isKaynScansUrl(exampleUrl)) {
+    const kaynImages = images.filter(
+      (url) => isKaynScansUrl(url) && (url.includes("/uploads/series/") || url.includes("/upload/series/")),
+    );
+    if (kaynImages.length > 0) return kaynImages;
+  }
+
   const prefix = getImageUrlTypePrefix(exampleUrl);
   if (!prefix) return images;
 
@@ -1239,6 +1257,15 @@ function isQimanhwaUrl(url: string) {
     return hostname.includes("qimanhwa.com") || hostname.includes("qiscans.org");
   } catch {
     return url.toLowerCase().includes("qimanhwa.com") || url.toLowerCase().includes("qiscans");
+  }
+}
+
+function isKaynScansUrl(url: string) {
+  try {
+    const hostname = new URL(url).hostname.toLowerCase();
+    return hostname.includes("kaynscans") || hostname.includes("kaynscan");
+  } catch {
+    return url.toLowerCase().includes("kaynscans") || url.toLowerCase().includes("kaynscan");
   }
 }
 

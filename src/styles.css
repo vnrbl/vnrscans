@@ -553,6 +553,7 @@
   .reader-page-container {
     content-visibility: auto;
     contain-intrinsic-size: auto 1200px;
+    min-height: 400px;
     width: 100%;
     max-width: 100%;
   }

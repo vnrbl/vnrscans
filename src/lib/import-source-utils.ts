@@ -73,6 +73,13 @@ const SOURCE_PRESETS: Array<{
     scanlationGroup: "Hive Toons",
     imageUrlExample: "https://storage.hivetoon.com/public/upload/series/lookism/503468341f2bfb17/image_1_9c56338a.webp",
   },
+  {
+    hostIncludes: "kaynscan",
+    sourceSite: "Kayn Scans",
+    scanlationGroup: "Kayn Scans",
+    imageUrlExample:
+      "https://kaynscans.com/uploads/series/echoes-of-the-reverse-planet/0044/p-6247461e-5129-40be-a735-9b5684e60237.webp",
+  },
 ];
 
 export function detectImportSource(url: string): ImportSourcePreset {

@@ -1064,6 +1064,15 @@ export default function ChapterManager({ seriesId, onBack }: { seriesId: string;
     }
   };
 
+  const isKaynScansUrl = (url: string) => {
+    try {
+      const hostname = new URL(url).hostname.toLowerCase();
+      return hostname.includes("kaynscans.com") || hostname.includes("kaynscan.org") || hostname.includes("kaynscans.org");
+    } catch {
+      return url.toLowerCase().includes("kaynscans") || url.toLowerCase().includes("kaynscan");
+    }
+  };
+
   const filterImagesByExampleUrl = (
     images: string[],
     exampleUrl: string,
@@ -1074,6 +1083,11 @@ export default function ChapterManager({ seriesId, onBack }: { seriesId: string;
     if (isQimanhwaUrl(exampleUrl)) {
       const numberedImages = images.filter((url) => isQimanhwaUrl(url) && isNumberedImageUrl(url));
       if (numberedImages.length > 0) return numberedImages;
+    }
+
+    if (isKaynScansUrl(exampleUrl)) {
+      const kaynImages = images.filter((url) => isKaynScansUrl(url) && (url.includes("/uploads/series/") || url.includes("/upload/series/")));
+      if (kaynImages.length > 0) return kaynImages;
     }
 
     const prefixMatches = images.filter((url) => url.startsWith(imageUrlPrefix));

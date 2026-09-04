@@ -114,6 +114,20 @@ export async function extractChaptersFromSeriesUrl(seriesUrl: string): Promise<C
       }
     }
 
+    // Custom extraction for Kayn Scans (Next.js RSC streaming & API)
+    if (isKaynScansUrl(seriesUrl)) {
+      try {
+        console.log(`[Scraper] Using custom Kayn Scans chapter extraction for: ${seriesUrl}`);
+        const kaynChapters = await extractKaynScansChapters(seriesUrl);
+        if (kaynChapters.length > 0) {
+          console.log(`[Scraper] Successfully extracted ${kaynChapters.length} free chapters for Kayn Scans (${seriesUrl})`);
+          return kaynChapters;
+        }
+      } catch (kaynErr) {
+        console.warn('[Scraper] Custom Kayn Scans chapter extraction failed, falling back to standard extraction:', kaynErr);
+      }
+    }
+
     let html = '';
     let usePuppeteerFallback = false;
 
@@ -292,9 +306,11 @@ async function scrapeWithPuppeteer(url: string, isChapterPage: boolean = false):
       const immediateImages = filterReaderImagesForSource(immediateUrls, url);
       const isQimanhwa = isQimanhwaLikeUrl(url);
       const isAsura = isAsuraScansUrl(url);
+      const isKayn = isKaynScansUrl(url);
       const shouldSkipScroll =
         (isAsura && immediateImages.length > 0) ||
-        (!isAsura && ((isQimanhwa && immediateImages.length > 0) || immediateImages.length >= 10));
+        (isKayn && immediateImages.length > 0) ||
+        (!isAsura && !isKayn && ((isQimanhwa && immediateImages.length > 0) || immediateImages.length >= 10));
 
       if (shouldSkipScroll) {
         console.log(`[Scraper] Collected ${immediateImages.length} images immediately. Skipping scroll.`);
@@ -463,6 +479,14 @@ async function collectLiveReaderImageUrls(page: any): Promise<string[]> {
               );
             });
 
+          const isKaynReaderImage = values.some((val) => {
+            const lVal = String(val).toLowerCase();
+            return (
+              (lVal.includes('kaynscan') || lVal.includes('/uploads/series/')) &&
+              lVal.includes('/uploads/series/')
+            );
+          });
+
           return {
             index,
             top: rect.top + window.scrollY,
@@ -479,7 +503,8 @@ async function collectLiveReaderImageUrls(page: any): Promise<string[]> {
               (alt.includes('chapter') && alt.includes('page')) ||
               (nw >= 500 && nh >= 800) ||
               isAsuraReaderImage ||
-              isHivetoonReaderImage
+              isHivetoonReaderImage ||
+              isKaynReaderImage
           };
         });
 
@@ -973,11 +998,11 @@ export function extractChapterLinks(html: string, baseUrl: string): ChapterInfo[
     // Filter out sidebar / footer recommendations for other series
     try {
       const parsedBase = new URL(baseUrl);
-      const baseSlugMatch = parsedBase.pathname.match(/\/(?:series|manga|comic|comics|manhwa|novel)\/([^\/]+)/i);
+      const baseSlugMatch = parsedBase.pathname.match(/\/(?:series\/comic|series|manga|comic|comics|manhwa|novel)\/([^\/]+)/i);
       if (baseSlugMatch && baseSlugMatch[1]) {
         const baseSlug = baseSlugMatch[1].toLowerCase().replace(/-[a-f0-9]{6,}$/i, '');
         const parsedUrl = new URL(url);
-        const urlSlugMatch = parsedUrl.pathname.match(/\/(?:series|manga|comic|comics|manhwa|novel)\/([^\/]+)/i);
+        const urlSlugMatch = parsedUrl.pathname.match(/\/(?:series\/comic|series|manga|comic|comics|manhwa|novel)\/([^\/]+)/i);
         if (urlSlugMatch && urlSlugMatch[1]) {
           const urlSlug = urlSlugMatch[1].toLowerCase().replace(/-[a-f0-9]{6,}$/i, '');
           if (baseSlug && urlSlug && !urlSlug.includes(baseSlug) && !baseSlug.includes(urlSlug)) {
@@ -1125,6 +1150,21 @@ export function extractChapterLinks(html: string, baseUrl: string): ChapterInfo[
     }
   }
 
+  // Support Kayn Scans embedded RSC / script data if standard HTML link tags were not present
+  if ((isKaynScansUrl(baseUrl) || html.includes('kaynscan')) && chapters.length === 0) {
+    try {
+      const parsedKayn = parseKaynChaptersFromText(html, baseUrl);
+      for (const c of parsedKayn) {
+        if (!seenUrls.has(c.url)) {
+          seenUrls.add(c.url);
+          chapters.push(c);
+        }
+      }
+    } catch (kaynErr) {
+      console.warn('[Scraper] Failed parsing Kayn Scans embedded text:', kaynErr);
+    }
+  }
+
   // Filter out any premium/locked/coin/early-access chapters
   return chapters
     .filter((c) => !isPremiumOrLockedChapter(c))
@@ -1252,6 +1292,20 @@ export async function extractImagesFromChapterUrl(
       }
     }
 
+    // Direct Kayn Scans RSC extraction (fast, ordered, and skips client-side bloat)
+    if (isKaynScansUrl(chapterUrl)) {
+      try {
+        console.log(`[Scraper] Using custom Kayn Scans image extraction for: ${chapterUrl}`);
+        const kaynImages = await extractKaynScansChapterImages(chapterUrl);
+        if (kaynImages.length > 0) {
+          console.log(`[Scraper] Successfully extracted ${kaynImages.length} images for Kayn Scans (${chapterUrl})`);
+          return kaynImages;
+        }
+      } catch (kaynErr) {
+        console.warn('[Scraper] Kayn Scans custom image extraction error, falling back to HTML/Puppeteer:', kaynErr);
+      }
+    }
+
     let html = '';
     let usePuppeteerFallback = false;
     const imageUrlExample = options.imageUrlExample?.trim() || '';
@@ -1344,23 +1398,27 @@ export async function extractImagesFromChapterUrls(
   const results = new Map<string, string[]>();
   const failedUrls: string[] = [];
 
-  const directSettled = await Promise.allSettled(
-    uniqueUrls.map(async (url) => {
-      try {
-        const images = await retryAsync(
-          () => extractImagesFromChapterUrl(url, options),
-          `Direct extraction for ${url}`,
-        );
-        if (images && images.length > 0) {
-          results.set(url, images);
-        } else {
+  const concurrency = Math.max(1, options.concurrency ?? 4);
+  for (let i = 0; i < uniqueUrls.length; i += concurrency) {
+    const chunk = uniqueUrls.slice(i, i + concurrency);
+    await Promise.allSettled(
+      chunk.map(async (url) => {
+        try {
+          const images = await retryAsync(
+            () => extractImagesFromChapterUrl(url, options),
+            `Direct extraction for ${url}`,
+          );
+          if (images && images.length > 0) {
+            results.set(url, images);
+          } else {
+            failedUrls.push(url);
+          }
+        } catch {
           failedUrls.push(url);
         }
-      } catch {
-        failedUrls.push(url);
-      }
-    }),
-  );
+      }),
+    );
+  }
 
   const browserUrls = failedUrls.filter((url) => shouldUseSharedReaderBrowser(url, options.imageUrlExample));
   if (browserUrls.length === 0) return results;
@@ -1864,6 +1922,13 @@ function filterReaderImagesForSource(
     return sourceImages.filter(isHivetoonReaderPageImage);
   }
 
+  if (isKaynScansUrl(pageUrl) || isKaynScansUrl(exampleUrl || '')) {
+    // Kayn Scans uses UUID filenames like p-6247461e-5129-40be-a735-9b5684e60237.webp.
+    // Generic cluster scoring treats UUID filenames as unrelated families.
+    // The extracted list is already reader-ordered.
+    return sourceImages.filter(isKaynReaderPageImage);
+  }
+
   return selectChapterImageCluster(
     sourceImages.filter((url) => isLikelyChapterReaderImage(url, pageUrl, exampleUrl)),
     pageUrl,
@@ -1890,6 +1955,11 @@ function findImagesMatchingExampleUrl(images: string[], exampleUrl?: string | nu
   if (isHivetoonUrl(cleanExampleUrl)) {
     const hivetoonImages = images.filter((url) => isHivetoonReaderPageImage(url));
     if (hivetoonImages.length > 0) return hivetoonImages;
+  }
+
+  if (isKaynScansUrl(cleanExampleUrl)) {
+    const kaynImages = images.filter((url) => isKaynReaderPageImage(url));
+    if (kaynImages.length > 0) return kaynImages;
   }
 
   const exampleFamily = getImageUrlFamilyPrefix(cleanExampleUrl);
@@ -1967,6 +2037,11 @@ function isLikelyChapterReaderImage(url: string, pageUrl: string = '', exampleUr
     // Custom check for Hivetoons
     if (isHivetoonUrl(url)) {
       return isHivetoonReaderPageImage(url);
+    }
+
+    // Custom check for Kayn Scans
+    if (isKaynScansUrl(url) || isKaynScansUrl(pageUrl) || isKaynScansUrl(exampleUrl || '')) {
+      return isKaynReaderPageImage(url);
     }
 
     // Custom check for Elftoon
@@ -2098,7 +2173,8 @@ function selectChapterImageCluster(
     isLikelyChapterReaderImage(url, pageUrl, exampleUrl) ||
     isQimanhwaReaderPageImage(url) ||
     isAsuraReaderPageImage(url) ||
-    isHivetoonReaderPageImage(url),
+    isHivetoonReaderPageImage(url) ||
+    isKaynReaderPageImage(url),
   );
 
   if (uniqueImages.length <= 2) return uniqueImages;
@@ -2287,4 +2363,290 @@ function isHivetoonReaderPageImage(url: string): boolean {
   } catch {
     return false;
   }
+}
+
+function isKaynScansUrl(url: string): boolean {
+  try {
+    const hostname = new URL(url).hostname.toLowerCase();
+    return (
+      hostname.includes('kaynscans') ||
+      hostname.includes('kaynscan') ||
+      hostname.includes('kayncomics')
+    );
+  } catch {
+    const lower = url.toLowerCase();
+    return lower.includes('kaynscans') || lower.includes('kaynscan');
+  }
+}
+
+function isKaynReaderPageImage(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    const pathname = parsed.pathname.toLowerCase();
+    const isKaynDomain = isKaynScansUrl(url);
+    const isUploadPath = pathname.includes('/uploads/series/') || pathname.includes('/upload/series/');
+    const isImage = /\.(?:jpe?g|png|webp|avif)(?:$|[?#])/i.test(pathname);
+    return (isKaynDomain || isUploadPath) && isUploadPath && isImage;
+  } catch {
+    const lower = url.toLowerCase();
+    return lower.includes('/uploads/series/') && /\.(?:jpe?g|png|webp|avif)/i.test(lower);
+  }
+}
+
+function parseKaynChaptersFromText(rscText: string, baseUrl: string): ChapterInfo[] {
+  const cleanBase = baseUrl.split('?')[0].replace(/\/+$/, '');
+  const list: ChapterInfo[] = [];
+  const seen = new Set<number>();
+
+  // 1. Try parsing full structured chapters JSON array if present
+  const arrayMatch = rscText.match(/"chapters":\s*(\[\{.*?"id":\s*"kayn-c-.*?\}[^\]]*\])/);
+  if (arrayMatch) {
+    try {
+      const arr = JSON.parse(arrayMatch[1]);
+      if (Array.isArray(arr)) {
+        for (const item of arr) {
+          const num = typeof item.number === 'number' ? item.number : parseFloat(item.number);
+          const isLocked = Boolean(item.isLocked);
+          const coinPrice = typeof item.coinPrice === 'number' ? item.coinPrice : parseFloat(item.coinPrice || '0');
+          if (isNaN(num) || isLocked || coinPrice > 0 || seen.has(num)) continue;
+          seen.add(num);
+          list.push({
+            chapterNumber: num,
+            title: typeof item.title === 'string' && item.title.trim() ? item.title.trim() : undefined,
+            url: `${cleanBase}/chapter/${num}`,
+          });
+        }
+      }
+    } catch {}
+  }
+
+  // 2. Regex to catch all chapter objects in streaming RSC payload
+  if (list.length === 0) {
+    const chRegex = /\{"id":"([^"]+)","number":([0-9.]+)(?:,"title":(null|"[^"]*"))?[^{}]*?"isLocked":(true|false)(?:,"coinPrice":([0-9.]+))?[^{}]*?\}/g;
+    let match: RegExpExecArray | null;
+
+    while ((match = chRegex.exec(rscText)) !== null) {
+      const num = parseFloat(match[2]);
+      const titleRaw = match[3];
+      const isLocked = match[4] === 'true';
+      const coinPrice = match[5] ? parseFloat(match[5]) : 0;
+
+      if (isLocked || coinPrice > 0) continue;
+      if (isNaN(num) || seen.has(num)) continue;
+      seen.add(num);
+
+      let title: string | undefined;
+      if (titleRaw && titleRaw !== 'null') {
+        try {
+          title = JSON.parse(titleRaw);
+        } catch {
+          title = titleRaw.replace(/^"|"$/g, '');
+        }
+      }
+
+      list.push({
+        chapterNumber: num,
+        title: title || undefined,
+        url: `${cleanBase}/chapter/${num}`,
+      });
+    }
+  }
+
+  // 3. Fallback: match any "number":<num>,"title":...,"isLocked":false objects
+  if (list.length === 0) {
+    const genericRegex = /"number":\s*([0-9.]+)[^{}]*?"isLocked":\s*(false|true)/g;
+    let m: RegExpExecArray | null;
+    while ((m = genericRegex.exec(rscText)) !== null) {
+      const num = parseFloat(m[1]);
+      const isLocked = m[2] === 'true';
+      if (!isLocked && !isNaN(num) && !seen.has(num)) {
+        seen.add(num);
+        list.push({
+          chapterNumber: num,
+          url: `${cleanBase}/chapter/${num}`,
+        });
+      }
+    }
+  }
+
+  return list;
+}
+
+async function extractKaynScansChapters(seriesUrl: string): Promise<ChapterInfo[]> {
+  const res = await fetch(seriesUrl, {
+    headers: {
+      'RSC': '1',
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      'Accept': '*/*',
+    },
+    redirect: 'follow',
+    signal: AbortSignal.timeout(20_000),
+  });
+
+  if (!res.ok) {
+    throw new Error(`Failed to fetch Kayn Scans series page: ${res.status} ${res.statusText}`);
+  }
+
+  const text = await res.text();
+  const canonicalBaseUrl = (res.url || seriesUrl).split('?')[0].replace(/\/+$/, '');
+
+  const allChapters = parseKaynChaptersFromText(text, canonicalBaseUrl);
+  const seen = new Set<number>(allChapters.map((c) => c.chapterNumber));
+
+  // Check pagination if totalPages > 1
+  const totalPagesMatch = text.match(/"totalPages":\s*([0-9]+)/);
+  const totalPages = Math.min(30, Math.max(1, totalPagesMatch ? parseInt(totalPagesMatch[1], 10) : 1));
+
+  if (totalPages > 1) {
+    const pageNumbers = Array.from({ length: totalPages - 1 }, (_, i) => i + 2);
+    const additionalPayloads = await Promise.all(
+      pageNumbers.map(async (page) => {
+        try {
+          const pageRes = await fetch(`${canonicalBaseUrl}?page=${page}`, {
+            headers: {
+              'RSC': '1',
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+              'Accept': '*/*',
+            },
+            signal: AbortSignal.timeout(15_000),
+          });
+          if (pageRes.ok) {
+            return await pageRes.text();
+          }
+        } catch (err) {
+          console.warn(`[Scraper] Failed to fetch Kayn Scans chapters page ${page}:`, err);
+        }
+        return '';
+      }),
+    );
+
+    for (const payload of additionalPayloads) {
+      if (payload) {
+        const moreChapters = parseKaynChaptersFromText(payload, canonicalBaseUrl);
+        for (const ch of moreChapters) {
+          if (!seen.has(ch.chapterNumber)) {
+            seen.add(ch.chapterNumber);
+            allChapters.push(ch);
+          }
+        }
+      }
+    }
+  }
+
+  // Fallback: If RSC stream gave 0 chapters, try HTML self.__next_f or API
+  if (allChapters.length === 0) {
+    try {
+      const segments = new URL(canonicalBaseUrl).pathname.split('/').filter(Boolean);
+      const slug = segments[segments.length - 1];
+      if (slug) {
+        const apiRes = await fetch(`https://kaynscans.com/api/series?q=${encodeURIComponent(slug)}`, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'application/json',
+          },
+          signal: AbortSignal.timeout(10_000),
+        });
+        if (apiRes.ok) {
+          const apiJson = (await apiRes.json()) as any;
+          const seriesItem = (apiJson?.data || []).find((s: any) => s.slug === slug || s.urlSlug === slug) || apiJson?.data?.[0];
+          if (seriesItem?.chapters && Array.isArray(seriesItem.chapters)) {
+            for (const ch of seriesItem.chapters) {
+              const num = Number(ch.number);
+              if (!ch.isLocked && !ch.coinPrice && !isNaN(num) && !seen.has(num)) {
+                seen.add(num);
+                allChapters.push({
+                  chapterNumber: num,
+                  title: ch.title || undefined,
+                  url: `${canonicalBaseUrl}/chapter/${num}`,
+                });
+              }
+            }
+          }
+        }
+      }
+    } catch (apiErr) {
+      console.warn('[Scraper] Kayn Scans API fallback failed:', apiErr);
+    }
+  }
+
+  const freeChapters = allChapters.filter((c) => !isPremiumOrLockedChapter(c));
+  // Sort descending by chapterNumber (latest chapter first, standard for scraper imports)
+  freeChapters.sort((a, b) => b.chapterNumber - a.chapterNumber);
+  return freeChapters;
+}
+
+async function extractKaynScansChapterImages(chapterUrl: string): Promise<string[]> {
+  const origin = new URL(chapterUrl).origin;
+  const res = await fetch(chapterUrl, {
+    headers: {
+      'RSC': '1',
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      'Accept': '*/*',
+    },
+    redirect: 'follow',
+    signal: AbortSignal.timeout(20_000),
+  });
+
+  if (!res.ok) {
+    throw new Error(`Failed to fetch Kayn Scans chapter: ${res.status} ${res.statusText}`);
+  }
+
+  const text = await res.text();
+  const canonicalOrigin = res.url ? new URL(res.url).origin : origin;
+
+  // 1. Extract from the structured pages JSON array
+  const pagesMatch = text.match(/"pages":\s*(\[\{.*?"imageUrl".*?\}\])/);
+  if (pagesMatch) {
+    try {
+      const pages = JSON.parse(pagesMatch[1]);
+      if (Array.isArray(pages) && pages.length > 0) {
+        pages.sort((a: any, b: any) => (Number(a.pageNumber) || 0) - (Number(b.pageNumber) || 0));
+        const urls = pages
+          .map((p: any) => (typeof p.imageUrl === 'string' ? p.imageUrl.trim() : ''))
+          .filter((u: string) => u.length > 0)
+          .map((u: string) => (u.startsWith('http') ? u : `${canonicalOrigin}${u.startsWith('/') ? '' : '/'}${u}`));
+        if (urls.length > 0) return urls;
+      }
+    } catch {}
+  }
+
+  // 2. Regex for pageNumber and imageUrl objects
+  const pageRegex = /\{"id":"[^"]+","pageNumber":(\d+)[^{}]*?"imageUrl":"([^"]+)"/g;
+  const matches = [...text.matchAll(pageRegex)];
+  if (matches.length > 0) {
+    const sorted = matches
+      .map((m) => ({ pageNumber: parseInt(m[1], 10), imageUrl: m[2].trim() }))
+      .filter((p) => p.imageUrl.length > 0)
+      .sort((a, b) => a.pageNumber - b.pageNumber)
+      .map((p) => (p.imageUrl.startsWith('http') ? p.imageUrl : `${canonicalOrigin}${p.imageUrl.startsWith('/') ? '' : '/'}${p.imageUrl}`));
+    if (sorted.length > 0) return sorted;
+  }
+
+  // 3. Fallback regex for /uploads/series/... paths in the RSC text
+  const rawMatches = text.match(/\/uploads\/series\/[^"'\\\s]+\.(?:webp|jpe?g|png|avif)/gi);
+  if (rawMatches && rawMatches.length > 0) {
+    const unique = Array.from(new Set(rawMatches));
+    return unique.map((u) => `${canonicalOrigin}${u.startsWith('/') ? '' : '/'}${u}`);
+  }
+
+  // 4. Fallback: fetch standard HTML if RSC had no images
+  try {
+    const htmlRes = await fetch(chapterUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+      },
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (htmlRes.ok) {
+      const htmlText = await htmlRes.text();
+      const htmlMatches = htmlText.match(/\/uploads\/series\/[^"'\\\s]+\.(?:webp|jpe?g|png|avif)/gi);
+      if (htmlMatches && htmlMatches.length > 0) {
+        const unique = Array.from(new Set(htmlMatches));
+        return unique.map((u) => `${canonicalOrigin}${u.startsWith('/') ? '' : '/'}${u}`);
+      }
+    }
+  } catch {}
+
+  return [];
 }

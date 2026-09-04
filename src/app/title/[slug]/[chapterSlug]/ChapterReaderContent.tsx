@@ -72,7 +72,8 @@ import {
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { safeUrlOrNull } from "@/lib/safe-url";
+import { safeUrlOrNull, serializeAttachmentUrls, parseSafeAttachmentUrls } from "@/lib/safe-url";
+import { CommentAttachmentGrid } from "@/components/comments/CommentAttachmentGrid";
 import { sanitizeHtml } from "@/lib/html-sanitizer";
 import NovelSettingsPanel from "@/components/NovelSettingsPanel";
 
@@ -266,21 +267,15 @@ export default function Reader({
   const activeScanlationGroup = chapterQ.data?.scanlation_group ?? null;
 
   const siblingsQ = useQuery({
-    queryKey: ["chapter-siblings", chapterQ.data?.series?.id, activeScanlationGroup],
+    queryKey: ["chapter-siblings", chapterQ.data?.series?.id],
     queryFn: async () => {
-      let query = supabase
+      const { data, error } = await supabase
         .from("chapters")
         .select("id,slug,chapter_number,scanlation_group")
         .eq("series_id", chapterQ.data!.series!.id)
-        .in("status", ["published", "scheduled"]);
+        .in("status", ["published", "scheduled"])
+        .order("chapter_number", { ascending: true });
 
-      if (activeScanlationGroup) {
-        query = query.eq("scanlation_group", activeScanlationGroup);
-      } else {
-        query = query.is("scanlation_group", null);
-      }
-
-      const { data, error } = await query.order("chapter_number");
       if (error) {
         throw error;
       }
@@ -351,7 +346,11 @@ export default function Reader({
       activeChapterIdRef.current = chId;
 
       const savedPos = getChapterReadingPosition(chId);
-      const hasProgress = savedPos && (savedPos.scrollTop > 80 || (savedPos.scrollRatio && savedPos.scrollRatio > 0.04));
+      const hasProgress =
+        savedPos &&
+        ((savedPos.pageIndex != null && savedPos.pageIndex > 0) ||
+          savedPos.scrollTop > 80 ||
+          (savedPos.scrollRatio && savedPos.scrollRatio > 0.04));
 
       if (!hasProgress) {
         // Immediate clean start from top
@@ -563,10 +562,82 @@ export default function Reader({
     });
   }, [chapterQ.data?.id, chapterSlug, qc]);
 
-  const idx = siblingsQ.data?.findIndex((c) => c.slug === chapterSlug) ?? -1;
-  const prev = idx > 0 ? siblingsQ.data![idx - 1] : null;
-  const next =
-    idx >= 0 && siblingsQ.data && idx < siblingsQ.data.length - 1 ? siblingsQ.data[idx + 1] : null;
+  const { prev, next } = useMemo(() => {
+    const siblings = siblingsQ.data ?? [];
+    const currentNum = chapterQ.data?.chapter_number;
+
+    if (siblings.length === 0 || currentNum == null || isNaN(currentNum)) {
+      const idx = siblings.findIndex((c) => c.slug === chapterSlug);
+      const p = idx > 0 ? siblings[idx - 1] : null;
+      const n = idx >= 0 && idx < siblings.length - 1 ? siblings[idx + 1] : null;
+      return { prev: p, next: n };
+    }
+
+    const normGroup = (g?: string | null) => g?.trim().toLowerCase() || null;
+    const currentGroup = normGroup(activeScanlationGroup);
+
+    // Candidates strictly greater than current chapter number (never same chapter!)
+    const greater = siblings.filter(
+      (c) => typeof c.chapter_number === "number" && c.chapter_number > currentNum
+    );
+    // Candidates strictly lesser than current chapter number (never same chapter!)
+    const lesser = siblings.filter(
+      (c) => typeof c.chapter_number === "number" && c.chapter_number < currentNum
+    );
+
+    let nextChapter: (typeof siblings)[0] | null = null;
+    if (greater.length > 0) {
+      const minNextNum = Math.min(...greater.map((c) => c.chapter_number));
+      const candidates = greater.filter((c) => c.chapter_number === minNextNum);
+      // Prefer same scanlation group, fallback to first available
+      nextChapter = candidates.find((c) => normGroup(c.scanlation_group) === currentGroup) ?? candidates[0];
+    }
+
+    let prevChapter: (typeof siblings)[0] | null = null;
+    if (lesser.length > 0) {
+      const maxPrevNum = Math.max(...lesser.map((c) => c.chapter_number));
+      const candidates = lesser.filter((c) => c.chapter_number === maxPrevNum);
+      // Prefer same scanlation group, fallback to first available
+      prevChapter = candidates.find((c) => normGroup(c.scanlation_group) === currentGroup) ?? candidates[0];
+    }
+
+    return { prev: prevChapter, next: nextChapter };
+  }, [siblingsQ.data, chapterQ.data?.chapter_number, chapterSlug, activeScanlationGroup]);
+
+  // Clean deduplicated chapter list for drawer and top bar dropdown (one entry per chapter number)
+  const navChapters = useMemo(() => {
+    const raw = siblingsQ.data ?? [];
+    if (raw.length === 0) return [];
+
+    const normGroup = (g?: string | null) => g?.trim().toLowerCase() || null;
+    const currentGroup = normGroup(activeScanlationGroup);
+
+    const map = new Map<number, (typeof raw)[0]>();
+    const sorted = [...raw].sort((a, b) => a.chapter_number - b.chapter_number);
+
+    for (const ch of sorted) {
+      const existing = map.get(ch.chapter_number);
+      if (!existing) {
+        map.set(ch.chapter_number, ch);
+        continue;
+      }
+      // Always keep the current chapter being read
+      if (ch.slug === chapterSlug) {
+        map.set(ch.chapter_number, ch);
+        continue;
+      }
+      // Otherwise prefer active scanlation group
+      if (existing.slug !== chapterSlug) {
+        const existingMatches = normGroup(existing.scanlation_group) === currentGroup;
+        const chMatches = normGroup(ch.scanlation_group) === currentGroup;
+        if (!existingMatches && chMatches) {
+          map.set(ch.chapter_number, ch);
+        }
+      }
+    }
+
+    return Array.from(map.values()).sort((a, b) => a.chapter_number - b.chapter_number);
+  }, [siblingsQ.data, chapterSlug, activeScanlationGroup]);
 
   // Prefetch next chapter when scroll progress is >= 50%
   const prefetchedNextRef = useRef<string | null>(null);
@@ -869,7 +940,7 @@ export default function Reader({
           seriesTitle={c.series?.title ?? ""}
           seriesSlug={c.series?.slug ?? ""}
           isNovel={isNovel}
-          allChapters={siblingsQ.data ?? []}
+          allChapters={navChapters}
           currentChapterSlug={chapterSlug}
           alternateGroups={alternateGroupsQ.data ?? []}
           currentGroup={activeScanlationGroup}
@@ -933,6 +1004,7 @@ export default function Reader({
               seriesSlug={seriesSlug}
               seriesTitle={c.series?.title ?? ""}
               chapterNumber={c.chapter_number}
+              chapterSlug={c.slug || chapterSlug}
               illustrations={pagesQ.data?.map((p: any) => p.image_url) ?? []}
             />
           ) : (
@@ -963,6 +1035,7 @@ export default function Reader({
               seriesSlug={seriesSlug}
               seriesTitle={c.series?.title ?? ""}
               chapterNumber={c.chapter_number}
+              chapterSlug={c.slug || chapterSlug}
             />
           )}
         </>
@@ -998,7 +1071,7 @@ export default function Reader({
             }
           }}
           seriesSlug={seriesSlug}
-          allChapters={siblingsQ.data ?? []}
+          allChapters={navChapters}
           currentChapterSlug={chapterSlug}
           chapterId={c.id}
           seriesId={c.series_id}
@@ -1540,6 +1613,7 @@ function ImageView({
   seriesSlug,
   seriesTitle,
   chapterNumber,
+  chapterSlug,
 }: {
   pages?: any[];
   loading: boolean;
@@ -1553,6 +1627,7 @@ function ImageView({
   seriesSlug: string;
   seriesTitle: string;
   chapterNumber: number;
+  chapterSlug?: string;
 }) {
   // ALL HOOKS MUST BE AT THE TOP - BEFORE ANY CONDITIONAL RETURNS
   const { user } = useAuth();
@@ -1573,10 +1648,13 @@ function ImageView({
   const restoredChapterRef = useRef<string | null>(null);
   const activePageRef = useRef(0);
   const isRestoringRef = useRef(true);
+  const restoreLockUntilRef = useRef(0);
+  const currentChapterSlug = chapterSlug || chapterNumber.toString();
 
-  // Release restoration guard as soon as the user deliberately interacts
+  // Release restoration guard ONLY after restoration lock window has passed
   useEffect(() => {
     const handleUserInteraction = () => {
+      if (Date.now() < restoreLockUntilRef.current) return;
       isRestoringRef.current = false;
     };
     window.addEventListener("wheel", handleUserInteraction, { passive: true });
@@ -1589,13 +1667,75 @@ function ImageView({
     };
   }, []);
 
+  // Safe scroll helper that locks restoration guard and scrolls accurately
+  const performScrollToTarget = useCallback(
+    (targetPg: number, sRatio?: number, sTop?: number, smooth: boolean = true) => {
+      isRestoringRef.current = true;
+      restoreLockUntilRef.current = Date.now() + (smooth ? 1500 : 400);
+
+      let scrolled = false;
+      if (targetPg > 0) {
+        const targetEl = document.getElementById(`chapter-page-${targetPg}`);
+        if (targetEl) {
+          const rect = targetEl.getBoundingClientRect();
+          const targetY = rect.top + (window.pageYOffset || document.documentElement.scrollTop) - 56;
+          window.scrollTo({
+            top: Math.max(0, targetY),
+            behavior: smooth ? "smooth" : "instant",
+          });
+          scrolled = true;
+        }
+      }
+
+      if (!scrolled) {
+        const scrollHeight = document.documentElement.scrollHeight - window.innerHeight;
+        if (scrollHeight > 0 && sRatio != null && sRatio > 0) {
+          window.scrollTo({
+            top: sRatio * scrollHeight,
+            behavior: smooth ? "smooth" : "instant",
+          });
+          scrolled = true;
+        } else if (sTop != null && sTop > 50) {
+          window.scrollTo({
+            top: sTop,
+            behavior: smooth ? "smooth" : "instant",
+          });
+          scrolled = true;
+        }
+      }
+
+      if (scrolled) {
+        const releaseGuard = () => {
+          const remaining = Math.max(0, restoreLockUntilRef.current - Date.now());
+          setTimeout(() => {
+            isRestoringRef.current = false;
+          }, remaining);
+        };
+
+        if (typeof window !== "undefined" && "onscrollend" in window) {
+          const onEnd = () => {
+            window.removeEventListener("scrollend", onEnd);
+            releaseGuard();
+          };
+          window.addEventListener("scrollend", onEnd, { once: true, passive: true });
+          setTimeout(onEnd, smooth ? 1400 : 300);
+        } else {
+          setTimeout(releaseGuard, smooth ? 1400 : 300);
+        }
+      }
+
+      return scrolled;
+    },
+    []
+  );
+
   // Track scroll position and visible page element
   useEffect(() => {
     if (!chapterId || loading || !pages?.length) return;
 
     const handleScroll = () => {
-      // Do NOT overwrite saved position while page is mounting or restoring
-      if (isRestoringRef.current) return;
+      // Do NOT overwrite saved position while page is mounting, restoring, or in grace lock
+      if (isRestoringRef.current || Date.now() < restoreLockUntilRef.current) return;
 
       const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
       const scrollHeight = document.documentElement.scrollHeight - window.innerHeight;
@@ -1618,7 +1758,7 @@ function ImageView({
       saveChapterReadingPosition({
         chapterId,
         seriesSlug,
-        chapterSlug: chapterNumber.toString(),
+        chapterSlug: currentChapterSlug,
         chapterNumber,
         pageIndex: visibleIdx,
         scrollRatio,
@@ -1637,11 +1777,11 @@ function ImageView({
     return () => {
       clearTimeout(scrollTimeout);
       window.removeEventListener("scroll", throttledScroll);
-      if (!isRestoringRef.current) {
+      if (!isRestoringRef.current && Date.now() >= restoreLockUntilRef.current) {
         handleScroll();
       }
     };
-  }, [chapterId, seriesSlug, chapterNumber, loading, pages?.length]);
+  }, [chapterId, seriesSlug, chapterNumber, currentChapterSlug, loading, pages?.length]);
 
   // Restore exact left-off place for visited chapters OR start from top for new chapters
   useEffect(() => {
@@ -1650,6 +1790,7 @@ function ImageView({
     if (restoredChapterRef.current !== chapterId) {
       restoredChapterRef.current = chapterId;
       isRestoringRef.current = true;
+      restoreLockUntilRef.current = Date.now() + 1500;
 
       // Prevent automatic browser scroll injection
       if (typeof window !== "undefined" && "scrollRestoration" in window.history) {
@@ -1703,34 +1844,18 @@ function ImageView({
       let attempts = 0;
       const maxAttempts = 20;
 
-      const performScroll = (smooth = true) => {
-        if (targetPage > 0) {
-          const targetEl = document.getElementById(`chapter-page-${targetPage}`);
-          if (targetEl) {
-            targetEl.scrollIntoView({ block: "start", behavior: smooth ? "smooth" : "instant" });
-            return true;
-          }
-        }
-        const scrollHeight = document.documentElement.scrollHeight - window.innerHeight;
-        if (scrollHeight > 0 && promptData.scrollRatio > 0) {
-          window.scrollTo({ top: promptData.scrollRatio * scrollHeight, behavior: smooth ? "smooth" : "instant" });
-          return true;
-        } else if (promptData.scrollTop > 50) {
-          window.scrollTo({ top: promptData.scrollTop, behavior: smooth ? "smooth" : "instant" });
-          return true;
-        }
-        return false;
-      };
-
       // Direct smooth scroll to where they left off once layout mounts
       const attemptRedirect = () => {
         if (cancelled) return;
         attempts++;
-        const scrolled = performScroll(true);
+        const scrolled = performScrollToTarget(
+          targetPage,
+          promptData.scrollRatio,
+          promptData.scrollTop,
+          true
+        );
         if (!scrolled && attempts < maxAttempts) {
           setTimeout(attemptRedirect, 150);
-        } else {
-          isRestoringRef.current = false;
         }
       };
 
@@ -1741,7 +1866,7 @@ function ImageView({
         clearTimeout(redirectTimer);
       };
     }
-  }, [chapterId, loading, pages]);
+  }, [chapterId, loading, pages, performScrollToTarget]);
 
   // Clean up old scroll positions (keep only last 10 chapters per user)
   useEffect(() => {
@@ -1834,19 +1959,12 @@ function ImageView({
             <button
               type="button"
               onClick={() => {
-                if (continuePrompt.targetPage > 0) {
-                  const targetEl = document.getElementById(`chapter-page-${continuePrompt.targetPage}`);
-                  if (targetEl) {
-                    targetEl.scrollIntoView({ block: "start", behavior: "smooth" });
-                    return;
-                  }
-                }
-                const scrollHeight = document.documentElement.scrollHeight - window.innerHeight;
-                if (scrollHeight > 0 && continuePrompt.scrollRatio > 0) {
-                  window.scrollTo({ top: continuePrompt.scrollRatio * scrollHeight, behavior: "smooth" });
-                } else if (continuePrompt.scrollTop > 50) {
-                  window.scrollTo({ top: continuePrompt.scrollTop, behavior: "smooth" });
-                }
+                performScrollToTarget(
+                  continuePrompt.targetPage,
+                  continuePrompt.scrollRatio,
+                  continuePrompt.scrollTop,
+                  true
+                );
               }}
               className="flex items-center gap-2 text-xs sm:text-sm font-semibold text-white hover:text-purple-100 transition-colors cursor-pointer"
             >
@@ -1943,9 +2061,17 @@ function ImageView({
                     data-page-id={p.id}
                     src={p.image_url}
                     alt={`${seriesTitle || "Manga"} Chapter ${chapterNumber} Page ${p.page_number} - vnrscans`}
-                    loading={idx < 2 ? "eager" : "lazy"}
+                    loading={
+                      idx < 2 || (continuePrompt?.targetPage != null && Math.abs(idx - continuePrompt.targetPage) <= 2)
+                        ? "eager"
+                        : "lazy"
+                    }
                     decoding="async"
-                    fetchPriority={idx < 2 ? "high" : "auto"}
+                    fetchPriority={
+                      idx < 2 || (continuePrompt?.targetPage != null && Math.abs(idx - continuePrompt.targetPage) <= 2)
+                        ? "high"
+                        : "auto"
+                    }
                     className="mx-auto block w-full max-w-full h-auto object-contain transition-transform duration-200"
                     referrerPolicy="no-referrer"
                     style={{
@@ -1991,6 +2117,7 @@ function NovelView({
   seriesTitle,
   chapterNumber,
   illustrations = [],
+  chapterSlug,
 }: {
   content: string;
   chapterId: string;
@@ -2003,6 +2130,7 @@ function NovelView({
   seriesTitle: string;
   chapterNumber: number;
   illustrations?: string[];
+  chapterSlug?: string;
 }) {
   const [fontSize, setFontSize] = useState(18);
   const [fontFamily, setFontFamily] = useState("sans-serif");
@@ -2037,10 +2165,13 @@ function NovelView({
   const [continuePrompt, setContinuePrompt] = useState<NovelContinuePromptData | null>(null);
   const restoredNovelChapterRef = useRef<string | null>(null);
   const isRestoringRef = useRef(true);
+  const restoreLockUntilRef = useRef(0);
+  const currentChapterSlug = chapterSlug || chapterNumber.toString();
 
-  // Release restoration guard as soon as the reader interacts
+  // Release restoration guard ONLY after restoration grace window has passed
   useEffect(() => {
     const handleUserInteraction = () => {
+      if (Date.now() < restoreLockUntilRef.current) return;
       isRestoringRef.current = false;
     };
     window.addEventListener("wheel", handleUserInteraction, { passive: true });
@@ -2053,12 +2184,53 @@ function NovelView({
     };
   }, []);
 
+  // Safe scroll helper that locks restoration guard and scrolls accurately
+  const performNovelScrollToTarget = useCallback(
+    (sRatio?: number, sTop?: number, smooth: boolean = true) => {
+      isRestoringRef.current = true;
+      restoreLockUntilRef.current = Date.now() + (smooth ? 1500 : 400);
+
+      let scrolled = false;
+      const scrollHeight = document.documentElement.scrollHeight - window.innerHeight;
+      if (scrollHeight > 0 && sRatio != null && sRatio > 0) {
+        window.scrollTo({ top: sRatio * scrollHeight, behavior: smooth ? "smooth" : "instant" });
+        scrolled = true;
+      } else if (sTop != null && sTop > 50) {
+        window.scrollTo({ top: sTop, behavior: smooth ? "smooth" : "instant" });
+        scrolled = true;
+      }
+
+      if (scrolled) {
+        const releaseGuard = () => {
+          const remaining = Math.max(0, restoreLockUntilRef.current - Date.now());
+          setTimeout(() => {
+            isRestoringRef.current = false;
+          }, remaining);
+        };
+
+        if (typeof window !== "undefined" && "onscrollend" in window) {
+          const onEnd = () => {
+            window.removeEventListener("scrollend", onEnd);
+            releaseGuard();
+          };
+          window.addEventListener("scrollend", onEnd, { once: true, passive: true });
+          setTimeout(onEnd, smooth ? 1400 : 300);
+        } else {
+          setTimeout(releaseGuard, smooth ? 1400 : 300);
+        }
+      }
+
+      return scrolled;
+    },
+    []
+  );
+
   // Track page scroll progress for the top progress bar & position saving
   useEffect(() => {
     if (!chapterId || !content) return;
 
     const handleScroll = () => {
-      if (isRestoringRef.current) return;
+      if (isRestoringRef.current || Date.now() < restoreLockUntilRef.current) return;
 
       const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
       const scrollHeight = document.documentElement.scrollHeight - window.innerHeight;
@@ -2069,7 +2241,7 @@ function NovelView({
       saveChapterReadingPosition({
         chapterId,
         seriesSlug,
-        chapterSlug: chapterNumber.toString(),
+        chapterSlug: currentChapterSlug,
         chapterNumber,
         pageIndex: 0,
         scrollRatio,
@@ -2088,11 +2260,11 @@ function NovelView({
     return () => {
       clearTimeout(scrollTimeout);
       window.removeEventListener("scroll", throttledScroll);
-      if (!isRestoringRef.current) {
+      if (!isRestoringRef.current && Date.now() >= restoreLockUntilRef.current) {
         handleScroll();
       }
     };
-  }, [chapterId, content, seriesSlug, chapterNumber]);
+  }, [chapterId, content, seriesSlug, chapterNumber, currentChapterSlug]);
 
   // Restore exact scroll position on visited chapters OR start from top on new chapters
   useEffect(() => {
@@ -2101,6 +2273,7 @@ function NovelView({
     if (restoredNovelChapterRef.current !== chapterId) {
       restoredNovelChapterRef.current = chapterId;
       isRestoringRef.current = true;
+      restoreLockUntilRef.current = Date.now() + 1500;
 
       if (typeof window !== "undefined" && "scrollRestoration" in window.history) {
         window.history.scrollRestoration = "manual";
@@ -2139,26 +2312,13 @@ function NovelView({
       };
       setContinuePrompt(promptData);
 
-      const performScroll = (smooth = true) => {
-        const scrollHeight = document.documentElement.scrollHeight - window.innerHeight;
-        if (scrollHeight > 0 && promptData.scrollRatio > 0) {
-          window.scrollTo({ top: promptData.scrollRatio * scrollHeight, behavior: smooth ? "smooth" : "instant" });
-          return true;
-        } else if (promptData.scrollTop > 50) {
-          window.scrollTo({ top: promptData.scrollTop, behavior: smooth ? "smooth" : "instant" });
-          return true;
-        }
-        return false;
-      };
-
       const redirectTimer = setTimeout(() => {
-        performScroll(true);
-        isRestoringRef.current = false;
+        performNovelScrollToTarget(promptData.scrollRatio, promptData.scrollTop, true);
       }, 350);
 
       return () => clearTimeout(redirectTimer);
     }
-  }, [chapterId, content]);
+  }, [chapterId, content, performNovelScrollToTarget]);
 
   // Determine content mode (HTML vs Plain Text split)
   const isHtml = useMemo(() => /<[a-z][\s\S]*>/i.test(content), [content]);
@@ -2222,12 +2382,7 @@ function NovelView({
             <button
               type="button"
               onClick={() => {
-                const scrollHeight = document.documentElement.scrollHeight - window.innerHeight;
-                if (scrollHeight > 0 && continuePrompt.scrollRatio > 0) {
-                  window.scrollTo({ top: continuePrompt.scrollRatio * scrollHeight, behavior: "smooth" });
-                } else if (continuePrompt.scrollTop > 50) {
-                  window.scrollTo({ top: continuePrompt.scrollTop, behavior: "smooth" });
-                }
+                performNovelScrollToTarget(continuePrompt.scrollRatio, continuePrompt.scrollTop, true);
               }}
               className="flex items-center gap-2 text-xs sm:text-sm font-semibold text-white hover:text-purple-100 transition-colors cursor-pointer"
             >
@@ -3221,94 +3376,17 @@ type CommentDraft = {
   attachmentAlt: string | null;
 };
 
-// Media attachment renderer with guaranteed visibility, loading shimmer, and lightbox
+// Media attachment renderer with multi-image support (up to 5 images), responsive grid, and interactive lightbox
 function CommentAttachmentMedia({
-  url,
+  urls,
   alt,
   type,
 }: {
-  url: string;
+  urls: string | string[] | null | undefined;
   alt?: string | null;
   type?: "image" | "gif" | null;
 }) {
-  const [error, setError] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [expanded, setExpanded] = useState(false);
-
-  const isGif = type === "gif" || url.toLowerCase().includes(".gif");
-
-  return (
-    <>
-      <div className="mt-2.5 inline-block max-w-full sm:max-w-md">
-        <div
-          onClick={() => setExpanded(true)}
-          className="group relative block overflow-hidden rounded-xl border border-border/60 bg-black/40 hover:border-primary/50 transition-all duration-200 shadow-md cursor-pointer select-none max-w-full"
-        >
-          {loading && !error && (
-            <div className="h-40 w-48 sm:h-48 sm:w-64 animate-pulse bg-secondary/80 rounded-xl flex items-center justify-center text-muted-foreground text-xs font-medium">
-              Loading meme...
-            </div>
-          )}
-
-          {error ? (
-            <div className="flex items-center gap-2.5 p-3 bg-secondary/50 rounded-xl border border-border/50">
-              <span className="text-2xl">🔥</span>
-              <div className="min-w-0 flex-1">
-                <p className="text-xs font-bold text-foreground truncate">{alt || "Anime Reaction Meme"}</p>
-                <span className="text-[10px] text-primary font-semibold">Click to view image</span>
-              </div>
-            </div>
-          ) : (
-            <img
-              src={url}
-              alt={alt ?? (isGif ? "Comment GIF" : "Comment Meme / Image")}
-              referrerPolicy="no-referrer"
-              loading="lazy"
-              decoding="async"
-              className={`max-h-56 sm:max-h-72 w-auto max-w-full object-contain rounded-xl group-hover:scale-[1.01] transition-transform duration-200 ${
-                loading ? "hidden" : "block"
-              }`}
-              onLoad={() => setLoading(false)}
-              onError={() => {
-                setLoading(false);
-                setError(true);
-              }}
-            />
-          )}
-
-          {!error && !loading && (
-            <div className="absolute top-2 left-2 px-2 py-0.5 rounded-md bg-black/75 backdrop-blur-md text-[10px] font-bold text-primary flex items-center gap-1 border border-primary/30 pointer-events-none">
-              <Flame className="h-3 w-3" />
-              <span>{isGif ? "GIF" : "MEME"}</span>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Lightbox Modal */}
-      {expanded && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200 cursor-pointer"
-          onClick={() => setExpanded(false)}
-        >
-          <div className="relative max-w-2xl max-h-[85vh] flex flex-col items-center justify-center" onClick={(e) => e.stopPropagation()}>
-            <div className="absolute -top-10 right-0">
-              <Button variant="ghost" size="icon" className="text-white hover:bg-white/20 rounded-full h-8 w-8" onClick={() => setExpanded(false)}>
-                <X className="h-5 w-5" />
-              </Button>
-            </div>
-            <img
-              src={url}
-              alt={alt || "Meme"}
-              referrerPolicy="no-referrer"
-              className="max-w-full max-h-[80vh] object-contain rounded-2xl shadow-2xl border border-border/50 bg-black/40"
-            />
-            {alt && <p className="mt-3 text-sm font-semibold text-white/90">{alt}</p>}
-          </div>
-        </div>
-      )}
-    </>
-  );
+  return <CommentAttachmentGrid urls={urls} alt={alt} type={type} />;
 }
 
 function CommentAvatarFrame({
@@ -3520,28 +3598,33 @@ function ChapterComments({
   const [content, setContent] = useState("");
   const [isSpoiler, setIsSpoiler] = useState(false);
   const [attachmentType, setAttachmentType] = useState<"image" | "gif" | null>(null);
-  const [attachmentUrl, setAttachmentUrl] = useState<string | null>(null);
+  const [attachmentUrls, setAttachmentUrls] = useState<string[]>([]);
   const [attachmentAlt, setAttachmentAlt] = useState<string | null>(null);
   const [uploadingAttachment, setUploadingAttachment] = useState(false);
+  const [uploadProgressText, setUploadProgressText] = useState<string | null>(null);
   const [sort, setSort] = useState<"newest" | "top" | "oldest">("newest");
   const [replyTo, setReplyTo] = useState<string | null>(null);
   const [replyContent, setReplyContent] = useState("");
   const [replySpoiler, setReplySpoiler] = useState(false);
   const [replyAttachmentType, setReplyAttachmentType] = useState<"image" | "gif" | null>(null);
-  const [replyAttachmentUrl, setReplyAttachmentUrl] = useState<string | null>(null);
+  const [replyAttachmentUrls, setReplyAttachmentUrls] = useState<string[]>([]);
   const [replyAttachmentAlt, setReplyAttachmentAlt] = useState<string | null>(null);
   const [replyUploadingAttachment, setReplyUploadingAttachment] = useState(false);
+  const [replyUploadProgressText, setReplyUploadProgressText] = useState<string | null>(null);
   const [revealedSpoilers, setRevealedSpoilers] = useState<Set<string>>(new Set());
   const contentRef = useRef<HTMLTextAreaElement | null>(null);
   const replyContentRef = useRef<HTMLTextAreaElement | null>(null);
   const [showMemePicker, setShowMemePicker] = useState(false);
   const [replyShowMemePicker, setReplyShowMemePicker] = useState(false);
 
+  const attachmentUrl = serializeAttachmentUrls(attachmentUrls);
+  const replyAttachmentUrl = serializeAttachmentUrls(replyAttachmentUrls);
+
   // Sync incoming meme from external Chapter Meme Vault
   useEffect(() => {
     if (pendingMeme) {
       setAttachmentType(pendingMeme.url.endsWith(".gif") ? "gif" : "image");
-      setAttachmentUrl(pendingMeme.url);
+      setAttachmentUrls([pendingMeme.url]);
       setAttachmentAlt(pendingMeme.name);
       onClearPendingMeme?.();
       requestAnimationFrame(() => {
@@ -3764,13 +3847,13 @@ function ChapterComments({
       setContent("");
       setIsSpoiler(false);
       setAttachmentType(null);
-      setAttachmentUrl(null);
+      setAttachmentUrls([]);
       setAttachmentAlt(null);
       setReplyTo(null);
       setReplyContent("");
       setReplySpoiler(false);
       setReplyAttachmentType(null);
-      setReplyAttachmentUrl(null);
+      setReplyAttachmentUrls([]);
       setReplyAttachmentAlt(null);
       qc.invalidateQueries({ queryKey: ["chapter-comments", chapterId] });
       qc.invalidateQueries({ queryKey: ["admin", "comments"] });
@@ -3892,47 +3975,133 @@ function ChapterComments({
     });
   };
 
-  const handleAttachmentUpload = async (file: File | null) => {
-    if (!file) return;
+  const handleAttachmentUpload = async (fileList: FileList | File[] | null) => {
+    if (!fileList || fileList.length === 0) return;
+    if (!user) {
+      toast.error("Please sign in to upload images");
+      return;
+    }
+    const files = Array.from(fileList);
+    const maxAllowed = 5;
+    const currentCount = attachmentUrls.length;
+    const remainingSlots = maxAllowed - currentCount;
+
+    if (remainingSlots <= 0) {
+      toast.error("Maximum 5 images allowed per comment");
+      return;
+    }
+
+    let filesToUpload = files;
+    if (files.length > remainingSlots) {
+      toast.warning(`Maximum 5 images allowed. Uploading first ${remainingSlots} image${remainingSlots === 1 ? "" : "s"}.`);
+      filesToUpload = files.slice(0, remainingSlots);
+    }
+
     try {
       setUploadingAttachment(true);
-      const url = await uploadCommentImage(file);
-      setAttachmentType(file.type === "image/gif" ? "gif" : "image");
-      setAttachmentUrl(url);
-      setAttachmentAlt(file.name);
-      toast.success("Media attached");
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to upload media");
+      const newUrls: string[] = [];
+      for (let i = 0; i < filesToUpload.length; i++) {
+        const file = filesToUpload[i];
+        setUploadProgressText(`Uploading ${i + 1}/${filesToUpload.length}...`);
+        try {
+          const url = await uploadCommentImage(file);
+          newUrls.push(url);
+        } catch (err) {
+          toast.error(`Failed to upload ${file.name}: ${err instanceof Error ? err.message : "Error"}`);
+        }
+      }
+
+      if (newUrls.length > 0) {
+        setAttachmentType("image");
+        setAttachmentUrls((prev) => [...prev, ...newUrls].slice(0, 5));
+        setAttachmentAlt(filesToUpload[0]?.name || "Comment image");
+        toast.success(`Attached ${newUrls.length} image${newUrls.length > 1 ? "s" : ""}`);
+      }
     } finally {
       setUploadingAttachment(false);
+      setUploadProgressText(null);
     }
   };
 
-  const handleReplyAttachmentUpload = async (file: File | null) => {
-    if (!file) return;
+  const handleReplyAttachmentUpload = async (fileList: FileList | File[] | null) => {
+    if (!fileList || fileList.length === 0) return;
+    if (!user) {
+      toast.error("Please sign in to upload images");
+      return;
+    }
+    const files = Array.from(fileList);
+    const maxAllowed = 5;
+    const currentCount = replyAttachmentUrls.length;
+    const remainingSlots = maxAllowed - currentCount;
+
+    if (remainingSlots <= 0) {
+      toast.error("Maximum 5 images allowed per comment");
+      return;
+    }
+
+    let filesToUpload = files;
+    if (files.length > remainingSlots) {
+      toast.warning(`Maximum 5 images allowed. Uploading first ${remainingSlots} image${remainingSlots === 1 ? "" : "s"}.`);
+      filesToUpload = files.slice(0, remainingSlots);
+    }
+
     try {
       setReplyUploadingAttachment(true);
-      const url = await uploadCommentImage(file);
-      setReplyAttachmentType(file.type === "image/gif" ? "gif" : "image");
-      setReplyAttachmentUrl(url);
-      setReplyAttachmentAlt(file.name);
-      toast.success("Media attached");
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to upload media");
+      const newUrls: string[] = [];
+      for (let i = 0; i < filesToUpload.length; i++) {
+        const file = filesToUpload[i];
+        setReplyUploadProgressText(`Uploading ${i + 1}/${filesToUpload.length}...`);
+        try {
+          const url = await uploadCommentImage(file);
+          newUrls.push(url);
+        } catch (err) {
+          toast.error(`Failed to upload ${file.name}: ${err instanceof Error ? err.message : "Error"}`);
+        }
+      }
+
+      if (newUrls.length > 0) {
+        setReplyAttachmentType("image");
+        setReplyAttachmentUrls((prev) => [...prev, ...newUrls].slice(0, 5));
+        setReplyAttachmentAlt(filesToUpload[0]?.name || "Reply image");
+        toast.success(`Attached ${newUrls.length} image${newUrls.length > 1 ? "s" : ""}`);
+      }
     } finally {
       setReplyUploadingAttachment(false);
+      setReplyUploadProgressText(null);
     }
+  };
+
+  const removeAttachment = (indexToRemove: number) => {
+    setAttachmentUrls((prev) => {
+      const next = prev.filter((_, idx) => idx !== indexToRemove);
+      if (next.length === 0) {
+        setAttachmentType(null);
+        setAttachmentAlt(null);
+      }
+      return next;
+    });
   };
 
   const clearAttachment = () => {
     setAttachmentType(null);
-    setAttachmentUrl(null);
+    setAttachmentUrls([]);
     setAttachmentAlt(null);
+  };
+
+  const removeReplyAttachment = (indexToRemove: number) => {
+    setReplyAttachmentUrls((prev) => {
+      const next = prev.filter((_, idx) => idx !== indexToRemove);
+      if (next.length === 0) {
+        setReplyAttachmentType(null);
+        setReplyAttachmentAlt(null);
+      }
+      return next;
+    });
   };
 
   const clearReplyAttachment = () => {
     setReplyAttachmentType(null);
-    setReplyAttachmentUrl(null);
+    setReplyAttachmentUrls([]);
     setReplyAttachmentAlt(null);
   };
 
@@ -4184,17 +4353,13 @@ function ChapterComments({
             </div>
           )}
 
-          {comment.attachment_url && !spoilerHidden && (() => {
-            const safeAttachmentUrl = safeUrlOrNull(comment.attachment_url);
-            if (!safeAttachmentUrl) return null;
-            return (
-              <CommentAttachmentMedia
-                url={safeAttachmentUrl}
-                alt={comment.attachment_alt}
-                type={comment.attachment_type}
-              />
-            );
-          })()}
+          {comment.attachment_url && !spoilerHidden && (
+            <CommentAttachmentMedia
+              urls={comment.attachment_url}
+              alt={comment.attachment_alt}
+              type={comment.attachment_type}
+            />
+          )}
 
           {spoilerHidden && (
             <Button
@@ -4275,35 +4440,56 @@ function ChapterComments({
                 </div>
               </div>
 
-              {replyAttachmentUrl && (
-                <div className="mt-2 flex max-w-md gap-3 rounded-lg border border-border/50 bg-background/70 p-2">
-                  <img
-                    src={replyAttachmentUrl}
-                    alt={replyAttachmentAlt ?? "Reply attachment preview"}
-                    referrerPolicy="no-referrer"
-                    className="h-14 w-16 rounded-md object-cover bg-black/40"
-                  />
-                  <div className="min-w-0 flex-1">
+              {replyAttachmentUrls.length > 0 && (
+                <div className="mt-2.5 rounded-lg border border-border/50 bg-background/70 p-2.5">
+                  <div className="flex items-center justify-between gap-2 mb-2 pb-1.5 border-b border-border/30">
                     <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-primary">
                       {replyAttachmentType === "gif" ? (
                         <Film className="h-3.5 w-3.5" />
                       ) : (
                         <Flame className="h-3.5 w-3.5" />
                       )}
-                      {replyAttachmentType === "gif" ? "GIF attached" : "Meme / Image attached"}
+                      <span>
+                        {replyAttachmentType === "gif"
+                          ? "GIF attached"
+                          : `Attached Images (${replyAttachmentUrls.length}/5)`}
+                      </span>
                     </div>
-                    <p className="mt-1 truncate text-xs text-muted-foreground font-medium">
-                      {replyAttachmentAlt ?? replyAttachmentUrl}
-                    </p>
                     <Button
+                      type="button"
                       variant="ghost"
                       size="sm"
-                      className="mt-1 h-6 px-2 text-xs text-destructive hover:bg-destructive/10"
+                      className="h-5 px-1.5 text-[11px] text-muted-foreground hover:text-destructive hover:bg-destructive/10"
                       onClick={clearReplyAttachment}
                     >
                       <X className="mr-1 h-3 w-3" />
-                      Remove
+                      Remove all
                     </Button>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {replyAttachmentUrls.map((url, idx) => (
+                      <div
+                        key={idx}
+                        className="group relative h-16 w-20 rounded-md overflow-hidden border border-border/60 bg-black/40 shrink-0 shadow-sm"
+                      >
+                        <img
+                          src={url}
+                          alt={`Reply attachment ${idx + 1}`}
+                          className="h-full w-full object-cover"
+                        />
+                        <span className="absolute bottom-1 left-1 px-1 py-0.2 rounded bg-black/75 text-[9px] font-bold text-white">
+                          {idx + 1}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => removeReplyAttachment(idx)}
+                          className="absolute top-1 right-1 p-0.5 rounded-full bg-black/80 hover:bg-destructive text-white opacity-80 hover:opacity-100 transition-all cursor-pointer"
+                          title="Remove image"
+                        >
+                          <X className="h-2.5 w-2.5" />
+                        </button>
+                      </div>
+                    ))}
                   </div>
                 </div>
               )}
@@ -4335,18 +4521,23 @@ function ChapterComments({
                     variant="outline"
                     size="sm"
                     className="h-7 gap-2 bg-background/50 hover:bg-background transition-colors text-[10px] cursor-pointer"
-                    disabled={!user || replyUploadingAttachment}
+                    disabled={!user || replyUploadingAttachment || replyAttachmentUrls.length >= 5}
                   >
-                    <label className="cursor-pointer">
+                    <label className={replyAttachmentUrls.length >= 5 ? "cursor-not-allowed opacity-60" : "cursor-pointer"}>
                       <ImageIcon className="h-3.5 w-3.5" />
-                      {replyUploadingAttachment ? "Uploading" : "Attach Image"}
+                      {replyUploadingAttachment
+                        ? (replyUploadProgressText || "Uploading...")
+                        : replyAttachmentUrls.length > 0
+                        ? `Add Image (${replyAttachmentUrls.length}/5)`
+                        : "Attach Image"}
                       <input
                         type="file"
+                        multiple
                         accept="image/png,image/jpeg,image/webp,image/gif"
                         className="sr-only"
-                        disabled={!user || replyUploadingAttachment}
+                        disabled={!user || replyUploadingAttachment || replyAttachmentUrls.length >= 5}
                         onChange={(event) => {
-                          void handleReplyAttachmentUpload(event.target.files?.[0] ?? null);
+                          void handleReplyAttachmentUpload(event.target.files);
                           event.currentTarget.value = "";
                         }}
                       />
@@ -4381,7 +4572,7 @@ function ChapterComments({
                       disabled={
                         createComment.isPending ||
                         replyUploadingAttachment ||
-                        (replyContent.trim().length < 2 && !replyAttachmentUrl)
+                        (replyContent.trim().length < 2 && replyAttachmentUrls.length === 0)
                       }
                       onClick={() =>
                         createComment.mutate({
@@ -4407,7 +4598,7 @@ function ChapterComments({
                   compact
                   onSelectGif={(gif) => {
                     setReplyAttachmentType("gif");
-                    setReplyAttachmentUrl(gif.url);
+                    setReplyAttachmentUrls([gif.url]);
                     setReplyAttachmentAlt(gif.title);
                     toast.success("Attached GIF!");
                     setReplyShowMemePicker(false);
@@ -4479,35 +4670,57 @@ function ChapterComments({
         </div>
 
         {/* Attachment preview area */}
-        {attachmentUrl && (
-          <div className="mt-3 flex max-w-md gap-3 rounded-lg border border-border/50 bg-background/70 p-2">
-            <img
-              src={attachmentUrl}
-              alt={attachmentAlt ?? "Comment attachment preview"}
-              referrerPolicy="no-referrer"
-              className="h-16 w-20 rounded-md object-cover bg-black/40"
-            />
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-primary">
+        {attachmentUrls.length > 0 && (
+          <div className="mt-3 rounded-xl border border-border/50 bg-background/80 p-3 shadow-inner">
+            <div className="flex items-center justify-between gap-2 mb-2 pb-2 border-b border-border/30">
+              <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-primary">
                 {attachmentType === "gif" ? (
                   <Film className="h-3.5 w-3.5" />
                 ) : (
                   <Flame className="h-3.5 w-3.5" />
                 )}
-                {attachmentType === "gif" ? "GIF attached" : "Meme / Image attached"}
+                <span>
+                  {attachmentType === "gif"
+                    ? "GIF attached"
+                    : `Attached Images (${attachmentUrls.length}/5)`}
+                </span>
               </div>
-              <p className="mt-1 truncate text-xs text-muted-foreground font-medium">
-                {attachmentAlt ?? attachmentUrl}
-              </p>
               <Button
+                type="button"
                 variant="ghost"
                 size="sm"
-                className="mt-1.5 h-6 px-2 text-xs text-destructive hover:bg-destructive/10"
+                className="h-6 px-2 text-xs text-muted-foreground hover:text-destructive hover:bg-destructive/10"
                 onClick={clearAttachment}
               >
                 <X className="mr-1 h-3 w-3" />
-                Remove
+                Remove all
               </Button>
+            </div>
+
+            <div className="flex flex-wrap gap-2.5">
+              {attachmentUrls.map((url, idx) => (
+                <div
+                  key={idx}
+                  className="group relative h-20 w-24 sm:h-24 sm:w-28 rounded-lg overflow-hidden border border-border/60 bg-black/40 shadow-sm shrink-0"
+                >
+                  <img
+                    src={url}
+                    alt={`Preview ${idx + 1}`}
+                    className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-200"
+                  />
+                  <span className="absolute bottom-1 left-1 px-1.5 py-0.5 rounded bg-black/75 text-[10px] font-bold text-white/90">
+                    {idx + 1}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => removeAttachment(idx)}
+                    className="absolute top-1 right-1 p-1 rounded-full bg-black/80 hover:bg-destructive text-white opacity-80 hover:opacity-100 transition-all shadow cursor-pointer"
+                    title="Remove this image"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+              ))}
             </div>
           </div>
         )}
@@ -4541,18 +4754,23 @@ function ChapterComments({
               variant="outline"
               size="sm"
               className="h-8 gap-2 bg-background/50 hover:bg-background transition-colors text-xs cursor-pointer"
-              disabled={!user || uploadingAttachment}
+              disabled={!user || uploadingAttachment || attachmentUrls.length >= 5}
             >
-              <label className="cursor-pointer">
+              <label className={attachmentUrls.length >= 5 ? "cursor-not-allowed opacity-60" : "cursor-pointer"}>
                 <ImageIcon className="h-3.5 w-3.5" />
-                {uploadingAttachment ? "Uploading" : "Attach Image"}
+                {uploadingAttachment
+                  ? (uploadProgressText || "Uploading...")
+                  : attachmentUrls.length > 0
+                  ? `Add Image (${attachmentUrls.length}/5)`
+                  : "Attach Image"}
                 <input
                   type="file"
+                  multiple
                   accept="image/png,image/jpeg,image/webp,image/gif"
                   className="sr-only"
-                  disabled={!user || uploadingAttachment}
+                  disabled={!user || uploadingAttachment || attachmentUrls.length >= 5}
                   onChange={(event) => {
-                    void handleAttachmentUpload(event.target.files?.[0] ?? null);
+                    void handleAttachmentUpload(event.target.files);
                     event.currentTarget.value = "";
                   }}
                 />
@@ -4584,7 +4802,7 @@ function ChapterComments({
                 !user ||
                 createComment.isPending ||
                 uploadingAttachment ||
-                (content.trim().length < 2 && !attachmentUrl)
+                (content.trim().length < 2 && attachmentUrls.length === 0)
               }
               onClick={() =>
                 createComment.mutate({
@@ -4608,7 +4826,7 @@ function ChapterComments({
           <LiveWebGifPicker
             onSelectGif={(gif) => {
               setAttachmentType("gif");
-              setAttachmentUrl(gif.url);
+              setAttachmentUrls([gif.url]);
               setAttachmentAlt(gif.title);
               toast.success("Attached GIF!");
               setShowMemePicker(false);

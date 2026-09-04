@@ -30,6 +30,7 @@ import { Button } from "@/components/ui/button";
 import { SocialLinksDisplay } from "@/components/profile/SocialLinks";
 import { BadgeIcon, enhanceBadge } from "@/lib/profileBadges";
 import { stripBbCode } from "@/lib/bbcode";
+import { parseSafeAttachmentUrls } from "@/lib/safe-url";
 import { OptimizedImage } from "@/components/OptimizedImage";
 
 type PublicProfileStats = {
@@ -1410,12 +1411,20 @@ export default function UserProfileContent({ username }: { username: string }) {
                         </p>
 
                         {/* Attachment indicator */}
-                        {comment.attachment_url && (
-                          <div className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground text-left">
-                            <span>📎</span>
-                            <span>{comment.attachment_type === "gif" ? "GIF" : "Image"} attached</span>
-                          </div>
-                        )}
+                        {comment.attachment_url && (() => {
+                          const urls = parseSafeAttachmentUrls(comment.attachment_url);
+                          const count = urls.length;
+                          return (
+                            <div className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground text-left">
+                              <span>📎</span>
+                              <span>
+                                {count > 1
+                                  ? `${count} images attached`
+                                  : `${comment.attachment_type === "gif" ? "GIF" : "Image"} attached`}
+                              </span>
+                            </div>
+                          );
+                        })()}
 
                         {/* Meta row */}
                         <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">

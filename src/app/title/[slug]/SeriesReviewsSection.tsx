@@ -23,11 +23,13 @@ import {
   Check,
   ChevronDown,
   ChevronUp,
+  X,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth, useIsAdmin } from "@/hooks/useAuth";
-import { safeUrlOrNull } from "@/lib/safe-url";
+import { safeUrlOrNull, serializeAttachmentUrls, MAX_COMMENT_ATTACHMENTS } from "@/lib/safe-url";
 import { LiveWebGifPicker } from "@/components/comments/LiveWebGifPicker";
+import { CommentAttachmentGrid } from "@/components/comments/CommentAttachmentGrid";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
@@ -68,9 +70,108 @@ export function SeriesReviewsSection({
   const [reviewBody, setReviewBody] = useState("");
   const [selectedRating, setSelectedRating] = useState<number>(10);
   const [isSpoiler, setIsSpoiler] = useState(false);
-  const [attachmentUrl, setAttachmentUrl] = useState<string | null>(null);
+  const [attachmentUrls, setAttachmentUrls] = useState<string[]>([]);
   const [attachmentType, setAttachmentType] = useState<"image" | "gif" | null>(null);
   const [attachmentAlt, setAttachmentAlt] = useState<string | null>(null);
+  const [uploadingAttachment, setUploadingAttachment] = useState(false);
+  const [uploadProgressText, setUploadProgressText] = useState<string | null>(null);
+  const reviewFileInputRef = React.useRef<HTMLInputElement | null>(null);
+
+  const serializedAttachmentUrl = serializeAttachmentUrls(attachmentUrls);
+
+  const uploadReviewImage = async (file: File) => {
+    if (!user) throw new Error("Sign in to upload images");
+    if (!file.type.startsWith("image/")) throw new Error("Please choose an image file");
+    if (file.size > 5 * 1024 * 1024) throw new Error("Image must be under 5MB");
+
+    const extension =
+      file.name
+        .split(".")
+        .pop()
+        ?.toLowerCase()
+        .replace(/[^a-z0-9]/g, "") || "jpg";
+    const path = `${user.id}/${crypto.randomUUID()}.${extension}`;
+    const { error } = await supabase.storage.from("comment-media").upload(path, file, {
+      contentType: file.type,
+      upsert: false,
+    });
+    if (error) throw error;
+
+    const { data } = supabase.storage.from("comment-media").getPublicUrl(path);
+    return data.publicUrl;
+  };
+
+  const handleReviewImageUpload = async (fileList: FileList | File[] | null) => {
+    if (!fileList || fileList.length === 0) return;
+    if (!user) {
+      toast.error("Please sign in to upload images");
+      return;
+    }
+    const files = Array.from(fileList);
+    const maxAllowed = MAX_COMMENT_ATTACHMENTS;
+    const currentCount = attachmentUrls.length;
+    const remainingSlots = maxAllowed - currentCount;
+
+    if (remainingSlots <= 0) {
+      toast.error("Maximum 5 images allowed per review");
+      return;
+    }
+
+    let filesToUpload = files;
+    if (files.length > remainingSlots) {
+      toast.warning(`Maximum 5 images allowed. Uploading first ${remainingSlots} image${remainingSlots === 1 ? "" : "s"}.`);
+      filesToUpload = files.slice(0, remainingSlots);
+    }
+
+    try {
+      setUploadingAttachment(true);
+      const newUrls: string[] = [];
+      for (let i = 0; i < filesToUpload.length; i++) {
+        const file = filesToUpload[i];
+        setUploadProgressText(`Uploading ${i + 1}/${filesToUpload.length}...`);
+        try {
+          const url = await uploadReviewImage(file);
+          newUrls.push(url);
+        } catch (err) {
+          toast.error(`Failed to upload ${file.name}: ${err instanceof Error ? err.message : "Error"}`);
+        }
+      }
+
+      if (newUrls.length > 0) {
+        setAttachmentType("image");
+        setAttachmentUrls((prev) => [...prev, ...newUrls].slice(0, MAX_COMMENT_ATTACHMENTS));
+        setAttachmentAlt(filesToUpload[0]?.name || "Review image");
+        toast.success(`Attached ${newUrls.length} image${newUrls.length > 1 ? "s" : ""}`);
+      }
+    } finally {
+      setUploadingAttachment(false);
+      setUploadProgressText(null);
+      if (reviewFileInputRef.current) {
+        reviewFileInputRef.current.value = "";
+      }
+    }
+  };
+
+  const removeAttachment = (indexToRemove: number) => {
+    setAttachmentUrls((prev) => {
+      const next = prev.filter((_, idx) => idx !== indexToRemove);
+      if (next.length === 0) {
+        setAttachmentType(null);
+        setAttachmentAlt(null);
+      }
+      return next;
+    });
+  };
+
+  const clearAttachments = () => {
+    setAttachmentUrls([]);
+    setAttachmentType(null);
+    setAttachmentAlt(null);
+    if (reviewFileInputRef.current) {
+      reviewFileInputRef.current.value = "";
+    }
+  };
+
   const [showMemeDrawer, setShowMemeDrawer] = useState(false);
   const [sortBy, setSortBy] = useState<"newest" | "top" | "highest" | "lowest">("top");
   const [revealedSpoilers, setRevealedSpoilers] = useState<Set<string>>(new Set());
@@ -242,7 +343,7 @@ export function SeriesReviewsSection({
     onSuccess: (_, vars) => {
       toast.success(vars.parentId ? "Reply posted!" : "Series review posted!");
       setReviewBody("");
-      setAttachmentUrl(null);
+      setAttachmentUrls([]);
       setAttachmentType(null);
       setAttachmentAlt(null);
       setIsSpoiler(false);
@@ -472,31 +573,89 @@ export function SeriesReviewsSection({
           className="text-xs sm:text-sm resize-none bg-background/50 leading-relaxed font-light whitespace-pre-wrap focus:ring-1 focus:ring-purple-500/50"
         />
 
-        {/* Attachment Preview if selected */}
-        {attachmentUrl && (
-          <div className="relative inline-block rounded-xl overflow-hidden border border-purple-500/40 bg-secondary/40 p-1">
-            <img
-              src={attachmentUrl}
-              alt={attachmentAlt || "Review attachment"}
-              className="max-h-36 max-w-xs object-cover rounded-lg"
-            />
-            <button
-              type="button"
-              onClick={() => {
-                setAttachmentUrl(null);
-                setAttachmentType(null);
-                setAttachmentAlt(null);
-              }}
-              className="absolute top-2 right-2 p-1 rounded-full bg-black/80 text-white hover:bg-black transition-colors"
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-            </button>
+        {/* Hidden File Input for Review Images (Max 5) */}
+        <input
+          ref={reviewFileInputRef}
+          type="file"
+          accept="image/*"
+          multiple
+          className="hidden"
+          disabled={!user || uploadingAttachment || attachmentUrls.length >= MAX_COMMENT_ATTACHMENTS}
+          onChange={(e) => handleReviewImageUpload(e.target.files)}
+        />
+
+        {/* Multi-Image Attachment Preview Strip */}
+        {attachmentUrls.length > 0 && (
+          <div className="space-y-2 rounded-xl border border-purple-500/40 bg-secondary/30 p-2.5">
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
+              <span className="font-semibold text-foreground flex items-center gap-1.5">
+                <ImageIcon className="h-3.5 w-3.5 text-purple-400" />
+                {attachmentUrls.length} / {MAX_COMMENT_ATTACHMENTS} attached ({attachmentType === "gif" ? "GIF" : "Images"})
+              </span>
+              <button
+                type="button"
+                onClick={clearAttachments}
+                className="text-2xs text-destructive hover:underline cursor-pointer"
+              >
+                Remove all
+              </button>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {attachmentUrls.map((url, idx) => (
+                <div key={idx} className="relative group/thumb rounded-lg overflow-hidden border border-border/50 bg-black/40">
+                  <img
+                    src={url}
+                    alt={`Preview ${idx + 1}`}
+                    className="h-16 w-16 sm:h-20 sm:w-20 object-cover"
+                  />
+                  <span className="absolute bottom-1 left-1 px-1 py-0.2 rounded bg-black/75 text-[10px] font-mono text-white">
+                    #{idx + 1}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => removeAttachment(idx)}
+                    className="absolute top-1 right-1 p-0.5 rounded-full bg-black/80 text-white hover:bg-destructive transition-colors cursor-pointer"
+                    title="Remove image"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
         {/* Toolbar & Action Row */}
         <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Upload Image Button (max 5) */}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => reviewFileInputRef.current?.click()}
+              disabled={!user || uploadingAttachment || attachmentUrls.length >= MAX_COMMENT_ATTACHMENTS}
+              className="h-8 gap-1.5 text-xs font-semibold cursor-pointer border-border/50 hover:bg-secondary/60"
+            >
+              {uploadingAttachment ? (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  <span>{uploadProgressText || "Uploading..."}</span>
+                </>
+              ) : (
+                <>
+                  <ImageIcon className="h-3.5 w-3.5 text-purple-400" />
+                  <span>
+                    {attachmentUrls.length >= MAX_COMMENT_ATTACHMENTS
+                      ? "Limit reached (5/5)"
+                      : attachmentUrls.length > 0
+                      ? `Add More (${attachmentUrls.length}/5)`
+                      : "Add Image (Max 5)"}
+                  </span>
+                </>
+              )}
+            </Button>
+
             {/* Reaction Meme / GIF Drawer Toggle */}
             <Button
               type="button"
@@ -534,13 +693,18 @@ export function SeriesReviewsSection({
               postReviewMutation.mutate({
                 body: reviewBody,
                 rating: selectedRating,
-                attachUrl: attachmentUrl,
+                attachUrl: serializedAttachmentUrl,
                 attachType: attachmentType,
                 attachAlt: attachmentAlt,
                 spoiler: isSpoiler,
               })
             }
-            disabled={!user || (!reviewBody.trim() && !attachmentUrl) || postReviewMutation.isPending}
+            disabled={
+              !user ||
+              (!reviewBody.trim() && attachmentUrls.length === 0) ||
+              postReviewMutation.isPending ||
+              uploadingAttachment
+            }
             className="h-8 font-bold bg-primary hover:bg-primary/90 text-primary-foreground gap-1.5 cursor-pointer shadow-md"
           >
             {postReviewMutation.isPending ? (
@@ -561,7 +725,7 @@ export function SeriesReviewsSection({
         {showMemeDrawer && (
           <LiveWebGifPicker
             onSelectGif={(gif) => {
-              setAttachmentUrl(gif.url);
+              setAttachmentUrls([gif.url]);
               setAttachmentType("gif");
               setAttachmentAlt(gif.title);
               setShowMemeDrawer(false);
@@ -703,10 +867,10 @@ export function SeriesReviewsSection({
                 {/* Attachment Media */}
                 {review.attachment_url && (!review.is_spoiler || isSpoilerRevealed) && (
                   <div className="pt-1">
-                    <img
-                      src={safeUrlOrNull(review.attachment_url) || review.attachment_url}
+                    <CommentAttachmentGrid
+                      urls={review.attachment_url}
                       alt={review.attachment_alt || "Review media"}
-                      className="max-h-60 max-w-sm rounded-xl object-cover border border-border/40 shadow-sm"
+                      type={review.attachment_type}
                     />
                   </div>
                 )}
