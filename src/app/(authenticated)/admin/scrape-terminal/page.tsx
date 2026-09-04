@@ -618,12 +618,12 @@ export default function ScrapeTerminal() {
       }
 
       setStep("AWAITING_UPLOADER");
-      appendLine("Enter Uploader Username (optional, press Enter to skip): ");
+      appendLine("Enter Uploader Username (optional, press Enter for \"vnr610\"): ");
       return;
     }
 
     if (step === "AWAITING_UPLOADER") {
-      const uploader = val || "";
+      const uploader = val || "vnr610";
       const nextContext = { ...context, uploader };
       setContext(nextContext);
       setStep("AWAITING_CONFIRM");
@@ -632,7 +632,7 @@ export default function ScrapeTerminal() {
       appendLine(`  series: ${nextContext.seriesTitle || "Dry-run Mode"}`);
       appendLine(`  source: ${nextContext.url}`);
       appendLine(`  group: ${nextContext.scanlationGroup || inferSourceGroup(nextContext.url || "") || "none"}`);
-      appendLine(`  uploader: ${uploader || "none"}`);
+      appendLine(`  uploader: ${uploader}`);
       appendLine("");
       appendLine("Run scrape and import now? (y/n): ");
       return;

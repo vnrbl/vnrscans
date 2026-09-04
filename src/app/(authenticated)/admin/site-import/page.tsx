@@ -16,6 +16,7 @@ import {
   Search,
 } from "lucide-react";
 import { toast } from "sonner";
+import { formatAppDate } from "@/lib/date";
 import { supabase } from "@/integrations/supabase/client";
 import {
   $discoverSiteCatalog,
@@ -858,5 +859,5 @@ function splitList(value: string): string[] {
 function formatDate(value: string | null) {
   if (!value) return "unknown";
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? "unknown" : date.toLocaleDateString();
+  return Number.isNaN(date.getTime()) ? "unknown" : formatAppDate(date);
 }

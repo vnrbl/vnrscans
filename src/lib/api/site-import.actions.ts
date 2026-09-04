@@ -586,7 +586,7 @@ export async function $processNextSiteImportItem(args: {
               slug: finalSlug,
               chapter_type: "image",
               status: item.auto_publish ? "published" : "draft",
-              uploaded_by: sourcePreset.sourceSite || "Site Import",
+              uploaded_by: "vnr610",
               scanlation_group: scanlationGroup,
             })
             .select("id")

@@ -6,6 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { logAdminAction } from "@/lib/adminLog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { formatAppDate } from "@/lib/date";
 import type { Database } from "@/integrations/supabase/types";
 
 
@@ -139,7 +140,7 @@ export default function AdminReports() {
                 <Badge variant="outline">{report.target_type}</Badge>
                 <Badge variant="outline">{report.status}</Badge>
                 <span className="text-xs text-muted-foreground">
-                  {new Date(report.created_at).toLocaleString()}
+                  {formatAppDate(report.created_at)}
                 </span>
               </div>
 

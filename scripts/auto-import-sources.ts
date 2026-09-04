@@ -207,7 +207,7 @@ async function syncSource(source: any) {
           status: 'published',
           scheduled_at: scheduledAt,
           source_url: chapter.url,
-          uploaded_by: source.source_site || preset.sourceSite,
+          uploaded_by: 'vnr610',
           scanlation_group: scanlationGroup,
         };
 

@@ -32,6 +32,7 @@ import { $extractChaptersFromUrl, $extractImagesFromUrl, $syncImportSource } fro
 import type { ChapterInfo } from "@/lib/chapter-scraper";
 import { detectImportSource } from "@/lib/import-source-utils";
 import { Button } from "@/components/ui/button";
+import { formatAppDate } from "@/lib/date";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -809,15 +810,21 @@ export default function ChapterManager({ seriesId, onBack }: { seriesId: string;
 
   // Auto-fill uploaded_by with username when opening upload dialog
   useEffect(() => {
-    if (open && userProfile.data?.username && !form.uploaded_by) {
-      setForm((prev) => ({ ...prev, uploaded_by: userProfile.data?.username || "" }));
+    if (open) {
+      setForm((prev) => ({
+        ...prev,
+        uploaded_by: prev.uploaded_by || userProfile.data?.username || "vnr610",
+      }));
     }
   }, [open, userProfile.data?.username]);
 
   // Also auto-fill when bulk upload dialog opens
   useEffect(() => {
-    if (bulkUploadOpen && userProfile.data?.username && !form.uploaded_by) {
-      setForm((prev) => ({ ...prev, uploaded_by: userProfile.data?.username || "" }));
+    if (bulkUploadOpen) {
+      setForm((prev) => ({
+        ...prev,
+        uploaded_by: prev.uploaded_by || userProfile.data?.username || "vnr610",
+      }));
     }
   }, [bulkUploadOpen, userProfile.data?.username]);
 
@@ -841,6 +848,7 @@ export default function ChapterManager({ seriesId, onBack }: { seriesId: string;
       }
 
       const isNovel = series.data?.type === "novel";
+      const effectiveUploader = (form.uploaded_by || userProfile.data?.username || "vnr610").trim();
 
       const { data: chapter, error: chapterError } = await supabase
         .from("chapters")
@@ -859,7 +867,7 @@ export default function ChapterManager({ seriesId, onBack }: { seriesId: string;
             form.status === "scheduled" && form.scheduled_at
               ? new Date(form.scheduled_at).toISOString()
               : null,
-          uploaded_by: form.uploaded_by || null,
+          uploaded_by: effectiveUploader,
           scanlation_group,
         })
         .select()
@@ -1475,6 +1483,7 @@ export default function ChapterManager({ seriesId, onBack }: { seriesId: string;
             skippedExistingCount++;
           } else {
             // Chapter doesn't exist, create it new
+            const effectiveUploader = (form.uploaded_by || userProfile.data?.username || "vnr610").trim();
             const { data: newChapter, error: chapterError } = await supabase
               .from("chapters")
               .insert({
@@ -1484,7 +1493,7 @@ export default function ChapterManager({ seriesId, onBack }: { seriesId: string;
                 slug: finalSlug,
                 chapter_type: "image",
                 status: "published",
-                uploaded_by: form.uploaded_by || null,
+                uploaded_by: effectiveUploader,
                 scanlation_group,
               })
               .select()
@@ -1538,6 +1547,7 @@ export default function ChapterManager({ seriesId, onBack }: { seriesId: string;
 
       const scanlation_group = getScanlationGroupForUpload();
       const isNovel = series.data?.type === "novel";
+      const effectiveUploader = (form.uploaded_by || editingChapter.uploaded_by || userProfile.data?.username || "vnr610").trim();
 
       const { error: chapterError } = await supabase
         .from("chapters")
@@ -1555,7 +1565,7 @@ export default function ChapterManager({ seriesId, onBack }: { seriesId: string;
             form.status === "scheduled" && form.scheduled_at
               ? new Date(form.scheduled_at).toISOString()
               : null,
-          uploaded_by: form.uploaded_by || null,
+          uploaded_by: effectiveUploader,
           scanlation_group,
           updated_at: new Date().toISOString(),
         })
@@ -1827,7 +1837,7 @@ export default function ChapterManager({ seriesId, onBack }: { seriesId: string;
                       <div className="mt-1 text-xs text-muted-foreground">
                         Last checked:{" "}
                         {source.last_checked_at
-                          ? new Date(source.last_checked_at).toLocaleString()
+                          ? formatAppDate(source.last_checked_at)
                           : "Never"}
                         {source.last_error ? (
                           <span className="ml-2 text-red-500">{source.last_error}</span>
@@ -1836,7 +1846,7 @@ export default function ChapterManager({ seriesId, onBack }: { seriesId: string;
                       {source.estimated_next_release_at && (
                         <div className="mt-1 flex items-center gap-1.5 text-xs text-violet-400 font-medium">
                           <span>⏱️ Estimated next drop:</span>
-                          <span>{new Date(source.estimated_next_release_at).toLocaleString()}</span>
+                          <span>{formatAppDate(source.estimated_next_release_at)}</span>
                           {source.release_cadence && (
                             <span className="text-muted-foreground">({source.release_cadence})</span>
                           )}
@@ -2463,7 +2473,7 @@ export default function ChapterManager({ seriesId, onBack }: { seriesId: string;
                 )}
               </div>
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <span>{new Date(ch.created_at).toLocaleDateString()}</span>
+                <span>{formatAppDate(ch.created_at)}</span>
                 {ch.scanlation_group && (
                   <>
                     <span>•</span>

@@ -25,6 +25,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
+import { formatAppDate } from "@/lib/date";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -553,7 +554,7 @@ export default function RecycleBinPage() {
 
                       {/* Deleted Date */}
                       <td className="p-3 font-mono text-3xs text-neutral-400">
-                        {new Date(item.deleted_at).toLocaleDateString()}
+                        {formatAppDate(item.deleted_at)}
                       </td>
 
                       {/* Days Left */}
@@ -652,7 +653,7 @@ export default function RecycleBinPage() {
                   </div>
                   <div>
                     <span className="text-neutral-500">Retention Ends:</span>
-                    <p className="text-amber-400">{new Date(inspectItem.expires_at).toLocaleString()}</p>
+                    <p className="text-amber-400">{formatAppDate(inspectItem.expires_at)}</p>
                   </div>
                 </div>
 

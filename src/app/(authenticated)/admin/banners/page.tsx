@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { logAdminAction } from "@/lib/adminLog";
 import { Button } from "@/components/ui/button";
+import { formatAppDate } from "@/lib/date";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -538,8 +539,8 @@ export default function AdminBanners() {
                     <span>Priority: {item.priority}</span>
                     <span>👁️ {item.view_count}</span>
                     <span>🖱️ {item.click_count}</span>
-                    <span>Starts: {item.starts_at ? new Date(item.starts_at).toLocaleDateString() : ""}</span>
-                    {item.expires_at && <span>Expires: {new Date(item.expires_at).toLocaleDateString()}</span>}
+                    <span>Starts: {item.starts_at ? formatAppDate(item.starts_at) : ""}</span>
+                    {item.expires_at && <span>Expires: {formatAppDate(item.expires_at)}</span>}
                   </div>
                 </div>
               </div>

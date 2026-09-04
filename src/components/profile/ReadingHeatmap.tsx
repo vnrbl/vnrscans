@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Flame, BookOpen, Calendar as CalendarIcon } from "lucide-react";
 import { useState, useMemo } from "react";
+import { formatAppDate } from "@/lib/date";
 
 type DayData = {
   date: string;
@@ -329,11 +330,7 @@ export function ReadingHeatmap() {
           }}
         >
           <p className="font-medium">
-            {new Date(hoveredDay.date.replace(/-/g, "/")).toLocaleDateString("en-US", {
-              month: "short",
-              day: "numeric",
-              year: "numeric",
-            })}
+            {formatAppDate(hoveredDay.date.replace(/-/g, "/"))}
           </p>
           <p className="text-muted-foreground">
             {hoveredDay.count === 0

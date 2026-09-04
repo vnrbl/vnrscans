@@ -574,10 +574,8 @@ async function main() {
   }
 
   // Ask for uploader username
-  const uploaderInput = (await askQuestion('Enter Uploader Username (optional, press Enter to skip): ')).trim();
-  if (uploaderInput) {
-    uploadedBy = uploaderInput;
-  }
+  const uploaderInput = (await askQuestion('Enter Uploader Username (optional, press Enter to default to "vnr610"): ')).trim();
+  uploadedBy = uploaderInput || 'vnr610';
 
   rl.close();
 

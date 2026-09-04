@@ -7,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { formatAppDate } from "@/lib/date";
 
 
 type TimeRange = "7d" | "30d" | "90d";
@@ -429,7 +430,7 @@ export default function AdminAnalytics() {
                       </p>
                     </div>
                     <div className="text-xs text-muted-foreground">
-                      {new Date(chapter.created_at).toLocaleDateString()}
+                      {formatAppDate(chapter.created_at)}
                     </div>
                   </div>
                 ))}

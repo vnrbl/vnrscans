@@ -22,6 +22,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { $deleteUser, $listUserEmails, $generateResetPasswordLink, $setUserBan } from "@/lib/api/admin.actions";
 import { logAdminAction } from "@/lib/adminLog";
 import { Button } from "@/components/ui/button";
+import { formatAppDate } from "@/lib/date";
 import {
   Dialog,
   DialogContent,
@@ -513,12 +514,12 @@ export default function AdminUsers() {
                   </span>
                 )}
                 <span title="Last read">
-                  {u.last_read_date ? new Date(u.last_read_date).toLocaleDateString() : "—"}
+                  {u.last_read_date ? formatAppDate(u.last_read_date) : "—"}
                 </span>
               </div>
 
               <div className="hidden text-xs text-muted-foreground sm:block">
-                {new Date(u.created_at).toLocaleDateString()}
+                {formatAppDate(u.created_at)}
               </div>
 
               <div className="flex items-center gap-1">

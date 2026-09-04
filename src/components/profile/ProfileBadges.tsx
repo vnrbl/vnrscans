@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { formatAppDate } from "@/lib/date";
 import {
   Dialog,
   DialogContent,
@@ -434,7 +435,7 @@ export function ProfileBadges({ accentColor }: { accentColor?: string }) {
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Earned</span>
                   <span className="font-medium">
-                    {selectedBadge.earned_at ? new Date(selectedBadge.earned_at).toLocaleDateString() : "Unknown"}
+                    {selectedBadge.earned_at ? formatAppDate(selectedBadge.earned_at) : "Unknown"}
                   </span>
                 </div>
                 <div className="flex justify-between text-sm">

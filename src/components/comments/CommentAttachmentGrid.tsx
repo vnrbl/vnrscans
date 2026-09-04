@@ -80,44 +80,37 @@ export function CommentAttachmentGrid({
 
     return (
       <>
-        <div className={`mt-2.5 inline-block max-w-full sm:max-w-md ${className}`}>
+        <div className={`mt-2 inline-block max-w-full sm:max-w-md ${className}`}>
           <div
             onClick={() => openLightbox(0)}
-            className="group relative block overflow-hidden rounded-xl border border-border/60 bg-black/40 hover:border-primary/50 transition-all duration-200 shadow-md cursor-pointer select-none max-w-full"
+            className="group relative block overflow-hidden rounded-xl border border-border/50 bg-black/40 hover:border-primary/50 transition-all duration-200 shadow-sm cursor-pointer select-none max-w-full"
           >
-            {!isLoaded && !hasError && (
-              <div className="h-40 w-48 sm:h-48 sm:w-64 animate-pulse bg-secondary/80 rounded-xl flex items-center justify-center text-muted-foreground text-xs font-medium">
-                Loading media...
-              </div>
-            )}
-
             {hasError ? (
-              <div className="flex items-center gap-2.5 p-3 bg-secondary/50 rounded-xl border border-border/50">
-                <span className="text-2xl">🔥</span>
+              <div className="flex items-center gap-2.5 p-3 bg-secondary/30 rounded-xl border border-border/40">
+                <span className="text-xl">⚠️</span>
                 <div className="min-w-0 flex-1">
-                  <p className="text-xs font-bold text-foreground truncate">{alt || "Comment Media"}</p>
-                  <span className="text-[10px] text-primary font-semibold">Click to view image</span>
+                  <p className="text-xs font-semibold text-foreground truncate">{alt || "Comment Media"}</p>
+                  <span className="text-[10px] text-muted-foreground">Media unavailable</span>
                 </div>
               </div>
             ) : (
-              <img
-                src={url}
-                alt={alt ?? (isGif ? "Comment GIF" : "Comment Image")}
-                referrerPolicy="no-referrer"
-                loading="lazy"
-                decoding="async"
-                className={`max-h-56 sm:max-h-72 w-auto max-w-full object-contain rounded-xl group-hover:scale-[1.01] transition-transform duration-200 ${
-                  isLoaded ? "block" : "hidden"
-                }`}
-                onLoad={() => setLoadedMap((prev) => ({ ...prev, 0: true }))}
-                onError={() => {
-                  setErrorMap((prev) => ({ ...prev, 0: true }));
-                  setLoadedMap((prev) => ({ ...prev, 0: true }));
-                }}
-              />
+              <div className="relative flex items-center justify-center bg-secondary/10">
+                <img
+                  src={url}
+                  alt={alt ?? (isGif ? "Comment GIF" : "Comment Image")}
+                  referrerPolicy="no-referrer"
+                  loading="lazy"
+                  decoding="async"
+                  className="max-h-56 sm:max-h-72 w-auto max-w-full object-contain rounded-xl group-hover:scale-[1.01] transition-transform duration-200 block"
+                  onLoad={() => setLoadedMap((prev) => ({ ...prev, 0: true }))}
+                  onError={() => {
+                    setErrorMap((prev) => ({ ...prev, 0: true }));
+                  }}
+                />
+              </div>
             )}
 
-            {!hasError && isLoaded && (
+            {!hasError && (
               <div className="absolute top-2 left-2 px-2 py-0.5 rounded-md bg-black/75 backdrop-blur-md text-[10px] font-bold text-primary flex items-center gap-1 border border-primary/30 pointer-events-none">
                 {isGif ? <Film className="h-3 w-3" /> : <Flame className="h-3 w-3" />}
                 <span>{isGif ? "GIF" : "MEME"}</span>
@@ -211,9 +204,7 @@ export function CommentAttachmentGrid({
             referrerPolicy="no-referrer"
             loading="lazy"
             decoding="async"
-            className={`h-full w-full object-cover group-hover:scale-105 transition-transform duration-300 ${
-              isLoaded ? "block" : "hidden"
-            }`}
+            className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-300 block"
             onLoad={() => setLoadedMap((prev) => ({ ...prev, [idx]: true }))}
             onError={() => {
               setErrorMap((prev) => ({ ...prev, [idx]: true }));

@@ -30,6 +30,7 @@ import { useAuth, useIsAdmin } from "@/hooks/useAuth";
 import { safeUrlOrNull, serializeAttachmentUrls, MAX_COMMENT_ATTACHMENTS } from "@/lib/safe-url";
 import { LiveWebGifPicker } from "@/components/comments/LiveWebGifPicker";
 import { CommentAttachmentGrid } from "@/components/comments/CommentAttachmentGrid";
+import { formatAppDate } from "@/lib/date";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
@@ -822,7 +823,7 @@ export function SeriesReviewsSection({
                         )}
                       </div>
                       <span className="text-2xs text-muted-foreground">
-                        {new Date(review.created_at).toLocaleDateString()}
+                        {formatAppDate(review.created_at)}
                       </span>
                     </div>
                   </div>
@@ -1020,7 +1021,7 @@ export function SeriesReviewsSection({
                                 {replyAuthor.username || "Reader"}
                               </span>
                               <span className="text-2xs text-muted-foreground">
-                                {new Date(reply.created_at).toLocaleDateString()}
+                                {formatAppDate(reply.created_at)}
                               </span>
                             </div>
 

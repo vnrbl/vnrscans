@@ -17,6 +17,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogT
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
+import { formatAppDate } from "@/lib/date";
 
 
 type AnnouncementForm = {
@@ -230,8 +231,8 @@ export default function AdminAnnouncements() {
                 </div>
                 <p className="mt-2 text-sm text-muted-foreground line-clamp-2">{item.content}</p>
                 <p className="mt-2 text-xs text-muted-foreground">
-                  {item.starts_at && `From ${new Date(item.starts_at).toLocaleString()}`}
-                  {item.expires_at && ` · Until ${new Date(item.expires_at).toLocaleString()}`}
+                  {item.starts_at && `From ${formatAppDate(item.starts_at)}`}
+                  {item.expires_at && ` · Until ${formatAppDate(item.expires_at)}`}
                 </p>
               </div>
               <div className="flex shrink-0 gap-1">

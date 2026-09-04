@@ -11,6 +11,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { formatAppDate } from "@/lib/date";
 
 /* ------------------------------------------------------------------ */
 /*  SeriesHeader — static metadata that never re-renders on           */
@@ -282,7 +283,7 @@ export const SeriesHeader = React.memo(function SeriesHeader({
       )}
 
       <MetaSection label="Details">
-        <MetaPill>Updated {new Date(s.updated_at).toLocaleDateString()}</MetaPill>
+        <MetaPill>Updated {formatAppDate(s.updated_at)}</MetaPill>
         {uniqueChapterCount > 0 && (
           <button
             onClick={() => {

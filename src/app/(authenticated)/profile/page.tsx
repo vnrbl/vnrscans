@@ -49,6 +49,9 @@ import { ProfileWidgets } from "@/components/profile/ProfileWidgets";
 import { AccentColorPicker } from "@/components/profile/AccentColorPicker";
 import { OptimizedImage } from "@/components/OptimizedImage";
 import { SectionPagination } from "@/components/SectionPagination";
+import { CommentAttachmentGrid } from "@/components/comments/CommentAttachmentGrid";
+import { formatAppDate } from "@/lib/date";
+import { useAuth } from "@/hooks/useAuth";
 
 import { SocialLinksEditor, SocialLinksDisplay, type SocialLinksData } from "@/components/profile/SocialLinks";
 import { xpSourceLabel } from "@/lib/xp";
@@ -375,6 +378,7 @@ const FRAME_REQUIREMENTS: Record<string, {
 };
 
 export default function ProfilePage() {
+  const { user } = useAuth();
   const qc = useQueryClient();
   const navigate = useNavigate();
   const [mounted, setMounted] = useState(false);
@@ -390,24 +394,25 @@ export default function ProfilePage() {
 
   // Fetch profile with all data
   const profile = useQuery({
-    queryKey: ["profile", "me"],
+    queryKey: ["profile", "me", user?.id],
     queryFn: async () => {
-      const { data: u } = await supabase.auth.getUser();
-      if (!u.user) throw new Error("No user");
+      const uid = user?.id;
+      if (!uid) throw new Error("No user");
       const { data, error } = await supabase
         .from("profiles")
         .select("*")
-        .eq("user_id", u.user.id)
+        .eq("user_id", uid)
         .maybeSingle();
       if (error) throw error;
-      return { ...data, email: u.user.email } as any;
+      return { ...data, email: user?.email } as any;
     },
-    staleTime: 0,
+    enabled: !!user?.id,
+    staleTime: 30 * 1000,
   });
 
   // Real-time synchronization with Supabase DB
   useEffect(() => {
-    const userId = profile.data?.user_id;
+    const userId = profile.data?.user_id || user?.id;
     if (!userId) return;
 
     const refreshUserData = () => {
@@ -471,21 +476,21 @@ export default function ProfilePage() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [profile.data?.user_id, qc]);
+  }, [profile.data?.user_id, user?.id, qc]);
 
   // Fetch equipped badge/title
   const equippedBadge = useQuery({
-    queryKey: ["profile", "equipped-badge"],
+    queryKey: ["profile", "equipped-badge", user?.id],
     queryFn: async () => {
-      const { data: u } = await supabase.auth.getUser();
-      if (!u.user) return null;
+      const uid = user?.id;
+      if (!uid) return null;
       const { data, error } = await supabase
         .from("user_badges")
         .select(`
           *,
           badge:badge_id(*)
         `)
-        .eq("user_id", u.user.id)
+        .eq("user_id", uid)
         .eq("is_equipped", true)
         .maybeSingle();
       if (error) {
@@ -497,18 +502,19 @@ export default function ProfilePage() {
       }
       return data as any;
     },
-    staleTime: 0,
+    enabled: !!user?.id,
+    staleTime: 30 * 1000,
   });
 
   // Fetch user comment history
   const commentHistory = useQuery({
-    queryKey: ["profile", "comment-history"],
+    queryKey: ["profile", "comment-history", user?.id],
     queryFn: async () => {
-      const { data: u } = await supabase.auth.getUser();
-      if (!u.user) return [];
+      const uid = user?.id;
+      if (!uid) return [];
       const { data, error } = await (supabase.from("comments") as any)
-        .select("id,content,created_at,chapter_id,series_id,parent_id,is_spoiler,is_hidden,attachment_type,attachment_url")
-        .eq("user_id", u.user.id)
+        .select("id,content,created_at,chapter_id,series_id,parent_id,is_spoiler,is_hidden,attachment_type,attachment_url,attachment_alt")
+        .eq("user_id", uid)
         .order("created_at", { ascending: false })
         .limit(100);
       if (error) {
@@ -517,7 +523,8 @@ export default function ProfilePage() {
       }
       return data || [];
     },
-    staleTime: 0,
+    enabled: !!user?.id,
+    staleTime: 30 * 1000,
   });
 
   // Fetch parent comments for comment history
@@ -598,16 +605,16 @@ export default function ProfilePage() {
 
   // Fetch reading stats
   const readingStats = useQuery({
-    queryKey: ["profile", "reading-stats"],
+    queryKey: ["profile", "reading-stats", user?.id],
     queryFn: async () => {
-      const { data: u } = await supabase.auth.getUser();
-      if (!u.user) return { chapters: 0, series: 0, comments: 0, ratings: 0 };
+      const uid = user?.id;
+      if (!uid) return { chapters: 0, series: 0, comments: 0, ratings: 0 };
       
       const [chaptersRead, seriesFollowed, commentsCount, ratingsCount] = await Promise.all([
-        supabase.from("reading_history").select("*", { count: "exact", head: true }).eq("user_id", u.user.id),
-        supabase.from("series_follows").select("*", { count: "exact", head: true }).eq("user_id", u.user.id),
-        supabase.from("comments").select("*", { count: "exact", head: true }).eq("user_id", u.user.id),
-        supabase.from("ratings").select("*", { count: "exact", head: true }).eq("user_id", u.user.id),
+        supabase.from("reading_history").select("*", { count: "exact", head: true }).eq("user_id", uid),
+        supabase.from("series_follows").select("*", { count: "exact", head: true }).eq("user_id", uid),
+        supabase.from("comments").select("*", { count: "exact", head: true }).eq("user_id", uid),
+        supabase.from("ratings").select("*", { count: "exact", head: true }).eq("user_id", uid),
       ]);
 
       return {
@@ -617,31 +624,33 @@ export default function ProfilePage() {
         ratings: ratingsCount.count || 0,
       };
     },
-    staleTime: 0,
+    enabled: !!user?.id,
+    staleTime: 30 * 1000,
   });
 
   // Fetch user roles
   const userRoles = useQuery({
-    queryKey: ["profile", "roles"],
+    queryKey: ["profile", "roles", user?.id],
     queryFn: async () => {
-      const { data: u } = await supabase.auth.getUser();
-      if (!u.user) return [];
+      const uid = user?.id;
+      if (!uid) return [];
       const { data, error } = await supabase
         .from("user_roles")
         .select("role")
-        .eq("user_id", u.user.id);
+        .eq("user_id", uid);
       if (error) return [];
       return (data || []).map((r) => r.role);
     },
-    staleTime: 0,
+    enabled: !!user?.id,
+    staleTime: 60 * 1000,
   });
 
   // Fetch reading history timestamps to compute streak (all-time, paginated)
   const historyQuery = useQuery({
-    queryKey: ["profile", "reading-history-dates"],
+    queryKey: ["profile", "reading-history-dates", user?.id],
     queryFn: async () => {
-      const { data: u } = await supabase.auth.getUser();
-      if (!u.user) return [];
+      const uid = user?.id;
+      if (!uid) return [];
       let allDates: { updated_at: string }[] = [];
       let from = 0;
       const PAGE_SIZE = 1000;
@@ -649,7 +658,7 @@ export default function ProfilePage() {
         const { data, error } = await supabase
           .from("reading_history")
           .select("updated_at")
-          .eq("user_id", u.user.id)
+          .eq("user_id", uid)
           .range(from, from + PAGE_SIZE - 1);
         if (error || !data || data.length === 0) break;
         allDates.push(...data);
@@ -658,24 +667,26 @@ export default function ProfilePage() {
       }
       return allDates;
     },
-    staleTime: 30 * 1000,
+    enabled: !!user?.id,
+    staleTime: 60 * 1000,
   });
 
   // XP history ledger — newest first, capped to a few hundred rows.
   const xpHistory = useQuery({
-    queryKey: ["xp-history", "me"],
+    queryKey: ["xp-history", "me", user?.id],
     queryFn: async () => {
-      const { data: u } = await supabase.auth.getUser();
-      if (!u.user) return [];
+      const uid = user?.id;
+      if (!uid) return [];
       const { data, error } = await supabase
         .from("xp_transactions")
         .select("id,amount,source,reference_id,reference_type,description,created_at")
-        .eq("user_id", u.user.id)
+        .eq("user_id", uid)
         .order("created_at", { ascending: false })
         .limit(200);
       if (error) throw error;
       return data ?? [];
     },
+    enabled: !!user?.id,
     staleTime: 30 * 1000,
   });
 
@@ -842,57 +853,39 @@ export default function ProfilePage() {
     staleTime: 30 * 1000,
   });
 
-  // ─── Uploaded Series: series where user uploaded chapters (all-time, paginated) ───
+  // ─── Uploaded Series: series where user uploaded chapters (fast single-query join) ───
   const activeUsername = profile.data?.username;
   const uploadedSeries = useQuery({
     queryKey: ["profile", "uploaded-series", activeUsername],
     queryFn: async () => {
       if (!activeUsername) return [];
-      let allChapters: { series_id: string }[] = [];
-      let from = 0;
-      const PAGE_SIZE = 1000;
       const matchNames = Array.from(new Set([activeUsername, "vnr610"].filter(Boolean)));
-      while (true) {
-        const { data: chaptersData, error: chaptersError } = await supabase
-          .from("chapters")
-          .select("series_id")
-          .in("uploaded_by", matchNames)
-          .eq("status", "published")
-          .range(from, from + PAGE_SIZE - 1);
-        if (chaptersError || !chaptersData || chaptersData.length === 0) break;
-        allChapters.push(...chaptersData);
-        if (chaptersData.length < PAGE_SIZE) break;
-        from += PAGE_SIZE;
-      }
-      if (allChapters.length === 0) return [];
+      
+      const { data, error } = await supabase
+        .from("series")
+        .select("id, slug, title, cover_url, type, status, rating_average, view_count, chapters!inner(count)")
+        .eq("is_hidden", false)
+        .in("chapters.uploaded_by", matchNames);
 
-      const seriesChapterCount = new Map<string, number>();
-      for (const c of allChapters) {
-        seriesChapterCount.set(c.series_id, (seriesChapterCount.get(c.series_id) || 0) + 1);
-      }
-      const seriesIds = Array.from(seriesChapterCount.keys());
-
-      // Fetch series details in batches of 50
-      const allSeries: any[] = [];
-      for (let i = 0; i < seriesIds.length; i += 50) {
-        const batchIds = seriesIds.slice(i, i + 50);
-        const { data: seriesData, error: seriesError } = await supabase
-          .from("series")
-          .select("id,slug,title,cover_url,type,status,rating_average,view_count")
-          .in("id", batchIds)
-          .eq("is_hidden", false);
-        if (!seriesError && seriesData) {
-          allSeries.push(...seriesData);
-        }
+      if (error || !data) {
+        console.error("Error fetching uploaded series:", error);
+        return [];
       }
 
-      return allSeries.map((s: any) => ({
-        ...s,
-        uploaded_chapter_count: seriesChapterCount.get(s.id) || 0,
+      return data.map((s: any) => ({
+        id: s.id,
+        slug: s.slug,
+        title: s.title,
+        cover_url: s.cover_url,
+        type: s.type,
+        status: s.status,
+        rating_average: s.rating_average,
+        view_count: s.view_count,
+        uploaded_chapter_count: s.chapters?.[0]?.count || 0,
       })).sort((a: any, b: any) => b.uploaded_chapter_count - a.uploaded_chapter_count);
     },
     enabled: !!activeUsername,
-    staleTime: 30 * 1000,
+    staleTime: 60 * 1000,
   });
 
   const streaks = useMemo(() => {
@@ -1749,7 +1742,7 @@ export default function ProfilePage() {
                 <SocialLinksDisplay values={socialLinks} accentColor={accentColor} />
                 <Badge variant="outline" className="text-xs border border-border/50 bg-secondary/20 text-muted-foreground shadow-sm">
                   <Calendar className="mr-1.5 h-3.5 w-3.5" style={{ color: accentColor }} />
-                  Joined {new Date(profile.data?.created_at || "").toLocaleDateString()}
+                  Joined {formatAppDate(profile.data?.created_at)}
                 </Badge>
                 {activeUsername && (
                   <Link
@@ -2345,7 +2338,7 @@ export default function ProfilePage() {
                         }}
                         onClick={(e) => {
                           const target = e.target as HTMLElement;
-                          if (target.closest("a, button")) return;
+                          if (target.closest("a, button, [data-media-action='true']")) return;
                           if (seriesInfo?.slug) {
                             if (chapterInfo?.slug) {
                               navigate({
@@ -2400,40 +2393,43 @@ export default function ProfilePage() {
                             })()}
 
                             {/* Comment content */}
-                            <p className="text-sm leading-relaxed text-foreground">
-                              {comment.is_spoiler ? (
-                                <span className="italic text-muted-foreground">⚠️ Spoiler comment</span>
-                              ) : comment.is_hidden ? (
-                                <span className="italic text-muted-foreground">🚫 Hidden by moderator</span>
-                              ) : (
-                                (() => {
-                                  const clean = stripBbCode(comment.content || "");
-                                  return clean.length > 200 ? clean.slice(0, 200) + "..." : clean;
-                                })()
-                              )}
-                            </p>
-
-                            {/* Attachment indicator */}
-                            {comment.attachment_url && (() => {
-                              const urls = parseSafeAttachmentUrls(comment.attachment_url);
-                              const count = urls.length;
-                              return (
-                                <div className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground">
-                                  <span>📎</span>
-                                  <span>
-                                    {count > 1
-                                      ? `${count} images attached`
-                                      : `${comment.attachment_type === "gif" ? "GIF" : "Image"} attached`}
-                                  </span>
-                                </div>
-                              );
+                            {(() => {
+                              if (comment.is_spoiler) {
+                                return <p className="text-sm leading-relaxed italic text-muted-foreground">⚠️ Spoiler comment</p>;
+                              }
+                              if (comment.is_hidden) {
+                                return <p className="text-sm leading-relaxed italic text-muted-foreground">🚫 Hidden by moderator</p>;
+                              }
+                              const clean = stripBbCode(comment.content || "").trim();
+                              const isPlaceholderGifText = (clean.toLowerCase() === "[gif]" || clean.toLowerCase() === "[image]") && !!comment.attachment_url;
+                              
+                              return !isPlaceholderGifText && clean.length > 0 ? (
+                                <p className="text-sm leading-relaxed text-foreground">
+                                  {clean.length > 200 ? clean.slice(0, 200) + "..." : clean}
+                                </p>
+                              ) : null;
                             })()}
+
+                            {/* Visible GIF / Image Attachment */}
+                            {comment.attachment_url && !comment.is_spoiler && !comment.is_hidden && (
+                              <div
+                                className="mt-2.5"
+                                data-media-action="true"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <CommentAttachmentGrid
+                                  urls={comment.attachment_url}
+                                  type={comment.attachment_type}
+                                  alt={comment.attachment_alt}
+                                />
+                              </div>
+                            )}
 
                             {/* Meta row */}
                             <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                               <span className="flex items-center gap-1">
                                 <Calendar className="h-3 w-3" />
-                                {new Date(comment.created_at).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" })}
+                                {formatAppDate(comment.created_at)}
                               </span>
                               <span className="text-border">•</span>
                               <span>{new Date(comment.created_at).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}</span>
@@ -2827,10 +2823,7 @@ export default function ProfilePage() {
                           )}
                           <div className="mt-1 flex items-center gap-1 text-[11px] text-muted-foreground">
                             <Calendar className="h-3 w-3" />
-                            {new Date(row.created_at).toLocaleString(undefined, {
-                              year: "numeric",
-                              month: "short",
-                              day: "numeric",
+                            {formatAppDate(row.created_at)} • {new Date(row.created_at).toLocaleTimeString(undefined, {
                               hour: "2-digit",
                               minute: "2-digit",
                             })}

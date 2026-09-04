@@ -1,4 +1,5 @@
 import { Resend } from "resend";
+import { formatAppDate } from "./date";
 
 /**
  * Direct Resend client (used by Next.js API routes as fallback).
@@ -94,7 +95,7 @@ export async function sendNewUserNotification(params: {
         </tr>
         <tr>
           <td style="padding:8px 0; font-weight:600;">Registered</td>
-          <td style="padding:8px 0;">${createdAt ? new Date(createdAt).toLocaleString() : "just now"}</td>
+          <td style="padding:8px 0;">${createdAt ? formatAppDate(createdAt) : "just now"}</td>
         </tr>
       </table>
 

@@ -5,6 +5,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
+import { formatAppDate } from "@/lib/date";
 import {
   BookOpen,
   Plus,
@@ -599,7 +600,7 @@ function NovelsWriterContent() {
           publishStatus === "scheduled" && scheduledAt
             ? new Date(scheduledAt).toISOString()
             : null,
-        uploaded_by: authorName,
+        uploaded_by: userProfile.data?.username || "vnr610",
       };
 
       let finalChapterId = "";
@@ -1036,7 +1037,7 @@ function NovelsWriterContent() {
                             Ch.{ch.chapter_number} {ch.title ? `- ${ch.title}` : ""}
                           </span>
                           <span className="text-[10px] text-muted-foreground mt-0.5">
-                            {new Date(ch.created_at).toLocaleDateString()}
+                            {formatAppDate(ch.created_at)}
                           </span>
                         </div>
                         

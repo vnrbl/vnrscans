@@ -42,6 +42,7 @@ import { $importComickMetadataToSeries } from "@/lib/api/comick-import.actions";
 import { detectImportSource } from "@/lib/import-source-utils";
 import { ComickMetadataImporter } from "@/components/admin/ComickMetadataImporter";
 import { Button } from "@/components/ui/button";
+import { formatAppDate } from "@/lib/date";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -1250,7 +1251,7 @@ export function LiveSeriesEditor({ series: initialSeries, slug, trigger }: LiveS
                                   {ch.scanlation_group || "—"}
                                 </td>
                                 <td className="p-2.5 text-muted-foreground">
-                                  {new Date(ch.created_at).toLocaleDateString()}
+                                  {formatAppDate(ch.created_at)}
                                 </td>
                                 <td className="p-2.5 text-right">
                                   <Button
@@ -1299,7 +1300,7 @@ export function LiveSeriesEditor({ series: initialSeries, slug, trigger }: LiveS
                               <span className="text-xs font-bold uppercase font-mono">{src.source_site || "Source"}</span>
                               {src.last_checked_at && (
                                 <span className="text-2xs text-muted-foreground">
-                                  Last checked: {new Date(src.last_checked_at).toLocaleDateString()}
+                                  Last checked: {formatAppDate(src.last_checked_at)}
                                 </span>
                               )}
                             </div>

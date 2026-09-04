@@ -15,6 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { formatAppDate } from "@/lib/date";
 
 
 export default function AdminModeration() {
@@ -156,10 +157,10 @@ export default function AdminModeration() {
                     <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
                       <span>ID: {item.content_id.slice(0, 8)}</span>
                       {item.reported_by && <span>Reported by: user {item.reported_by.slice(0, 8)}…</span>}
-                      <span>Created: {new Date(item.created_at).toLocaleString()}</span>
+                      <span>Created: {formatAppDate(item.created_at)}</span>
                       {item.reviewed_at && (
                         <>
-                          <span>Reviewed: {new Date(item.reviewed_at).toLocaleString()}</span>
+                          <span>Reviewed: {formatAppDate(item.reviewed_at)}</span>
                           {item.reviewed_by && <span>By: user {item.reviewed_by.slice(0, 8)}…</span>}
                         </>
                       )}

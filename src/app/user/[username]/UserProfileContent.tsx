@@ -36,6 +36,8 @@ import { stripBbCode } from "@/lib/bbcode";
 import { parseSafeAttachmentUrls } from "@/lib/safe-url";
 import { OptimizedImage } from "@/components/OptimizedImage";
 import { SectionPagination } from "@/components/SectionPagination";
+import { CommentAttachmentGrid } from "@/components/comments/CommentAttachmentGrid";
+import { formatAppDate } from "@/lib/date";
 
 type PublicProfileStats = {
   chapters_read: number;
@@ -702,57 +704,39 @@ export default function UserProfileContent({ username }: { username: string }) {
     staleTime: 30 * 1000,
   });
 
-  // ─── Uploaded Series: series where user uploaded chapters (all-time, paginated) ───
+  // ─── Uploaded Series: series where user uploaded chapters (fast single-query join) ───
   const targetUsername = profile.data?.username || decodedUsername;
   const uploadedSeries = useQuery({
     queryKey: ["public-profile-uploaded-series", targetUsername],
     queryFn: async () => {
       if (!targetUsername) return [];
-      let allChapters: { series_id: string }[] = [];
-      let from = 0;
-      const PAGE_SIZE = 1000;
       const matchNames = Array.from(new Set([targetUsername, decodedUsername, username, "The Love Venerable 0", "vnr610"].filter(Boolean)));
-      while (true) {
-        const { data: chaptersData, error: chaptersError } = await supabase
-          .from("chapters")
-          .select("series_id")
-          .in("uploaded_by", matchNames)
-          .eq("status", "published")
-          .range(from, from + PAGE_SIZE - 1);
-        if (chaptersError || !chaptersData || chaptersData.length === 0) break;
-        allChapters.push(...chaptersData);
-        if (chaptersData.length < PAGE_SIZE) break;
-        from += PAGE_SIZE;
-      }
-      if (allChapters.length === 0) return [];
+      
+      const { data, error } = await supabase
+        .from("series")
+        .select("id, slug, title, cover_url, type, status, rating_average, view_count, chapters!inner(count)")
+        .eq("is_hidden", false)
+        .in("chapters.uploaded_by", matchNames);
 
-      const seriesChapterCount = new Map<string, number>();
-      for (const c of allChapters) {
-        seriesChapterCount.set(c.series_id, (seriesChapterCount.get(c.series_id) || 0) + 1);
-      }
-      const seriesIds = Array.from(seriesChapterCount.keys());
-
-      // Fetch series details in batches of 50
-      const allSeries: any[] = [];
-      for (let i = 0; i < seriesIds.length; i += 50) {
-        const batchIds = seriesIds.slice(i, i + 50);
-        const { data: seriesData, error: seriesError } = await supabase
-          .from("series")
-          .select("id,slug,title,cover_url,type,status,rating_average,view_count")
-          .in("id", batchIds)
-          .eq("is_hidden", false);
-        if (!seriesError && seriesData) {
-          allSeries.push(...seriesData);
-        }
+      if (error || !data) {
+        console.error("Error fetching uploaded series:", error);
+        return [];
       }
 
-      return allSeries.map((s: any) => ({
-        ...s,
-        uploaded_chapter_count: seriesChapterCount.get(s.id) || 0,
+      return data.map((s: any) => ({
+        id: s.id,
+        slug: s.slug,
+        title: s.title,
+        cover_url: s.cover_url,
+        type: s.type,
+        status: s.status,
+        rating_average: s.rating_average,
+        view_count: s.view_count,
+        uploaded_chapter_count: s.chapters?.[0]?.count || 0,
       })).sort((a: any, b: any) => b.uploaded_chapter_count - a.uploaded_chapter_count);
     },
     enabled: !!username && isProfilePublic,
-    staleTime: 30 * 1000,
+    staleTime: 60 * 1000,
   });
 
   // Fetch total comments count accurately from DB
@@ -869,6 +853,25 @@ export default function UserProfileContent({ username }: { username: string }) {
   });
 
 
+  // Paginated slices (20 items per page) - must be before any conditional returns to obey Rules of Hooks
+  const paginatedUploadedSeries = useMemo(() => {
+    const list = uploadedSeries.data || [];
+    const start = (uploadedPage - 1) * 20;
+    return list.slice(start, start + 20);
+  }, [uploadedSeries.data, uploadedPage]);
+
+  const paginatedComments = useMemo(() => {
+    const list = commentHistory.data || [];
+    const start = (commentsPage - 1) * 20;
+    return list.slice(start, start + 20);
+  }, [commentHistory.data, commentsPage]);
+
+  const paginatedLibrary = useMemo(() => {
+    const list = publicLibrary.data || [];
+    const start = (libraryPage - 1) * 20;
+    return list.slice(start, start + 20);
+  }, [publicLibrary.data, libraryPage]);
+
   // Loading state
   if (!mounted || profile.isLoading) {
     return (
@@ -911,25 +914,6 @@ export default function UserProfileContent({ username }: { username: string }) {
   const xpProgress = ((xp % xpForNextLevel) / xpForNextLevel) * 100;
   const roles = userRoles.data ?? [];
   const profileVisibility = profile.data.profile_visibility ?? "public";
-
-  // Paginated slices (20 items per page)
-  const paginatedUploadedSeries = useMemo(() => {
-    const list = uploadedSeries.data || [];
-    const start = (uploadedPage - 1) * 20;
-    return list.slice(start, start + 20);
-  }, [uploadedSeries.data, uploadedPage]);
-
-  const paginatedComments = useMemo(() => {
-    const list = commentHistory.data || [];
-    const start = (commentsPage - 1) * 20;
-    return list.slice(start, start + 20);
-  }, [commentHistory.data, commentsPage]);
-
-  const paginatedLibrary = useMemo(() => {
-    const list = publicLibrary.data || [];
-    const start = (libraryPage - 1) * 20;
-    return list.slice(start, start + 20);
-  }, [publicLibrary.data, libraryPage]);
 
   const socialLinks = {
     social_discord: profile.data.social_discord || "",
@@ -1468,7 +1452,7 @@ export default function UserProfileContent({ username }: { username: string }) {
                 <SocialLinksDisplay values={socialLinks} accentColor={accentColor} />
                 <Badge variant="outline" className="text-xs border border-border/50 bg-secondary/20 text-muted-foreground shadow-sm">
                   <Calendar className="mr-1.5 h-3.5 w-3.5" style={{ color: accentColor }} />
-                  Joined {new Date(profile.data.created_at || "").toLocaleDateString()}
+                  Joined {formatAppDate(profile.data.created_at)}
                 </Badge>
               </div>
 
@@ -1869,7 +1853,7 @@ export default function UserProfileContent({ username }: { username: string }) {
                         }}
                         onClick={(e) => {
                           const target = e.target as HTMLElement;
-                          if (target.closest("a, button")) return;
+                          if (target.closest("a, button, [data-media-action='true']")) return;
                           if (seriesInfo?.slug) {
                             if (chapterInfo?.slug) {
                               navigate({
@@ -1924,38 +1908,43 @@ export default function UserProfileContent({ username }: { username: string }) {
                             })()}
 
                             {/* Comment content */}
-                            <p className="text-sm leading-relaxed text-foreground text-left">
-                              {comment.is_spoiler ? (
-                                <span className="italic text-muted-foreground">⚠️ Spoiler comment</span>
-                              ) : (
-                                (() => {
-                                  const clean = stripBbCode(comment.content || "");
-                                  return clean.length > 200 ? clean.slice(0, 200) + "..." : clean;
-                                })()
-                              )}
-                            </p>
-
-                            {/* Attachment indicator */}
-                            {comment.attachment_url && (() => {
-                              const urls = parseSafeAttachmentUrls(comment.attachment_url);
-                              const count = urls.length;
-                              return (
-                                <div className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground text-left">
-                                  <span>📎</span>
-                                  <span>
-                                    {count > 1
-                                      ? `${count} images attached`
-                                      : `${comment.attachment_type === "gif" ? "GIF" : "Image"} attached`}
-                                  </span>
-                                </div>
-                              );
+                            {(() => {
+                              if (comment.is_spoiler) {
+                                return <p className="text-sm leading-relaxed italic text-muted-foreground text-left">⚠️ Spoiler comment</p>;
+                              }
+                              if (comment.is_hidden) {
+                                return <p className="text-sm leading-relaxed italic text-muted-foreground text-left">🚫 Hidden by moderator</p>;
+                              }
+                              const clean = stripBbCode(comment.content || "").trim();
+                              const isPlaceholderGifText = (clean.toLowerCase() === "[gif]" || clean.toLowerCase() === "[image]") && !!comment.attachment_url;
+                              
+                              return !isPlaceholderGifText && clean.length > 0 ? (
+                                <p className="text-sm leading-relaxed text-foreground text-left">
+                                  {clean.length > 200 ? clean.slice(0, 200) + "..." : clean}
+                                </p>
+                              ) : null;
                             })()}
+
+                            {/* Visible GIF / Image Attachment */}
+                            {comment.attachment_url && !comment.is_spoiler && !comment.is_hidden && (
+                              <div
+                                className="mt-2.5"
+                                data-media-action="true"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <CommentAttachmentGrid
+                                  urls={comment.attachment_url}
+                                  type={comment.attachment_type}
+                                  alt={comment.attachment_alt}
+                                />
+                              </div>
+                            )}
 
                             {/* Meta row */}
                             <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                               <span className="flex items-center gap-1 text-left">
                                 <Calendar className="h-3 w-3" />
-                                {new Date(comment.created_at).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" })}
+                                {formatAppDate(comment.created_at)}
                               </span>
                               <span className="text-border">•</span>
                               <span>{new Date(comment.created_at).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}</span>
@@ -2095,7 +2084,7 @@ export default function UserProfileContent({ username }: { username: string }) {
                             <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
                               <span className="inline-flex items-center gap-1">
                                 <Clock className="h-3 w-3" />
-                                Updated {new Date(item.updated_at).toLocaleDateString()}
+                                Updated {formatAppDate(item.updated_at)}
                               </span>
                               <span className="inline-flex items-center gap-1 font-medium">
                                 <Star className="h-3 w-3 text-amber-400 fill-amber-400" />

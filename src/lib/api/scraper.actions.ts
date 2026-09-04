@@ -48,7 +48,16 @@ async function verifyAdmin(requestUserToken: string) {
   const isAdmin = (roles ?? []).some((r: any) => r.role === "admin");
   if (!isAdmin) throw new Error("Forbidden: admin role required");
 
-  return user;
+  // Fetch username from profiles table
+  const { data: profile } = await admin
+    .from("profiles")
+    .select("username")
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  (user as any).username = profile?.username || "vnr610";
+
+  return user as typeof user & { username: string };
 }
 
 export async function $extractChaptersFromUrl(args: {
@@ -375,12 +384,12 @@ export async function $runCloudScrape(args: {
     })
     .parse(data);
 
-  await verifyAdmin(validated.accessToken);
+  const adminUser = await verifyAdmin(validated.accessToken);
 
   const admin = getAdminSupabase();
   const imageUrlExample = validated.imageUrlExample || null;
   const scanlationGroup = validated.scanlationGroup?.trim() || inferSourceGroup(validated.url);
-  const uploadedBy = validated.uploader?.trim() || null;
+  const uploadedBy = validated.uploader?.trim() || (adminUser as any)?.username || "vnr610";
 
   const allDiscovered = await extractChaptersFromSeriesUrl(validated.url);
 
@@ -668,8 +677,10 @@ export async function $syncImportSource(args: {
     })
     .parse(data);
 
+  let uploaderUsername = "vnr610";
   if (validated.accessToken !== "cron-internal") {
-    await verifyAdmin(validated.accessToken);
+    const adminUser = await verifyAdmin(validated.accessToken);
+    uploaderUsername = (adminUser as any)?.username || "vnr610";
   }
 
   const admin = getAdminSupabase();
@@ -818,7 +829,7 @@ export async function $syncImportSource(args: {
           status: "published",
           scheduled_at: scheduledAt,
           source_url: chapter.url,
-          uploaded_by: source.source_site || sourcePreset.sourceSite,
+          uploaded_by: uploaderUsername,
           scanlation_group: scanlationGroup,
         });
         chapterImages.set(chapterScanKey(chapter.chapterNumber, scanlationGroup), images);

@@ -43,6 +43,7 @@ import {
 } from "@/lib/offlineStorage";
 import { DownloadChaptersModal } from "@/components/DownloadChaptersModal";
 import { useReaderSettings } from "@/contexts/ReaderSettingsContext";
+import { formatAppDate } from "@/lib/date";
 import { UserAvatarFrame } from "@/components/UserAvatarFrame";
 import {
   Tooltip,
@@ -202,18 +203,38 @@ export const ChapterList = React.memo(function ChapterList({
     gcTime: 1000 * 60 * 10,
   });
 
+  // Helper to resolve clean uploader name (defaults to "vnr610" if null or mistakenly set to scanlation group)
+  const resolveChapterUploader = React.useCallback((c: any): string => {
+    const rawUploadedBy = c.uploaded_by;
+    const scanlationGroup = c.scanlation_group;
+    if (!rawUploadedBy || !rawUploadedBy.trim()) return "vnr610";
+    const cleanUploader = rawUploadedBy.trim();
+    if (
+      scanlationGroup &&
+      cleanUploader.toLowerCase() === scanlationGroup.trim().toLowerCase()
+    ) {
+      return "vnr610";
+    }
+    const knownGroups = ["asura scans", "qi scans", "vortex scans", "hive scans", "flame scans", "reaper scans"];
+    if (knownGroups.includes(cleanUploader.toLowerCase())) {
+      return "vnr610";
+    }
+    return cleanUploader;
+  }, []);
+
   // Fetch profiles for all distinct uploaders in the chapter list
   const uploaderNames = React.useMemo(() => {
-    if (!chaptersQ.data) return [];
-    const set = new Set<string>();
-    chaptersQ.data.forEach((c: any) => {
-      const uploader = c.uploaded_by;
-      if (uploader && typeof uploader === "string" && uploader.trim()) {
-        set.add(uploader.trim());
-      }
-    });
+    const set = new Set<string>(["vnr610"]);
+    if (chaptersQ.data) {
+      chaptersQ.data.forEach((c: any) => {
+        const uploader = resolveChapterUploader(c);
+        if (uploader) {
+          set.add(uploader);
+        }
+      });
+    }
     return Array.from(set);
-  }, [chaptersQ.data]);
+  }, [chaptersQ.data, resolveChapterUploader]);
 
   const uploaderProfilesQ = useQuery({
     queryKey: ["chapter-uploader-profiles", uploaderNames],
@@ -648,7 +669,7 @@ export const ChapterList = React.memo(function ChapterList({
               const isRead = (readChapters.data?.has(c.id) || readChapterNumbers.has(Number(c.chapter_number))) ?? false;
               const isNew = new Date(c.created_at) > new Date(Date.now() - 2 * 60 * 60 * 1000);
               const showNewBadge = isNew && !isRead;
-              const uploadedBy = (c as { uploaded_by?: string }).uploaded_by;
+              const uploadedBy = resolveChapterUploader(c);
               const scanlationGroup = (c as { scanlation_group?: string }).scanlation_group;
               const isLatest = latestChapterId === c.id;
               const readerCount = readerCounts.data?.get(c.id) ?? 0;
@@ -814,7 +835,7 @@ export const ChapterList = React.memo(function ChapterList({
                         </Link>
                       );
                     })()}
-                    <span>{new Date(c.created_at).toLocaleDateString()}</span>
+                    <span>{formatAppDate(c.created_at)}</span>
                     <span>{formatChapterAge(c.created_at)}</span>
                   </div>
                 </div>
@@ -857,7 +878,7 @@ export const ChapterList = React.memo(function ChapterList({
                     : 0;
                   const sourceUrl = (c as any).source_url;
                   const scanlationGroup = (c as { scanlation_group?: string }).scanlation_group;
-                  const uploadedBy = (c as { uploaded_by?: string }).uploaded_by;
+                  const uploadedBy = resolveChapterUploader(c);
 
                   return (
                     <tr key={c.id} className="transition-colors hover:bg-surface-2/60 group">
@@ -973,7 +994,7 @@ export const ChapterList = React.memo(function ChapterList({
                         <div className="text-xs text-muted-foreground" title={new Date(c.created_at).toLocaleString()}>
                           <span className="font-medium text-neutral-300">{formatChapterAge(c.created_at)}</span>
                           <span className="hidden 2xl:inline ml-1.5 text-neutral-500">
-                            ({new Date(c.created_at).toLocaleDateString()})
+                            ({formatAppDate(c.created_at)})
                           </span>
                         </div>
                       </td>

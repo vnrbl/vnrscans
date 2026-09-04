@@ -18,8 +18,8 @@ export default function AuthenticatedLayout({ children }: { children: React.Reac
 
   if (loading || !user) {
     return (
-      <div className="flex h-[50vh] items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+      <div className="flex h-[50vh] items-center justify-center" suppressHydrationWarning>
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" suppressHydrationWarning />
       </div>
     );
   }

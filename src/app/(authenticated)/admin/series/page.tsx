@@ -41,6 +41,7 @@ import { $extractChaptersFromUrl, $extractImagesFromUrl, $syncImportSource, $syn
 import type { ChapterInfo } from "@/lib/chapter-scraper";
 import { detectImportSource } from "@/lib/import-source-utils";
 import { Button } from "@/components/ui/button";
+import { formatAppDate } from "@/lib/date";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -1713,7 +1714,7 @@ export default function AdminSeries() {
                               )}
                               <span className="flex items-center gap-1 font-mono text-2xs">
                                 <Clock className="h-3 w-3" />
-                                {new Date(log.created_at).toLocaleString()}
+                                {formatAppDate(log.created_at)}
                               </span>
                               {log.duration_seconds && (
                                 <span className="text-2xs text-muted-foreground bg-secondary px-1.5 py-0.2 rounded font-mono">

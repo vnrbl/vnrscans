@@ -20,6 +20,7 @@ import {
 import { useState, useMemo } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { moveToRecycleBin } from "@/lib/recycle-bin";
+import { formatAppDate } from "@/lib/date";
 
 
 type CommentFilter = "all" | "visible" | "hidden" | "media" | "spoilers" | "pinned";
@@ -207,7 +208,7 @@ export default function AdminComments() {
                 })()}
 
                 <div className="mt-3 flex flex-wrap gap-2 text-xs text-muted-foreground">
-                  <span>{new Date(c.created_at).toLocaleString()}</span>
+                  <span>{formatAppDate(c.created_at)}</span>
                   {c.series?.title && <span>{c.series.title}</span>}
                   {c.chapter?.chapter_number && <span>Ch. {c.chapter.chapter_number}</span>}
                   {chapterLink && (
