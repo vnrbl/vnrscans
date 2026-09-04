@@ -22,11 +22,14 @@ export const metadata: Metadata = {
 
 async function fetchInitialData(): Promise<BrowseInitialData> {
   const [genresRes, tagsRes, defaultManhwaRes] = await Promise.all([
-    supabase.from("genres").select("id,name,slug").order("name"),
+    supabase
+      .from("genres")
+      .select("id,name,slug,series_genres!inner(series_id)")
+      .order("name"),
     supabase
       .from("tags")
-      .select("id,name,slug,color,icon")
-      .order("usage_count", { ascending: false }),
+      .select("id,name,slug,color,icon,series_tags!inner(series_id)")
+      .order("name"),
     supabase
       .from("series")
       .select(
@@ -67,9 +70,23 @@ async function fetchInitialData(): Promise<BrowseInitialData> {
     });
   }
 
+  const uniqueGenresMap = new Map<string, { id: string; name: string; slug: string }>();
+  (genresRes.data ?? []).forEach((g: any) => {
+    if (!uniqueGenresMap.has(g.id)) {
+      uniqueGenresMap.set(g.id, { id: g.id, name: g.name, slug: g.slug });
+    }
+  });
+
+  const uniqueTagsMap = new Map<string, any>();
+  (tagsRes.data ?? []).forEach((t: any) => {
+    if (!uniqueTagsMap.has(t.id)) {
+      uniqueTagsMap.set(t.id, { id: t.id, name: t.name, slug: t.slug, color: t.color, icon: t.icon });
+    }
+  });
+
   return {
-    genres: genresRes.data ?? [],
-    tags: tagsRes.data ?? [],
+    genres: Array.from(uniqueGenresMap.values()),
+    tags: Array.from(uniqueTagsMap.values()),
     defaultManhwa: seriesWithRealCounts,
   };
 }

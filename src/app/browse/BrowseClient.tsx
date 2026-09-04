@@ -86,33 +86,63 @@ function BrowsePageContent({ initialData }: { initialData?: BrowseInitialData })
     }
   }, [urlTag]);
 
-  // Fetch genres
+  // Fetch genres (only those that actually exist on series)
   const genres = useQuery({
-    queryKey: ["genres"],
+    queryKey: ["genres", "active-series"],
     initialData: initialData?.genres,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("genres")
-        .select("id,name,slug")
+        .select("id,name,slug,series_genres!inner(series_id)")
         .order("name");
-      if (error) throw error;
-      return data ?? [];
+
+      if (error) {
+        const { data: fallback, error: fbError } = await supabase
+          .from("genres")
+          .select("id,name,slug")
+          .order("name");
+        if (fbError) throw fbError;
+        return fallback ?? [];
+      }
+
+      const unique = new Map<string, { id: string; name: string; slug: string }>();
+      (data ?? []).forEach((g: any) => {
+        if (!unique.has(g.id)) {
+          unique.set(g.id, { id: g.id, name: g.name, slug: g.slug });
+        }
+      });
+      return Array.from(unique.values());
     },
     staleTime: 1000 * 60 * 10,
     gcTime: 1000 * 60 * 30,
   });
 
-  // Fetch tags
+  // Fetch tags (only those that actually exist on series)
   const tags = useQuery({
-    queryKey: ["tags"],
+    queryKey: ["tags", "active-series"],
     initialData: initialData?.tags,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("tags")
-        .select("id,name,slug,color,icon")
+        .select("id,name,slug,color,icon,series_tags!inner(series_id)")
         .order("name");
-      if (error) throw error;
-      return (data ?? []) as any[];
+
+      if (error) {
+        const { data: fallback, error: fbError } = await supabase
+          .from("tags")
+          .select("id,name,slug,color,icon")
+          .order("name");
+        if (fbError) throw fbError;
+        return (fallback ?? []) as any[];
+      }
+
+      const unique = new Map<string, any>();
+      (data ?? []).forEach((t: any) => {
+        if (!unique.has(t.id)) {
+          unique.set(t.id, { id: t.id, name: t.name, slug: t.slug, color: t.color, icon: t.icon });
+        }
+      });
+      return Array.from(unique.values());
     },
     staleTime: 1000 * 60 * 10,
     gcTime: 1000 * 60 * 30,
