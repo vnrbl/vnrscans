@@ -34,6 +34,10 @@ import {
   Orbit,
   Sword,
   Lock,
+  BarChart3,
+  Upload,
+  ExternalLink,
+  Clock,
 } from "lucide-react";
 
 import { AvatarUpload } from "@/components/profile/AvatarUpload";
@@ -43,6 +47,7 @@ import { PrivacySettings } from "@/components/profile/PrivacySettings";
 import { ReadingHeatmap } from "@/components/profile/ReadingHeatmap";
 import { ProfileWidgets } from "@/components/profile/ProfileWidgets";
 import { AccentColorPicker } from "@/components/profile/AccentColorPicker";
+import { OptimizedImage } from "@/components/OptimizedImage";
 
 import { SocialLinksEditor, SocialLinksDisplay, type SocialLinksData } from "@/components/profile/SocialLinks";
 import { xpSourceLabel } from "@/lib/xp";
@@ -650,6 +655,125 @@ export default function ProfilePage() {
       );
     },
     enabled: xpChapterIds.length > 0,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  // ─── Reading Preferences: genre breakdown from reading history ───
+  const readingPreferences = useQuery({
+    queryKey: ["profile", "reading-preferences", profile.data?.user_id],
+    queryFn: async () => {
+      const { data: u } = await supabase.auth.getUser();
+      const userId = u.user?.id || profile.data?.user_id;
+      if (!userId) return [];
+
+      // Step 1: Get reading history entries → series_id + chapter count
+      const { data: historyData, error: historyError } = await supabase
+        .from("reading_history")
+        .select("series_id,chapter_id")
+        .eq("user_id", userId);
+      if (historyError || !historyData || historyData.length === 0) return [];
+
+      const seriesChapterMap = new Map<string, number>();
+      for (const h of historyData) {
+        seriesChapterMap.set(h.series_id, (seriesChapterMap.get(h.series_id) || 0) + 1);
+      }
+      const seriesIds = Array.from(seriesChapterMap.keys());
+
+      // Step 2: Get genre links for those series
+      const { data: sgData, error: sgError } = await supabase
+        .from("series_genres")
+        .select("series_id,genre_id")
+        .in("series_id", seriesIds);
+      if (sgError || !sgData) return [];
+
+      // Step 3: Get genre names
+      const genreIds = Array.from(new Set(sgData.map((sg: any) => sg.genre_id)));
+      if (genreIds.length === 0) return [];
+      const { data: genresData, error: genresError } = await supabase
+        .from("genres")
+        .select("id,name")
+        .in("id", genreIds);
+      if (genresError || !genresData) return [];
+      const genreNameMap = new Map(genresData.map((g: any) => [g.id, g.name]));
+
+      // Step 4: Reading session durations per series
+      let seriesDurationMap = new Map<string, number>();
+      try {
+        const { data: sessionsData } = await supabase
+          .from("reading_sessions")
+          .select("series_id,duration_seconds")
+          .eq("user_id", userId)
+          .in("series_id", seriesIds);
+        if (sessionsData) {
+          for (const s of sessionsData) {
+            seriesDurationMap.set(s.series_id, (seriesDurationMap.get(s.series_id) || 0) + (s.duration_seconds || 0));
+          }
+        }
+      } catch {
+        // sessions optional
+      }
+
+      // Step 5: Aggregate by genre
+      const genreAgg = new Map<string, { name: string; seriesSet: Set<string>; chapters: number; minutes: number }>();
+      for (const sg of sgData) {
+        const gName = genreNameMap.get(sg.genre_id);
+        if (!gName) continue;
+        if (!genreAgg.has(sg.genre_id)) {
+          genreAgg.set(sg.genre_id, { name: gName, seriesSet: new Set(), chapters: 0, minutes: 0 });
+        }
+        const agg = genreAgg.get(sg.genre_id)!;
+        agg.seriesSet.add(sg.series_id);
+        agg.chapters += seriesChapterMap.get(sg.series_id) || 0;
+        const durationSec = seriesDurationMap.get(sg.series_id) || 0;
+        agg.minutes += Math.round(durationSec / 60);
+      }
+
+      return Array.from(genreAgg.values())
+        .map((g) => ({
+          name: g.name,
+          seriesCount: g.seriesSet.size,
+          chapterCount: g.chapters,
+          minutes: g.minutes,
+        }))
+        .sort((a, b) => b.chapterCount - a.chapterCount)
+        .slice(0, 8);
+    },
+    enabled: !!profile.data?.user_id,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  // ─── Uploaded Series: series where user uploaded chapters ───
+  const activeUsername = profile.data?.username;
+  const uploadedSeries = useQuery({
+    queryKey: ["profile", "uploaded-series", activeUsername],
+    queryFn: async () => {
+      if (!activeUsername) return [];
+      const { data: chaptersData, error: chaptersError } = await supabase
+        .from("chapters")
+        .select("series_id")
+        .eq("uploaded_by", activeUsername)
+        .eq("status", "published");
+      if (chaptersError || !chaptersData || chaptersData.length === 0) return [];
+
+      const seriesChapterCount = new Map<string, number>();
+      for (const c of chaptersData) {
+        seriesChapterCount.set(c.series_id, (seriesChapterCount.get(c.series_id) || 0) + 1);
+      }
+      const seriesIds = Array.from(seriesChapterCount.keys());
+
+      const { data: seriesData, error: seriesError } = await supabase
+        .from("series")
+        .select("id,slug,title,cover_url,type,status,rating_average,view_count")
+        .in("id", seriesIds)
+        .eq("is_hidden", false);
+      if (seriesError || !seriesData) return [];
+
+      return seriesData.map((s: any) => ({
+        ...s,
+        uploaded_chapter_count: seriesChapterCount.get(s.id) || 0,
+      })).sort((a: any, b: any) => b.uploaded_chapter_count - a.uploaded_chapter_count);
+    },
+    enabled: !!activeUsername,
     staleTime: 5 * 60 * 1000,
   });
 
@@ -1463,6 +1587,21 @@ export default function ProfilePage() {
                   <Calendar className="mr-1.5 h-3.5 w-3.5" style={{ color: accentColor }} />
                   Joined {new Date(profile.data?.created_at || "").toLocaleDateString()}
                 </Badge>
+                {activeUsername && (
+                  <Link
+                    to="/user/$username"
+                    params={{ username: activeUsername }}
+                    className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-md border transition-all duration-200 hover:scale-[1.02] shadow-sm backdrop-blur-sm"
+                    style={{
+                      borderColor: `${accentColor}40`,
+                      backgroundColor: `${accentColor}15`,
+                      color: accentColor,
+                    }}
+                  >
+                    <ExternalLink className="h-3.5 w-3.5" />
+                    View Public Profile
+                  </Link>
+                )}
               </div>
 
               {/* Bio */}
@@ -1556,28 +1695,40 @@ export default function ProfilePage() {
         style={{ animation: "profileFadeInUp 0.6s ease-out 0.2s both" }}
       >
         <Tabs defaultValue="edit" className="w-full">
-          <TabsList className="grid h-11 w-full grid-cols-6 gap-1 p-1">
-            <TabsTrigger value="edit" className="h-9 min-w-0 gap-2 px-0 sm:px-3">
+          <TabsList className="grid h-11 w-full grid-cols-7 gap-1 p-1">
+            <TabsTrigger value="edit" className="h-9 min-w-0 gap-1.5 px-0 sm:px-2">
               <Settings className="h-4 w-4" />
               <span className="hidden sm:inline">Edit</span>
             </TabsTrigger>
-            <TabsTrigger value="badges" className="h-9 min-w-0 gap-2 px-0 sm:px-3">
+            <TabsTrigger value="badges" className="h-9 min-w-0 gap-1.5 px-0 sm:px-2">
               <Award className="h-4 w-4" />
               <span className="hidden sm:inline">Badges</span>
             </TabsTrigger>
-            <TabsTrigger value="comments" className="h-9 min-w-0 gap-2 px-0 sm:px-3">
+            <TabsTrigger value="comments" className="h-9 min-w-0 gap-1.5 px-0 sm:px-2">
               <MessageSquare className="h-4 w-4" />
               <span className="hidden sm:inline">Comments</span>
             </TabsTrigger>
-            <TabsTrigger value="stats" className="h-9 min-w-0 gap-2 px-0 sm:px-3">
+            <TabsTrigger value="stats" className="h-9 min-w-0 gap-1.5 px-0 sm:px-2">
               <TrendingUp className="h-4 w-4" />
               <span className="hidden sm:inline">Stats</span>
             </TabsTrigger>
-            <TabsTrigger value="xp" className="h-9 min-w-0 gap-2 px-0 sm:px-3">
+            <TabsTrigger value="uploads" className="h-9 min-w-0 gap-1.5 px-0 sm:px-2">
+              <Upload className="h-4 w-4" />
+              <span className="hidden sm:inline">Uploads</span>
+              {uploadedSeries.data && uploadedSeries.data.length > 0 && (
+                <span
+                  className="ml-1 hidden md:inline-flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-bold"
+                  style={{ backgroundColor: `${accentColor}25`, color: accentColor }}
+                >
+                  {uploadedSeries.data.length}
+                </span>
+              )}
+            </TabsTrigger>
+            <TabsTrigger value="xp" className="h-9 min-w-0 gap-1.5 px-0 sm:px-2">
               <Sparkles className="h-4 w-4" />
               <span className="hidden sm:inline">XP</span>
             </TabsTrigger>
-            <TabsTrigger value="privacy" className="h-9 min-w-0 gap-2 px-0 sm:px-3">
+            <TabsTrigger value="privacy" className="h-9 min-w-0 gap-1.5 px-0 sm:px-2">
               <Shield className="h-4 w-4" />
               <span className="hidden sm:inline">Privacy</span>
             </TabsTrigger>
@@ -2178,6 +2329,70 @@ export default function ProfilePage() {
             <div className="space-y-6">
               <ReadingHeatmap />
 
+              {/* Reading Preferences */}
+              {readingPreferences.data && readingPreferences.data.length > 0 && (
+                <Card className="p-4 sm:p-6">
+                  <div className="mb-4 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <BarChart3 className="h-5 w-5" style={{ color: accentColor }} />
+                      <h2 className="text-xl font-bold">Reading Preferences</h2>
+                    </div>
+                    <Badge variant="outline" className="text-xs border-border/50 text-muted-foreground">
+                      {readingPreferences.data.length} Top Genres
+                    </Badge>
+                  </div>
+                  <div className="space-y-1">
+                    {readingPreferences.data.map((genre, idx) => {
+                      const maxChapters = readingPreferences.data![0]?.chapterCount || 1;
+                      const barPercent = Math.max(8, (genre.chapterCount / maxChapters) * 100);
+                      const timeLabel = genre.minutes >= 60
+                        ? `${Math.floor(genre.minutes / 60)}h ${genre.minutes % 60}m`
+                        : genre.minutes > 0 ? `${genre.minutes}m` : null;
+                      return (
+                        <div
+                          key={genre.name}
+                          className="py-2.5"
+                          style={{ animation: `profileFadeInUp 0.4s ease-out ${idx * 0.05}s both` }}
+                        >
+                          <div className="flex items-center justify-between mb-1.5">
+                            <div className="flex items-center gap-2.5">
+                              <span className="text-sm font-bold text-muted-foreground w-6">#{idx + 1}</span>
+                              <Badge
+                                className="text-xs font-bold border transition-all duration-200 hover:brightness-110 hover:scale-[1.02] shadow-sm cursor-default"
+                                style={{
+                                  borderColor: `${accentColor}40`,
+                                  backgroundColor: `${accentColor}18`,
+                                  color: accentColor,
+                                }}
+                              >
+                                {genre.name}
+                              </Badge>
+                            </div>
+                            {timeLabel && (
+                              <span className="text-sm font-bold text-muted-foreground">{timeLabel}</span>
+                            )}
+                          </div>
+                          <div className="relative h-2 w-full overflow-hidden rounded-full bg-secondary/50">
+                            <div
+                              className="h-full rounded-full transition-all duration-1000 ease-out"
+                              style={{
+                                width: `${barPercent}%`,
+                                background: `linear-gradient(90deg, ${accentColor}, ${accentColor}cc)`,
+                                opacity: 1 - idx * 0.06,
+                                boxShadow: `0 0 8px ${accentColor}40`,
+                              }}
+                            />
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-1 ml-8">
+                            {genre.seriesCount} series, {genre.chapterCount} chapters
+                          </p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </Card>
+              )}
+
               <Card className="p-4 sm:p-6">
                 <h2 className="mb-4 text-xl font-bold">Your Statistics</h2>
                 <div className="space-y-6">
@@ -2218,6 +2433,132 @@ export default function ProfilePage() {
                 </div>
               </Card>
             </div>
+          </TabsContent>
+
+          {/* ─── Uploaded Series Tab ─── */}
+          <TabsContent value="uploads">
+            <Card className="p-4 sm:p-6">
+              <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h3 className="flex items-center gap-2 text-lg font-bold">
+                    <Upload className="h-5 w-5" style={{ color: accentColor }} />
+                    Uploaded Series
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
+                    Series you have contributed and uploaded chapters to.
+                  </p>
+                </div>
+                <Badge
+                  className="text-xs font-semibold border"
+                  style={{
+                    borderColor: `${accentColor}30`,
+                    backgroundColor: `${accentColor}12`,
+                    color: accentColor,
+                  }}
+                >
+                  {uploadedSeries.data?.length ?? 0} Series Total
+                </Badge>
+              </div>
+
+              {uploadedSeries.isLoading ? (
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {[...Array(4)].map((_, i) => (
+                    <div key={i} className="flex gap-3 rounded-lg border border-border/40 p-3">
+                      <div className="h-20 w-14 flex-shrink-0 animate-pulse rounded-md bg-secondary" />
+                      <div className="flex-1 space-y-2 py-1">
+                        <div className="h-4 w-3/4 animate-pulse rounded bg-secondary" />
+                        <div className="h-3 w-1/2 animate-pulse rounded bg-secondary" />
+                        <div className="h-3 w-1/3 animate-pulse rounded bg-secondary" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : uploadedSeries.data && uploadedSeries.data.length > 0 ? (
+                <div className="grid gap-4 sm:grid-cols-2">
+                  {uploadedSeries.data.map((series: any) => (
+                    <Link
+                      key={series.id}
+                      to="/title/$slug"
+                      params={{ slug: series.slug }}
+                      className="group rounded-xl border border-border/40 bg-card/60 p-3.5 transition-all duration-200 hover:shadow-lg"
+                      onMouseEnter={(e: React.MouseEvent<HTMLAnchorElement>) => {
+                        e.currentTarget.style.borderColor = `${accentColor}50`;
+                      }}
+                      onMouseLeave={(e: React.MouseEvent<HTMLAnchorElement>) => {
+                        e.currentTarget.style.borderColor = '';
+                      }}
+                    >
+                      <div className="flex gap-3.5">
+                        <div className="h-24 w-16 flex-shrink-0 overflow-hidden rounded-lg bg-secondary shadow-sm">
+                          <OptimizedImage
+                            src={series.cover_url}
+                            alt={series.title}
+                            seriesId={series.id}
+                            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                          />
+                        </div>
+                        <div className="min-w-0 flex-1 flex flex-col justify-between py-0.5">
+                          <div>
+                            <p className="truncate text-base font-semibold group-hover:text-primary transition-colors">
+                              {series.title}
+                            </p>
+                            <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs">
+                              <Badge
+                                className="text-xs font-semibold border"
+                                style={{
+                                  borderColor: `${accentColor}30`,
+                                  backgroundColor: `${accentColor}12`,
+                                  color: accentColor,
+                                }}
+                              >
+                                <Upload className="mr-1 h-3 w-3" />
+                                {series.uploaded_chapter_count} chapters uploaded
+                              </Badge>
+                              <span className="text-muted-foreground capitalize font-medium">
+                                {series.type}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                            <span className="inline-flex items-center gap-1.5 capitalize">
+                              <span
+                                className="h-2 w-2 rounded-full"
+                                style={{
+                                  backgroundColor:
+                                    series.status === "ongoing"
+                                      ? "#22C55E"
+                                      : series.status === "completed"
+                                      ? "#3B82F6"
+                                      : "#F59E0B",
+                                }}
+                              />
+                              {series.status}
+                            </span>
+                            <span className="inline-flex items-center gap-1 font-medium">
+                              <Star className="h-3 w-3 text-amber-400 fill-amber-400" />
+                              {Number(series.rating_average || 0).toFixed(1)}
+                            </span>
+                            {series.view_count > 0 && (
+                              <span className="text-muted-foreground/70">
+                                {series.view_count.toLocaleString()} views
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              ) : (
+                <div className="rounded-lg border border-dashed border-border/40 p-8 text-center">
+                  <Upload className="mx-auto h-12 w-12 text-muted-foreground/40" />
+                  <p className="mt-2 text-sm font-semibold text-muted-foreground">No series uploaded yet</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Upload chapters through the uploader or admin dashboard to see your series here.
+                  </p>
+                </div>
+              )}
+            </Card>
           </TabsContent>
 
           {/* ─── Qi History Tab ─── */}

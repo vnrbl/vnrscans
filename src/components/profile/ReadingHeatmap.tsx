@@ -27,15 +27,11 @@ export function ReadingHeatmap() {
       const { data: u } = await supabase.auth.getUser();
       if (!u.user) return {};
 
-      // Get date 365 days ago
-      const oneYearAgo = new Date();
-      oneYearAgo.setDate(oneYearAgo.getDate() - 365);
-
+      // Fetch ALL reading history (no date filter) so stats match the top cards
       const { data, error } = await supabase
         .from("reading_history")
         .select("updated_at")
-        .eq("user_id", u.user.id)
-        .gte("updated_at", oneYearAgo.toISOString());
+        .eq("user_id", u.user.id);
 
       if (error) throw error;
 
@@ -81,9 +77,14 @@ export function ReadingHeatmap() {
 
   const days = generateDays();
 
-  // Calculate stats
+  // Calculate stats — use all-time data from heatmapData for totals,
+  // but the heatmap grid (days array) only covers the displayed calendar range
+  const allTimeTotalChapters = useMemo(() => {
+    if (!heatmapData.data) return 0;
+    return Object.values(heatmapData.data).reduce((sum, count) => sum + count, 0);
+  }, [heatmapData.data]);
   const totalDays = days.filter((d) => d.count > 0).length;
-  const totalChapters = days.reduce((sum, d) => sum + d.count, 0);
+  const totalChapters = allTimeTotalChapters;
   const maxStreak = calculateMaxStreak(days);
   const currentStreak = calculateCurrentStreak(days);
 
@@ -104,8 +105,17 @@ export function ReadingHeatmap() {
   }
 
   function calculateCurrentStreak(days: DayData[]): number {
-    let streak = 0;
+    // Find today's index — don't count future padding days
+    const todayStr = toLocalYYYYMMDD(new Date());
+    let startIdx = days.length - 1;
     for (let i = days.length - 1; i >= 0; i--) {
+      if (days[i].date <= todayStr) {
+        startIdx = i;
+        break;
+      }
+    }
+    let streak = 0;
+    for (let i = startIdx; i >= 0; i--) {
       if (days[i].count > 0) {
         streak++;
       } else {
