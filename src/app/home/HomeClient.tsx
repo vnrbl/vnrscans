@@ -1073,11 +1073,12 @@ function LatestUpdatesSection({
   const hasMoreSeries = visibleCount < series.length;
 
   const isNewChapter = (createdAt: string) => {
+    if (!createdAt) return false;
     const now = new Date();
     const chapterDate = new Date(createdAt);
-    const twoHoursInMs = 2 * 60 * 60 * 1000;
+    const threeHoursInMs = 3 * 60 * 60 * 1000;
     const timeDiff = now.getTime() - chapterDate.getTime();
-    return timeDiff < twoHoursInMs && timeDiff >= 0;
+    return timeDiff < threeHoursInMs && timeDiff >= 0;
   };
 
   return (
@@ -1211,6 +1212,7 @@ function LatestUpdatesSection({
                       {item.recent_chapters.length > 0 ? (
                         item.recent_chapters.map((chapter) => {
                           const isRead = readChapterIds.has(chapter.id);
+                          const isNew = isNewChapter(chapter.created_at);
                           const isScheduledLock = chapter.status === "scheduled" || (!!chapter.scheduled_at && new Date(chapter.scheduled_at) > new Date());
                           const remainingMinutes = isScheduledLock && chapter.scheduled_at
                             ? Math.max(1, Math.ceil((new Date(chapter.scheduled_at).getTime() - Date.now()) / (1000 * 60)))
@@ -1240,7 +1242,7 @@ function LatestUpdatesSection({
                                   : 'border-white/10 bg-surface-1/60 hover:bg-surface-2 hover:border-purple-500/40 text-neutral-200 hover:text-white'
                               }`}
                             >
-                              <div className="flex items-center gap-1 shrink-0">
+                              <div className="flex items-center gap-1.5 shrink-0 min-w-0">
                                 {isScheduledLock ? (
                                   <Lock className="h-3 w-3 shrink-0 text-amber-400" />
                                 ) : (
@@ -1249,6 +1251,11 @@ function LatestUpdatesSection({
                                 <span className={`whitespace-nowrap text-xs ${isScheduledLock ? "font-semibold text-amber-300" : "font-medium"}`}>
                                   Ch. {chapter.chapter_number}
                                 </span>
+                                {isNew && !isRead && !isScheduledLock && (
+                                  <span className="shrink-0 rounded-[3px] bg-purple-600 px-1.5 py-0.5 text-[9px] font-bold text-white uppercase tracking-wide shadow-[0_0_8px_rgba(168,85,247,0.5)]">
+                                    NEW
+                                  </span>
+                                )}
                               </div>
                               <span className={`ml-1 shrink-0 text-[11px] ${isScheduledLock ? "text-amber-400 font-medium font-mono" : "text-neutral-400"}`}>
                                 {isScheduledLock && formattedRemaining ? formattedRemaining : formatTimeAgo(chapter.created_at)}

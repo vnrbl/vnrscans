@@ -152,6 +152,26 @@ export default function HomeHistoryContent({
     refetchOnWindowFocus: true,
   });
 
+  const readingHistoryQuery = useQuery({
+    queryKey: ["home-history-read-chapters", user?.id],
+    queryFn: async () => {
+      if (!user?.id) return [];
+      const { data, error } = await supabase
+        .from("reading_history")
+        .select("chapter_id")
+        .eq("user_id", user.id);
+      if (error) throw error;
+      return data?.map((d) => d.chapter_id) ?? [];
+    },
+    enabled: !!user?.id,
+    staleTime: 1000 * 60 * 2,
+  });
+
+  const readChapterIds = useMemo(
+    () => new Set(readingHistoryQuery.data ?? []),
+    [readingHistoryQuery.data]
+  );
+
   if (!sectionKey || !meta) {
     return (
       <main className="container mx-auto min-h-screen px-4 py-24">
@@ -273,6 +293,7 @@ export default function HomeHistoryContent({
                   key={item.slug}
                   item={item}
                   accentColor={meta.accentColor}
+                  readChapterIds={readChapterIds}
                 />
               ))}
             </div>
@@ -627,10 +648,21 @@ async function fetchReadingHistory(
 function GroupedSeriesCard({
   item,
   accentColor,
+  readChapterIds,
 }: {
   item: GroupedSeries;
   accentColor: string;
+  readChapterIds?: Set<string>;
 }) {
+  const isNewChapter = (createdAt: string) => {
+    if (!createdAt) return false;
+    const now = new Date();
+    const chapterDate = new Date(createdAt);
+    const threeHoursInMs = 3 * 60 * 60 * 1000;
+    const timeDiff = now.getTime() - chapterDate.getTime();
+    return timeDiff < threeHoursInMs && timeDiff >= 0;
+  };
+
   // Show 5 chapters directly on the card with NO inner scroll trap!
   // The mouse wheel will scroll the page naturally.
   const displayChapters = item.chapters.slice(0, 5);
@@ -672,27 +704,53 @@ function GroupedSeriesCard({
 
           {/* List of chapters: WITHOUT any overflow-y-auto so page scrolls freely */}
           <div className="mt-2.5 space-y-1.5">
-            {displayChapters.map((chapter) => (
-              <Link
-                key={chapter.id}
-                to="/title/$titleSlug/$chapterSlug"
-                params={{ titleSlug: item.slug, chapterSlug: chapter.slug }}
-                className="flex items-center justify-between text-xs hover:text-primary transition-colors font-medium text-muted-foreground hover:text-foreground py-1 px-1.5 rounded hover:bg-secondary/40"
-              >
-                <div className="flex min-w-0 flex-1 items-center gap-1.5">
-                  <BookOpen
-                    className="h-3.5 w-3.5 shrink-0"
-                    style={{ color: accentColor }}
-                  />
-                  <span className="truncate font-semibold text-white group-hover:text-primary">
-                    Ch. {chapter.chapter_number}
+            {displayChapters.map((chapter) => {
+              const isRead = readChapterIds?.has(chapter.id) ?? false;
+              const isNew = isNewChapter(chapter.created_at);
+
+              return (
+                <Link
+                  key={chapter.id}
+                  to="/title/$titleSlug/$chapterSlug"
+                  params={{ titleSlug: item.slug, chapterSlug: chapter.slug }}
+                  className={`flex items-center justify-between text-xs transition-colors font-medium py-1 px-1.5 rounded ${
+                    isRead
+                      ? "text-neutral-500 hover:text-neutral-300 opacity-75 hover:bg-secondary/40"
+                      : "text-muted-foreground hover:text-foreground hover:bg-secondary/40"
+                  }`}
+                >
+                  <div className="flex min-w-0 flex-1 items-center gap-1.5">
+                    <BookOpen
+                      className={`h-3.5 w-3.5 shrink-0 ${isRead ? "text-neutral-500" : ""}`}
+                      style={{ color: isRead ? undefined : accentColor }}
+                    />
+                    <span
+                      className={`truncate ${
+                        isRead
+                          ? "text-neutral-500 font-normal"
+                          : "font-semibold text-white group-hover:text-primary"
+                      }`}
+                    >
+                      Ch. {chapter.chapter_number}
+                    </span>
+                    {isNew && !isRead && (
+                      <span
+                        className="shrink-0 rounded-[3px] px-1.5 py-0.5 text-[9px] font-bold text-white uppercase tracking-wide"
+                        style={{
+                          backgroundColor: accentColor,
+                          boxShadow: `0 0 8px ${accentColor}80`,
+                        }}
+                      >
+                        NEW
+                      </span>
+                    )}
+                  </div>
+                  <span className="ml-2 shrink-0 text-[10px] text-neutral-400">
+                    {formatTimeAgo(chapter.created_at)}
                   </span>
-                </div>
-                <span className="ml-2 shrink-0 text-[10px] text-neutral-400">
-                  {formatTimeAgo(chapter.created_at)}
-                </span>
-              </Link>
-            ))}
+                </Link>
+              );
+            })}
 
             {remainingCount > 0 && (
               <Link
