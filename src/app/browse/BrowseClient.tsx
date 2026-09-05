@@ -79,11 +79,20 @@ function BrowsePageContent({ initialData }: { initialData?: BrowseInitialData })
   const urlType = searchParams.get("type") || "";
 
   const [searchQuery, setSearchQuery] = useState(urlSearch);
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState(urlSearch);
   const [groupFilter, setGroupFilter] = useState(urlGroup);
 
   useEffect(() => {
     setSearchQuery(urlSearch);
+    setDebouncedSearchQuery(urlSearch);
   }, [urlSearch]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   useEffect(() => {
     setGroupFilter(urlGroup);
@@ -289,12 +298,12 @@ function BrowsePageContent({ initialData }: { initialData?: BrowseInitialData })
     tagFilters.length === 0 &&
     sortBy === "latest" &&
     duration === "all" &&
-    !searchQuery &&
+    !debouncedSearchQuery &&
     !groupFilter;
 
   // All manhwa
   const allManhwa = useQuery({
-    queryKey: ["browse-manhwa", typeFilters, statusFilter, contentRating, genreFilters, tagFilters, sortBy, duration, searchQuery, groupFilter],
+    queryKey: ["browse-manhwa", typeFilters, statusFilter, contentRating, genreFilters, tagFilters, sortBy, duration, debouncedSearchQuery, groupFilter],
     initialData: isDefaultBrowseState ? initialData?.defaultManhwa : undefined,
     queryFn: async () => {
       let query = supabase
@@ -330,7 +339,7 @@ function BrowsePageContent({ initialData }: { initialData?: BrowseInitialData })
       if (contentRating !== "all") {
         query = query.eq("content_rating", contentRating as any);
       }
-      const preparedSearch = prepareSearchInput(searchQuery);
+      const preparedSearch = prepareSearchInput(debouncedSearchQuery);
       if (preparedSearch.primaryTerm) {
         const searchFilter = buildSeriesSearchOrFilter(preparedSearch.terms);
         if (searchFilter) {
@@ -445,7 +454,7 @@ function BrowsePageContent({ initialData }: { initialData?: BrowseInitialData })
         });
       }
       
-      return searchQuery ? rankSeriesResults(filtered, preparedSearch) : filtered;
+      return debouncedSearchQuery ? rankSeriesResults(filtered, preparedSearch) : filtered;
     },
     staleTime: 1000 * 30, // 30s stale time for snappy browsing with fast cache updates
     gcTime: 1000 * 60 * 20,

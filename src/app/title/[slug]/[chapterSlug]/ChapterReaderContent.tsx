@@ -135,6 +135,7 @@ export default function Reader({
   const seriesSlug = titleSlug;
   const { user } = useAuth();
   const navigate = useNavigate();
+  const router = useRouter();
   const qc = useQueryClient();
 
   // All state hooks must be at the top, before any conditional returns
@@ -639,81 +640,87 @@ export default function Reader({
     return Array.from(map.values()).sort((a, b) => a.chapter_number - b.chapter_number);
   }, [siblingsQ.data, chapterSlug, activeScanlationGroup]);
 
-  // Prefetch next chapter when scroll progress is >= 50%
+  // Prefetch next chapter route bundle + top 4 images on idle (zero scroll listeners)
   const prefetchedNextRef = useRef<string | null>(null);
   useEffect(() => {
     if (!next || !chapterQ.data?.series?.id) return;
 
-    // Check if we already prefetched this next chapter slug
+    // Prefetch Next.js page route bundle for instant transition
+    try {
+      router.prefetch(`/title/${seriesSlug}/${next.slug}`);
+    } catch {}
+
     if (prefetchedNextRef.current === next.slug) return;
 
-    const handleScrollPrefetch = () => {
-      const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
-      const scrollHeight = document.documentElement.scrollHeight - window.innerHeight;
-      const progress = scrollHeight > 0 ? (scrollTop / scrollHeight) * 100 : 0;
+    const triggerPrefetch = () => {
+      if (prefetchedNextRef.current === next.slug) return;
+      prefetchedNextRef.current = next.slug;
 
-      if (progress >= 50) {
-        prefetchedNextRef.current = next.slug;
-        window.removeEventListener("scroll", handleScrollPrefetch);
+      const nextChapterSlug = next.slug;
+      const seriesData = chapterQ.data?.series;
+      if (!seriesData) return;
 
-        console.log(`Prefetching next chapter in background: ${next.slug}`);
+      // Prefetch next chapter metadata
+      qc.prefetchQuery({
+        queryKey: ["chapter", titleSlug, nextChapterSlug],
+        queryFn: async () => {
+          const { data, error } = await supabase
+            .from("chapters")
+            .select("*, series:series(id,slug,title,type)")
+            .eq("slug", nextChapterSlug)
+            .eq("series_id", seriesData.id)
+            .maybeSingle();
 
-        const nextChapterSlug = next.slug;
-        const seriesData = chapterQ.data.series;
+          if (error) throw error;
+          if (!data) throw new Error("Next chapter not found");
 
-        // Prefetch next chapter metadata
-        qc.prefetchQuery({
-          queryKey: ["chapter", titleSlug, nextChapterSlug],
-          queryFn: async () => {
-            const { data, error } = await supabase
-              .from("chapters")
-              .select("*, series:series(id,slug,title,type)")
-              .eq("slug", nextChapterSlug)
-              .eq("series_id", seriesData!.id)
-              .maybeSingle();
+          // Side effect: also prefetch next chapter's pages if it is an image type!
+          if (data.chapter_type === "image") {
+            qc.prefetchQuery({
+              queryKey: ["pages", data.id],
+              queryFn: async () => {
+                const { data: pageData, error: pageError } = await supabase
+                  .from("chapter_pages")
+                  .select("id,page_number,image_url")
+                  .eq("chapter_id", data.id)
+                  .order("page_number");
+                if (pageError) throw pageError;
 
-            if (error) throw error;
-            if (!data) throw new Error("Next chapter not found");
+                // 🚀 Zero-Wait Smart Image Preloader:
+                // Preload top 4 images into browser image cache so next chapter paints in 0ms!
+                if (pageData && typeof window !== "undefined") {
+                  pageData.slice(0, 4).forEach((p) => {
+                    if (p.image_url) {
+                      const img = new window.Image();
+                      img.src = p.image_url;
+                    }
+                  });
+                }
 
-            // Side effect: also prefetch next chapter's pages if it is an image type!
-            if (data.chapter_type === "image") {
-              qc.prefetchQuery({
-                queryKey: ["pages", data.id],
-                queryFn: async () => {
-                  const { data: pageData, error: pageError } = await supabase
-                    .from("chapter_pages")
-                    .select("id,page_number,image_url")
-                    .eq("chapter_id", data.id)
-                    .order("page_number");
-                  if (pageError) throw pageError;
+                return pageData ?? [];
+              },
+            });
+          }
 
-                  // 🚀 Zero-Wait Smart Image Preloader:
-                  // Preload top 4 images into browser image cache so next chapter paints in 0ms!
-                  if (pageData && typeof window !== "undefined") {
-                    pageData.slice(0, 4).forEach((p) => {
-                      if (p.image_url) {
-                        const img = new window.Image();
-                        img.src = p.image_url;
-                      }
-                    });
-                  }
+          return data;
+        },
+      });
+    };
 
-                  return pageData ?? [];
-                },
-              });
-            }
+    // Use requestIdleCallback / fallback timer to avoid competing with visible image loading
+    const idleId =
+      typeof window !== "undefined" && "requestIdleCallback" in window
+        ? (window as any).requestIdleCallback(triggerPrefetch, { timeout: 3500 })
+        : setTimeout(triggerPrefetch, 2000);
 
-            return data;
-          },
-        });
+    return () => {
+      if (typeof window !== "undefined" && "cancelIdleCallback" in window && typeof idleId === "number") {
+        (window as any).cancelIdleCallback(idleId);
+      } else {
+        clearTimeout(idleId as any);
       }
     };
-
-    window.addEventListener("scroll", handleScrollPrefetch, { passive: true });
-    return () => {
-      window.removeEventListener("scroll", handleScrollPrefetch);
-    };
-  }, [next, chapterQ.data, titleSlug, qc]);
+  }, [next, chapterQ.data, titleSlug, seriesSlug, qc, router]);
 
   // Keyboard navigation (Arrow keys for PC)
   useEffect(() => {
@@ -1085,11 +1092,11 @@ export default function Reader({
 
       {/* Bottom Nav - Fixed at bottom (Mobile only) */}
       <nav
-        className={`fixed bottom-0 left-0 right-0 z-30 border-t border-border/50 bg-background/90 backdrop-blur md:hidden transition-transform duration-300 ${
+        className={`fixed bottom-0 left-0 right-0 z-30 border-t border-border/50 bg-background/90 backdrop-blur md:hidden transition-transform duration-300 pb-[env(safe-area-inset-bottom,0px)] ${
           controlsVisible ? "translate-y-0" : "translate-y-full"
         }`}
       >
-        <div className="container mx-auto flex items-center justify-between gap-2 px-4 py-3">
+        <div className="container mx-auto flex items-center justify-between gap-2 px-4 py-2.5">
           <Button
             variant="outline"
             size="sm"
@@ -1160,7 +1167,7 @@ export default function Reader({
 
       {/* Auto-scroll Speed Control - Mobile only */}
       {isAutoScrolling && (
-        <div className="fixed bottom-16 left-1/2 z-40 -translate-x-1/2 rounded-full bg-background/95 px-4 py-2 shadow-lg backdrop-blur md:hidden">
+        <div className="fixed bottom-[calc(4.25rem+env(safe-area-inset-bottom,0px))] left-1/2 z-40 -translate-x-1/2 rounded-full bg-background/95 px-4 py-2 shadow-lg backdrop-blur md:hidden">
           <div className="flex items-center gap-3">
             <span className="text-xs text-muted-foreground">Speed:</span>
             <div className="flex items-center gap-2">

@@ -41,8 +41,31 @@ export function Link({ to, params, search, hash, children, activeProps, activeOp
     delete mergedProps.className;
   }
 
+  const router = useRouter();
+
+  const handleMouseEnter = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    if (href && typeof href === "string" && href.startsWith("/")) {
+      try { router.prefetch(href); } catch {}
+    }
+    props.onMouseEnter?.(e);
+  };
+
+  const handleTouchStart = (e: React.TouchEvent<HTMLAnchorElement>) => {
+    if (href && typeof href === "string" && href.startsWith("/")) {
+      try { router.prefetch(href); } catch {}
+    }
+    props.onTouchStart?.(e);
+  };
+
   return (
-    <NextLink href={href} className={finalClassName} prefetch={true} {...mergedProps}>
+    <NextLink
+      href={href}
+      className={finalClassName}
+      prefetch={props.prefetch ?? false}
+      onMouseEnter={handleMouseEnter}
+      onTouchStart={handleTouchStart}
+      {...mergedProps}
+    >
       {children}
     </NextLink>
   );

@@ -243,7 +243,7 @@
      *   Leading is TIGHT on display (0.95), normal on body (1.5–1.7)
      */
     font-family: var(--font-inter), 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-    font-weight: 700;
+    font-weight: 400;
     letter-spacing: -0.011em;
     line-height: 1.6;
     -webkit-font-smoothing: antialiased;
@@ -257,7 +257,7 @@
 
   p {
     font-family: var(--font-inter), 'Inter', sans-serif;
-    font-weight: 700;
+    font-weight: 400;
   }
 
   h1, h2, h3, h4, h5, h6, .font-heading, .font-display, .font-outfit, .font-title {
@@ -269,7 +269,19 @@
 
   .font-body, .font-sans {
     font-family: var(--font-inter), 'Inter', sans-serif !important;
-    font-weight: 700;
+  }
+
+  /* ── Safe-Area Insets Helper Utilities for iOS / Modern Android ───────── */
+  .safe-area-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .safe-area-top {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+
+  /* ── Ultrawide Container Bound (2560px–3840px display comfort) ────────── */
+  .container {
+    max-width: min(100%, 1880px);
   }
 
   img, video, canvas, svg {

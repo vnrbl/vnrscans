@@ -515,7 +515,7 @@ export function Navbar() {
       </aside>
 
       {/* Mobile Bottom Navigation Bar */}
-      <nav className="fixed bottom-0 left-0 right-0 z-50 flex sm:hidden h-14 items-center justify-around navbar-ios-glass border-t border-white/10 px-2 shadow-2xl">
+      <nav className="fixed bottom-0 left-0 right-0 z-50 flex sm:hidden h-[calc(3.5rem+env(safe-area-inset-bottom,0px))] pb-[env(safe-area-inset-bottom,0px)] items-center justify-around navbar-ios-glass border-t border-white/10 px-2 shadow-2xl">
         <Link
           to="/home"
           className="flex flex-col items-center justify-center gap-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground hover:text-primary transition-colors py-1 flex-1"

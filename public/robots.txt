@@ -14,26 +14,46 @@ Disallow: /auth
 Disallow: /library
 Disallow: /notifications
 Disallow: /profile
+Disallow: /reading-history
 Disallow: /settings
 Disallow: /search
 Disallow: /user/
 Disallow: /api/
 
-# ---- Google / AdSense crawlers: FULL access to public content ----
+# ---- Google / AdSense crawlers: access public content, block private/admin ----
 User-agent: Mediapartners-Google
 Allow: /
+Disallow: /admin
+Disallow: /api/
 
 User-agent: AdsBot-Google
 Allow: /
+Disallow: /admin
+Disallow: /api/
 
 User-agent: AdsBot-Google-Mobile
 Allow: /
+Disallow: /admin
+Disallow: /api/
 
 User-agent: Googlebot
 Allow: /
+Disallow: /admin
+Disallow: /auth
+Disallow: /library
+Disallow: /notifications
+Disallow: /profile
+Disallow: /reading-history
+Disallow: /settings
+Disallow: /search
+Disallow: /user/
+Disallow: /api/
 
 User-agent: Googlebot-Image
 Allow: /
+Disallow: /admin
+Disallow: /api/
 
 # ---- Sitemap index (dynamic — always reflects current DB state) ----
 Sitemap: https://www.vnrscans.com/sitemap.xml
+

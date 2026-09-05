@@ -143,7 +143,8 @@ function HomeContent({ initialData }: { initialData?: HomeInitialData }) {
           "id,updated_at,progress,series_id,series:series_id(id,slug,title,cover_url),chapters:chapter_id(slug,chapter_number,title)"
         )
         .eq("user_id", user!.id)
-        .order("updated_at", { ascending: false });
+        .order("updated_at", { ascending: false })
+        .limit(40);
       if (error) throw error;
 
       // Group by series and keep only the most recent chapter per series
@@ -177,7 +178,7 @@ function HomeContent({ initialData }: { initialData?: HomeInitialData }) {
       const seriesIds = Array.from(seriesIdSet).filter(Boolean);
       if (seriesIds.length === 0) return [];
 
-      // 2. Fetch recent chapter drops to capture active batch updates + all series latest chapters via RPC in parallel
+      // 2. Fetch recent chapter drops to capture active batch updates + series latest chapters
       const [recentRes, rpcRes] = await Promise.all([
         supabase
           .from("chapters")
@@ -186,8 +187,8 @@ function HomeContent({ initialData }: { initialData?: HomeInitialData }) {
           .eq("status", "published")
           .order("created_at", { ascending: false })
           .order("chapter_number", { ascending: false })
-          .limit(300),
-        supabase.rpc("get_series_with_latest_chapters", { limit_count: 1000 }),
+          .limit(100),
+        supabase.rpc("get_series_with_latest_chapters", { limit_count: 60 }),
       ]);
 
       // Group by series so that mass updates (e.g. 5+ chapters) collapse into ONE cover card
@@ -324,37 +325,13 @@ function HomeContent({ initialData }: { initialData?: HomeInitialData }) {
   const latestUpdates = useQuery({
     queryKey: ["latest-updates", settings.showNovelsOnHome],
     queryFn: async () => {
-      const [rpcRes, allSeriesRes] = await Promise.all([
-        supabase.rpc("get_series_with_latest_chapters", { limit_count: 1000 }),
-        supabase.from("series").select("id,slug,title,cover_url,type,updated_at").order("title"),
-      ]);
-
+      const rpcRes = await supabase.rpc("get_series_with_latest_chapters", { limit_count: 60 });
       if (rpcRes.error) throw rpcRes.error;
 
-      const rpcMap = new Map((rpcRes.data ?? []).map((s: any) => [s.id, s]));
-      let fullSeriesList = (allSeriesRes.data ?? []).map((s: any) => {
-        const existing = rpcMap.get(s.id);
-        if (existing) return existing;
-        return {
-          id: s.id,
-          slug: s.slug,
-          title: s.title,
-          cover_url: s.cover_url,
-          type: s.type,
-          latest_chapter_created_at: s.updated_at,
-          recent_chapters: [],
-        };
-      });
-
+      let fullSeriesList = rpcRes.data ?? [];
       if (!settings.showNovelsOnHome) {
         fullSeriesList = fullSeriesList.filter((series: any) => series.type !== "novel");
       }
-
-      fullSeriesList.sort(
-        (a: any, b: any) =>
-          new Date(b.latest_chapter_created_at || 0).getTime() -
-          new Date(a.latest_chapter_created_at || 0).getTime()
-      );
 
       return fullSeriesList.map((series: any) => ({
         id: series.id,
@@ -374,8 +351,7 @@ function HomeContent({ initialData }: { initialData?: HomeInitialData }) {
       }));
     },
     initialData: latestUpdatesInitialData,
-    staleTime: 1000 * 30, // 30 seconds
-    refetchInterval: 1000 * 60, // Keep hold countdowns synced every minute
+    staleTime: 1000 * 60, // 1 minute
     gcTime: 1000 * 60 * 20,
   });
 

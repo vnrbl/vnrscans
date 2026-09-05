@@ -1,5 +1,6 @@
 import { cache } from "react";
 import type { Metadata } from "next";
+import { notFound } from "next/navigation";
 import ChapterReaderContent from "./ChapterReaderContent";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -58,7 +59,8 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
   if (!data || !data.series) {
     return {
-      title: `Read ${chapterSlug} — vnrscans`,
+      title: "Chapter Not Found — vnrscans",
+      robots: { index: false, follow: false },
     };
   }
 
@@ -122,11 +124,15 @@ export default async function Page({ params }: PageProps) {
   const fullData = await getChapterFullData(slug, chapterSlug);
   const data = fullData?.chapter;
 
-  const series = data?.series as unknown as {
-    title: string;
-  } | undefined;
+  if (!data || !data.series) {
+    notFound();
+  }
 
-  const breadcrumbLd = data && series ? {
+  const series = data.series as unknown as {
+    title: string;
+  };
+
+  const breadcrumbLd = {
     "@context": "https://schema.org",
     "@type": "BreadcrumbList",
     "itemListElement": [
@@ -134,7 +140,7 @@ export default async function Page({ params }: PageProps) {
         "@type": "ListItem",
         "position": 1,
         "name": "Home",
-        "item": "https://www.vnrscans.com/home"
+        "item": "https://www.vnrscans.com"
       },
       {
         "@type": "ListItem",
@@ -149,7 +155,7 @@ export default async function Page({ params }: PageProps) {
         "item": `https://www.vnrscans.com/title/${slug}/${chapterSlug}`
       }
     ]
-  } : null;
+  };
 
   return (
     <>

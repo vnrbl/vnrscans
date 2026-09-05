@@ -106,17 +106,30 @@ export const SeriesHeader = React.memo(function SeriesHeader({
         return { favorited: true };
       }
     },
+    onMutate: async () => {
+      await qc.cancelQueries({ queryKey: ["is-favorited", s.id, user?.id] });
+      const previousValue = qc.getQueryData(["is-favorited", s.id, user?.id]);
+      qc.setQueryData(["is-favorited", s.id, user?.id], (old: boolean | undefined) => !old);
+      return { previousValue };
+    },
     onSuccess: (res) => {
-      qc.invalidateQueries({ queryKey: ["is-favorited", s.id] });
-      qc.invalidateQueries({ queryKey: ["library", "favorites"] });
-      qc.invalidateQueries({ queryKey: ["library", "all"] });
       if (res?.favorited) {
         toast.success("Added to Favorites ❤️");
       } else {
         toast.info("Removed from Favorites");
       }
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (err: any, _vars, context) => {
+      if (context?.previousValue !== undefined) {
+        qc.setQueryData(["is-favorited", s.id, user?.id], context.previousValue);
+      }
+      toast.error(err.message);
+    },
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: ["is-favorited", s.id] });
+      qc.invalidateQueries({ queryKey: ["library", "favorites"] });
+      qc.invalidateQueries({ queryKey: ["library", "all"] });
+    },
   });
   const CORE_GENRES_SET = React.useMemo(
     () =>
@@ -206,7 +219,7 @@ export const SeriesHeader = React.memo(function SeriesHeader({
         </span>
       </div>
 
-      <h1 className="text-2xl font-black tracking-tight text-white uppercase font-heading sm:text-3xl md:text-4xl lg:text-[2.6rem] lg:leading-[1.1]">
+      <h1 className="text-[clamp(1.5rem,3.2vw,2.5rem)] font-black tracking-tight text-white uppercase font-heading leading-[1.12]">
         {s.title}
       </h1>
 
@@ -214,7 +227,7 @@ export const SeriesHeader = React.memo(function SeriesHeader({
         <p className="mt-1.5 text-xs leading-relaxed text-neutral-400 font-sans font-normal">{s.alternative_titles}</p>
       )}
 
-      <div className="mt-3.5 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-xs sm:justify-start font-sans">
+      <div className="mt-3.5 flex flex-wrap items-center justify-center gap-x-3 sm:gap-x-4 gap-y-2 text-xs sm:justify-start font-sans">
         {seriesRank && (
           <span className="inline-flex items-center gap-1.5 rounded-md bg-amber-500/10 border border-amber-500/25 px-2 py-0.5 text-xs font-mono font-bold text-amber-300 shadow-sm shadow-amber-500/5">
             <Trophy className="h-3.5 w-3.5 text-amber-400" />
@@ -413,7 +426,7 @@ function LimitedTagPills({
     <>
       <span className="contents md:hidden">
         {mobileTags.map((tag) => (
-          <MetaPill key={tag.id || tag.slug} href="/browse" search={{ tag: tag.slug }}>
+          <MetaPill key={tag.id || tag.slug} href={`/tags/${tag.slug}`}>
             {tag.icon && <span className="mr-1">{tag.icon}</span>}
             {tag.name}
           </MetaPill>
@@ -422,7 +435,7 @@ function LimitedTagPills({
 
       <span className="hidden md:contents">
         {desktopTags.map((tag) => (
-          <MetaPill key={tag.id || tag.slug} href="/browse" search={{ tag: tag.slug }}>
+          <MetaPill key={tag.id || tag.slug} href={`/tags/${tag.slug}`}>
             {tag.icon && <span className="mr-1">{tag.icon}</span>}
             {tag.name}
           </MetaPill>

@@ -8,10 +8,19 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 
-export default function TagDetailPageContent({ slug }: { slug: string }) {
+export default function TagDetailPageContent({
+  slug,
+  initialTag,
+  initialSeries,
+}: {
+  slug: string;
+  initialTag?: any;
+  initialSeries?: any[];
+}) {
   // Get tag details
   const tag = useQuery({
     queryKey: ["tag", slug],
+    initialData: initialTag,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("tags")
@@ -26,6 +35,7 @@ export default function TagDetailPageContent({ slug }: { slug: string }) {
   // Get series with this tag
   const series = useQuery({
     queryKey: ["tag-series", slug],
+    initialData: initialSeries,
     queryFn: async () => {
       if (!tag.data?.id) return [];
       

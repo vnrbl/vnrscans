@@ -674,17 +674,17 @@ export const ChapterList = React.memo(function ChapterList({
               return (
                 <div
                   key={c.id}
-                  className="glass-card block rounded-lg p-3 hover-lift transition-all"
+                  className="glass-card block rounded-lg p-3 sm:p-3.5 hover-lift transition-all min-h-[50px]"
                 >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
                         <TooltipProvider delayDuration={100}>
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <Link
                                 href={`/title/${slug}/${c.slug}`}
-                                className={`text-sm transition-colors flex items-center gap-1.5 ${
+                                className={`text-sm transition-colors flex items-center gap-1.5 py-0.5 ${
                                   isRead ? "text-neutral-500 font-medium hover:text-neutral-300" : "text-white font-semibold hover:text-purple-400"
                                 }`}
                                 title={c.title ? `Chapter ${c.chapter_number}: ${c.title}` : `Chapter ${c.chapter_number}`}
@@ -744,7 +744,7 @@ export const ChapterList = React.memo(function ChapterList({
                         type="button"
                         onClick={(e) => handleDownloadSingleChapter(e, c)}
                         title={savedOfflineIds.has(c.id) ? "Saved Offline (Click to remove)" : "Save Chapter Offline"}
-                        className={`p-1.5 rounded-lg border text-xs transition-colors cursor-pointer shrink-0 ${
+                        className={`min-h-[36px] min-w-[36px] flex items-center justify-center p-1.5 rounded-lg border text-xs transition-colors cursor-pointer shrink-0 ${
                           savedOfflineIds.has(c.id)
                             ? "border-emerald-500/50 bg-emerald-950/40 text-emerald-400"
                             : "border-border/40 bg-secondary/50 hover:bg-secondary text-muted-foreground hover:text-foreground"

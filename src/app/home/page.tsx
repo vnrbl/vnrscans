@@ -3,6 +3,7 @@
 // User-scoped sections (followed chapters, reading history) stay client-side
 // because they need the auth session.
 
+import type { Metadata } from "next";
 import HomeClient, {
   type HomeInitialData,
   type HomeLatestUpdate,
@@ -11,6 +12,22 @@ import HomeClient, {
 import { supabase } from "@/integrations/supabase/client";
 
 export const revalidate = 60; // ISR cache for 60s — instant edge delivery
+
+export const metadata: Metadata = {
+  title: "Read Manga, Manhwa, Manhua & Novels Online Free — vnrscans",
+  description:
+    "Explore the latest manga, manhwa, manhua, and novel updates, popular series, and top-rated titles with fast loading and high quality on vnrscans.",
+  alternates: {
+    canonical: "https://www.vnrscans.com/home",
+  },
+  openGraph: {
+    title: "Read Manga, Manhwa, Manhua & Novels — vnrscans",
+    description:
+      "Explore the latest manga, manhwa, manhua, and novel updates on vnrscans.",
+    type: "website",
+    url: "https://www.vnrscans.com/home",
+  },
+};
 
 async function fetchHomeInitialData(): Promise<HomeInitialData> {
   const [carouselRes, latestRes, popularRes, highScoreRes] = await Promise.all([

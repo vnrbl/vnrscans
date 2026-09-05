@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { isChapterReadingPath } from "@/lib/layout";
 import {
@@ -65,12 +65,31 @@ export function CommandSearchModal() {
     };
   }, [isReading]);
 
-  // Debounced search query
+  const searchCacheRef = useRef<Map<string, SearchSeriesResult[]>>(new Map());
+  const abortControllerRef = useRef<AbortController | null>(null);
+
+  // Debounced search query with AbortController and instant cache
   useEffect(() => {
-    if (!query.trim()) {
+    const trimmed = query.trim();
+    if (!trimmed) {
       setResults([]);
+      setLoading(false);
       return;
     }
+
+    // Check memory cache for instantaneous response (<1ms)
+    if (searchCacheRef.current.has(trimmed.toLowerCase())) {
+      setResults(searchCacheRef.current.get(trimmed.toLowerCase())!);
+      setLoading(false);
+      return;
+    }
+
+    // Cancel any previous in-flight request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
 
     const timer = setTimeout(async () => {
       setLoading(true);
@@ -78,20 +97,30 @@ export function CommandSearchModal() {
         const { data, error } = await supabase
           .from("series")
           .select("id, slug, title, cover_url, type, status")
-          .or(`title.ilike.%${query}%,alternative_titles.ilike.%${query}%,author.ilike.%${query}%`)
+          .or(`title.ilike.%${trimmed}%,alternative_titles.ilike.%${trimmed}%,author.ilike.%${trimmed}%`)
+          .abortSignal(controller.signal)
           .limit(8);
 
-        if (!error && data) {
-          setResults(data as SearchSeriesResult[]);
+        if (!error && data && !controller.signal.aborted) {
+          const formatted = data as SearchSeriesResult[];
+          searchCacheRef.current.set(trimmed.toLowerCase(), formatted);
+          setResults(formatted);
         }
-      } catch (err) {
-        console.error("Search error:", err);
+      } catch (err: any) {
+        if (err?.name !== "AbortError") {
+          console.error("Search error:", err);
+        }
       } finally {
-        setLoading(false);
+        if (!controller.signal.aborted) {
+          setLoading(false);
+        }
       }
     }, 200);
 
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
   }, [query]);
 
   const handleSelect = useCallback(

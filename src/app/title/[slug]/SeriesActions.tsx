@@ -272,17 +272,30 @@ export const SeriesActions = React.memo(function SeriesActions({
         return { favorited: true };
       }
     },
+    onMutate: async () => {
+      await qc.cancelQueries({ queryKey: ["is-favorited", seriesId, user?.id] });
+      const previousValue = qc.getQueryData(["is-favorited", seriesId, user?.id]);
+      qc.setQueryData(["is-favorited", seriesId, user?.id], (old: boolean | undefined) => !old);
+      return { previousValue };
+    },
     onSuccess: (res) => {
-      qc.invalidateQueries({ queryKey: ["is-favorited", seriesId] });
-      qc.invalidateQueries({ queryKey: ["library", "favorites"] });
-      qc.invalidateQueries({ queryKey: ["library", "all"] });
       if (res?.favorited) {
         toast.success("Added to Favorites ❤️");
       } else {
         toast.info("Removed from Favorites");
       }
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (err: any, _vars, context) => {
+      if (context?.previousValue !== undefined) {
+        qc.setQueryData(["is-favorited", seriesId, user?.id], context.previousValue);
+      }
+      toast.error(err.message);
+    },
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: ["is-favorited", seriesId] });
+      qc.invalidateQueries({ queryKey: ["library", "favorites"] });
+      qc.invalidateQueries({ queryKey: ["library", "all"] });
+    },
   });
 
   const toggleFollow = useMutation({
@@ -299,7 +312,26 @@ export const SeriesActions = React.memo(function SeriesActions({
       });
       return { wasFollowing: false };
     },
+    onMutate: async () => {
+      await qc.cancelQueries({ queryKey: ["following", slug] });
+      const previousValue = qc.getQueryData(["following", slug]);
+      qc.setQueryData(["following", slug], (old: boolean | undefined) => !old);
+      return { previousValue };
+    },
     onSuccess: (result) => {
+      if (result?.wasFollowing) {
+        toast.success("Unfollowed");
+      } else {
+        toast.success(`Following — +${XP_AMOUNTS.follow_series} Qi gathered`);
+      }
+    },
+    onError: (err: any, _vars, context) => {
+      if (context?.previousValue !== undefined) {
+        qc.setQueryData(["following", slug], context.previousValue);
+      }
+      toast.error(err.message);
+    },
+    onSettled: () => {
       qc.invalidateQueries({ queryKey: ["following", slug] });
       qc.invalidateQueries({ queryKey: ["library-status", slug] });
       qc.invalidateQueries({ queryKey: ["library"] });
@@ -307,13 +339,7 @@ export const SeriesActions = React.memo(function SeriesActions({
       qc.invalidateQueries({ queryKey: ["profile"] });
       qc.invalidateQueries({ queryKey: ["user-stats"] });
       qc.invalidateQueries({ queryKey: ["xp-history"] });
-      if (result?.wasFollowing) {
-        toast.success("Unfollowed");
-      } else {
-        toast.success(`Following — +${XP_AMOUNTS.follow_series} Qi gathered`);
-      }
     },
-    onError: (e: Error) => toast.error(e.message),
   });
 
   const rate = useMutation({

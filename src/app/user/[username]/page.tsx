@@ -18,6 +18,10 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const decoded = safeDecode(username);
   return {
     title: `${decoded}'s Profile — vnrscans`,
+    robots: {
+      index: false,
+      follow: true,
+    },
   };
 }
 

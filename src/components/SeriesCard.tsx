@@ -65,15 +65,15 @@ export const SeriesCard = memo(function SeriesCard({ s, rank }: { s: Series; ran
           </div>
         </div>
       </div>
-      <div className="p-3 bg-surface-1/90">
+      <div className="p-2.5 sm:p-3 bg-surface-1/90">
         <h3
           title={s.title}
-          className="line-clamp-1 text-sm font-semibold leading-snug text-white group-hover:text-purple-400 transition-colors duration-200"
+          className="line-clamp-2 text-xs sm:text-sm font-semibold leading-snug text-white group-hover:text-purple-400 transition-colors duration-200 min-h-[2rem] sm:min-h-[2.4rem]"
         >
           {s.title}
         </h3>
         {s.chapter_count !== undefined && s.chapter_count !== null && s.chapter_count > 0 && (
-          <p className="mt-1 text-xs text-neutral-400 font-normal">
+          <p className="mt-1 text-3xs sm:text-xs text-neutral-400 font-normal">
             {s.chapter_count} {s.chapter_count === 1 ? "Chapter" : "Chapters"}
           </p>
         )}
