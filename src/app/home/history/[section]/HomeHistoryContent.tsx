@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { Link } from "@/lib/router-compat";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, BookOpen, Clock, Layers, ListFilter } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -90,9 +90,50 @@ export default function HomeHistoryContent({
   const meta = sectionKey ? SECTION_META[sectionKey] : null;
   const periodKey = (period === "week" || period === "month" || period === "all" ? period : "day") as Period;
 
+  const queryClient = useQueryClient();
+
   useEffect(() => {
     setCurrentPage(1);
   }, [sectionKey, periodKey, historyView]);
+
+  // Realtime subscription: synchronize Latest Updates, Followed Chapters, and Reading History with live DB updates
+  useEffect(() => {
+    const channel = supabase
+      .channel("home-history-realtime")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "chapters" },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ["home-history"] });
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "reading_history" },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ["home-history"] });
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "user_library" },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ["home-history"] });
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "bookmarks" },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ["home-history"] });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient]);
 
   const historyQuery = useQuery({
     queryKey: ["home-history", sectionKey, periodKey, user?.id],
@@ -516,9 +557,9 @@ function GroupedSeriesCard({
   item: GroupedSeries;
   accentColor: string;
 }) {
-  // Show only top 3 chapters directly on the card so there is NO inner scroll trap!
+  // Show 5 chapters directly on the card with NO inner scroll trap!
   // The mouse wheel will scroll the page naturally.
-  const displayChapters = item.chapters.slice(0, 3);
+  const displayChapters = item.chapters.slice(0, 5);
   const remainingCount = Math.max(
     0,
     (item.totalUpdated || item.chapters.length) - displayChapters.length
@@ -533,7 +574,7 @@ function GroupedSeriesCard({
           params={{ slug: item.slug }}
           className="shrink-0"
         >
-          <div className="relative h-[160px] w-[110px] overflow-hidden rounded-lg bg-secondary shadow-md">
+          <div className="relative h-[195px] w-[125px] overflow-hidden rounded-lg bg-secondary shadow-md">
             <OptimizedImage
               src={item.cover_url}
               alt={item.title}
