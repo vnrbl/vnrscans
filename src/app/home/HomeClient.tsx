@@ -1144,8 +1144,8 @@ function LatestUpdatesSection({
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {[...Array(8)].map((_, i) => (
             <div key={i} className="glass-card rounded-lg p-3 overflow-hidden">
-              <div className="flex gap-3">
-                <div className="h-[160px] w-[105px] shrink-0 rounded shimmer-dark" />
+              <div className="flex gap-3 items-stretch">
+                <div className="w-[125px] sm:w-[130px] md:w-[135px] self-stretch min-h-[160px] shrink-0 rounded shimmer-dark" />
                 <div className="flex-1 space-y-2 py-1">
                   <div className="h-4 w-3/4 shimmer-dark rounded" />
                   <div className="h-6 w-full shimmer-dark rounded mt-3" />
@@ -1164,45 +1164,46 @@ function LatestUpdatesSection({
                 key={item.id}
                 className="glass-card group rounded-lg p-3 hover-lift transition-[border-color,box-shadow] flex flex-col justify-between"
               >
-                <div className="flex gap-3">
-                  {/* Cover and Flag Column */}
-                  <div className="shrink-0 flex flex-col items-center">
-                    <Link
-                      to="/title/$slug"
-                      params={{ slug: item.slug }}
-                      className="shrink-0 block"
-                    >
-                      <div className="relative h-[160px] w-[105px] overflow-hidden rounded bg-neutral-950">
-                        <OptimizedImage
-                          src={item.cover_url}
-                          alt={item.title}
-                          seriesId={item.id}
-                          className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-                        />
-                        {item.recent_chapters.some((c) => c.status === "scheduled" || (c.scheduled_at && new Date(c.scheduled_at) > new Date())) && (
-                          <div
-                            className="absolute top-2 right-2 rounded bg-amber-950/90 border border-amber-500/50 p-1 text-amber-300 shadow-md backdrop-blur-md"
-                            title="Has chapters currently on early-access hold"
-                          >
-                            <Lock className="h-2.5 w-2.5 text-amber-400 animate-pulse" />
-                          </div>
-                        )}
-                      </div>
-                    </Link>
+                <div className="flex gap-3 items-stretch">
+                  {/* Cover Column touching the bottom without cutting any part */}
+                  <Link
+                    to="/title/$slug"
+                    params={{ slug: item.slug }}
+                    className="shrink-0 self-stretch block"
+                  >
+                    <div className="relative h-full w-[125px] sm:w-[130px] md:w-[135px] min-h-[160px] overflow-hidden rounded bg-neutral-950">
+                      <OptimizedImage
+                        src={item.cover_url}
+                        alt={item.title}
+                        seriesId={item.id}
+                        fit="cover"
+                        className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                      />
 
-                    {/* Flag below the cover inside the card */}
-                    <div
-                      className="mt-2 flex items-center justify-center w-[105px]"
-                      title={getTypeLabel(item.type)}
-                    >
-                      <div className="flex items-center justify-center p-0.5 rounded bg-surface-1/90 border border-white/10 shadow-xs hover:border-purple-500/40 transition-colors">
-                        <CountryFlag type={item.type} className="h-3.5 w-5 rounded-[2px] shadow-xs overflow-hidden" />
+                      {/* Flag at top left */}
+                      <div
+                        className="absolute top-2 left-2 z-10 pointer-events-none"
+                        title={getTypeLabel(item.type)}
+                      >
+                        <div className="flex items-center justify-center p-0.5 rounded bg-black/75 border border-white/20 shadow-md backdrop-blur-md">
+                          <CountryFlag type={item.type} className="h-3.5 w-5 rounded-[2px] shadow-xs overflow-hidden" />
+                        </div>
                       </div>
+
+                      {/* Scheduled Lock at top right */}
+                      {item.recent_chapters.some((c) => c.status === "scheduled" || (c.scheduled_at && new Date(c.scheduled_at) > new Date())) && (
+                        <div
+                          className="absolute top-2 right-2 z-10 rounded bg-amber-950/90 border border-amber-500/50 p-1 text-amber-300 shadow-md backdrop-blur-md"
+                          title="Has chapters currently on early-access hold"
+                        >
+                          <Lock className="h-2.5 w-2.5 text-amber-400 animate-pulse" />
+                        </div>
+                      )}
                     </div>
-                  </div>
+                  </Link>
 
                   {/* Series Info and Chapters */}
-                  <div className="flex min-w-0 flex-1 flex-col justify-between">
+                  <div className="flex min-w-0 flex-1 flex-col justify-start">
                     <div className="mb-2">
                       <Link
                         to="/title/$slug"

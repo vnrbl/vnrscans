@@ -9,6 +9,8 @@ interface OptimizedImageProps {
   priority?: boolean;
   onLoad?: () => void;
   seriesId?: string;
+  fit?: "cover" | "contain";
+  imageClassName?: string;
 }
 
 // Shared singleton IntersectionObserver for all cards sitewide
@@ -42,6 +44,8 @@ export function OptimizedImage({
   priority = false,
   onLoad,
   seriesId,
+  fit = "cover",
+  imageClassName,
 }: OptimizedImageProps) {
   const [isLoaded, setIsLoaded] = useState(false);
   const [error, setError] = useState(false);
@@ -161,7 +165,7 @@ export function OptimizedImage({
             loop
             muted
             playsInline
-            className="h-full w-full object-cover transition-opacity duration-300 opacity-100"
+            className={`h-full w-full ${fit === "contain" ? "object-contain" : "object-cover"} transition-opacity duration-300 opacity-100`}
             draggable={false}
           />
         ) : (
@@ -188,7 +192,9 @@ export function OptimizedImage({
           referrerPolicy="no-referrer"
           onLoad={handleLoad}
           onError={handleError}
-          className={`h-full w-full object-cover transition-opacity duration-300 ${
+          className={`h-full ${
+            imageClassName || (fit === "contain" ? "w-full object-contain" : "w-full object-cover")
+          } transition-opacity duration-300 ${
             isLoaded ? "opacity-100" : "opacity-0"
           }`}
           draggable={false}

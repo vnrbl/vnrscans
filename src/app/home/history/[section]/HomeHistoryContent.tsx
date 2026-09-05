@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { OptimizedImage } from "@/components/OptimizedImage";
 import { SectionPagination } from "@/components/SectionPagination";
 import { formatTimeAgo, formatUserDateTime, getUserTimeZone } from "@/lib/date";
+import { CountryFlag, getTypeLabel } from "@/components/CountryFlag";
 
 type HistorySection = "followed-chapters" | "reading-history" | "latest-updates";
 type Period = "day" | "week" | "month" | "all";
@@ -19,6 +20,7 @@ export interface GroupedSeries {
   title: string;
   slug: string;
   cover_url: string | null;
+  type?: string;
   totalUpdated?: number;
   latestCreatedAt?: string;
   chapters: Array<{
@@ -399,6 +401,7 @@ async function fetchLatestUpdates(period: Period): Promise<GroupedSeries[]> {
       title: s.title,
       slug: s.slug,
       cover_url: s.cover_url,
+      type: s.type,
       totalUpdated: filteredChapters.length > 0 ? filteredChapters.length : chaptersToUse.length,
       latestCreatedAt: latestDate,
       chapters: chaptersToUse.map((ch: any) => ({
@@ -674,26 +677,37 @@ function GroupedSeriesCard({
   );
 
   return (
-    <article className="group overflow-hidden rounded-xl border border-border/40 bg-card/70 backdrop-blur-sm p-4 transition-all hover:border-primary/50 hover:shadow-lg hover:shadow-primary/10 flex flex-col justify-between">
-      <div className="flex gap-4">
-        {/* Cover Image */}
+    <article className="group overflow-hidden rounded-xl border border-border/40 bg-card/70 backdrop-blur-sm p-4 transition-all hover:border-primary/50 hover:shadow-lg hover:shadow-primary/10">
+      <div className="flex gap-4 items-stretch">
+        {/* Cover Image touching the bottom without cutting any part */}
         <Link
           to="/title/$slug"
           params={{ slug: item.slug }}
-          className="shrink-0"
+          className="shrink-0 self-stretch block"
         >
-          <div className="relative h-[195px] w-[125px] overflow-hidden rounded-lg bg-secondary shadow-md">
+          <div className="relative h-full w-[130px] sm:w-[135px] md:w-[140px] min-h-[195px] overflow-hidden rounded-lg bg-neutral-950 shadow-md">
             <OptimizedImage
               src={item.cover_url}
               alt={item.title}
               seriesId={item.id}
+              fit="cover"
               className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
             />
+            {item.type && (
+              <div
+                className="absolute top-2 left-2 z-10 pointer-events-none"
+                title={getTypeLabel(item.type)}
+              >
+                <div className="flex items-center justify-center p-0.5 rounded bg-black/75 border border-white/20 shadow-md backdrop-blur-md">
+                  <CountryFlag type={item.type} className="h-3.5 w-5 rounded-[2px] shadow-xs overflow-hidden" />
+                </div>
+              </div>
+            )}
           </div>
         </Link>
 
         {/* Series Info & Chapters */}
-        <div className="flex min-w-0 flex-1 flex-col justify-between">
+        <div className="flex min-w-0 flex-1 flex-col justify-start">
           <div>
             <Link
               to="/title/$slug"
