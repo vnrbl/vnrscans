@@ -69,10 +69,28 @@ async function fetchInitialData(): Promise<BrowseInitialData> {
     });
   }
 
+const CORE_GENRES_SET = new Set([
+  "action", "adventure", "boys love", "comedy", "crime", "cyberpunk", "drama", 
+  "ecchi", "erotica", "fantasy", "girls love", "harem", "historical", "horror", 
+  "isekai", "josei", "martial arts", "mecha", "medical", "mystery", "psychological", 
+  "reincarnation", "romance", "sci-fi", "seinen", "shoujo", "shounen", "slice of life", 
+  "sports", "supernatural", "thriller", "wuxia", "xianxia", "xuanhuan", "yaoi", "yuri",
+  "monsters", "magic", "cultivation", "webtoon", "manhwa", "manhua", "manga"
+]);
+
   const uniqueGenresMap = new Map<string, { id: string; name: string; slug: string }>();
   (genresRes.data ?? []).forEach((g: any) => {
-    if (!uniqueGenresMap.has(g.id)) {
-      uniqueGenresMap.set(g.id, { id: g.id, name: g.name, slug: g.slug });
+    if (g?.slug && !uniqueGenresMap.has(g.slug.toLowerCase())) {
+      uniqueGenresMap.set(g.slug.toLowerCase(), { id: g.id, name: g.name, slug: g.slug });
+    }
+  });
+
+  // Also include core genres from series tags (e.g. cultivation, martial arts, reincarnation)
+  (tagsRes.data ?? []).forEach((t: any) => {
+    const slug = (t?.slug || "").toLowerCase().trim();
+    const name = (t?.name || "").toLowerCase().trim();
+    if ((CORE_GENRES_SET.has(slug) || CORE_GENRES_SET.has(name)) && !uniqueGenresMap.has(slug)) {
+      uniqueGenresMap.set(slug, { id: t.id, name: t.name, slug: t.slug });
     }
   });
 
@@ -84,7 +102,7 @@ async function fetchInitialData(): Promise<BrowseInitialData> {
   });
 
   return {
-    genres: Array.from(uniqueGenresMap.values()),
+    genres: Array.from(uniqueGenresMap.values()).sort((a, b) => a.name.localeCompare(b.name)),
     tags: Array.from(uniqueTagsMap.values()),
     defaultManhwa: seriesWithRealCounts,
   };

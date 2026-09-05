@@ -104,28 +104,28 @@ export default function HomeHistoryContent({
         "postgres_changes",
         { event: "*", schema: "public", table: "chapters" },
         () => {
-          queryClient.invalidateQueries({ queryKey: ["home-history"] });
+          queryClient.invalidateQueries({ queryKey: ["home-history"], refetchType: "all" });
         }
       )
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "reading_history" },
         () => {
-          queryClient.invalidateQueries({ queryKey: ["home-history"] });
+          queryClient.invalidateQueries({ queryKey: ["home-history"], refetchType: "all" });
         }
       )
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "user_library" },
         () => {
-          queryClient.invalidateQueries({ queryKey: ["home-history"] });
+          queryClient.invalidateQueries({ queryKey: ["home-history"], refetchType: "all" });
         }
       )
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "bookmarks" },
         () => {
-          queryClient.invalidateQueries({ queryKey: ["home-history"] });
+          queryClient.invalidateQueries({ queryKey: ["home-history"], refetchType: "all" });
         }
       )
       .subscribe();
@@ -136,33 +136,21 @@ export default function HomeHistoryContent({
   }, [queryClient]);
 
   const historyQuery = useQuery({
-    queryKey: ["home-history", sectionKey, periodKey, user?.id],
+    queryKey: ["home-history", sectionKey, periodKey, user?.id, historyView],
     queryFn: async () => {
       if (!sectionKey) return [];
       if (sectionKey === "followed-chapters") {
         return fetchFollowedChapters(user!.id, periodKey);
       }
       if (sectionKey === "reading-history") {
-        return fetchReadingHistory(user!.id, periodKey);
+        return fetchReadingHistory(user!.id, periodKey, historyView);
       }
       return fetchLatestUpdates(periodKey);
     },
     enabled: !!sectionKey && (!meta?.requiresAuth || !!user) && !authLoading,
-    staleTime: 1000 * 60 * 2,
+    staleTime: 1000 * 15, // 15 seconds for responsive syncing
+    refetchOnWindowFocus: true,
   });
-
-  // Reading history grouped by series (most recent chapter read per series)
-  const seriesGroupedHistory = useMemo(() => {
-    if (sectionKey !== "reading-history" || !historyQuery.data) return [];
-    const map = new Map<string, ChapterItem>();
-    (historyQuery.data as ChapterItem[]).forEach((item) => {
-      const sId = item.series?.id || item.series?.slug;
-      if (sId && !map.has(sId)) {
-        map.set(sId, item);
-      }
-    });
-    return Array.from(map.values());
-  }, [historyQuery.data, sectionKey]);
 
   if (!sectionKey || !meta) {
     return (
@@ -183,9 +171,7 @@ export default function HomeHistoryContent({
   // Pagination calculations
   const totalItems =
     sectionKey === "reading-history"
-      ? historyView === "series"
-        ? seriesGroupedHistory.length
-        : ((historyQuery.data as ChapterItem[]) ?? []).length
+      ? ((historyQuery.data as ChapterItem[]) ?? []).length
       : ((historyQuery.data as GroupedSeries[]) ?? []).length;
 
   const paginatedGroupedSeries = useMemo(() => {
@@ -197,13 +183,10 @@ export default function HomeHistoryContent({
 
   const paginatedHistoryData = useMemo(() => {
     if (sectionKey !== "reading-history") return [];
-    const list =
-      historyView === "series"
-        ? seriesGroupedHistory
-        : ((historyQuery.data as ChapterItem[]) ?? []);
+    const list = (historyQuery.data as ChapterItem[]) ?? [];
     const start = (currentPage - 1) * PAGE_SIZE;
     return list.slice(start, start + PAGE_SIZE);
-  }, [historyView, seriesGroupedHistory, historyQuery.data, sectionKey, currentPage]);
+  }, [historyQuery.data, sectionKey, currentPage]);
 
   return (
     <main className="container mx-auto min-h-screen px-4 py-20 sm:px-6 md:px-8 lg:px-12 xl:px-16">
@@ -339,18 +322,32 @@ export default function HomeHistoryContent({
 async function fetchLatestUpdates(period: Period): Promise<GroupedSeries[]> {
   const cutoff = getCutoffDate(period);
 
-  // Use the dedicated database RPC which groups recent chapters by series at the DB level,
-  // preventing mass drops from starving other series.
-  const { data, error } = await supabase.rpc("get_series_with_latest_chapters", {
-    limit_count: 1000,
+  // Fetch RPC for latest 5 chapters per series AND all series to guarantee complete coverage
+  const [rpcRes, allSeriesRes] = await Promise.all([
+    supabase.rpc("get_series_with_latest_chapters", { limit_count: 1000 }),
+    supabase.from("series").select("id,slug,title,cover_url,type,updated_at").order("title"),
+  ]);
+  if (rpcRes.error) throw rpcRes.error;
+
+  const rpcMap = new Map((rpcRes.data ?? []).map((s: any) => [s.id, s]));
+  const fullSeriesList = (allSeriesRes.data ?? []).map((s: any) => {
+    const existing = rpcMap.get(s.id);
+    if (existing) return existing;
+    return {
+      id: s.id,
+      slug: s.slug,
+      title: s.title,
+      cover_url: s.cover_url,
+      type: s.type,
+      latest_chapter_created_at: s.updated_at,
+      recent_chapters: [],
+    };
   });
-  if (error) throw error;
 
   const results: GroupedSeries[] = [];
 
-  (data ?? []).forEach((s: any) => {
+  fullSeriesList.forEach((s: any) => {
     const recentChapters = Array.isArray(s.recent_chapters) ? s.recent_chapters : [];
-    if (recentChapters.length === 0 && !s.latest_chapter_created_at) return;
 
     // Filter chapters based on period cutoff if selected
     const filteredChapters = cutoff
@@ -400,22 +397,25 @@ async function fetchLatestUpdates(period: Period): Promise<GroupedSeries[]> {
 }
 
 async function fetchFollowedChapters(userId: string, period: Period): Promise<GroupedSeries[]> {
-  // 1. Fetch followed series IDs from BOTH user_library and bookmarks (Favorites)
+  // 1. Fetch followed series IDs from BOTH user_library (excluding dropped) and bookmarks (Favorites)
   const [libRes, bmRes] = await Promise.all([
-    supabase.from("user_library" as any).select("series_id").eq("user_id", userId),
+    supabase.from("user_library" as any).select("series_id, reading_status").eq("user_id", userId),
     supabase.from("bookmarks" as any).select("series_id").eq("user_id", userId),
   ]);
-  const seriesIdSet = new Set<string>([
-    ...(((libRes.data ?? []) as any[]).map((r) => r.series_id)),
-    ...(((bmRes.data ?? []) as any[]).map((r) => r.series_id)),
-  ]);
-  const seriesIds = Array.from(seriesIdSet).filter(Boolean);
+  const libSeries = ((libRes.data ?? []) as any[])
+    .filter((r) => r.reading_status !== "dropped")
+    .map((r) => r.series_id);
+  const bmSeries = ((bmRes.data ?? []) as any[]).map((r) => r.series_id);
+
+  const seriesIdSet = new Set<string>([...libSeries, ...bmSeries].filter(Boolean));
+  const seriesIds = Array.from(seriesIdSet);
   if (seriesIds.length === 0) return [];
 
   const cutoff = getCutoffDate(period);
 
-  // 2. Query recent chapter drops + all series latest chapters via RPC in parallel
-  const [recentRes, rpcRes] = await Promise.all([
+  // 2. Fetch series metadata, recent chapters, and RPC in parallel
+  const [allFollowedSeriesRes, recentRes, rpcRes] = await Promise.all([
+    supabase.from("series").select("id,slug,title,cover_url,type,updated_at").in("id", seriesIds),
     supabase
       .from("chapters")
       .select("id,slug,title,chapter_number,created_at,series_id,series:series_id(id,slug,title,cover_url)")
@@ -423,51 +423,31 @@ async function fetchFollowedChapters(userId: string, period: Period): Promise<Gr
       .eq("status", "published")
       .order("created_at", { ascending: false })
       .order("chapter_number", { ascending: false })
-      .limit(400),
+      .limit(1000),
     supabase.rpc("get_series_with_latest_chapters", { limit_count: 1000 }),
   ]);
 
   const seriesMap = new Map<string, GroupedSeries>();
 
-  // Add from recent drops
-  (recentRes.data ?? []).forEach((ch: any) => {
-    if (!ch.series?.slug) return;
-    if (cutoff && new Date(ch.created_at) < new Date(cutoff)) return;
-
-    if (!seriesMap.has(ch.series_id)) {
-      seriesMap.set(ch.series_id, {
-        id: ch.series.id,
-        title: ch.series.title,
-        slug: ch.series.slug,
-        cover_url: ch.series.cover_url,
+  // Initialize all followed series so none are ever missing when period === "all"
+  if (!cutoff) {
+    (allFollowedSeriesRes.data ?? []).forEach((s: any) => {
+      seriesMap.set(s.id, {
+        id: s.id,
+        title: s.title,
+        slug: s.slug,
+        cover_url: s.cover_url,
         totalUpdated: 0,
-        latestCreatedAt: ch.created_at,
+        latestCreatedAt: s.updated_at,
         chapters: [],
       });
-    }
+    });
+  }
 
-    const entry = seriesMap.get(ch.series_id)!;
-    if (!entry.chapters.some((c) => c.id === ch.id)) {
-      entry.chapters.push({
-        id: ch.id,
-        slug: ch.slug,
-        chapter_number: Number(ch.chapter_number),
-        title: ch.title,
-        created_at: ch.created_at,
-      });
-      entry.totalUpdated = (entry.totalUpdated || 0) + 1;
-      if (new Date(ch.created_at).getTime() > new Date(entry.latestCreatedAt || 0).getTime()) {
-        entry.latestCreatedAt = ch.created_at;
-      }
-    }
-  });
-
-  // Populate from get_series_with_latest_chapters for any followed series
-  (rpcRes.data ?? []).forEach((s: any) => {
-    if (!seriesIdSet.has(s.id)) return;
+  // Populate latest chapters from RPC (gives reliable top 5 chapters per series)
+  const rpcFollowed = (rpcRes.data ?? []).filter((s: any) => seriesIdSet.has(s.id));
+  rpcFollowed.forEach((s: any) => {
     const recentList = Array.isArray(s.recent_chapters) ? s.recent_chapters : [];
-    if (recentList.length === 0) return;
-
     const filtered = cutoff
       ? recentList.filter(
           (ch: any) => ch.created_at && new Date(ch.created_at) >= new Date(cutoff)
@@ -477,8 +457,8 @@ async function fetchFollowedChapters(userId: string, period: Period): Promise<Gr
     if (cutoff && filtered.length === 0) return;
 
     const chaptersToUse = filtered.length > 0 ? filtered : recentList.slice(0, 5);
-
-    if (!seriesMap.has(s.id)) {
+    const existing = seriesMap.get(s.id);
+    if (!existing) {
       seriesMap.set(s.id, {
         id: s.id,
         title: s.title,
@@ -495,7 +475,9 @@ async function fetchFollowedChapters(userId: string, period: Period): Promise<Gr
         })),
       });
     } else {
-      const existing = seriesMap.get(s.id)!;
+      existing.totalUpdated = chaptersToUse.length;
+      existing.latestCreatedAt =
+        chaptersToUse[0]?.created_at || s.latest_chapter_created_at || existing.latestCreatedAt;
       chaptersToUse.forEach((ch: any) => {
         if (!existing.chapters.some((c) => c.id === ch.id)) {
           existing.chapters.push({
@@ -510,6 +492,45 @@ async function fetchFollowedChapters(userId: string, period: Period): Promise<Gr
     }
   });
 
+  // Merge recent chapter drops to ensure multiple recent drops are captured
+  (recentRes.data ?? []).forEach((ch: any) => {
+    if (!ch.series?.slug) return;
+    if (cutoff && new Date(ch.created_at) < new Date(cutoff)) return;
+
+    let entry = seriesMap.get(ch.series_id);
+    if (!entry) {
+      entry = {
+        id: ch.series.id,
+        title: ch.series.title,
+        slug: ch.series.slug,
+        cover_url: ch.series.cover_url,
+        totalUpdated: 0,
+        latestCreatedAt: ch.created_at,
+        chapters: [],
+      };
+      seriesMap.set(ch.series_id, entry);
+    }
+
+    if (!entry.chapters.some((c) => c.id === ch.id)) {
+      entry.chapters.push({
+        id: ch.id,
+        slug: ch.slug,
+        chapter_number: Number(ch.chapter_number),
+        title: ch.title,
+        created_at: ch.created_at,
+      });
+      entry.totalUpdated = (entry.totalUpdated || 0) + 1;
+      if (new Date(ch.created_at).getTime() > new Date(entry.latestCreatedAt || 0).getTime()) {
+        entry.latestCreatedAt = ch.created_at;
+      }
+    }
+  });
+
+  // Sort each series chapters by chapter_number DESC
+  seriesMap.forEach((entry) => {
+    entry.chapters.sort((a, b) => b.chapter_number - a.chapter_number);
+  });
+
   return Array.from(seriesMap.values()).sort((a, b) => {
     const timeA = a.latestCreatedAt ? new Date(a.latestCreatedAt).getTime() : 0;
     const timeB = b.latestCreatedAt ? new Date(b.latestCreatedAt).getTime() : 0;
@@ -517,8 +538,61 @@ async function fetchFollowedChapters(userId: string, period: Period): Promise<Gr
   });
 }
 
-async function fetchReadingHistory(userId: string, period: Period): Promise<ChapterItem[]> {
+async function fetchReadingHistory(
+  userId: string,
+  period: Period,
+  historyView: "series" | "chapters"
+): Promise<ChapterItem[]> {
   const cutoff = getCutoffDate(period);
+
+  if (historyView === "series") {
+    // Dedicated RPC groups by series directly at DB level, returning all series read by user
+    const { data, error } = await supabase.rpc("get_user_reading_history_series", {
+      _user_id: userId,
+      _cutoff: cutoff,
+    });
+    if (!error && Array.isArray(data)) {
+      return data.map((row: any) => ({
+        id: row.id,
+        slug: row.chapter_slug,
+        title: row.chapter_title,
+        chapter_number: Number(row.chapter_number),
+        created_at: row.updated_at,
+        progress: Number(row.progress || 0),
+        series: {
+          id: row.series_id,
+          slug: row.series_slug,
+          title: row.series_title,
+          cover_url: row.series_cover_url,
+        },
+      }));
+    }
+  } else {
+    // Chapters view: return individual chapter read rows
+    const { data, error } = await supabase.rpc("get_user_reading_history_chapters", {
+      _user_id: userId,
+      _cutoff: cutoff,
+      _limit: 1000,
+    });
+    if (!error && Array.isArray(data)) {
+      return data.map((row: any) => ({
+        id: row.id,
+        slug: row.chapter_slug,
+        title: row.chapter_title,
+        chapter_number: Number(row.chapter_number),
+        created_at: row.updated_at,
+        progress: Number(row.progress || 0),
+        series: {
+          id: row.series_id,
+          slug: row.series_slug,
+          title: row.series_title,
+          cover_url: row.series_cover_url,
+        },
+      }));
+    }
+  }
+
+  // Resilient fallback in case of connection or RPC error
   let query = supabase
     .from("reading_history")
     .select(
@@ -526,7 +600,7 @@ async function fetchReadingHistory(userId: string, period: Period): Promise<Chap
     )
     .eq("user_id", userId)
     .order("updated_at", { ascending: false })
-    .limit(500);
+    .limit(1000);
 
   if (cutoff) query = query.gte("updated_at", cutoff);
 
@@ -539,9 +613,9 @@ async function fetchReadingHistory(userId: string, period: Period): Promise<Chap
       id: row.id,
       slug: row.chapters.slug,
       title: row.chapters.title,
-      chapter_number: row.chapters.chapter_number,
+      chapter_number: Number(row.chapters.chapter_number),
       created_at: row.updated_at,
-      progress: row.progress,
+      progress: Number(row.progress || 0),
       series: row.series,
     }));
 }
@@ -594,13 +668,6 @@ function GroupedSeriesCard({
             >
               {item.title}
             </Link>
-            <p className="mt-1 text-xs text-muted-foreground font-medium">
-              {item.totalUpdated && item.totalUpdated > 1
-                ? `${item.totalUpdated} new chapters`
-                : item.chapters.length > 0
-                ? `${item.chapters.length} recent chapter${item.chapters.length !== 1 ? "s" : ""}`
-                : "Latest releases"}
-            </p>
           </div>
 
           {/* List of chapters: WITHOUT any overflow-y-auto so page scrolls freely */}

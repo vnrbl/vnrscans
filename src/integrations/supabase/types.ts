@@ -1746,6 +1746,23 @@ export type Database = {
           reader_count: number
         }[]
       }
+      get_series_top_cultivators: {
+        Args: {
+          _series_id: string
+          _limit?: number
+        }
+        Returns: {
+          user_id: string
+          username: string
+          avatar_url: string | null
+          avatar_frame: string | null
+          accent_color: string | null
+          user_level: number
+          total_user_qi: number
+          series_qi_collected: number
+          chapters_read: number
+        }[]
+      }
       get_series_with_latest_chapters: {
         Args: {
           limit_count: number
@@ -1759,6 +1776,45 @@ export type Database = {
           type: string
           latest_chapter_created_at: string
           recent_chapters: any
+        }[]
+      }
+      get_user_reading_history_series: {
+        Args: {
+          _user_id: string
+          _cutoff?: string | null
+        }
+        Returns: {
+          id: string
+          updated_at: string
+          progress: number
+          series_id: string
+          series_slug: string
+          series_title: string
+          series_cover_url: string | null
+          chapter_id: string
+          chapter_slug: string
+          chapter_number: number
+          chapter_title: string | null
+        }[]
+      }
+      get_user_reading_history_chapters: {
+        Args: {
+          _user_id: string
+          _cutoff?: string | null
+          _limit?: number
+        }
+        Returns: {
+          id: string
+          updated_at: string
+          progress: number
+          series_id: string
+          series_slug: string
+          series_title: string
+          series_cover_url: string | null
+          chapter_id: string
+          chapter_slug: string
+          chapter_number: number
+          chapter_title: string | null
         }[]
       }
     }

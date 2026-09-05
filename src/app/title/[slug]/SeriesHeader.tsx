@@ -413,7 +413,7 @@ function LimitedTagPills({
     <>
       <span className="contents md:hidden">
         {mobileTags.map((tag) => (
-          <MetaPill key={tag.id || tag.slug} href="/browse" search={{ genre: tag.slug }}>
+          <MetaPill key={tag.id || tag.slug} href="/browse" search={{ tag: tag.slug }}>
             {tag.icon && <span className="mr-1">{tag.icon}</span>}
             {tag.name}
           </MetaPill>
@@ -422,7 +422,7 @@ function LimitedTagPills({
 
       <span className="hidden md:contents">
         {desktopTags.map((tag) => (
-          <MetaPill key={tag.id || tag.slug} href="/browse" search={{ genre: tag.slug }}>
+          <MetaPill key={tag.id || tag.slug} href="/browse" search={{ tag: tag.slug }}>
             {tag.icon && <span className="mr-1">{tag.icon}</span>}
             {tag.name}
           </MetaPill>

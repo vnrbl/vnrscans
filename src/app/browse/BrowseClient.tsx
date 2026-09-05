@@ -36,6 +36,15 @@ export type BrowseInitialData = {
   defaultManhwa?: any[];
 };
 
+const CORE_GENRES_SET = new Set([
+  "action", "adventure", "boys love", "comedy", "crime", "cyberpunk", "drama", 
+  "ecchi", "erotica", "fantasy", "girls love", "harem", "historical", "horror", 
+  "isekai", "josei", "martial arts", "mecha", "medical", "mystery", "psychological", 
+  "reincarnation", "romance", "sci-fi", "seinen", "shoujo", "shounen", "slice of life", 
+  "sports", "supernatural", "thriller", "wuxia", "xianxia", "xuanhuan", "yaoi", "yuri",
+  "monsters", "magic", "cultivation", "webtoon", "manhwa", "manhua", "manga"
+]);
+
 function BrowsePageContent({ initialData }: { initialData?: BrowseInitialData }) {
   const qc = useQueryClient();
   const { settings } = useReaderSettings();
@@ -91,48 +100,64 @@ function BrowsePageContent({ initialData }: { initialData?: BrowseInitialData })
 
   useEffect(() => {
     if (urlType) {
-      setTypeFilters((prev) => (prev.includes(urlType) ? prev : [...prev, urlType]));
+      setTypeFilters([urlType]);
     }
   }, [urlType]);
 
   useEffect(() => {
     if (urlGenre) {
-      setGenreFilters((prev) => (prev.includes(urlGenre) ? prev : [...prev, urlGenre]));
+      setGenreFilters([urlGenre]);
+      if (!urlTag) {
+        setTagFilters([]);
+      }
     }
-  }, [urlGenre]);
+  }, [urlGenre, urlTag]);
 
   useEffect(() => {
     if (urlTag) {
-      setTagFilters((prev) => (prev.includes(urlTag) ? prev : [...prev, urlTag]));
+      setTagFilters([urlTag]);
+      if (!urlGenre) {
+        setGenreFilters([]);
+      }
     }
-  }, [urlTag]);
+  }, [urlTag, urlGenre]);
 
-  // Fetch genres (only those that actually exist on series)
+  // Fetch genres (including core manhwa/manga genres from series tags)
   const genres = useQuery({
     queryKey: ["genres", "active-series"],
     initialData: initialData?.genres,
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("genres")
-        .select("id,name,slug,series_genres!inner(series_id)")
-        .order("name");
-
-      if (error) {
-        const { data: fallback, error: fbError } = await supabase
+      const [genresRes, tagsRes] = await Promise.all([
+        supabase
           .from("genres")
-          .select("id,name,slug")
-          .order("name");
-        if (fbError) throw fbError;
-        return fallback ?? [];
-      }
+          .select("id,name,slug,series_genres!inner(series_id)")
+          .order("name"),
+        supabase
+          .from("tags")
+          .select("id,name,slug,series_tags!inner(series_id)")
+          .order("name"),
+      ]);
 
       const unique = new Map<string, { id: string; name: string; slug: string }>();
-      (data ?? []).forEach((g: any) => {
-        if (!unique.has(g.id)) {
-          unique.set(g.id, { id: g.id, name: g.name, slug: g.slug });
+
+      const genresList = genresRes.data ?? [];
+      genresList.forEach((g: any) => {
+        if (g?.slug && !unique.has(g.slug.toLowerCase())) {
+          unique.set(g.slug.toLowerCase(), { id: g.id, name: g.name, slug: g.slug });
         }
       });
-      return Array.from(unique.values());
+
+      // Also include active core genres from tags (e.g. cultivation, martial arts, reincarnation)
+      const tagsList = tagsRes.data ?? [];
+      tagsList.forEach((t: any) => {
+        const slug = (t?.slug || "").toLowerCase().trim();
+        const name = (t?.name || "").toLowerCase().trim();
+        if ((CORE_GENRES_SET.has(slug) || CORE_GENRES_SET.has(name)) && !unique.has(slug)) {
+          unique.set(slug, { id: t.id, name: t.name, slug: t.slug });
+        }
+      });
+
+      return Array.from(unique.values()).sort((a, b) => a.name.localeCompare(b.name));
     },
     staleTime: 1000 * 60 * 10,
     gcTime: 1000 * 60 * 30,
@@ -180,20 +205,32 @@ function BrowsePageContent({ initialData }: { initialData?: BrowseInitialData })
 
   // Toggle genre filter
   const toggleGenre = (slug: string) => {
-    setGenreFilters(prev => 
-      prev.includes(slug) 
-        ? prev.filter(g => g !== slug)
-        : [...prev, slug]
-    );
+    setGenreFilters(prev => {
+      const exists = prev.includes(slug);
+      const next = exists ? prev.filter(g => g !== slug) : [...prev, slug];
+      if (exists && urlGenre === slug) {
+        const params = new URLSearchParams(searchParams.toString());
+        params.delete("genre");
+        const qs = params.toString();
+        router.replace(qs ? `${pathname}?${qs}` : pathname);
+      }
+      return next;
+    });
   };
 
   // Toggle tag filter
   const toggleTag = (slug: string) => {
-    setTagFilters(prev => 
-      prev.includes(slug) 
-        ? prev.filter(t => t !== slug)
-        : [...prev, slug]
-    );
+    setTagFilters(prev => {
+      const exists = prev.includes(slug);
+      const next = exists ? prev.filter(t => t !== slug) : [...prev, slug];
+      if (exists && urlTag === slug) {
+        const params = new URLSearchParams(searchParams.toString());
+        params.delete("tag");
+        const qs = params.toString();
+        router.replace(qs ? `${pathname}?${qs}` : pathname);
+      }
+      return next;
+    });
   };
 
   // Clear all filters
@@ -362,22 +399,49 @@ function BrowsePageContent({ initialData }: { initialData?: BrowseInitialData })
         };
       });
       
+      // Helper to collect all taxonomy slugs and normalized names for a series
+      const getSeriesTaxonomy = (s: any) => {
+        const identifiers = new Set<string>();
+
+        (s.series_genres || []).forEach((sg: any) => {
+          if (sg?.genre?.slug) {
+            identifiers.add(String(sg.genre.slug).toLowerCase().trim());
+          }
+          if (sg?.genre?.name) {
+            identifiers.add(String(sg.genre.name).toLowerCase().trim());
+          }
+        });
+
+        (s.series_tags || []).forEach((st: any) => {
+          if (st?.tag?.slug) {
+            identifiers.add(String(st.tag.slug).toLowerCase().trim());
+          }
+          if (st?.tag?.name) {
+            identifiers.add(String(st.tag.name).toLowerCase().trim());
+          }
+        });
+
+        return identifiers;
+      };
+
       // Filter by genres if selected - series must have ALL selected genres
       let filtered = seriesWithChapters;
       if (genreFilters.length > 0 && filtered.length > 0) {
         filtered = filtered.filter((series: any) => {
-          const seriesGenres = series.series_genres?.map((sg: any) => sg.genre?.slug).filter(Boolean) || [];
-          // Check if series has ALL selected genres
-          return genreFilters.every(selectedGenre => seriesGenres.includes(selectedGenre));
+          const identifiers = getSeriesTaxonomy(series);
+          return genreFilters.every((selectedGenre) =>
+            identifiers.has(selectedGenre.toLowerCase().trim())
+          );
         });
       }
 
       // Filter by tags if selected - series must have ALL selected tags
       if (tagFilters.length > 0 && filtered.length > 0) {
         filtered = filtered.filter((series: any) => {
-          const seriesTags = series.series_tags?.map((st: any) => st.tag?.slug).filter(Boolean) || [];
-          // Check if series has ALL selected tags
-          return tagFilters.every(selectedTag => seriesTags.includes(selectedTag));
+          const identifiers = getSeriesTaxonomy(series);
+          return tagFilters.every((selectedTag) =>
+            identifiers.has(selectedTag.toLowerCase().trim())
+          );
         });
       }
       
@@ -485,12 +549,12 @@ function BrowsePageContent({ initialData }: { initialData?: BrowseInitialData })
                     >
                       <div 
                         className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border ${
-                          genreFilters.includes(genre.slug)
+                          genreFilters.some((g) => g.toLowerCase() === genre.slug.toLowerCase())
                             ? "border-violet-600 bg-violet-600"
                             : "border-input"
                         }`}
                       >
-                        {genreFilters.includes(genre.slug) && (
+                        {genreFilters.some((g) => g.toLowerCase() === genre.slug.toLowerCase()) && (
                           <Check className="h-3 w-3 text-white" />
                         )}
                       </div>
@@ -530,11 +594,11 @@ function BrowsePageContent({ initialData }: { initialData?: BrowseInitialData })
                       <div 
                         className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border`}
                         style={{
-                          borderColor: tagFilters.includes(tag.slug) ? (tag.color || "#8b5cf6") : undefined,
-                          backgroundColor: tagFilters.includes(tag.slug) ? (tag.color || "#8b5cf6") : undefined,
+                          borderColor: tagFilters.some((t) => t.toLowerCase() === tag.slug.toLowerCase()) ? (tag.color || "#8b5cf6") : undefined,
+                          backgroundColor: tagFilters.some((t) => t.toLowerCase() === tag.slug.toLowerCase()) ? (tag.color || "#8b5cf6") : undefined,
                         }}
                       >
-                        {tagFilters.includes(tag.slug) && (
+                        {tagFilters.some((t) => t.toLowerCase() === tag.slug.toLowerCase()) && (
                           <Check className="h-3 w-3 text-white" />
                         )}
                       </div>
@@ -614,6 +678,42 @@ function BrowsePageContent({ initialData }: { initialData?: BrowseInitialData })
               />
             </Badge>
           )}
+
+          {genreFilters.map((slug) => {
+            const genreObj = genres.data?.find((g) => g.slug.toLowerCase() === slug.toLowerCase());
+            const label = genreObj?.name || slug;
+            return (
+              <Badge
+                key={`genre-${slug}`}
+                variant="secondary"
+                className="gap-1.5 py-1 px-2.5 bg-violet-500/10 text-primary border border-violet-500/20 text-xs font-semibold h-9 rounded-lg capitalize"
+              >
+                Genre: {label}
+                <X
+                  className="h-3.5 w-3.5 cursor-pointer hover:text-foreground"
+                  onClick={() => toggleGenre(slug)}
+                />
+              </Badge>
+            );
+          })}
+
+          {tagFilters.map((slug) => {
+            const tagObj = tags.data?.find((t) => t.slug.toLowerCase() === slug.toLowerCase());
+            const label = tagObj?.name || slug;
+            return (
+              <Badge
+                key={`tag-${slug}`}
+                variant="secondary"
+                className="gap-1.5 py-1 px-2.5 bg-purple-500/10 text-purple-300 border border-purple-500/20 text-xs font-semibold h-9 rounded-lg capitalize"
+              >
+                Tag: {label}
+                <X
+                  className="h-3.5 w-3.5 cursor-pointer hover:text-foreground"
+                  onClick={() => toggleTag(slug)}
+                />
+              </Badge>
+            );
+          })}
 
           {hasActiveFilters && (
             <Button

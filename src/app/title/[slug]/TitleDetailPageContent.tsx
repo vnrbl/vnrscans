@@ -1083,6 +1083,7 @@ function SeriesLeaderboardWidget({ seriesId }: { seriesId: string }) {
             avatarFrame: row.avatar_frame,
             accentColor: row.accent_color,
             userLevel: row.user_level || 1,
+            totalUserQi: Number(row.total_user_qi) || 0,
             seriesQiCollected: Number(row.series_qi_collected) || 0,
             chaptersRead: Number(row.chapters_read) || 0,
           }));
@@ -1125,6 +1126,7 @@ function SeriesLeaderboardWidget({ seriesId }: { seriesId: string }) {
               avatarFrame: p.avatar_frame,
               accentColor: p.accent_color,
               userLevel: p.user_level || 1,
+              totalUserQi: Number(p.experience_points) || 0,
               seriesQiCollected: qiGathered,
               chaptersRead: chRead,
             };
@@ -1169,6 +1171,7 @@ function SeriesLeaderboardWidget({ seriesId }: { seriesId: string }) {
             const isTop2 = index === 1;
             const isTop3 = index === 2;
             const isDaoAncestor = reader.username?.toLowerCase() === "vnr610" || reader.userLevel >= 100;
+            const totalQi = reader.totalUserQi > 0 ? reader.totalUserQi : reader.seriesQiCollected;
 
             return (
               <div
@@ -1223,16 +1226,16 @@ function SeriesLeaderboardWidget({ seriesId }: { seriesId: string }) {
                   </div>
                 </div>
 
-                {/* Qi Collected & Chapter Count */}
+                {/* Total Qi & Series Qi Gained */}
                 <div className="text-right shrink-0 pl-2">
                   <div className="flex items-center justify-end gap-1">
                     <span className="text-3xs text-amber-400">⚡</span>
                     <span className="text-xs font-mono font-bold text-amber-300 tabular-nums">
-                      {isDaoAncestor ? "∞ Qi" : `${reader.seriesQiCollected.toLocaleString()} Qi`}
+                      {isDaoAncestor ? "∞ Qi" : `${totalQi.toLocaleString()} Qi`}
                     </span>
                   </div>
-                  <span className="text-[9px] font-mono text-neutral-500 block">
-                    {reader.chaptersRead} ch. read
+                  <span className="text-[9px] font-mono text-neutral-400 block tabular-nums">
+                    +{reader.seriesQiCollected.toLocaleString()} Qi from series
                   </span>
                 </div>
               </div>
