@@ -3,22 +3,23 @@
 import { useState, useEffect, useMemo } from "react";
 import { Link } from "@/lib/router-compat";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, BookOpen, Clock, CheckCircle2, Bookmark, Layers, ListFilter } from "lucide-react";
+import { ArrowLeft, BookOpen, Clock, Layers, ListFilter } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { OptimizedImage } from "@/components/OptimizedImage";
 import { SectionPagination } from "@/components/SectionPagination";
 
 type HistorySection = "followed-chapters" | "reading-history" | "latest-updates";
 type Period = "day" | "week" | "month" | "all";
 
-interface GroupedSeries {
+export interface GroupedSeries {
   id: string;
   title: string;
   slug: string;
   cover_url: string | null;
+  totalUpdated?: number;
+  latestCreatedAt?: string;
   chapters: Array<{
     id: string;
     slug: string;
@@ -28,7 +29,7 @@ interface GroupedSeries {
   }>;
 }
 
-type ChapterItem = {
+export type ChapterItem = {
   id: string;
   slug: string;
   title: string | null;
@@ -38,7 +39,10 @@ type ChapterItem = {
   series: { id: string; slug: string; title: string; cover_url: string | null } | null;
 };
 
-const SECTION_META: Record<HistorySection, { title: string; description: string; requiresAuth: boolean; timeLabel: string; accentColor: string }> = {
+const SECTION_META: Record<
+  HistorySection,
+  { title: string; description: string; requiresAuth: boolean; timeLabel: string; accentColor: string }
+> = {
   "followed-chapters": {
     title: "New Chapters from Followed",
     description: "Chapter uploads from series in your library and favorites.",
@@ -71,7 +75,13 @@ const PERIODS: Array<{ value: Period; label: string }> = [
 
 const PAGE_SIZE = 20;
 
-export default function HomeHistoryContent({ section, period = "day" }: { section: string; period?: string }) {
+export default function HomeHistoryContent({
+  section,
+  period = "day",
+}: {
+  section: string;
+  period?: string;
+}) {
   const { user, loading: authLoading } = useAuth();
   const [currentPage, setCurrentPage] = useState(1);
   const [historyView, setHistoryView] = useState<"series" | "chapters">("series");
@@ -84,65 +94,34 @@ export default function HomeHistoryContent({ section, period = "day" }: { sectio
     setCurrentPage(1);
   }, [sectionKey, periodKey, historyView]);
 
-  const chapters = useQuery({
+  const historyQuery = useQuery({
     queryKey: ["home-history", sectionKey, periodKey, user?.id],
     queryFn: async () => {
       if (!sectionKey) return [];
-      if (sectionKey === "followed-chapters") return fetchFollowedChapters(user!.id, periodKey);
-      if (sectionKey === "reading-history") return fetchReadingHistory(user!.id, periodKey);
+      if (sectionKey === "followed-chapters") {
+        return fetchFollowedChapters(user!.id, periodKey);
+      }
+      if (sectionKey === "reading-history") {
+        return fetchReadingHistory(user!.id, periodKey);
+      }
       return fetchLatestUpdates(periodKey);
     },
     enabled: !!sectionKey && (!meta?.requiresAuth || !!user) && !authLoading,
     staleTime: 1000 * 60 * 2,
   });
 
-  const groupedData = useMemo(() => {
-    if (!chapters.data) return [];
-    if (sectionKey !== "latest-updates" && sectionKey !== "followed-chapters") return [];
-
-    const seriesMap = new Map<string, GroupedSeries>();
-
-    chapters.data.forEach((ch) => {
-      const seriesSlug = ch.series?.slug;
-      if (!seriesSlug) return;
-
-      if (!seriesMap.has(seriesSlug)) {
-        seriesMap.set(seriesSlug, {
-          id: ch.series?.id || "",
-          title: ch.series?.title || "",
-          slug: seriesSlug,
-          cover_url: ch.series?.cover_url || null,
-          chapters: [],
-        });
-      }
-
-      const existing = seriesMap.get(seriesSlug)!;
-      if (!existing.chapters.some((c) => c.id === ch.id)) {
-        existing.chapters.push({
-          id: ch.id,
-          slug: ch.slug,
-          chapter_number: ch.chapter_number,
-          title: ch.title,
-          created_at: ch.created_at,
-        });
-      }
-    });
-
-    return Array.from(seriesMap.values());
-  }, [chapters.data, sectionKey]);
-
   // Reading history grouped by series (most recent chapter read per series)
   const seriesGroupedHistory = useMemo(() => {
-    if (sectionKey !== "reading-history" || !chapters.data) return [];
+    if (sectionKey !== "reading-history" || !historyQuery.data) return [];
     const map = new Map<string, ChapterItem>();
-    chapters.data.forEach((item) => {
+    (historyQuery.data as ChapterItem[]).forEach((item) => {
       const sId = item.series?.id || item.series?.slug;
       if (sId && !map.has(sId)) {
         map.set(sId, item);
       }
     });
     return Array.from(map.values());
-  }, [chapters.data, sectionKey]);
+  }, [historyQuery.data, sectionKey]);
 
   if (!sectionKey || !meta) {
     return (
@@ -165,19 +144,25 @@ export default function HomeHistoryContent({ section, period = "day" }: { sectio
     sectionKey === "reading-history"
       ? historyView === "series"
         ? seriesGroupedHistory.length
-        : (chapters.data ?? []).length
-      : groupedData.length;
+        : ((historyQuery.data as ChapterItem[]) ?? []).length
+      : ((historyQuery.data as GroupedSeries[]) ?? []).length;
 
-  const paginatedGroupedData = useMemo(() => {
-    const start = (currentPage - 1) * PAGE_SIZE;
-    return groupedData.slice(start, start + PAGE_SIZE);
-  }, [groupedData, currentPage]);
-
-  const paginatedHistoryData = useMemo(() => {
-    const list = historyView === "series" ? seriesGroupedHistory : (chapters.data ?? []);
+  const paginatedGroupedSeries = useMemo(() => {
+    if (sectionKey !== "followed-chapters" && sectionKey !== "latest-updates") return [];
+    const list = (historyQuery.data as GroupedSeries[]) ?? [];
     const start = (currentPage - 1) * PAGE_SIZE;
     return list.slice(start, start + PAGE_SIZE);
-  }, [historyView, seriesGroupedHistory, chapters.data, currentPage]);
+  }, [historyQuery.data, sectionKey, currentPage]);
+
+  const paginatedHistoryData = useMemo(() => {
+    if (sectionKey !== "reading-history") return [];
+    const list =
+      historyView === "series"
+        ? seriesGroupedHistory
+        : ((historyQuery.data as ChapterItem[]) ?? []);
+    const start = (currentPage - 1) * PAGE_SIZE;
+    return list.slice(start, start + PAGE_SIZE);
+  }, [historyView, seriesGroupedHistory, historyQuery.data, sectionKey, currentPage]);
 
   return (
     <main className="container mx-auto min-h-screen px-4 py-20 sm:px-6 md:px-8 lg:px-12 xl:px-16">
@@ -210,7 +195,7 @@ export default function HomeHistoryContent({ section, period = "day" }: { sectio
                 size="sm"
                 variant={historyView === "series" ? "default" : "ghost"}
                 onClick={() => setHistoryView("series")}
-                className="h-7 text-xs px-2.5 gap-1.5"
+                className="h-7 text-xs px-2.5 gap-1.5 cursor-pointer"
               >
                 <Layers className="h-3.5 w-3.5" />
                 By Series
@@ -219,7 +204,7 @@ export default function HomeHistoryContent({ section, period = "day" }: { sectio
                 size="sm"
                 variant={historyView === "chapters" ? "default" : "ghost"}
                 onClick={() => setHistoryView("chapters")}
-                className="h-7 text-xs px-2.5 gap-1.5"
+                className="h-7 text-xs px-2.5 gap-1.5 cursor-pointer"
               >
                 <ListFilter className="h-3.5 w-3.5" />
                 All Chapters
@@ -234,7 +219,7 @@ export default function HomeHistoryContent({ section, period = "day" }: { sectio
                 asChild
                 size="sm"
                 variant={periodKey === item.value ? "default" : "outline"}
-                className="h-8 text-xs"
+                className="h-8 text-xs cursor-pointer"
               >
                 <Link
                   to="/home/history/$section"
@@ -253,14 +238,18 @@ export default function HomeHistoryContent({ section, period = "day" }: { sectio
         <div className="rounded-lg border border-border/40 bg-card p-8 text-center text-muted-foreground">
           Sign in to view this history.
         </div>
-      ) : chapters.isLoading || authLoading ? (
+      ) : historyQuery.isLoading || authLoading ? (
         <HistoryGridSkeleton />
       ) : totalItems > 0 ? (
         <>
           {sectionKey === "latest-updates" || sectionKey === "followed-chapters" ? (
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {paginatedGroupedData.map((item) => (
-                <GroupedSeriesCard key={item.slug} item={item} timeLabel={meta.timeLabel} />
+              {paginatedGroupedSeries.map((item) => (
+                <GroupedSeriesCard
+                  key={item.slug}
+                  item={item}
+                  accentColor={meta.accentColor}
+                />
               ))}
             </div>
           ) : (
@@ -285,7 +274,11 @@ export default function HomeHistoryContent({ section, period = "day" }: { sectio
               setCurrentPage(p);
               window.scrollTo({ top: 0, behavior: "smooth" });
             }}
-            itemLabel={sectionKey === "reading-history" && historyView === "chapters" ? "chapters" : "series"}
+            itemLabel={
+              sectionKey === "reading-history" && historyView === "chapters"
+                ? "chapters"
+                : "series"
+            }
             accentColor={meta.accentColor}
           />
         </>
@@ -298,23 +291,89 @@ export default function HomeHistoryContent({ section, period = "day" }: { sectio
   );
 }
 
-async function fetchFollowedChapters(userId: string, period: Period): Promise<ChapterItem[]> {
+// ---------------------------------------------------------------------------
+// DATA FETCHING HELPERS
+// ---------------------------------------------------------------------------
+
+async function fetchLatestUpdates(period: Period): Promise<GroupedSeries[]> {
+  const cutoff = getCutoffDate(period);
+
+  // Use the dedicated database RPC which groups recent chapters by series at the DB level,
+  // preventing mass drops from starving other series.
+  const { data, error } = await supabase.rpc("get_series_with_latest_chapters", {
+    limit_count: 1000,
+  });
+  if (error) throw error;
+
+  const results: GroupedSeries[] = [];
+
+  (data ?? []).forEach((s: any) => {
+    const recentChapters = Array.isArray(s.recent_chapters) ? s.recent_chapters : [];
+    if (recentChapters.length === 0 && !s.latest_chapter_created_at) return;
+
+    // Filter chapters based on period cutoff if selected
+    const filteredChapters = cutoff
+      ? recentChapters.filter(
+          (ch: any) => ch.created_at && new Date(ch.created_at) >= new Date(cutoff)
+        )
+      : recentChapters;
+
+    // If a cutoff is active and no chapters were created after cutoff, skip series
+    if (cutoff && filteredChapters.length === 0) {
+      if (
+        !s.latest_chapter_created_at ||
+        new Date(s.latest_chapter_created_at) < new Date(cutoff)
+      ) {
+        return;
+      }
+    }
+
+    const chaptersToUse =
+      filteredChapters.length > 0 ? filteredChapters : recentChapters.slice(0, 5);
+    const latestDate =
+      chaptersToUse[0]?.created_at || s.latest_chapter_created_at || s.updated_at;
+
+    results.push({
+      id: s.id,
+      title: s.title,
+      slug: s.slug,
+      cover_url: s.cover_url,
+      totalUpdated: filteredChapters.length > 0 ? filteredChapters.length : chaptersToUse.length,
+      latestCreatedAt: latestDate,
+      chapters: chaptersToUse.map((ch: any) => ({
+        id: ch.id,
+        slug: ch.slug,
+        chapter_number: Number(ch.chapter_number),
+        title: ch.title,
+        created_at: ch.created_at,
+      })),
+    });
+  });
+
+  // Order series by newest chapter release date DESC
+  return results.sort((a, b) => {
+    const timeA = a.latestCreatedAt ? new Date(a.latestCreatedAt).getTime() : 0;
+    const timeB = b.latestCreatedAt ? new Date(b.latestCreatedAt).getTime() : 0;
+    return timeB - timeA;
+  });
+}
+
+async function fetchFollowedChapters(userId: string, period: Period): Promise<GroupedSeries[]> {
   // 1. Fetch followed series IDs from BOTH user_library and bookmarks (Favorites)
   const [libRes, bmRes] = await Promise.all([
     supabase.from("user_library" as any).select("series_id").eq("user_id", userId),
     supabase.from("bookmarks" as any).select("series_id").eq("user_id", userId),
   ]);
-  const seriesIds = Array.from(
-    new Set([
-      ...(((libRes.data ?? []) as any[]).map((r) => r.series_id)),
-      ...(((bmRes.data ?? []) as any[]).map((r) => r.series_id)),
-    ])
-  ).filter(Boolean);
+  const seriesIdSet = new Set<string>([
+    ...(((libRes.data ?? []) as any[]).map((r) => r.series_id)),
+    ...(((bmRes.data ?? []) as any[]).map((r) => r.series_id)),
+  ]);
+  const seriesIds = Array.from(seriesIdSet).filter(Boolean);
   if (seriesIds.length === 0) return [];
 
   const cutoff = getCutoffDate(period);
 
-  // 2. Query recent chapter drops + all series latest chapters in parallel
+  // 2. Query recent chapter drops + all series latest chapters via RPC in parallel
   const [recentRes, rpcRes] = await Promise.all([
     supabase
       .from("chapters")
@@ -327,55 +386,103 @@ async function fetchFollowedChapters(userId: string, period: Period): Promise<Ch
     supabase.rpc("get_series_with_latest_chapters", { limit_count: 1000 }),
   ]);
 
-  const rows: ChapterItem[] = [];
-  const seenChapterIds = new Set<string>();
+  const seriesMap = new Map<string, GroupedSeries>();
 
+  // Add from recent drops
   (recentRes.data ?? []).forEach((ch: any) => {
-    if (!ch.series?.slug || seenChapterIds.has(ch.id)) return;
+    if (!ch.series?.slug) return;
     if (cutoff && new Date(ch.created_at) < new Date(cutoff)) return;
-    seenChapterIds.add(ch.id);
-    rows.push(ch);
+
+    if (!seriesMap.has(ch.series_id)) {
+      seriesMap.set(ch.series_id, {
+        id: ch.series.id,
+        title: ch.series.title,
+        slug: ch.series.slug,
+        cover_url: ch.series.cover_url,
+        totalUpdated: 0,
+        latestCreatedAt: ch.created_at,
+        chapters: [],
+      });
+    }
+
+    const entry = seriesMap.get(ch.series_id)!;
+    if (!entry.chapters.some((c) => c.id === ch.id)) {
+      entry.chapters.push({
+        id: ch.id,
+        slug: ch.slug,
+        chapter_number: Number(ch.chapter_number),
+        title: ch.title,
+        created_at: ch.created_at,
+      });
+      entry.totalUpdated = (entry.totalUpdated || 0) + 1;
+      if (new Date(ch.created_at).getTime() > new Date(entry.latestCreatedAt || 0).getTime()) {
+        entry.latestCreatedAt = ch.created_at;
+      }
+    }
   });
 
-  // For any followed series not present in recent drops, extract from get_series_with_latest_chapters
-  const coveredSeriesIds = new Set(rows.map((ch) => ch.series?.id).filter(Boolean));
-  const missingSeriesIds = new Set(seriesIds.filter((id) => !coveredSeriesIds.has(id)));
+  // Populate from get_series_with_latest_chapters for any followed series
+  (rpcRes.data ?? []).forEach((s: any) => {
+    if (!seriesIdSet.has(s.id)) return;
+    const recentList = Array.isArray(s.recent_chapters) ? s.recent_chapters : [];
+    if (recentList.length === 0) return;
 
-  if (missingSeriesIds.size > 0 && rpcRes.data) {
-    (rpcRes.data ?? []).forEach((s: any) => {
-      if (!missingSeriesIds.has(s.id)) return;
-      const recentList = Array.isArray(s.recent_chapters) ? s.recent_chapters : [];
-      recentList.forEach((ch: any) => {
-        if (!ch.id || seenChapterIds.has(ch.id)) return;
-        if (cutoff && ch.created_at && new Date(ch.created_at) < new Date(cutoff)) return;
-        seenChapterIds.add(ch.id);
-        rows.push({
+    const filtered = cutoff
+      ? recentList.filter(
+          (ch: any) => ch.created_at && new Date(ch.created_at) >= new Date(cutoff)
+        )
+      : recentList;
+
+    if (cutoff && filtered.length === 0) return;
+
+    const chaptersToUse = filtered.length > 0 ? filtered : recentList.slice(0, 5);
+
+    if (!seriesMap.has(s.id)) {
+      seriesMap.set(s.id, {
+        id: s.id,
+        title: s.title,
+        slug: s.slug,
+        cover_url: s.cover_url,
+        totalUpdated: chaptersToUse.length,
+        latestCreatedAt: chaptersToUse[0]?.created_at || s.latest_chapter_created_at,
+        chapters: chaptersToUse.map((ch: any) => ({
           id: ch.id,
           slug: ch.slug,
-          title: ch.title,
           chapter_number: Number(ch.chapter_number),
+          title: ch.title,
           created_at: ch.created_at,
-          series: {
-            id: s.id,
-            slug: s.slug,
-            title: s.title,
-            cover_url: s.cover_url,
-          },
-        });
+        })),
       });
-    });
-  }
+    } else {
+      const existing = seriesMap.get(s.id)!;
+      chaptersToUse.forEach((ch: any) => {
+        if (!existing.chapters.some((c) => c.id === ch.id)) {
+          existing.chapters.push({
+            id: ch.id,
+            slug: ch.slug,
+            chapter_number: Number(ch.chapter_number),
+            title: ch.title,
+            created_at: ch.created_at,
+          });
+        }
+      });
+    }
+  });
 
-  return rows.sort(
-    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-  );
+  return Array.from(seriesMap.values()).sort((a, b) => {
+    const timeA = a.latestCreatedAt ? new Date(a.latestCreatedAt).getTime() : 0;
+    const timeB = b.latestCreatedAt ? new Date(b.latestCreatedAt).getTime() : 0;
+    return timeB - timeA;
+  });
 }
 
 async function fetchReadingHistory(userId: string, period: Period): Promise<ChapterItem[]> {
   const cutoff = getCutoffDate(period);
   let query = supabase
     .from("reading_history")
-    .select("id,updated_at,progress,series_id,series:series_id(id,slug,title,cover_url),chapters:chapter_id(slug,chapter_number,title)")
+    .select(
+      "id,updated_at,progress,series_id,series:series_id(id,slug,title,cover_url),chapters:chapter_id(slug,chapter_number,title)"
+    )
     .eq("user_id", userId)
     .order("updated_at", { ascending: false })
     .limit(500);
@@ -398,26 +505,27 @@ async function fetchReadingHistory(userId: string, period: Period): Promise<Chap
     }));
 }
 
-async function fetchLatestUpdates(period: Period): Promise<ChapterItem[]> {
-  const cutoff = getCutoffDate(period);
-  let query = supabase
-    .from("chapters")
-    .select("id,slug,title,chapter_number,created_at,series:series_id(id,slug,title,cover_url)")
-    .eq("status", "published")
-    .order("created_at", { ascending: false })
-    .order("chapter_number", { ascending: false })
-    .limit(500);
+// ---------------------------------------------------------------------------
+// UI COMPONENTS
+// ---------------------------------------------------------------------------
 
-  if (cutoff) query = query.gte("created_at", cutoff);
+function GroupedSeriesCard({
+  item,
+  accentColor,
+}: {
+  item: GroupedSeries;
+  accentColor: string;
+}) {
+  // Show only top 3 chapters directly on the card so there is NO inner scroll trap!
+  // The mouse wheel will scroll the page naturally.
+  const displayChapters = item.chapters.slice(0, 3);
+  const remainingCount = Math.max(
+    0,
+    (item.totalUpdated || item.chapters.length) - displayChapters.length
+  );
 
-  const { data, error } = await query;
-  if (error) throw error;
-  return (data ?? []) as ChapterItem[];
-}
-
-function GroupedSeriesCard({ item, timeLabel }: { item: GroupedSeries; timeLabel: string }) {
   return (
-    <article className="group overflow-hidden rounded-xl border border-border/40 bg-card/70 backdrop-blur-sm p-4 transition-all hover:border-emerald-500/50 hover:shadow-lg hover:shadow-emerald-500/10 flex flex-col justify-between">
+    <article className="group overflow-hidden rounded-xl border border-border/40 bg-card/70 backdrop-blur-sm p-4 transition-all hover:border-primary/50 hover:shadow-lg hover:shadow-primary/10 flex flex-col justify-between">
       <div className="flex gap-4">
         {/* Cover Image */}
         <Link
@@ -441,34 +549,52 @@ function GroupedSeriesCard({ item, timeLabel }: { item: GroupedSeries; timeLabel
             <Link
               to="/title/$slug"
               params={{ slug: item.slug }}
-              className="line-clamp-2 text-base font-bold leading-tight hover:text-emerald-400 transition-colors text-white"
+              className="line-clamp-2 text-base font-bold leading-tight hover:text-primary transition-colors text-white"
             >
               {item.title}
             </Link>
             <p className="mt-1 text-xs text-muted-foreground font-medium">
-              {item.chapters.length} new chapter{item.chapters.length !== 1 ? "s" : ""}
+              {item.totalUpdated && item.totalUpdated > 1
+                ? `${item.totalUpdated} new chapters`
+                : item.chapters.length > 0
+                ? `${item.chapters.length} recent chapter${item.chapters.length !== 1 ? "s" : ""}`
+                : "Latest releases"}
             </p>
           </div>
 
-          <div className="mt-3 space-y-1.5 max-h-[96px] overflow-y-auto pr-1">
-            {item.chapters.map((chapter) => (
+          {/* List of chapters: WITHOUT any overflow-y-auto so page scrolls freely */}
+          <div className="mt-2.5 space-y-1.5">
+            {displayChapters.map((chapter) => (
               <Link
                 key={chapter.id}
                 to="/title/$titleSlug/$chapterSlug"
                 params={{ titleSlug: item.slug, chapterSlug: chapter.slug }}
-                className="flex items-center justify-between text-xs hover:text-emerald-400 transition-colors font-medium text-muted-foreground hover:text-foreground py-0.5 px-1 rounded hover:bg-secondary/40"
+                className="flex items-center justify-between text-xs hover:text-primary transition-colors font-medium text-muted-foreground hover:text-foreground py-1 px-1.5 rounded hover:bg-secondary/40"
               >
                 <div className="flex min-w-0 flex-1 items-center gap-1.5">
-                  <BookOpen className="h-3.5 w-3.5 shrink-0 text-emerald-400" />
-                  <span className="truncate font-semibold text-white group-hover:text-emerald-400">
+                  <BookOpen
+                    className="h-3.5 w-3.5 shrink-0"
+                    style={{ color: accentColor }}
+                  />
+                  <span className="truncate font-semibold text-white group-hover:text-primary">
                     Ch. {chapter.chapter_number}
                   </span>
                 </div>
-                <span className="ml-2 shrink-0 text-[10px] text-muted-foreground">
+                <span className="ml-2 shrink-0 text-[10px] text-neutral-400">
                   {formatTimeAgo(chapter.created_at)}
                 </span>
               </Link>
             ))}
+
+            {remainingCount > 0 && (
+              <Link
+                to="/title/$slug"
+                params={{ slug: item.slug }}
+                className="block text-[11px] font-semibold text-primary/85 hover:text-primary transition-colors pt-0.5 px-1.5"
+              >
+                +{remainingCount} more chapters →
+              </Link>
+            )}
           </div>
         </div>
       </div>
@@ -488,7 +614,9 @@ function HistoryChapterCard({
   const seriesSlug = chapter.series?.slug;
   if (!seriesSlug) return null;
 
-  const progressPercent = chapter.progress ? Math.min(100, Math.round(chapter.progress * 100)) : 0;
+  const progressPercent = chapter.progress
+    ? Math.min(100, Math.round(chapter.progress * 100))
+    : 0;
 
   return (
     <article className="group glass-card flex flex-col h-full rounded-lg overflow-hidden hover-lift transition-all border border-border/40 hover:border-purple-500/50">
