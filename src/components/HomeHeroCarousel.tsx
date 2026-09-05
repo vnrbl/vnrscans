@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { useReaderSettings } from "@/contexts/ReaderSettingsContext";
 import { OptimizedImage } from "@/components/OptimizedImage";
 
-type CarouselItem = {
+export type CarouselItem = {
   id: string;
   series: {
     id: string;
@@ -19,7 +19,7 @@ type CarouselItem = {
   };
 };
 
-export function HomeHeroCarousel() {
+export function HomeHeroCarousel({ initialItems }: { initialItems?: CarouselItem[] }) {
   const { settings } = useReaderSettings();
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [showLeftArrow, setShowLeftArrow] = useState(false);
@@ -40,6 +40,7 @@ export function HomeHeroCarousel() {
   // Fetch carousel series items
   const carouselSeries = useQuery({
     queryKey: ["carousel", "series"],
+    initialData: initialItems && initialItems.length > 0 ? initialItems : undefined,
     queryFn: async () => {
       try {
         const { data, error } = await supabase

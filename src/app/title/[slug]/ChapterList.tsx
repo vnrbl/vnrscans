@@ -81,18 +81,6 @@ export const ChapterList = React.memo(function ChapterList({
   const qc = useQueryClient();
   const { settings } = useReaderSettings();
 
-  // Auto-sync database if any chapter's scheduled unlock time has passed
-  React.useEffect(() => {
-    fetch("/api/chapters/auto-unlock", { method: "POST" })
-      .then((res) => res.json())
-      .then((data: any) => {
-        if (data?.unlockedCount > 0) {
-          qc.invalidateQueries({ queryKey: ["chapters"] });
-          qc.invalidateQueries({ queryKey: ["live-release-schedule"] });
-        }
-      })
-      .catch(() => {});
-  }, [qc]);
 
   const [deletingChapterId, setDeletingChapterId] = React.useState<string | null>(null);
   const [unlockingChapterId, setUnlockingChapterId] = React.useState<string | null>(null);

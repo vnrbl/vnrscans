@@ -1966,8 +1966,15 @@ function ImageView({
     }
   };
 
-  const handleImageLoad = (pageId: string) => {
+  const handleImageLoad = (pageId: string, pageIdx?: number) => {
     setImageLoading((prev) => ({ ...prev, [pageId]: false }));
+    if (pageIdx != null && pages && typeof window !== "undefined") {
+      const nextSlice = pages[pageIdx + 1];
+      if (nextSlice?.image_url && !isVideoUrl(nextSlice.image_url)) {
+        const preloadImg = new window.Image();
+        preloadImg.src = nextSlice.image_url;
+      }
+    }
   };
 
   return (
@@ -2014,97 +2021,112 @@ function ImageView({
 
       {/* Pages */}
       <div className="mx-auto max-w-3xl w-full px-0 sm:px-2 py-2 sm:py-4">
-        {pages.map((p, idx) => (
-          <div key={p.id} id={`chapter-page-${idx}`} data-page-index={idx} className="relative scroll-mt-14 reader-page-container w-full max-w-full">
-            {imageErrors[p.id] ? (
-              // Error fallback UI
-              <div className="mx-auto flex aspect-[2/3] w-full flex-col items-center justify-center rounded-lg border-2 border-dashed border-border bg-secondary/50 text-center">
-                <div className="rounded-full bg-destructive/20 p-4 text-destructive">
-                  <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-                    />
-                  </svg>
-                </div>
-                <p className="mt-4 text-sm font-medium text-foreground">
-                  Failed to load Page {p.page_number}
-                </p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Image URL may be broken or expired
-                </p>
-                <button
-                  onClick={() => {
-                    setImageErrors((prev) => {
-                      const updated = { ...prev };
-                      delete updated[p.id];
-                      return updated;
-                    });
-                    setImageRetries((prev) => {
-                      const updated = { ...prev };
-                      delete updated[p.id];
-                      return updated;
-                    });
-                    setImageLoading((prev) => ({ ...prev, [p.id]: true }));
-                  }}
-                  className="mt-4 rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground hover:bg-primary/90"
-                >
-                  Retry
-                </button>
-              </div>
-            ) : (
-              <>
-                {imageLoading[p.id] && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-secondary/80">
-                    <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
+        {pages.map((p, idx) => {
+          const isLoading = imageLoading[p.id] !== false;
+          return (
+            <div
+              key={p.id}
+              id={`chapter-page-${idx}`}
+              data-page-index={idx}
+              className={`relative scroll-mt-14 reader-page-container w-full max-w-full overflow-hidden transition-[min-height] duration-200 ${
+                isLoading && !imageErrors[p.id] ? "min-h-[420px] sm:min-h-[600px] bg-secondary/30" : "min-h-0"
+              }`}
+              style={{
+                contentVisibility: "auto",
+                containIntrinsicSize: "auto 800px",
+              }}
+            >
+              {imageErrors[p.id] ? (
+                // Error fallback UI
+                <div className="mx-auto flex aspect-[2/3] w-full flex-col items-center justify-center rounded-lg border-2 border-dashed border-border bg-secondary/50 text-center">
+                  <div className="rounded-full bg-destructive/20 p-4 text-destructive">
+                    <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                      />
+                    </svg>
                   </div>
-                )}
-                {isVideoUrl(p.image_url) ? (
-                  <video
-                    data-page-id={p.id}
-                    src={p.image_url}
-                    autoPlay
-                    loop
-                    muted
-                    playsInline
-                    className="mx-auto block w-full transition-transform duration-200"
-                    style={{
-                      opacity: imageLoading[p.id] ? 0.3 : 1,
+                  <p className="mt-4 text-sm font-medium text-foreground">
+                    Failed to load Page {p.page_number}
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Image URL may be broken or expired
+                  </p>
+                  <button
+                    onClick={() => {
+                      setImageErrors((prev) => {
+                        const updated = { ...prev };
+                        delete updated[p.id];
+                        return updated;
+                      });
+                      setImageRetries((prev) => {
+                        const updated = { ...prev };
+                        delete updated[p.id];
+                        return updated;
+                      });
+                      setImageLoading((prev) => ({ ...prev, [p.id]: true }));
                     }}
-                    onLoadedData={() => handleImageLoad(p.id)}
-                    onError={() => handleImageError(p.id, p.image_url)}
-                  />
-                ) : (
-                  <img
-                    data-page-id={p.id}
-                    src={p.image_url}
-                    alt={`${seriesTitle || "Manga"} Chapter ${chapterNumber} Page ${p.page_number} - vnrscans`}
-                    loading={
-                      idx < 2 || (continuePrompt?.targetPage != null && Math.abs(idx - continuePrompt.targetPage) <= 2)
-                        ? "eager"
-                        : "lazy"
-                    }
-                    decoding="async"
-                    fetchPriority={
-                      idx < 2 || (continuePrompt?.targetPage != null && Math.abs(idx - continuePrompt.targetPage) <= 2)
-                        ? "high"
-                        : "auto"
-                    }
-                    className="mx-auto block w-full max-w-full h-auto object-contain transition-transform duration-200"
-                    referrerPolicy="no-referrer"
-                    style={{
-                      opacity: imageLoading[p.id] ? 0.3 : 1,
-                    }}
-                    onLoad={() => handleImageLoad(p.id)}
-                    onError={() => handleImageError(p.id, p.image_url)}
-                  />
-                )}
-              </>
-            )}
-          </div>
-        ))}
+                    className="mt-4 rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground hover:bg-primary/90"
+                  >
+                    Retry
+                  </button>
+                </div>
+              ) : (
+                <>
+                  {isLoading && (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-secondary/40 animate-pulse select-none pointer-events-none">
+                      <div className="h-7 w-7 animate-spin rounded-full border-2 border-primary border-t-transparent mb-2" />
+                      <span className="text-[11px] font-medium text-neutral-400">Page {p.page_number}</span>
+                    </div>
+                  )}
+                  {isVideoUrl(p.image_url) ? (
+                    <video
+                      data-page-id={p.id}
+                      src={p.image_url}
+                      autoPlay
+                      loop
+                      muted
+                      playsInline
+                      className="mx-auto block w-full transition-transform duration-200"
+                      style={{
+                        opacity: isLoading ? 0.3 : 1,
+                      }}
+                      onLoadedData={() => handleImageLoad(p.id, idx)}
+                      onError={() => handleImageError(p.id, p.image_url)}
+                    />
+                  ) : (
+                    <img
+                      data-page-id={p.id}
+                      src={p.image_url}
+                      alt={`${seriesTitle || "Manga"} Chapter ${chapterNumber} Page ${p.page_number} - vnrscans`}
+                      loading={
+                        idx < 2 || (continuePrompt?.targetPage != null && Math.abs(idx - continuePrompt.targetPage) <= 2)
+                          ? "eager"
+                          : "lazy"
+                      }
+                      decoding="async"
+                      fetchPriority={
+                        idx < 2 || (continuePrompt?.targetPage != null && Math.abs(idx - continuePrompt.targetPage) <= 2)
+                          ? "high"
+                          : "auto"
+                      }
+                      className="mx-auto block w-full max-w-full h-auto object-contain transition-opacity duration-200"
+                      referrerPolicy="no-referrer"
+                      style={{
+                        opacity: isLoading ? 0.2 : 1,
+                      }}
+                      onLoad={() => handleImageLoad(p.id, idx)}
+                      onError={() => handleImageError(p.id, p.image_url)}
+                    />
+                  )}
+                </>
+              )}
+            </div>
+          );
+        })}
 
         {/* Chapter bottom completion anchor - triggers Qi when reaching the end */}
         <div id="chapter-bottom-completion-anchor" className="h-4 w-full" />

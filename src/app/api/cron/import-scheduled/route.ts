@@ -21,11 +21,10 @@ async function handleScheduledImport(req: NextRequest) {
     const secretParam = searchParams.get("secret");
 
     const expectedSecret = process.env.CRON_SECRET;
-    if (expectedSecret) {
-      const providedSecret = authHeader?.replace(/^Bearer\s+/i, "") || secretParam;
-      if (providedSecret !== expectedSecret) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-      }
+    const providedSecret = authHeader?.replace(/^Bearer\s+/i, "") || secretParam;
+
+    if (!expectedSecret || !providedSecret || providedSecret !== expectedSecret) {
+      return NextResponse.json({ error: "Unauthorized: Invalid or missing CRON_SECRET" }, { status: 401 });
     }
 
     if (scanTimingOnly) {

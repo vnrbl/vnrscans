@@ -1,4 +1,5 @@
 import { cache } from "react";
+import ReactDOM from "react-dom";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import TitleDetailPageContent from "./TitleDetailPageContent";
@@ -87,7 +88,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     description,
     keywords,
     alternates: {
-      canonical: `/title/${slug}`,
+      canonical: `https://www.vnrscans.com/title/${slug}`,
     },
     openGraph: {
       title,
@@ -102,14 +103,6 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       description,
       images: series?.cover_url ? [series.cover_url] : [],
     },
-    // Preload cover image in the <head> so the browser discovers it before JS hydration
-    ...(series?.cover_url
-      ? {
-          other: {
-            "link:preload": series.cover_url,
-          },
-        }
-      : {}),
   };
 }
 
@@ -124,6 +117,11 @@ export default async function Page({ params }: PageProps) {
   // thin error pages that hurt sitewide quality signals.
   if (!initialSeriesData) {
     notFound();
+  }
+
+  // Preload cover image in document head for instant discovery
+  if (initialSeriesData.cover_url) {
+    ReactDOM.preload(initialSeriesData.cover_url, { as: "image", fetchPriority: "high" });
   }
 
   // Fetch chapters in parallel only if series exists

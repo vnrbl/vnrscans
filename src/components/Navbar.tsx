@@ -141,7 +141,7 @@ export function Navbar() {
       .from("series")
       .select("id,slug,title,cover_url,type")
       .eq("is_hidden", false)
-      .limit(500);
+      .limit(24);
 
     if (!error && data && data.length > 0) {
       const shuffled = [...data].sort(() => Math.random() - 0.5);

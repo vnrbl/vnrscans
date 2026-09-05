@@ -18,10 +18,12 @@ import {
 import { useDragScroll, DRAG_SCROLL_CONTAINER_CLASS } from "@/hooks/useDragScroll";
 import { TITLE_CARD_WIDTH, TITLE_COVER_CLASS } from "@/components/titleCardStyles";
 import dynamic from "next/dynamic";
+import type { CarouselItem } from "@/components/HomeHeroCarousel";
+
 const HomeHeroCarousel = dynamic(
   () => import("@/components/HomeHeroCarousel").then((m) => m.HomeHeroCarousel),
   {
-    ssr: false,
+    ssr: true,
     loading: () => (
       <div className="h-64 sm:h-72 w-full animate-pulse rounded-lg bg-secondary/30" />
     ),
@@ -69,6 +71,7 @@ export type HomeLatestUpdate = {
 };
 
 export type HomeInitialData = {
+  carouselItems?: CarouselItem[];
   latestUpdates?: HomeLatestUpdate[];
   popular?: HomeSeriesCard[];
   highScore?: HomeSeriesCard[];
@@ -443,7 +446,7 @@ function HomeContent({ initialData }: { initialData?: HomeInitialData }) {
 
   return (
     <div className="min-h-screen">
-      <HomeHeroCarousel />
+      <HomeHeroCarousel initialItems={initialData?.carouselItems} />
 
       {user && (
         <>

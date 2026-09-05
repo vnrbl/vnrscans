@@ -99,7 +99,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     description,
     keywords,
     alternates: {
-      canonical: `/title/${slug}/${chapterSlug}`,
+      canonical: `https://www.vnrscans.com/title/${slug}/${chapterSlug}`,
     },
     openGraph: {
       title,

@@ -13,9 +13,23 @@ import { supabase } from "@/integrations/supabase/client";
 export const revalidate = 60; // ISR cache for 60s — instant edge delivery
 
 async function fetchHomeInitialData(): Promise<HomeInitialData> {
-  const [latestRes, allSeriesRes, popularRes, highScoreRes] = await Promise.all([
-    supabase.rpc("get_series_with_latest_chapters", { limit_count: 1000 }),
-    supabase.from("series").select("id,slug,title,cover_url,type,updated_at").order("title"),
+  const [carouselRes, latestRes, popularRes, highScoreRes] = await Promise.all([
+    supabase
+      .from("carousel_items")
+      .select(`
+        id,
+        series:series_id(
+          id,
+          title,
+          slug,
+          cover_url,
+          description,
+          type
+        )
+      `)
+      .eq("is_active", true)
+      .order("position", { ascending: true }),
+    supabase.rpc("get_series_with_latest_chapters", { limit_count: 48 }),
     supabase
       .from("series")
       .select("id,slug,title,cover_url,type,rating_average,status,view_count")
@@ -28,28 +42,7 @@ async function fetchHomeInitialData(): Promise<HomeInitialData> {
       .limit(15),
   ]);
 
-  const rpcMap = new Map((latestRes.data ?? []).map((s: any) => [s.id, s]));
-  const fullSeriesList = (allSeriesRes.data ?? []).map((s: any) => {
-    const existing = rpcMap.get(s.id);
-    if (existing) return existing;
-    return {
-      id: s.id,
-      slug: s.slug,
-      title: s.title,
-      cover_url: s.cover_url,
-      type: s.type,
-      latest_chapter_created_at: s.updated_at,
-      recent_chapters: [],
-    };
-  });
-
-  fullSeriesList.sort(
-    (a: any, b: any) =>
-      new Date(b.latest_chapter_created_at || 0).getTime() -
-      new Date(a.latest_chapter_created_at || 0).getTime()
-  );
-
-  const latestUpdates: HomeLatestUpdate[] = fullSeriesList.map((series: any) => ({
+  const latestUpdates: HomeLatestUpdate[] = (latestRes.data ?? []).map((series: any) => ({
     id: series.id,
     slug: series.slug,
     title: series.title,
@@ -66,7 +59,15 @@ async function fetchHomeInitialData(): Promise<HomeInitialData> {
     })),
   }));
 
+  const carouselItems = (carouselRes.data ?? [])
+    .filter((item: any) => item.series)
+    .map((item: any) => ({
+      id: item.id,
+      series: item.series,
+    }));
+
   return {
+    carouselItems,
     latestUpdates,
     popular: (popularRes.data ?? []) as HomeSeriesCard[],
     highScore: (highScoreRes.data ?? []) as HomeSeriesCard[],
