@@ -3,7 +3,7 @@
 import React, { type ReactNode } from "react";
 import { Link } from "@/lib/router-compat";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { BookOpen, Clock, History, ChevronLeft, ChevronRight, ChevronUp, Star, MoreVertical, EyeOff, Lock } from "lucide-react";
+import { BookOpen, Clock, History, ChevronLeft, ChevronRight, ChevronUp, Star, MoreVertical, EyeOff, Lock, ExternalLink, Trophy } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -162,23 +162,30 @@ function HomeContent({ initialData }: { initialData?: HomeInitialData }) {
   const followedChapters = useQuery({
     queryKey: ["home-followed-chapters", user?.id],
     queryFn: async () => {
-      const { data: library, error: libError } = await supabase
-        .from("user_library")
-        .select("series_id")
-        .eq("user_id", user!.id);
-      if (libError) throw libError;
-      const seriesIds = (library ?? []).map((row) => row.series_id);
+      // 1. Fetch followed series IDs from BOTH user_library and bookmarks (Favorites)
+      const [libRes, bmRes] = await Promise.all([
+        supabase.from("user_library").select("series_id").eq("user_id", user!.id),
+        supabase.from("bookmarks").select("series_id").eq("user_id", user!.id),
+      ]);
+      const seriesIdSet = new Set<string>([
+        ...(libRes.data ?? []).map((row) => row.series_id),
+        ...(bmRes.data ?? []).map((row) => row.series_id),
+      ]);
+      const seriesIds = Array.from(seriesIdSet).filter(Boolean);
       if (seriesIds.length === 0) return [];
 
-      const { data, error } = await supabase
-        .from("chapters")
-        .select("id,slug,title,chapter_number,created_at,scheduled_at,series_id,series:series_id(id,slug,title,cover_url)")
-        .in("series_id", seriesIds)
-        .eq("status", "published")
-        .order("created_at", { ascending: false })
-        .order("chapter_number", { ascending: false })
-        .limit(200);
-      if (error) throw error;
+      // 2. Fetch recent chapter drops to capture active batch updates + all series latest chapters via RPC in parallel
+      const [recentRes, rpcRes] = await Promise.all([
+        supabase
+          .from("chapters")
+          .select("id,slug,title,chapter_number,created_at,scheduled_at,series_id,series:series_id(id,slug,title,cover_url,type)")
+          .in("series_id", seriesIds)
+          .eq("status", "published")
+          .order("created_at", { ascending: false })
+          .order("chapter_number", { ascending: false })
+          .limit(300),
+        supabase.rpc("get_series_with_latest_chapters", { limit_count: 1000 }),
+      ]);
 
       // Group by series so that mass updates (e.g. 5+ chapters) collapse into ONE cover card
       const seriesMap = new Map<string, {
@@ -189,7 +196,7 @@ function HomeContent({ initialData }: { initialData?: HomeInitialData }) {
         totalUpdated: number;
       }>();
 
-      (data ?? []).forEach((chapter: any) => {
+      (recentRes.data ?? []).forEach((chapter: any) => {
         const sid = chapter.series_id;
         if (!sid || !chapter.series) return;
         const num = Number(chapter.chapter_number);
@@ -214,27 +221,48 @@ function HomeContent({ initialData }: { initialData?: HomeInitialData }) {
         }
       });
 
-      // Include all-time history: for any followed series not covered in recent drops,
-      // fetch their latest chapter so all followed series are represented
-      const missingSeriesIds = seriesIds.filter((id) => !seriesMap.has(id));
-      if (missingSeriesIds.length > 0) {
-        const { data: olderChapters } = await supabase
-          .from("chapters")
-          .select("id,slug,title,chapter_number,created_at,scheduled_at,series_id,series:series_id(id,slug,title,cover_url)")
-          .in("series_id", missingSeriesIds)
-          .eq("status", "published")
-          .order("chapter_number", { ascending: false });
+      // 3. For any followed series not covered in recent drops,
+      // populate their latest chapter from get_series_with_latest_chapters so ALL followed series are represented
+      const missingSeriesIds = new Set(seriesIds.filter((id) => !seriesMap.has(id)));
+      if (missingSeriesIds.size > 0 && rpcRes.data) {
+        (rpcRes.data ?? []).forEach((s: any) => {
+          if (!missingSeriesIds.has(s.id)) return;
+          const latest = s.recent_chapters?.[0];
+          if (!latest) return;
+          const num = Number(latest.chapter_number);
 
-        (olderChapters ?? []).forEach((chapter: any) => {
-          const sid = chapter.series_id;
-          if (!sid || !chapter.series || seriesMap.has(sid)) return;
-          const num = Number(chapter.chapter_number);
-          seriesMap.set(sid, {
-            latestChapter: chapter,
-            chapters: [chapter],
-            minChapter: num,
-            maxChapter: num,
-            totalUpdated: 1,
+          const recentList = Array.isArray(s.recent_chapters) ? s.recent_chapters : [];
+          const batchChapters = recentList.filter((c: any) => {
+            if (!latest.created_at || !c.created_at) return false;
+            const diff = Math.abs(new Date(latest.created_at).getTime() - new Date(c.created_at).getTime());
+            return diff <= 1000 * 60 * 60 * 24; // within 24 hours
+          });
+          const totalUpdated = Math.max(1, batchChapters.length);
+          const chNums = batchChapters.map((c: any) => Number(c.chapter_number)).filter((n: number) => !isNaN(n));
+          const minChapter = chNums.length > 0 ? Math.min(...chNums) : num;
+          const maxChapter = chNums.length > 0 ? Math.max(...chNums) : num;
+
+          seriesMap.set(s.id, {
+            latestChapter: {
+              id: latest.id,
+              slug: latest.slug,
+              title: latest.title,
+              chapter_number: latest.chapter_number,
+              created_at: latest.created_at,
+              scheduled_at: latest.scheduled_at,
+              series_id: s.id,
+              series: {
+                id: s.id,
+                slug: s.slug,
+                title: s.title,
+                cover_url: s.cover_url,
+                type: s.type,
+              },
+            },
+            chapters: batchChapters.length > 0 ? batchChapters : [latest],
+            minChapter,
+            maxChapter,
+            totalUpdated,
           });
         });
       }
@@ -249,7 +277,7 @@ function HomeContent({ initialData }: { initialData?: HomeInitialData }) {
           batchChapters: entry.chapters,
         }));
 
-      return groupedChapters.slice(0, HOME_HORIZONTAL_CARD_LIMIT);
+      return groupedChapters.slice(0, 50);
     },
     enabled: !!user,
     staleTime: 1000 * 60 * 2, // 2 minutes
@@ -600,6 +628,17 @@ function ChapterCarouselSection({
           )}
         </div>
         <div className="flex items-center gap-2">
+          <Button
+            asChild
+            variant="ghost"
+            size="sm"
+            className="h-8 text-xs font-semibold text-purple-400 hover:text-purple-300 hover:bg-purple-950/20 px-2.5"
+          >
+            <Link to="/home/history/$section" params={{ section: "reading-history" }}>
+              View All
+              <ChevronRight className="ml-1 h-3.5 w-3.5" />
+            </Link>
+          </Button>
           {chapters.length > 0 && (
             <div className="hidden gap-2 md:flex">
               <Button
@@ -628,7 +667,17 @@ function ChapterCarouselSection({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="glass-panel">
-                <DropdownMenuItem onClick={onHide} className="text-xs">
+                <DropdownMenuItem asChild className="text-xs cursor-pointer">
+                  <Link
+                    to="/home/history/$section"
+                    params={{ section: "reading-history" }}
+                    className="flex items-center"
+                  >
+                    <ExternalLink className="mr-2 h-4 w-4 text-purple-400" />
+                    View Full History
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={onHide} className="text-xs cursor-pointer">
                   <EyeOff className="mr-2 h-4 w-4" />
                   Hide this section
                 </DropdownMenuItem>
@@ -708,6 +757,17 @@ function FollowedUpdatesCarouselSection({
           )}
         </div>
         <div className="flex items-center gap-2">
+          <Button
+            asChild
+            variant="ghost"
+            size="sm"
+            className="h-8 text-xs font-semibold text-emerald-400 hover:text-emerald-300 hover:bg-emerald-950/20 px-2.5"
+          >
+            <Link to="/home/history/$section" params={{ section: "followed-chapters" }}>
+              View All
+              <ChevronRight className="ml-1 h-3.5 w-3.5" />
+            </Link>
+          </Button>
           {chapters.length > 0 && (
             <div className="hidden gap-2 md:flex">
               <Button
@@ -736,7 +796,17 @@ function FollowedUpdatesCarouselSection({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="glass-panel">
-                <DropdownMenuItem onClick={onHide} className="text-xs">
+                <DropdownMenuItem asChild className="text-xs cursor-pointer">
+                  <Link
+                    to="/home/history/$section"
+                    params={{ section: "followed-chapters" }}
+                    className="flex items-center"
+                  >
+                    <ExternalLink className="mr-2 h-4 w-4 text-emerald-400" />
+                    View All Followed Updates
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={onHide} className="text-xs cursor-pointer">
                   <EyeOff className="mr-2 h-4 w-4" />
                   Hide this section
                 </DropdownMenuItem>
@@ -817,6 +887,20 @@ function SeriesCarouselSection({
           )}
         </div>
         <div className="flex items-center gap-2">
+          <Button
+            asChild
+            variant="ghost"
+            size="sm"
+            className="h-8 text-xs font-semibold text-amber-400 hover:text-amber-300 hover:bg-amber-950/20 px-2.5"
+          >
+            <Link
+              to="/rankings"
+              search={{ tab: sectionId === "popular" ? "most-viewed" : "top-rated" }}
+            >
+              Rankings
+              <ChevronRight className="ml-1 h-3.5 w-3.5" />
+            </Link>
+          </Button>
           {series.length > 0 && (
             <div className="hidden gap-2 md:flex">
               <Button
@@ -845,7 +929,17 @@ function SeriesCarouselSection({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="glass-panel">
-                <DropdownMenuItem onClick={onHide} className="text-xs">
+                <DropdownMenuItem asChild className="text-xs cursor-pointer">
+                  <Link
+                    to="/rankings"
+                    search={{ tab: sectionId === "popular" ? "most-viewed" : "top-rated" }}
+                    className="flex items-center"
+                  >
+                    <Trophy className="mr-2 h-4 w-4 text-amber-400" />
+                    View in Rankings
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={onHide} className="text-xs cursor-pointer">
                   <EyeOff className="mr-2 h-4 w-4" />
                   Hide this section
                 </DropdownMenuItem>
@@ -999,6 +1093,17 @@ function LatestUpdatesSection({
           )}
         </div>
         <div className="flex items-center gap-2">
+          <Button
+            asChild
+            variant="ghost"
+            size="sm"
+            className="h-8 text-xs font-semibold text-purple-400 hover:text-purple-300 hover:bg-purple-950/20 px-2.5"
+          >
+            <Link to="/home/history/$section" params={{ section: "latest-updates" }}>
+              View All
+              <ChevronRight className="ml-1 h-3.5 w-3.5" />
+            </Link>
+          </Button>
           {sectionId && onHide && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -1007,7 +1112,17 @@ function LatestUpdatesSection({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="glass-panel">
-                <DropdownMenuItem onClick={onHide} className="text-xs">
+                <DropdownMenuItem asChild className="text-xs cursor-pointer">
+                  <Link
+                    to="/home/history/$section"
+                    params={{ section: "latest-updates" }}
+                    className="flex items-center"
+                  >
+                    <ExternalLink className="mr-2 h-4 w-4 text-purple-400" />
+                    View All Updates
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={onHide} className="text-xs cursor-pointer">
                   <EyeOff className="mr-2 h-4 w-4" />
                   Hide this section
                 </DropdownMenuItem>

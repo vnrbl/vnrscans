@@ -1,14 +1,15 @@
 "use client";
 
-import { useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Link } from "@/lib/router-compat";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, BookOpen, Clock } from "lucide-react";
+import { ArrowLeft, BookOpen, Clock, CheckCircle2, Bookmark, Layers, ListFilter } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { OptimizedImage } from "@/components/OptimizedImage";
+import { SectionPagination } from "@/components/SectionPagination";
 
 type HistorySection = "followed-chapters" | "reading-history" | "latest-updates";
 type Period = "day" | "week" | "month" | "all";
@@ -27,37 +28,37 @@ interface GroupedSeries {
   }>;
 }
 
-type HistorySearch = {
-  period?: Period;
-};
-
 type ChapterItem = {
   id: string;
   slug: string;
   title: string | null;
   chapter_number: number;
   created_at: string;
+  progress?: number;
   series: { id: string; slug: string; title: string; cover_url: string | null } | null;
 };
 
-const SECTION_META: Record<HistorySection, { title: string; description: string; requiresAuth: boolean; timeLabel: string }> = {
+const SECTION_META: Record<HistorySection, { title: string; description: string; requiresAuth: boolean; timeLabel: string; accentColor: string }> = {
   "followed-chapters": {
     title: "New Chapters from Followed",
-    description: "Chapter uploads from series in your library.",
+    description: "Chapter uploads from series in your library and favorites.",
     requiresAuth: true,
     timeLabel: "Uploaded",
+    accentColor: "#10B981",
   },
   "reading-history": {
     title: "Reading History",
-    description: "Chapters you opened, grouped by when you read them.",
+    description: "Chapters and series you opened, organized by when you read them.",
     requiresAuth: true,
     timeLabel: "Read",
+    accentColor: "#8B5CF6",
   },
   "latest-updates": {
     title: "Latest Updates",
     description: "All recently published chapters across the site.",
     requiresAuth: false,
     timeLabel: "Uploaded",
+    accentColor: "#8B5CF6",
   },
 };
 
@@ -68,16 +69,20 @@ const PERIODS: Array<{ value: Period; label: string }> = [
   { value: "all", label: "All Time" },
 ];
 
-const HISTORY_PERIOD_LIMIT = 120;
-const HISTORY_ALL_PAGE_SIZE = 1000;
-
+const PAGE_SIZE = 20;
 
 export default function HomeHistoryContent({ section, period = "day" }: { section: string; period?: string }) {
   const { user, loading: authLoading } = useAuth();
+  const [currentPage, setCurrentPage] = useState(1);
+  const [historyView, setHistoryView] = useState<"series" | "chapters">("series");
 
   const sectionKey = isHistorySection(section) ? section : null;
   const meta = sectionKey ? SECTION_META[sectionKey] : null;
   const periodKey = (period === "week" || period === "month" || period === "all" ? period : "day") as Period;
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [sectionKey, periodKey, historyView]);
 
   const chapters = useQuery({
     queryKey: ["home-history", sectionKey, periodKey, user?.id],
@@ -96,7 +101,7 @@ export default function HomeHistoryContent({ section, period = "day" }: { sectio
     if (sectionKey !== "latest-updates" && sectionKey !== "followed-chapters") return [];
 
     const seriesMap = new Map<string, GroupedSeries>();
-    
+
     chapters.data.forEach((ch) => {
       const seriesSlug = ch.series?.slug;
       if (!seriesSlug) return;
@@ -126,6 +131,19 @@ export default function HomeHistoryContent({ section, period = "day" }: { sectio
     return Array.from(seriesMap.values());
   }, [chapters.data, sectionKey]);
 
+  // Reading history grouped by series (most recent chapter read per series)
+  const seriesGroupedHistory = useMemo(() => {
+    if (sectionKey !== "reading-history" || !chapters.data) return [];
+    const map = new Map<string, ChapterItem>();
+    chapters.data.forEach((item) => {
+      const sId = item.series?.id || item.series?.slug;
+      if (sId && !map.has(sId)) {
+        map.set(sId, item);
+      }
+    });
+    return Array.from(map.values());
+  }, [chapters.data, sectionKey]);
+
   if (!sectionKey || !meta) {
     return (
       <main className="container mx-auto min-h-screen px-4 py-24">
@@ -142,6 +160,25 @@ export default function HomeHistoryContent({ section, period = "day" }: { sectio
 
   const needsLogin = meta.requiresAuth && !authLoading && !user;
 
+  // Pagination calculations
+  const totalItems =
+    sectionKey === "reading-history"
+      ? historyView === "series"
+        ? seriesGroupedHistory.length
+        : (chapters.data ?? []).length
+      : groupedData.length;
+
+  const paginatedGroupedData = useMemo(() => {
+    const start = (currentPage - 1) * PAGE_SIZE;
+    return groupedData.slice(start, start + PAGE_SIZE);
+  }, [groupedData, currentPage]);
+
+  const paginatedHistoryData = useMemo(() => {
+    const list = historyView === "series" ? seriesGroupedHistory : (chapters.data ?? []);
+    const start = (currentPage - 1) * PAGE_SIZE;
+    return list.slice(start, start + PAGE_SIZE);
+  }, [historyView, seriesGroupedHistory, chapters.data, currentPage]);
+
   return (
     <main className="container mx-auto min-h-screen px-4 py-20 sm:px-6 md:px-8 lg:px-12 xl:px-16">
       <Button asChild variant="ghost" className="mb-6 gap-2">
@@ -153,27 +190,62 @@ export default function HomeHistoryContent({ section, period = "day" }: { sectio
 
       <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div>
-          <h1 className="text-3xl font-bold">{meta.title}</h1>
+          <div className="flex items-center gap-2.5">
+            <span
+              className="h-2.5 w-2.5 rounded-full animate-pulse"
+              style={{
+                backgroundColor: meta.accentColor,
+                boxShadow: `0 0 10px ${meta.accentColor}`,
+              }}
+            />
+            <h1 className="text-2xl sm:text-3xl font-bold">{meta.title}</h1>
+          </div>
           <p className="mt-2 text-sm text-muted-foreground">{meta.description}</p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          {PERIODS.map((item) => (
-            <Button
-              key={item.value}
-              asChild
-              size="sm"
-              variant={period === item.value ? "default" : "outline"}
-              className="h-9"
-            >
-              <Link
-                to="/home/history/$section"
-                params={{ section: sectionKey }}
-                search={{ period: item.value }}
+
+        <div className="flex flex-wrap items-center gap-3">
+          {sectionKey === "reading-history" && (
+            <div className="flex items-center rounded-lg border border-border/40 bg-card p-1">
+              <Button
+                size="sm"
+                variant={historyView === "series" ? "default" : "ghost"}
+                onClick={() => setHistoryView("series")}
+                className="h-7 text-xs px-2.5 gap-1.5"
               >
-                {item.label}
-              </Link>
-            </Button>
-          ))}
+                <Layers className="h-3.5 w-3.5" />
+                By Series
+              </Button>
+              <Button
+                size="sm"
+                variant={historyView === "chapters" ? "default" : "ghost"}
+                onClick={() => setHistoryView("chapters")}
+                className="h-7 text-xs px-2.5 gap-1.5"
+              >
+                <ListFilter className="h-3.5 w-3.5" />
+                All Chapters
+              </Button>
+            </div>
+          )}
+
+          <div className="flex flex-wrap gap-1.5">
+            {PERIODS.map((item) => (
+              <Button
+                key={item.value}
+                asChild
+                size="sm"
+                variant={periodKey === item.value ? "default" : "outline"}
+                className="h-8 text-xs"
+              >
+                <Link
+                  to="/home/history/$section"
+                  params={{ section: sectionKey }}
+                  search={{ period: item.value }}
+                >
+                  {item.label}
+                </Link>
+              </Button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -183,23 +255,43 @@ export default function HomeHistoryContent({ section, period = "day" }: { sectio
         </div>
       ) : chapters.isLoading || authLoading ? (
         <HistoryGridSkeleton />
-      ) : (chapters.data ?? []).length > 0 ? (
-        sectionKey === "latest-updates" || sectionKey === "followed-chapters" ? (
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {groupedData.map((item) => (
-              <GroupedSeriesCard key={item.slug} item={item} timeLabel={meta.timeLabel} />
-            ))}
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 gap-3 min-[380px]:grid-cols-2 sm:grid-cols-3 md:grid-cols-4 md:gap-4 lg:grid-cols-5 xl:grid-cols-6">
-            {(chapters.data ?? []).map((chapter) => (
-              <HistoryChapterCard key={chapter.id} chapter={chapter} timeLabel={meta.timeLabel} />
-            ))}
-          </div>
-        )
+      ) : totalItems > 0 ? (
+        <>
+          {sectionKey === "latest-updates" || sectionKey === "followed-chapters" ? (
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {paginatedGroupedData.map((item) => (
+                <GroupedSeriesCard key={item.slug} item={item} timeLabel={meta.timeLabel} />
+              ))}
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-3 min-[380px]:grid-cols-2 sm:grid-cols-3 md:grid-cols-4 md:gap-4 lg:grid-cols-5 xl:grid-cols-6">
+              {paginatedHistoryData.map((chapter) => (
+                <HistoryChapterCard
+                  key={chapter.id}
+                  chapter={chapter}
+                  timeLabel={meta.timeLabel}
+                  showProgress={historyView === "series"}
+                />
+              ))}
+            </div>
+          )}
+
+          {/* Section Pagination (triggers whenever total items exceed 20) */}
+          <SectionPagination
+            currentPage={currentPage}
+            totalItems={totalItems}
+            pageSize={PAGE_SIZE}
+            onPageChange={(p) => {
+              setCurrentPage(p);
+              window.scrollTo({ top: 0, behavior: "smooth" });
+            }}
+            itemLabel={sectionKey === "reading-history" && historyView === "chapters" ? "chapters" : "series"}
+            accentColor={meta.accentColor}
+          />
+        </>
       ) : (
         <div className="rounded-lg border border-border/40 bg-card p-8 text-center text-muted-foreground">
-          No chapters found for this period.
+          No entries found for this period.
         </div>
       )}
     </main>
@@ -207,116 +299,125 @@ export default function HomeHistoryContent({ section, period = "day" }: { sectio
 }
 
 async function fetchFollowedChapters(userId: string, period: Period): Promise<ChapterItem[]> {
-  const { data: library, error: libError } = await supabase
-    .from("user_library" as any)
-    .select("series_id")
-    .eq("user_id", userId);
-  if (libError) throw libError;
-
-  const seriesIds = ((library ?? []) as unknown as Array<{ series_id: string }>).map((row) => row.series_id);
+  // 1. Fetch followed series IDs from BOTH user_library and bookmarks (Favorites)
+  const [libRes, bmRes] = await Promise.all([
+    supabase.from("user_library" as any).select("series_id").eq("user_id", userId),
+    supabase.from("bookmarks" as any).select("series_id").eq("user_id", userId),
+  ]);
+  const seriesIds = Array.from(
+    new Set([
+      ...(((libRes.data ?? []) as any[]).map((r) => r.series_id)),
+      ...(((bmRes.data ?? []) as any[]).map((r) => r.series_id)),
+    ])
+  ).filter(Boolean);
   if (seriesIds.length === 0) return [];
 
   const cutoff = getCutoffDate(period);
-  const rows: ChapterItem[] = [];
-  let page = 0;
 
-  while (true) {
-    const pageSize = period === "all" ? HISTORY_ALL_PAGE_SIZE : HISTORY_PERIOD_LIMIT;
-    const from = page * pageSize;
-    const to = from + pageSize - 1;
-    let query = supabase
+  // 2. Query recent chapter drops + all series latest chapters in parallel
+  const [recentRes, rpcRes] = await Promise.all([
+    supabase
       .from("chapters")
-      .select("id,slug,title,chapter_number,created_at,series:series_id(id,slug,title,cover_url)")
+      .select("id,slug,title,chapter_number,created_at,series_id,series:series_id(id,slug,title,cover_url)")
       .in("series_id", seriesIds)
       .eq("status", "published")
       .order("created_at", { ascending: false })
       .order("chapter_number", { ascending: false })
-      .range(from, to);
+      .limit(400),
+    supabase.rpc("get_series_with_latest_chapters", { limit_count: 1000 }),
+  ]);
 
-    if (cutoff) query = query.gte("created_at", cutoff);
+  const rows: ChapterItem[] = [];
+  const seenChapterIds = new Set<string>();
 
-    const { data, error } = await query;
-    if (error) throw error;
-    rows.push(...((data ?? []) as ChapterItem[]));
+  (recentRes.data ?? []).forEach((ch: any) => {
+    if (!ch.series?.slug || seenChapterIds.has(ch.id)) return;
+    if (cutoff && new Date(ch.created_at) < new Date(cutoff)) return;
+    seenChapterIds.add(ch.id);
+    rows.push(ch);
+  });
 
-    if (period !== "all" || !data || data.length < pageSize || rows.length >= 1000) break;
-    page += 1;
+  // For any followed series not present in recent drops, extract from get_series_with_latest_chapters
+  const coveredSeriesIds = new Set(rows.map((ch) => ch.series?.id).filter(Boolean));
+  const missingSeriesIds = new Set(seriesIds.filter((id) => !coveredSeriesIds.has(id)));
+
+  if (missingSeriesIds.size > 0 && rpcRes.data) {
+    (rpcRes.data ?? []).forEach((s: any) => {
+      if (!missingSeriesIds.has(s.id)) return;
+      const recentList = Array.isArray(s.recent_chapters) ? s.recent_chapters : [];
+      recentList.forEach((ch: any) => {
+        if (!ch.id || seenChapterIds.has(ch.id)) return;
+        if (cutoff && ch.created_at && new Date(ch.created_at) < new Date(cutoff)) return;
+        seenChapterIds.add(ch.id);
+        rows.push({
+          id: ch.id,
+          slug: ch.slug,
+          title: ch.title,
+          chapter_number: Number(ch.chapter_number),
+          created_at: ch.created_at,
+          series: {
+            id: s.id,
+            slug: s.slug,
+            title: s.title,
+            cover_url: s.cover_url,
+          },
+        });
+      });
+    });
   }
 
-  return rows;
+  return rows.sort(
+    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+  );
 }
 
 async function fetchReadingHistory(userId: string, period: Period): Promise<ChapterItem[]> {
   const cutoff = getCutoffDate(period);
-  const rows: any[] = [];
-  let page = 0;
+  let query = supabase
+    .from("reading_history")
+    .select("id,updated_at,progress,series_id,series:series_id(id,slug,title,cover_url),chapters:chapter_id(slug,chapter_number,title)")
+    .eq("user_id", userId)
+    .order("updated_at", { ascending: false })
+    .limit(500);
 
-  while (true) {
-    const pageSize = period === "all" ? HISTORY_ALL_PAGE_SIZE : HISTORY_PERIOD_LIMIT;
-    const from = page * pageSize;
-    const to = from + pageSize - 1;
-    let query = supabase
-      .from("reading_history")
-      .select("id,updated_at,progress,series:series_id(id,slug,title,cover_url),chapters:chapter_id(slug,chapter_number,title)")
-      .eq("user_id", userId)
-      .order("updated_at", { ascending: false })
-      .range(from, to);
+  if (cutoff) query = query.gte("updated_at", cutoff);
 
-    if (cutoff) query = query.gte("updated_at", cutoff);
+  const { data, error } = await query;
+  if (error) throw error;
 
-    const { data, error } = await query;
-    if (error) throw error;
-    rows.push(...(data ?? []));
-
-    if (period !== "all" || !data || data.length < pageSize || rows.length >= 1000) break;
-    page += 1;
-  }
-
-  return rows
-    .filter((row) => row.series?.slug && row.chapters?.slug)
-    .map((row) => ({
+  return (data ?? [])
+    .filter((row: any) => row.series?.slug && row.chapters?.slug)
+    .map((row: any) => ({
       id: row.id,
       slug: row.chapters.slug,
       title: row.chapters.title,
       chapter_number: row.chapters.chapter_number,
       created_at: row.updated_at,
+      progress: row.progress,
       series: row.series,
     }));
 }
 
 async function fetchLatestUpdates(period: Period): Promise<ChapterItem[]> {
   const cutoff = getCutoffDate(period);
-  const rows: ChapterItem[] = [];
-  let page = 0;
+  let query = supabase
+    .from("chapters")
+    .select("id,slug,title,chapter_number,created_at,series:series_id(id,slug,title,cover_url)")
+    .eq("status", "published")
+    .order("created_at", { ascending: false })
+    .order("chapter_number", { ascending: false })
+    .limit(500);
 
-  while (true) {
-    const pageSize = period === "all" ? HISTORY_ALL_PAGE_SIZE : HISTORY_PERIOD_LIMIT;
-    const from = page * pageSize;
-    const to = from + pageSize - 1;
-    let query = supabase
-      .from("chapters")
-      .select("id,slug,title,chapter_number,created_at,series:series_id(id,slug,title,cover_url)")
-      .eq("status", "published")
-      .order("created_at", { ascending: false })
-      .order("chapter_number", { ascending: false })
-      .range(from, to);
+  if (cutoff) query = query.gte("created_at", cutoff);
 
-    if (cutoff) query = query.gte("created_at", cutoff);
-
-    const { data, error } = await query;
-    if (error) throw error;
-    rows.push(...((data ?? []) as ChapterItem[]));
-
-    if (period !== "all" || !data || data.length < pageSize || rows.length >= 1000) break;
-    page += 1;
-  }
-
-  return rows;
+  const { data, error } = await query;
+  if (error) throw error;
+  return (data ?? []) as ChapterItem[];
 }
 
 function GroupedSeriesCard({ item, timeLabel }: { item: GroupedSeries; timeLabel: string }) {
   return (
-    <article className="group overflow-hidden rounded-lg border border-border/40 bg-card p-4 transition-all hover:border-primary/50 hover:shadow-lg hover:shadow-primary/10">
+    <article className="group overflow-hidden rounded-xl border border-border/40 bg-card/70 backdrop-blur-sm p-4 transition-all hover:border-emerald-500/50 hover:shadow-lg hover:shadow-emerald-500/10 flex flex-col justify-between">
       <div className="flex gap-4">
         {/* Cover Image */}
         <Link
@@ -324,7 +425,7 @@ function GroupedSeriesCard({ item, timeLabel }: { item: GroupedSeries; timeLabel
           params={{ slug: item.slug }}
           className="shrink-0"
         >
-          <div className="relative h-[160px] w-[110px] overflow-hidden rounded-lg bg-secondary">
+          <div className="relative h-[160px] w-[110px] overflow-hidden rounded-lg bg-secondary shadow-md">
             <OptimizedImage
               src={item.cover_url}
               alt={item.title}
@@ -340,11 +441,11 @@ function GroupedSeriesCard({ item, timeLabel }: { item: GroupedSeries; timeLabel
             <Link
               to="/title/$slug"
               params={{ slug: item.slug }}
-              className="line-clamp-2 text-base font-bold leading-tight hover:text-primary"
+              className="line-clamp-2 text-base font-bold leading-tight hover:text-emerald-400 transition-colors text-white"
             >
               {item.title}
             </Link>
-            <p className="mt-1 text-xs text-muted-foreground">
+            <p className="mt-1 text-xs text-muted-foreground font-medium">
               {item.chapters.length} new chapter{item.chapters.length !== 1 ? "s" : ""}
             </p>
           </div>
@@ -355,11 +456,13 @@ function GroupedSeriesCard({ item, timeLabel }: { item: GroupedSeries; timeLabel
                 key={chapter.id}
                 to="/title/$titleSlug/$chapterSlug"
                 params={{ titleSlug: item.slug, chapterSlug: chapter.slug }}
-                className="flex items-center justify-between text-xs hover:text-primary transition-colors font-medium text-muted-foreground hover:text-foreground"
+                className="flex items-center justify-between text-xs hover:text-emerald-400 transition-colors font-medium text-muted-foreground hover:text-foreground py-0.5 px-1 rounded hover:bg-secondary/40"
               >
                 <div className="flex min-w-0 flex-1 items-center gap-1.5">
-                  <BookOpen className="h-3.5 w-3.5 shrink-0 text-primary/70" />
-                  <span className="truncate font-semibold text-white group-hover:text-primary">Ch. {chapter.chapter_number}</span>
+                  <BookOpen className="h-3.5 w-3.5 shrink-0 text-emerald-400" />
+                  <span className="truncate font-semibold text-white group-hover:text-emerald-400">
+                    Ch. {chapter.chapter_number}
+                  </span>
                 </div>
                 <span className="ml-2 shrink-0 text-[10px] text-muted-foreground">
                   {formatTimeAgo(chapter.created_at)}
@@ -373,13 +476,27 @@ function GroupedSeriesCard({ item, timeLabel }: { item: GroupedSeries; timeLabel
   );
 }
 
-function HistoryChapterCard({ chapter, timeLabel }: { chapter: ChapterItem; timeLabel: string }) {
+function HistoryChapterCard({
+  chapter,
+  timeLabel,
+  showProgress,
+}: {
+  chapter: ChapterItem;
+  timeLabel: string;
+  showProgress?: boolean;
+}) {
   const seriesSlug = chapter.series?.slug;
   if (!seriesSlug) return null;
 
+  const progressPercent = chapter.progress ? Math.min(100, Math.round(chapter.progress * 100)) : 0;
+
   return (
-    <article className="group glass-card flex flex-col h-full rounded-lg overflow-hidden hover-lift transition-all">
-      <Link to="/title/$titleSlug/$chapterSlug" params={{ titleSlug: seriesSlug, chapterSlug: chapter.slug }} className="block shrink-0">
+    <article className="group glass-card flex flex-col h-full rounded-lg overflow-hidden hover-lift transition-all border border-border/40 hover:border-purple-500/50">
+      <Link
+        to="/title/$titleSlug/$chapterSlug"
+        params={{ titleSlug: seriesSlug, chapterSlug: chapter.slug }}
+        className="block shrink-0"
+      >
         <div className="relative aspect-[3/4] overflow-hidden bg-neutral-950">
           <OptimizedImage
             src={chapter.series?.cover_url ?? null}
@@ -391,6 +508,11 @@ function HistoryChapterCard({ chapter, timeLabel }: { chapter: ChapterItem; time
             <BookOpen className="h-3.5 w-3.5 text-purple-400" />
             <span>Ch. {chapter.chapter_number}</span>
           </div>
+          {showProgress && progressPercent > 0 && (
+            <div className="absolute top-2 right-2 rounded bg-black/85 border border-purple-500/40 px-1.5 py-0.5 text-[10px] font-bold text-purple-300 backdrop-blur-md">
+              {progressPercent}%
+            </div>
+          )}
         </div>
       </Link>
       <div className="p-3 bg-surface-1/90 flex flex-col justify-between flex-1 min-w-0">
@@ -407,11 +529,21 @@ function HistoryChapterCard({ chapter, timeLabel }: { chapter: ChapterItem; time
             Chapter {chapter.chapter_number}
           </p>
         </div>
-        <div className="mt-1 flex items-center gap-1 text-xs text-neutral-400">
-          <Clock className="h-3.5 w-3.5 shrink-0 text-neutral-400" />
-          <span className="truncate">
-            {timeLabel} {formatTimeAgo(chapter.created_at)}
-          </span>
+        <div className="mt-2">
+          {showProgress && progressPercent > 0 && (
+            <div className="mb-2 w-full bg-secondary/80 h-1.5 rounded-full overflow-hidden">
+              <div
+                className="bg-purple-500 h-full rounded-full transition-all"
+                style={{ width: `${progressPercent}%` }}
+              />
+            </div>
+          )}
+          <div className="flex items-center gap-1 text-xs text-neutral-400">
+            <Clock className="h-3.5 w-3.5 shrink-0 text-neutral-400" />
+            <span className="truncate">
+              {timeLabel} {formatTimeAgo(chapter.created_at)}
+            </span>
+          </div>
         </div>
       </div>
     </article>
@@ -420,7 +552,7 @@ function HistoryChapterCard({ chapter, timeLabel }: { chapter: ChapterItem; time
 
 function HistoryGridSkeleton() {
   return (
-    <div className="grid grid-cols-1 gap-3 min-[380px]:grid-cols-2 sm:grid-cols-3 md:gap-4 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+    <div className="grid grid-cols-2 gap-3 min-[380px]:grid-cols-2 sm:grid-cols-3 md:gap-4 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
       {[...Array(12)].map((_, i) => (
         <div key={i} className="overflow-hidden rounded-lg border border-border/40 bg-card">
           <div className="aspect-[3/4] animate-pulse bg-secondary" />
@@ -435,7 +567,11 @@ function HistoryGridSkeleton() {
 }
 
 function isHistorySection(section: string): section is HistorySection {
-  return section === "followed-chapters" || section === "reading-history" || section === "latest-updates";
+  return (
+    section === "followed-chapters" ||
+    section === "reading-history" ||
+    section === "latest-updates"
+  );
 }
 
 function getCutoffDate(period: Period): string | null {

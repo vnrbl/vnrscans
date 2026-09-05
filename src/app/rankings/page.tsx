@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import { Link } from "@/lib/router-compat";
 import { useQuery } from "@tanstack/react-query";
 import { Trophy, TrendingUp, Eye, Star, Heart, BookOpen } from "lucide-react";
@@ -10,7 +11,32 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card } from "@/components/ui/card";
 
 export default function RankingsPage() {
-  const [activeTab, setActiveTab] = useState("top-rated");
+  return (
+    <Suspense
+      fallback={
+        <div className="flex h-[50vh] items-center justify-center">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+        </div>
+      }
+    >
+      <RankingsContent />
+    </Suspense>
+  );
+}
+
+function RankingsContent() {
+  const searchParams = useSearchParams();
+  const tabParam = searchParams.get("tab");
+  const validTabs = ["top-rated", "trending", "most-viewed", "most-followed"];
+  const [activeTab, setActiveTab] = useState(
+    tabParam && validTabs.includes(tabParam) ? tabParam : "top-rated"
+  );
+
+  useEffect(() => {
+    if (tabParam && validTabs.includes(tabParam)) {
+      setActiveTab(tabParam);
+    }
+  }, [tabParam]);
 
   const topRated = useQuery({
     queryKey: ["rankings", "top-rated"],
