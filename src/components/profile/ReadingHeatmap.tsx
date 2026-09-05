@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Flame, BookOpen, Calendar as CalendarIcon } from "lucide-react";
 import { useState, useMemo } from "react";
-import { formatAppDate } from "@/lib/date";
+import { formatAppDate, parseUtcDate } from "@/lib/date";
 
 type DayData = {
   date: string;
@@ -47,7 +47,7 @@ export function ReadingHeatmap() {
       // Group by date
       const dateCounts: Record<string, number> = {};
       allItems.forEach((item) => {
-        const dateStr = toLocalYYYYMMDD(new Date(item.updated_at));
+        const dateStr = toLocalYYYYMMDD(parseUtcDate(item.updated_at));
         dateCounts[dateStr] = (dateCounts[dateStr] || 0) + 1;
       });
 

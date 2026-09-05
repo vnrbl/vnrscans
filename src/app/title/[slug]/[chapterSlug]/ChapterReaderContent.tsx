@@ -370,7 +370,6 @@ export default function Reader({
     const ch = chapterQ.data;
 
     // Update reading progress based on scroll position.
-    // Note: Per user directive, a chapter is ONLY added to reading history once completed at least 50%.
     const updateProgress = () => {
       const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
       const scrollHeight = document.documentElement.scrollHeight - window.innerHeight;
@@ -378,7 +377,7 @@ export default function Reader({
       const progress =
         scrollHeight > 0 ? Math.min(Math.round(scrollRatio * 100), 100) : 0;
 
-      if (progress > 0) {
+      if (progress >= 0) {
         const lastLocalProgress = parseInt(
           localStorage.getItem(`chapter-progress-${ch.id}`) || "0",
           10
@@ -388,13 +387,11 @@ export default function Reader({
         }
       }
 
-      if (user && progress >= 50) {
-        // Only update database if progress has changed significantly (every 5%) or first reaching 50%
-        const lastDbProgress = parseInt(
-          localStorage.getItem(`chapter-db-progress-${ch.id}`) || "0",
-          10
-        );
-        if (Math.abs(progress - lastDbProgress) >= 5 || lastDbProgress < 50) {
+      if (user) {
+        // Record reading history on initial visit, and update when progress changes significantly (every 5%) or reaches completion
+        const lastDbProgressStr = localStorage.getItem(`chapter-db-progress-${ch.id}`);
+        const lastDbProgress = lastDbProgressStr !== null ? parseInt(lastDbProgressStr, 10) : -1;
+        if (lastDbProgress === -1 || Math.abs(progress - lastDbProgress) >= 5 || (progress >= 95 && lastDbProgress < 95)) {
           localStorage.setItem(`chapter-db-progress-${ch.id}`, progress.toString());
           supabase
             .from("reading_history")
@@ -412,6 +409,9 @@ export default function Reader({
         }
       }
     };
+
+    // Immediately record chapter visit
+    updateProgress();
 
     let progressTimeout: NodeJS.Timeout;
     const handleProgressUpdate = () => {

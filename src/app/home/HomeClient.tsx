@@ -32,6 +32,7 @@ const HomeHeroCarousel = dynamic(
 import { OptimizedImage } from "@/components/OptimizedImage";
 import { useReaderSettings } from "@/contexts/ReaderSettingsContext";
 import { CountryFlag, getTypeLabel } from "@/components/CountryFlag";
+import { formatTimeAgo, formatUserDateTime, getUserTimeZone } from "@/lib/date";
 
 const LATEST_UPDATES_CHAPTER_LIMIT = 5;
 const LATEST_UPDATES_PAGE_SIZE = 1000;
@@ -137,6 +138,33 @@ function HomeContent({ initialData }: { initialData?: HomeInitialData }) {
   const readingHistory = useQuery({
     queryKey: ["home-reading-history", user?.id],
     queryFn: async () => {
+      // 1. Try dedicated PostgreSQL RPC which groups by series_id at DB level (returns all read series)
+      const { data: rpcData, error: rpcError } = await supabase.rpc(
+        "get_user_reading_history_series",
+        { _user_id: user!.id }
+      );
+
+      if (!rpcError && Array.isArray(rpcData) && rpcData.length > 0) {
+        return rpcData.map((row: any) => ({
+          id: row.id,
+          updated_at: row.updated_at,
+          progress: Number(row.progress || 0),
+          series_id: row.series_id,
+          series: {
+            id: row.series_id,
+            slug: row.series_slug,
+            title: row.series_title,
+            cover_url: row.series_cover_url,
+          },
+          chapters: {
+            slug: row.chapter_slug,
+            chapter_number: Number(row.chapter_number),
+            title: row.chapter_title,
+          },
+        })).slice(0, HOME_HORIZONTAL_CARD_LIMIT);
+      }
+
+      // 2. Resilient fallback: direct query with limit 1000 to prevent truncating distinct series
       const { data, error } = await supabase
         .from("reading_history")
         .select(
@@ -144,7 +172,7 @@ function HomeContent({ initialData }: { initialData?: HomeInitialData }) {
         )
         .eq("user_id", user!.id)
         .order("updated_at", { ascending: false })
-        .limit(40);
+        .limit(1000);
       if (error) throw error;
 
       // Group by series and keep only the most recent chapter per series
@@ -1440,7 +1468,12 @@ function FollowedChapterCard({ chapter }: { chapter: RecentChapter }) {
               `Chapter ${chapter.chapter_number}`
             )}
           </span>
-          <span className="shrink-0">{formatTimeAgo(chapter.created_at)}</span>
+          <span
+            className="shrink-0"
+            title={chapter.created_at ? `Uploaded: ${formatUserDateTime(chapter.created_at)} (${getUserTimeZone()})` : undefined}
+          >
+            {formatTimeAgo(chapter.created_at)}
+          </span>
         </Link>
       </div>
     </article>
@@ -1486,7 +1519,10 @@ function RecentChapterCard({
   );
 
   const timeRow = (
-    <div className="mt-1 flex items-center gap-1.5 text-xs text-neutral-400">
+    <div
+      className="mt-1 flex items-center gap-1.5 text-xs text-neutral-400"
+      title={chapter.created_at ? `${timeLabel}: ${formatUserDateTime(chapter.created_at)} (${getUserTimeZone()})` : undefined}
+    >
       <Clock className="h-3.5 w-3.5 shrink-0 text-neutral-400" />
       <span className="truncate">
         {timeLabel} {formatTimeAgo(chapter.created_at)}
@@ -1546,17 +1582,4 @@ function RecentChapterCard({
       </div>
     </article>
   );
-}
-
-function formatTimeAgo(date: string): string {
-  const seconds = Math.floor((new Date().getTime() - new Date(date).getTime()) / 1000);
-  if (seconds < 60) return `${seconds}s ago`;
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  if (days < 7) return `${days}d ago`;
-  const weeks = Math.floor(days / 7);
-  return `${weeks}w ago`;
 }

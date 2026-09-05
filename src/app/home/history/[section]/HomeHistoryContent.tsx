@@ -9,6 +9,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { OptimizedImage } from "@/components/OptimizedImage";
 import { SectionPagination } from "@/components/SectionPagination";
+import { formatTimeAgo, formatUserDateTime, getUserTimeZone } from "@/lib/date";
 
 type HistorySection = "followed-chapters" | "reading-history" | "latest-updates";
 type Period = "day" | "week" | "month" | "all";
@@ -88,7 +89,8 @@ export default function HomeHistoryContent({
 
   const sectionKey = isHistorySection(section) ? section : null;
   const meta = sectionKey ? SECTION_META[sectionKey] : null;
-  const periodKey = (period === "week" || period === "month" || period === "all" ? period : "day") as Period;
+  const defaultPeriod: Period = sectionKey === "reading-history" ? "all" : "day";
+  const periodKey = (period === "week" || period === "month" || period === "all" ? period : (period === "day" ? "day" : defaultPeriod)) as Period;
 
   const queryClient = useQueryClient();
 
@@ -745,7 +747,10 @@ function GroupedSeriesCard({
                       </span>
                     )}
                   </div>
-                  <span className="ml-2 shrink-0 text-[10px] text-neutral-400">
+                  <span
+                    className="ml-2 shrink-0 text-[10px] text-neutral-400"
+                    title={chapter.created_at ? `Uploaded: ${formatUserDateTime(chapter.created_at)} (${getUserTimeZone()})` : undefined}
+                  >
                     {formatTimeAgo(chapter.created_at)}
                   </span>
                 </Link>
@@ -832,7 +837,10 @@ function HistoryChapterCard({
               />
             </div>
           )}
-          <div className="flex items-center gap-1 text-xs text-neutral-400">
+          <div
+            className="flex items-center gap-1 text-xs text-neutral-400"
+            title={chapter.created_at ? `${timeLabel}: ${formatUserDateTime(chapter.created_at)} (${getUserTimeZone()})` : undefined}
+          >
             <Clock className="h-3.5 w-3.5 shrink-0 text-neutral-400" />
             <span className="truncate">
               {timeLabel} {formatTimeAgo(chapter.created_at)}
@@ -872,21 +880,8 @@ function getCutoffDate(period: Period): string | null {
   if (period === "all") return null;
 
   const date = new Date();
-  if (period === "day") date.setDate(date.getDate() - 1);
-  if (period === "week") date.setDate(date.getDate() - 7);
-  if (period === "month") date.setMonth(date.getMonth() - 1);
+  if (period === "day") date.setUTCDate(date.getUTCDate() - 1);
+  if (period === "week") date.setUTCDate(date.getUTCDate() - 7);
+  if (period === "month") date.setUTCMonth(date.getUTCMonth() - 1);
   return date.toISOString();
-}
-
-function formatTimeAgo(date: string): string {
-  const seconds = Math.floor((new Date().getTime() - new Date(date).getTime()) / 1000);
-  if (seconds < 60) return `${seconds}s ago`;
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  if (days < 7) return `${days}d ago`;
-  const weeks = Math.floor(days / 7);
-  return `${weeks}w ago`;
 }
