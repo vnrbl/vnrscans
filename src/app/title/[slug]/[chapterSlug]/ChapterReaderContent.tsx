@@ -970,7 +970,7 @@ export default function Reader({
           ) : (
             <>
               {c.scheduled_at && new Date(c.scheduled_at) > new Date() && settings.enable30MinHold !== false && (
-                <div className="sticky top-16 z-30 mb-3 flex items-center gap-2.5 rounded-lg border border-amber-500/40 bg-amber-950/90 px-4 py-2.5 text-xs backdrop-blur-md shadow-lg text-amber-300">
+                <div className="mb-3 flex items-center gap-2.5 rounded-lg border border-amber-500/40 bg-amber-950/90 px-4 py-2.5 text-xs backdrop-blur-md shadow-lg text-amber-300">
                   <Lock className="h-4 w-4 shrink-0 text-amber-400 animate-pulse" />
                   <span>
                     <strong>Viewing as Admin:</strong> Chapter {c.chapter_number} is currently on hold for regular readers until{" "}
@@ -1471,7 +1471,27 @@ function ScheduledChapterUnlockView({
   }, [targetDate, onUnlock]);
 
   const sourceUrl = chapter.source_url;
-  const sourceName = chapter.uploaded_by || chapter.scanlation_group || "Official Scans Source";
+  const getScanGroupName = () => {
+    if (chapter.scanlation_group && chapter.scanlation_group.trim()) {
+      return chapter.scanlation_group.trim();
+    }
+    if ((chapter as any).source_site && (chapter as any).source_site.trim()) {
+      return (chapter as any).source_site.trim();
+    }
+    if (chapter.source_url) {
+      try {
+        const hostname = new URL(chapter.source_url).hostname.replace(/^www\./, "");
+        const main = hostname.split(".")[0];
+        if (main && main.toLowerCase().includes("qi")) return "Qi Scans";
+        if (main && main.toLowerCase().includes("asura")) return "Asura Scans";
+        if (main && main.toLowerCase().includes("flame")) return "Flame Comics";
+        if (main && main.toLowerCase().includes("reaper")) return "Reaper Scans";
+        if (main) return main.charAt(0).toUpperCase() + main.slice(1);
+      } catch {}
+    }
+    return "Official Scans Source";
+  };
+  const sourceName = getScanGroupName();
 
   return (
     <div className="flex min-h-[65vh] items-center justify-center px-4 py-12">
