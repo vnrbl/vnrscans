@@ -370,18 +370,23 @@ async function mirrorPagesForChapter(
   return Promise.all(
     images.map(async (rawImgUrl, idx) => {
       const pageNum = idx + 1;
-      if (!rawImgUrl.includes("wowpic") && !rawImgUrl.includes("comix.to")) {
+      // Already mirrored in Supabase storage?
+      if (rawImgUrl.includes("supabase.co/storage")) {
         return rawImgUrl;
       }
       try {
+        const isVortex = rawImgUrl.includes("vortexscans.org");
+        const isComix = rawImgUrl.includes("wowpic") || rawImgUrl.includes("comix.to");
+        const referer = isVortex ? "https://vortexscans.org/" : isComix ? "https://comix.to/" : undefined;
+
         const res = await fetch(rawImgUrl, {
           headers: {
-            Referer: "https://comix.to/",
+            ...(referer ? { Referer: referer } : {}),
             "User-Agent":
               "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
             Accept: "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
           },
-          signal: AbortSignal.timeout(15_000),
+          signal: AbortSignal.timeout(20_000),
         });
 
         if (res.ok) {
@@ -1292,6 +1297,10 @@ function filterImagesByExampleUrl(images: string[], exampleUrl: string) {
       (url) => isKaynScansUrl(url) && (url.includes("/uploads/series/") || url.includes("/upload/series/")),
     );
     if (kaynImages.length > 0) return kaynImages;
+  }
+
+  if (exampleUrl.toLowerCase().includes("vortex")) {
+    return images;
   }
 
   const prefix = getImageUrlTypePrefix(exampleUrl);

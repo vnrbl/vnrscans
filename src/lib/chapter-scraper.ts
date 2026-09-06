@@ -144,6 +144,20 @@ export async function extractChaptersFromSeriesUrl(seriesUrl: string): Promise<C
       }
     }
 
+    // Custom extraction for Vortex Scans (fast server-side hydration & Astro props extraction)
+    if (isVortexLikeUrl(seriesUrl)) {
+      try {
+        console.log(`[Scraper] Using custom Vortex Scans chapter extraction for: ${seriesUrl}`);
+        const vortexChapters = await extractVortexChapters(seriesUrl);
+        if (vortexChapters.length > 0) {
+          console.log(`[Scraper] Successfully extracted ${vortexChapters.length} chapters from Vortex Scans (${seriesUrl})`);
+          return vortexChapters;
+        }
+      } catch (vortexErr) {
+        console.warn('[Scraper] Custom Vortex Scans chapter extraction failed, falling back to standard extraction:', vortexErr);
+      }
+    }
+
     let html = '';
     let usePuppeteerFallback = false;
 
@@ -473,9 +487,12 @@ async function collectLiveReaderImageUrls(page: any): Promise<string[]> {
             }
           })();
           const isVortexReaderImage =
-            lowercaseSrc.includes('storage.vortexscans.org/upload/series/') &&
-            !lowercaseSrc.includes('/series/featured/') &&
-            /^page[-_]\\d{1,4}/i.test(filename);
+            (lowercaseSrc.includes('storage.vortexscans.org/upload/series/') ||
+             lowercaseSrc.includes('storage.vortexscans.org//upload/series/')) &&
+            !lowercaseSrc.includes('/featured/') &&
+            !lowercaseSrc.includes('logo') &&
+            !lowercaseSrc.includes('avatar') &&
+            !lowercaseSrc.includes('banner');
 
           const isAsuraReaderImage = values.some((val) => {
             const lVal = String(val).toLowerCase();
@@ -1336,6 +1353,20 @@ export async function extractImagesFromChapterUrl(
       }
     }
 
+    // Custom extraction for Vortex Scans reader pages (fast direct image extraction from server HTML)
+    if (isVortexLikeUrl(chapterUrl)) {
+      try {
+        console.log(`[Scraper] Using custom Vortex Scans image extraction for: ${chapterUrl}`);
+        const vortexImages = await extractVortexChapterImages(chapterUrl);
+        if (vortexImages.length > 0) {
+          console.log(`[Scraper] Successfully extracted ${vortexImages.length} images for Vortex Scans (${chapterUrl})`);
+          return vortexImages;
+        }
+      } catch (vortexErr) {
+        console.warn('[Scraper] Custom Vortex Scans image extraction failed, falling back to standard extraction:', vortexErr);
+      }
+    }
+
     let html = '';
     let usePuppeteerFallback = false;
     const imageUrlExample = options.imageUrlExample?.trim() || '';
@@ -1959,6 +1990,10 @@ function filterReaderImagesForSource(
     return sourceImages.filter(isKaynReaderPageImage);
   }
 
+  if (isVortexLikeUrl(pageUrl) || isVortexLikeUrl(exampleUrl || '')) {
+    return sourceImages.filter(isVortexReaderPageImage);
+  }
+
   return selectChapterImageCluster(
     sourceImages.filter((url) => isLikelyChapterReaderImage(url, pageUrl, exampleUrl)),
     pageUrl,
@@ -1990,6 +2025,11 @@ function findImagesMatchingExampleUrl(images: string[], exampleUrl?: string | nu
   if (isKaynScansUrl(cleanExampleUrl)) {
     const kaynImages = images.filter((url) => isKaynReaderPageImage(url));
     if (kaynImages.length > 0) return kaynImages;
+  }
+
+  if (isVortexLikeUrl(cleanExampleUrl)) {
+    const vortexImages = images.filter(isVortexReaderPageImage);
+    if (vortexImages.length > 0) return vortexImages;
   }
 
   const exampleFamily = getImageUrlFamilyPrefix(cleanExampleUrl);
@@ -2067,6 +2107,11 @@ function isLikelyChapterReaderImage(url: string, pageUrl: string = '', exampleUr
     // Custom check for Hivetoons
     if (isHivetoonUrl(url)) {
       return isHivetoonReaderPageImage(url);
+    }
+
+    // Custom check for Vortex Scans
+    if (isVortexLikeUrl(url) || isVortexLikeUrl(pageUrl) || isVortexLikeUrl(exampleUrl || '')) {
+      return isVortexReaderPageImage(url);
     }
 
     // Custom check for Kayn Scans
@@ -2368,6 +2413,24 @@ function isVortexLikeUrl(url: string): boolean {
     return hostname.includes('vortexscans') || hostname.includes('vortex');
   } catch {
     return url.toLowerCase().includes('vortexscans') || url.toLowerCase().includes('vortex');
+  }
+}
+
+function isVortexReaderPageImage(url: string): boolean {
+  try {
+    const lowercaseUrl = url.toLowerCase();
+    const isVortexStorage = lowercaseUrl.includes('storage.vortexscans.org') || lowercaseUrl.includes('vortexscans.org');
+    const isSeriesUpload = lowercaseUrl.includes('/upload/series/') || lowercaseUrl.includes('/uploads/series/');
+    const isExcluded =
+      lowercaseUrl.includes('/featured/') ||
+      lowercaseUrl.includes('logo') ||
+      lowercaseUrl.includes('avatar') ||
+      lowercaseUrl.includes('banner') ||
+      lowercaseUrl.includes('cover') ||
+      lowercaseUrl.includes('favicon');
+    return isVortexStorage && isSeriesUpload && !isExcluded;
+  } catch {
+    return false;
   }
 }
 
@@ -3067,5 +3130,99 @@ async function extractComixChapterImages(chapterUrl: string): Promise<string[]> 
   } finally {
     await browser.close();
   }
+}
+
+async function extractVortexChapters(seriesUrl: string): Promise<ChapterInfo[]> {
+  const urlObj = new URL(seriesUrl);
+  const response = await fetch(seriesUrl, {
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+    },
+    signal: AbortSignal.timeout(20_000),
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to fetch Vortex series page: ${response.status} ${response.statusText}`);
+  }
+  const html = await response.text();
+  const chapters: ChapterInfo[] = [];
+  const seenSlugs = new Set<string>();
+
+  // 1. Primary: Parse embedded hydration data from Astro island props
+  const regex = /&quot;id&quot;:\[0,(\d+)\],&quot;number&quot;:\[0,([0-9.]+)\],&quot;slug&quot;:\[0,&quot;([^&]+)&quot;\],(?:&quot;title&quot;:\[0,(?:&quot;([^&]+)&quot;|null)\],)?/g;
+  let m: RegExpExecArray | null;
+  while ((m = regex.exec(html)) !== null) {
+    const num = parseFloat(m[2]);
+    const slug = m[3];
+    const rawTitle = m[4];
+    const title = rawTitle && rawTitle !== 'null' ? rawTitle : undefined;
+    if (!seenSlugs.has(slug)) {
+      seenSlugs.add(slug);
+      chapters.push({
+        chapterNumber: num,
+        title,
+        url: `${urlObj.origin}${urlObj.pathname.replace(/\/+$/, '')}/${slug}`,
+      });
+    }
+  }
+
+  // 2. Fallback: Parse HTML anchor links if any additional exist
+  const anchorRegex = /href="([^"]*\/chapter-([0-9.]+)[^"]*)"/gi;
+  let am: RegExpExecArray | null;
+  while ((am = anchorRegex.exec(html)) !== null) {
+    const rawHref = am[1];
+    const num = parseFloat(am[2]);
+    const cleanUrl = rawHref.startsWith('http') ? rawHref : `${urlObj.origin}${rawHref.startsWith('/') ? '' : '/'}${rawHref}`;
+    const slug = cleanUrl.split('/').pop() || '';
+    if (!seenSlugs.has(slug)) {
+      seenSlugs.add(slug);
+      chapters.push({
+        chapterNumber: num,
+        url: cleanUrl,
+      });
+    }
+  }
+
+  return chapters.sort((a, b) => a.chapterNumber - b.chapterNumber);
+}
+
+async function extractVortexChapterImages(chapterUrl: string): Promise<string[]> {
+  const response = await fetch(chapterUrl, {
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+    },
+    signal: AbortSignal.timeout(20_000),
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to fetch Vortex chapter page: ${response.status} ${response.statusText}`);
+  }
+  const html = await response.text();
+
+  // Extract from <img ... data-reader-page-image ...>
+  const readerImgMatches = [...html.matchAll(/<img[^>]+data-reader-page-image[^>]+>/gi)].map((m) => m[0]);
+  const pageUrls: string[] = [];
+
+  for (const tag of readerImgMatches) {
+    const srcMatch = tag.match(/src="([^"]+)"/i);
+    if (srcMatch && srcMatch[1]) {
+      const normalized = srcMatch[1].replace(/storage\.vortexscans\.org\/+/i, 'storage.vortexscans.org/');
+      if (!pageUrls.includes(normalized)) {
+        pageUrls.push(normalized);
+      }
+    }
+  }
+
+  if (pageUrls.length > 0) {
+    return pageUrls;
+  }
+
+  // Fallback: extract all storage.vortexscans.org/upload/series/ links
+  const storageMatches = [...html.matchAll(/https?:\/\/storage\.vortexscans\.org\/{1,2}upload\/series\/[^"'\s\\]+/gi)].map((m) => m[0]);
+  const filtered = storageMatches
+    .map((u) => u.replace(/storage\.vortexscans\.org\/+/i, 'storage.vortexscans.org/'))
+    .filter((u) => !u.includes('/featured/') && !u.includes('/logo') && !u.includes('/avatar') && !u.includes('banner') && !u.includes('cover'));
+
+  return Array.from(new Set(filtered));
 }
 
