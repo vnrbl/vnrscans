@@ -27,6 +27,7 @@ import {
   type ComickExtractedMetadata,
 } from "@/lib/api/comick-import.actions";
 import {
+  $searchComixList,
   $previewComixMetadata,
   $importComixMetadataToSeries,
 } from "@/lib/api/comix-import.actions";
@@ -149,20 +150,15 @@ export function ComickMetadataImporter({
       setIsSearching(true);
 
       if (activeSource === "comix") {
-        const res = await $previewComixMetadata({
+        const res = await $searchComixList({
           data: {
             query: q,
             accessToken: session.access_token,
           },
         });
 
-        if (!res.success || !res.metadata) {
-          setSearchResults([]);
-          setSelectedComic(null);
-          toast.error(res.error || `No comics found on Comix.to for "${q}".`);
-        } else {
-          const meta = res.metadata;
-          const mapped: ComickExtractedMetadata = {
+        if (res.success && res.results && res.results.length > 0) {
+          const mappedList: ComickExtractedMetadata[] = res.results.map((meta) => ({
             title: meta.title,
             slug: meta.slug,
             description: meta.description,
@@ -174,10 +170,42 @@ export function ComickMetadataImporter({
             coverUrl: meta.coverUrl,
             author: meta.author,
             artist: meta.artist,
-          };
-          setSearchResults([mapped]);
-          setSelectedComic(mapped);
-          toast.success(`Found "${meta.title}" on Comix.to!`);
+          }));
+          setSearchResults(mappedList);
+          setSelectedComic(mappedList[0]);
+          toast.success(`Found "${res.results[0].title}" on Comix.to!`);
+        } else {
+          // Fallback to preview
+          const prevRes = await $previewComixMetadata({
+            data: {
+              query: q,
+              accessToken: session.access_token,
+            },
+          });
+
+          if (!prevRes.success || !prevRes.metadata) {
+            setSearchResults([]);
+            setSelectedComic(null);
+            toast.error(prevRes.error || `No comics found on Comix.to for "${q}".`);
+          } else {
+            const meta = prevRes.metadata;
+            const mapped: ComickExtractedMetadata = {
+              title: meta.title,
+              slug: meta.slug,
+              description: meta.description,
+              alternativeTitles: meta.alternativeTitles,
+              genres: meta.genres,
+              tags: meta.tags,
+              status: meta.status,
+              releaseYear: meta.releaseYear,
+              coverUrl: meta.coverUrl,
+              author: meta.author,
+              artist: meta.artist,
+            };
+            setSearchResults([mapped]);
+            setSelectedComic(mapped);
+            toast.success(`Found "${meta.title}" on Comix.to!`);
+          }
         }
       } else {
         const res = await $searchComickList({
@@ -336,27 +364,27 @@ export function ComickMetadataImporter({
         )}
       </DialogTrigger>
 
-      <DialogContent className="max-w-2xl bg-[#0d0d12] border-border/50 text-foreground overflow-hidden flex flex-col p-0">
-        <DialogHeader className="p-5 sm:p-6 pb-4 border-b border-border/20 bg-card/60">
-          <div className="flex items-center gap-3">
-            <div className="grid h-10 w-10 place-items-center rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-lg shadow-emerald-500/20">
-              <Globe className="h-5 w-5" />
+      <DialogContent className="w-[calc(100vw-1rem)] sm:w-full max-w-2xl max-h-[90dvh] bg-[#0d0d12] border-border/50 text-foreground overflow-hidden flex flex-col p-0 gap-0 shadow-2xl">
+        <DialogHeader className="p-3.5 sm:p-6 pb-3 sm:pb-4 border-b border-border/20 bg-card/60 shrink-0">
+          <div className="flex items-center gap-2.5 sm:gap-3 pr-8 sm:pr-0">
+            <div className="grid h-9 w-9 sm:h-10 sm:w-10 place-items-center rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-lg shadow-emerald-500/20 shrink-0">
+              <Globe className="h-4 w-4 sm:h-5 sm:w-5" />
             </div>
-            <div>
-              <DialogTitle className="text-lg font-bold flex items-center gap-2">
-                <span>Auto-Search & Import from Comick</span>
-                <Badge variant="outline" className="text-[10px] bg-emerald-500/10 text-emerald-400 border-emerald-500/30">
-                  Search by Title
+            <div className="min-w-0">
+              <DialogTitle className="text-sm sm:text-lg font-bold flex items-center gap-1.5 sm:gap-2 truncate">
+                <span className="truncate">Auto-Search & Import from Comick</span>
+                <Badge variant="outline" className="text-[10px] bg-emerald-500/10 text-emerald-400 border-emerald-500/30 shrink-0">
+                  Search
                 </Badge>
               </DialogTitle>
-              <DialogDescription className="text-xs text-muted-foreground">
-                Search any series name to automatically fetch synopsis, genres, tags, alternative titles, and cover art.
+              <DialogDescription className="text-[11px] sm:text-xs text-muted-foreground line-clamp-1 sm:line-clamp-none">
+                Search any series name to automatically fetch synopsis, genres, tags, and cover art.
               </DialogDescription>
             </div>
           </div>
         </DialogHeader>
 
-        <div className="p-5 sm:p-6 space-y-4 max-h-[70vh] overflow-y-auto">
+        <div className="p-3.5 sm:p-6 space-y-4 flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
           {/* Search Input with Source Switcher */}
           <div className="space-y-1.5">
             <div className="flex items-center justify-between">

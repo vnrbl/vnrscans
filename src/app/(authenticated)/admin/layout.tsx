@@ -129,21 +129,22 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   );
 
   return (
-    <div className="container mx-auto grid gap-4 px-4 py-4 sm:px-6 md:grid-cols-[220px_1fr] md:gap-6 md:px-8 md:py-6 lg:px-12 xl:px-16">
+    <div className="container mx-auto grid gap-4 px-3 sm:px-6 md:grid-cols-[220px_1fr] md:gap-6 md:px-8 py-3 sm:py-6 lg:px-12 xl:px-16 pb-24 sm:pb-8">
       <aside className="min-w-0 md:sticky md:top-20 md:max-h-[calc(100vh-6rem)] md:self-start md:overflow-y-auto">
-        <div className="mb-3 px-3 py-1 text-2xs font-extrabold text-primary uppercase tracking-widest bg-primary/10 rounded-md border border-primary/20 w-fit">
+        <div className="mb-2 sm:mb-3 px-2.5 sm:px-3 py-1 text-2xs font-extrabold text-primary uppercase tracking-widest bg-primary/10 rounded-md border border-primary/20 w-fit">
           {panelTitle}
         </div>
-        <nav className="flex gap-2 overflow-x-auto rounded-lg border border-border/40 bg-card p-2 md:block md:space-y-1 md:overflow-visible">
+        <nav className="flex gap-1.5 overflow-x-auto no-scrollbar rounded-xl border border-border/40 bg-card/80 p-1.5 md:block md:space-y-1 md:overflow-visible">
           {visibleItems.map((it) => (
             <Link
               key={it.to}
               to={it.to}
-              activeProps={{ className: "bg-primary/15 text-primary" }}
+              activeProps={{ className: "bg-primary/15 text-primary font-semibold" }}
               activeOptions={{ exact: it.exact }}
-              className="flex shrink-0 items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-secondary hover:text-foreground md:shrink"
+              className="flex shrink-0 items-center gap-1.5 sm:gap-2 rounded-lg px-2.5 py-1.5 sm:px-3 sm:py-2 text-xs sm:text-sm font-medium text-muted-foreground hover:bg-secondary hover:text-foreground md:shrink transition-colors"
             >
-              <it.icon className="h-4 w-4" />{it.label}
+              <it.icon className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+              <span>{it.label}</span>
             </Link>
           ))}
         </nav>

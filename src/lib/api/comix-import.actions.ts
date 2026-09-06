@@ -10,6 +10,7 @@ import {
   type ComixGroupInfo,
 } from "@/lib/chapter-scraper";
 import { resolveChapterImageUrl } from "@/lib/chapter-utils";
+import { searchComickComics } from "./comick-import.actions";
 
 function getAdminSupabase() {
   const url = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
@@ -221,6 +222,200 @@ export async function parseComixPageHtml(html: string, pageUrl: string): Promise
   }
 }
 
+function scoreMatch(title: string, query: string): number {
+  const tNorm = title.toLowerCase().trim();
+  const qNorm = query.toLowerCase().trim();
+  if (tNorm === qNorm) return 1000;
+  if (tNorm.replace(/[^a-z0-9]/g, "") === qNorm.replace(/[^a-z0-9]/g, "")) return 900;
+  if (tNorm.startsWith(qNorm)) return 800;
+  if (tNorm.includes(qNorm)) return 700;
+
+  const qWords = qNorm.split(/\s+/).filter((w) => w.length > 2);
+  let matchedWords = 0;
+  for (const w of qWords) {
+    if (tNorm.includes(w)) matchedWords++;
+  }
+  const wordRatio = qWords.length > 0 ? matchedWords / qWords.length : 0;
+  return wordRatio * 500;
+}
+
+const comixSearchCache = new Map<string, { timestamp: number; data: ComixExtractedMetadata[] }>();
+const COMIX_CACHE_TTL = 15 * 60 * 1000;
+
+/**
+ * Search series titles from Comix.to using title name or URL (just like Comick)
+ */
+export async function searchComixTitles(queryOrUrl: string): Promise<ComixExtractedMetadata[]> {
+  const clean = queryOrUrl.trim();
+  if (!clean) return [];
+
+  // Extract clean search term if user passed a URL
+  let searchTerm = clean;
+  let targetComixUrl: string | null = null;
+
+  if (clean.startsWith("http") || clean.includes("comix.to")) {
+    targetComixUrl = clean;
+    const match = clean.match(/comix\.to\/title\/([^/?#]+)/i);
+    if (match && match[1]) {
+      // e.g. "e071e-chronicles-of-the-lazy-sovereign" -> "chronicles of the lazy sovereign"
+      searchTerm = match[1].replace(/^[a-z0-9]+-/, "").replace(/-/g, " ").trim();
+    }
+  }
+
+  const cacheKey = searchTerm.toLowerCase();
+  const cached = comixSearchCache.get(cacheKey);
+  if (cached && Date.now() - cached.timestamp < COMIX_CACHE_TTL) {
+    return cached.data;
+  }
+
+  const results: ComixExtractedMetadata[] = [];
+
+  try {
+    const browseUrl = `https://r.jina.ai/https://comix.to/browse?keyword=${encodeURIComponent(searchTerm)}`;
+    const res = await fetch(browseUrl, {
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+      },
+      signal: AbortSignal.timeout(12000),
+    });
+
+    if (res.ok) {
+      const text = await res.text();
+      const itemRegex =
+        /\[!\[.*?\]\((https:\/\/static\.comix\.to\/[^\)]+)\)\]\((https:\/\/comix\.to\/title\/[^\)]+)\)\s*###\s*\[(.*?)\]\(\2\)\s*([\s\S]*?)(?=(?:\[!\[Image|\n##|\nShowing|$))/g;
+
+      let match: RegExpExecArray | null;
+      while ((match = itemRegex.exec(text)) !== null) {
+        const [, coverUrl, comixUrl, title, metaAndDesc] = match;
+        const lines = metaAndDesc.trim().split("\n").filter(Boolean);
+        const metaLine = lines[0] || "";
+        const descLines = lines
+          .slice(1)
+          .filter((l) => !l.match(/^\d+[hdwmy]\s+ago$/i) && !l.startsWith("---"));
+
+        let type: "manhwa" | "manga" | "manhua" | "novel" = "manhwa";
+        const mLower = metaLine.toLowerCase();
+        if (mLower.includes("manhua")) type = "manhua";
+        else if (mLower.includes("manga")) type = "manga";
+        else if (mLower.includes("novel")) type = "novel";
+
+        let status: "ongoing" | "completed" | "hiatus" = "ongoing";
+        if (mLower.includes("finish") || mLower.includes("complete")) status = "completed";
+        else if (mLower.includes("hiatus") || mLower.includes("cancel")) status = "hiatus";
+
+        const yearMatch = metaLine.match(/\b(19\d\d|20\d\d)\b/);
+        const year = yearMatch ? parseInt(yearMatch[1], 10) : undefined;
+
+        const chMatch = metaLine.match(/CH\.(\d+)/i);
+        const latestChapter = chMatch ? parseInt(chMatch[1], 10) : undefined;
+
+        const ratingMatch = metaLine.match(/\b([0-9]\.[0-9])\b/);
+        const rating = ratingMatch ? ratingMatch[1] : undefined;
+
+        results.push({
+          title: title.trim(),
+          slug: slugify(title),
+          comixUrl,
+          coverUrl,
+          type,
+          status,
+          releaseYear: year,
+          latestChapter,
+          rating,
+          description: descLines.join("\n").trim(),
+          alternativeTitles: "",
+          genres: [],
+          tags: [],
+        });
+      }
+    }
+  } catch (err) {
+    console.warn(`[ComixImport] Browse search failed for "${searchTerm}":`, err);
+  }
+
+  // Sort results by relevance to search query
+  if (results.length > 0) {
+    results.sort((a, b) => {
+      if (targetComixUrl) {
+        if (a.comixUrl.toLowerCase() === targetComixUrl.toLowerCase()) return -1;
+        if (b.comixUrl.toLowerCase() === targetComixUrl.toLowerCase()) return 1;
+      }
+      return scoreMatch(b.title, searchTerm) - scoreMatch(a.title, searchTerm);
+    });
+
+    // Enrich top 3 matches with genres, tags, authors, and artists
+    const enrichLimit = Math.min(results.length, 3);
+    await Promise.allSettled(
+      results.slice(0, enrichLimit).map(async (item) => {
+        try {
+          const comickMatches = await searchComickComics(item.title);
+          if (comickMatches && comickMatches.length > 0) {
+            const best =
+              comickMatches.find((c) => scoreMatch(c.title || "", item.title) > 600) ||
+              comickMatches[0];
+            if (best.genres && best.genres.length > 0) {
+              item.genres = best.genres;
+            }
+            if (best.tags && best.tags.length > 0) {
+              item.tags = best.tags;
+            }
+            if (best.alternativeTitles) {
+              item.alternativeTitles = best.alternativeTitles;
+            }
+            if (!item.author && best.author) {
+              item.author = best.author;
+            }
+            if (!item.artist && best.artist) {
+              item.artist = best.artist;
+            }
+            if (!item.description && best.description) {
+              item.description = best.description;
+            }
+          }
+        } catch {
+          // ignore enrichment failure
+        }
+      }),
+    );
+  }
+
+  // Fallback: If Comix search returned 0 items, fallback to Comick search
+  if (results.length === 0) {
+    try {
+      const comickFallback = await searchComickComics(searchTerm);
+      if (comickFallback && comickFallback.length > 0) {
+        for (const c of comickFallback.slice(0, 5)) {
+          results.push({
+            title: c.title,
+            slug: slugify(c.title),
+            alternativeTitles: c.alternativeTitles || "",
+            description: c.description || "",
+            genres: c.genres || [],
+            tags: c.tags || [],
+            status: normalizeStatus(c.status),
+            releaseYear: c.releaseYear,
+            coverUrl: c.coverUrl,
+            author: c.author,
+            artist: c.artist,
+            type: normalizeType(c.country === "jp" ? "manga" : c.country === "cn" ? "manhua" : "manhwa"),
+            comixUrl: targetComixUrl || `https://comix.to/title/${slugify(c.title)}`,
+            rating: c.rating,
+          });
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  if (results.length > 0) {
+    comixSearchCache.set(cacheKey, { timestamp: Date.now(), data: results });
+  }
+
+  return results;
+}
+
 /**
  * Fetch and extract metadata from a comix.to series page or search term
  */
@@ -228,6 +423,17 @@ export async function fetchComixMetadata(queryOrUrl: string): Promise<ComixExtra
   const clean = queryOrUrl.trim();
   if (!clean) return null;
 
+  // 1. First, search Comix using the search/browse engine
+  const results = await searchComixTitles(clean);
+  if (results && results.length > 0) {
+    if (clean.includes("comix.to/title/")) {
+      const match = results.find((r) => r.comixUrl.toLowerCase() === clean.toLowerCase());
+      if (match) return match;
+    }
+    return results[0];
+  }
+
+  // 2. Direct fetch fallback if query was a raw URL
   let targetUrl = clean;
   if (!targetUrl.startsWith("http")) {
     if (targetUrl.startsWith("title/")) {
@@ -235,7 +441,6 @@ export async function fetchComixMetadata(queryOrUrl: string): Promise<ComixExtra
     } else if (targetUrl.includes("/")) {
       targetUrl = `https://comix.to/title/${targetUrl}`;
     } else {
-      // If it looks like a slug
       targetUrl = `https://comix.to/title/${slugify(targetUrl)}`;
     }
   }
@@ -249,7 +454,7 @@ export async function fetchComixMetadata(queryOrUrl: string): Promise<ComixExtra
         "User-Agent": userAgent,
         Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
       },
-      signal: AbortSignal.timeout(10000),
+      signal: AbortSignal.timeout(8000),
     });
 
     if (res.ok) {
@@ -266,8 +471,37 @@ export async function fetchComixMetadata(queryOrUrl: string): Promise<ComixExtra
 
 // ── SERVER ACTIONS ────────────────────────────────────────────────
 
+const SearchComixSchema = z.object({
+  query: z.string().min(1, "Enter a Comix.to series title or URL"),
+  accessToken: z.string().min(1),
+});
+
+/**
+ * Search and list series from Comix.to (just like Comick)
+ */
+export async function $searchComixList(args: {
+  data: z.infer<typeof SearchComixSchema>;
+}) {
+  try {
+    const validated = SearchComixSchema.parse(args.data);
+    await verifyAdmin(validated.accessToken);
+
+    const results = await searchComixTitles(validated.query);
+    return {
+      success: true,
+      results,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      results: [],
+      error: error instanceof Error ? error.message : "Failed to search Comix.to",
+    };
+  }
+}
+
 const PreviewComixSchema = z.object({
-  query: z.string().min(1, "Enter a Comix.to URL or series title"),
+  query: z.string().min(1, "Enter a Comix.to series title or URL"),
   accessToken: z.string().min(1),
 });
 
@@ -285,7 +519,7 @@ export async function $previewComixMetadata(args: {
     if (!metadata) {
       return {
         success: false,
-        error: `Could not load series data from Comix.to for "${validated.query}". Please provide the direct comix.to/title/... URL.`,
+        error: `Could not find series on Comix.to for "${validated.query}". Please check the spelling or try another title.`,
       };
     }
 

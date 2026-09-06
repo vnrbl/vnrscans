@@ -204,34 +204,95 @@ export default function Reader({
   const chapterQ = useQuery({
     queryKey: ["chapter", titleSlug, chapterSlug],
     queryFn: async () => {
-      // First get the series to ensure it exists
-      const { data: seriesData, error: seriesError } = await supabase
+      // 1. Resolve series by slug (with hyphen/punctuation-insensitive fallback)
+      let { data: seriesData } = await supabase
         .from("series")
         .select("id, slug, title, type")
         .eq("slug", titleSlug)
-        .single();
-
-      if (seriesError) {
-        throw seriesError;
-      }
-      if (!seriesData) {
-        throw new Error(`Series "${titleSlug}" not found`);
-      }
-
-      // Then get the chapter that belongs to this series
-      const { data, error } = await supabase
-        .from("chapters")
-        .select("*, series:series(id,slug,title,type)")
-        .eq("slug", chapterSlug)
-        .eq("series_id", seriesData.id)
         .maybeSingle();
 
-      if (error) {
-        throw error;
+      if (!seriesData) {
+        const normalized = titleSlug.replace(/[^a-z0-9]/g, "").toLowerCase();
+        const { data: candidates } = await supabase
+          .from("series")
+          .select("id, slug, title, type")
+          .limit(100);
+
+        if (candidates) {
+          seriesData =
+            candidates.find(
+              (s) =>
+                s.slug === titleSlug ||
+                s.slug.replace(/[^a-z0-9]/g, "").toLowerCase() === normalized
+            ) ?? null;
+        }
+      }
+
+      let data: any = null;
+
+      // 2. If series is resolved, look up chapter within that series
+      if (seriesData) {
+        // 2a. Match exact series_id and chapter slug (use limit(1) to avoid PGRST116)
+        const resExact = await supabase
+          .from("chapters")
+          .select("*, series:series_id(id,slug,title,type)")
+          .eq("series_id", seriesData.id)
+          .eq("slug", chapterSlug)
+          .limit(1);
+
+        if (resExact.data && resExact.data.length > 0) {
+          data = resExact.data[0];
+        } else {
+          // 2b. Try partial slug match within series
+          const resPartial = await supabase
+            .from("chapters")
+            .select("*, series:series_id(id,slug,title,type)")
+            .eq("series_id", seriesData.id)
+            .ilike("slug", `%${chapterSlug}%`)
+            .limit(1);
+
+          if (resPartial.data && resPartial.data.length > 0) {
+            data = resPartial.data[0];
+          } else {
+            // 2c. Try chapter number match within series
+            const match =
+              chapterSlug.match(/chapter[_-]?([0-9]+(?:\.[0-9]+)?)/i) ||
+              chapterSlug.match(/^([0-9]+(?:\.[0-9]+)?)$/);
+            if (match) {
+              const num = parseFloat(match[1]);
+              const resNum = await supabase
+                .from("chapters")
+                .select("*, series:series_id(id,slug,title,type)")
+                .eq("series_id", seriesData.id)
+                .eq("chapter_number", num)
+                .order("created_at", { ascending: false })
+                .limit(1);
+
+              if (resNum.data && resNum.data.length > 0) {
+                data = resNum.data[0];
+              }
+            }
+          }
+        }
+      }
+
+      // 3. Global fallback if series was not found or chapter wasn't found in series
+      if (!data) {
+        const resGlobal = await supabase
+          .from("chapters")
+          .select("*, series:series_id(id,slug,title,type)")
+          .eq("slug", chapterSlug)
+          .limit(1);
+
+        if (resGlobal.data && resGlobal.data.length > 0) {
+          data = resGlobal.data[0];
+        }
       }
 
       if (!data) {
-        throw new Error(`Chapter "${chapterSlug}" not found in series "${seriesData.title}"`);
+        throw new Error(
+          `Chapter "${chapterSlug}" not found in series "${seriesData?.title || titleSlug}"`
+        );
       }
 
       return data;

@@ -557,7 +557,7 @@ export default function MangaImporterPage() {
   return (
     <div className="space-y-6 pb-12">
       {/* Header Banner */}
-      <div className="relative overflow-hidden rounded-2xl border border-border/40 bg-gradient-to-br from-purple-950/40 via-background to-blue-950/20 p-6 md:p-8 backdrop-blur-xl shadow-xl">
+      <div className="relative overflow-hidden rounded-2xl border border-border/40 bg-gradient-to-br from-purple-950/40 via-background to-blue-950/20 p-4 sm:p-6 md:p-8 backdrop-blur-xl shadow-xl">
         <div className="relative z-10 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div className="space-y-1.5">
             <div className="flex items-center gap-2">
@@ -568,9 +568,9 @@ export default function MangaImporterPage() {
                 Comick.dev & Comix.to
               </Badge>
             </div>
-            <h1 className="text-2xl md:text-3xl font-black tracking-tight text-white flex items-center gap-2.5">
-              <Globe className="h-7 w-7 text-purple-400" />
-              Manga Importer & Tracker
+            <h1 className="text-xl sm:text-2xl md:text-3xl font-black tracking-tight text-white flex items-center gap-2 sm:gap-2.5">
+              <Globe className="h-6 w-6 sm:h-7 sm:w-7 text-purple-400 shrink-0" />
+              <span>Manga Importer & Tracker</span>
             </h1>
             <p className="text-xs md:text-sm text-muted-foreground max-w-2xl font-normal leading-relaxed">
               <span className="text-purple-300 font-semibold">Comick.dev</span> is the default tracker for rich metadata (covers, taxonomy tags, all genres, synopsis). <span className="text-blue-300 font-semibold">Comix.to</span> provides direct high-speed chapter scraping with Cloudflare stealth and serves as an instant fallback when Comick lacks scans.
@@ -578,7 +578,7 @@ export default function MangaImporterPage() {
           </div>
 
           {/* Quick Target Series Selector in Header */}
-          <div className="bg-card/70 border border-border/40 rounded-xl p-3 min-w-[300px] max-w-sm shadow-sm backdrop-blur-md">
+          <div className="bg-card/70 border border-border/40 rounded-xl p-3 w-full sm:w-auto sm:min-w-[280px] md:min-w-[300px] max-w-sm shadow-sm backdrop-blur-md">
             <div className="flex items-center justify-between mb-1.5">
               <Label className="text-[11px] font-semibold text-neutral-300 flex items-center gap-1.5">
                 <span>Target Database Series:</span>
@@ -648,14 +648,15 @@ export default function MangaImporterPage() {
                 </Button>
               </PopoverTrigger>
               <PopoverContent
-                className="w-[320px] sm:w-[360px] p-0 bg-neutral-950/95 backdrop-blur-xl border-neutral-800 shadow-2xl rounded-xl overflow-hidden z-50"
+                className="w-[calc(100vw-2rem)] sm:w-[320px] p-0 bg-neutral-950 border-neutral-800 rounded-xl shadow-2xl z-50 text-white"
                 align="end"
               >
-                {/* Search Header */}
-                <div className="flex items-center border-b border-neutral-800/80 px-3 py-2 bg-neutral-900/40">
-                  <Search className="mr-2 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                {/* Search in Dropdown */}
+                <div className="p-2 border-b border-neutral-800 flex items-center gap-2">
+                  <Search className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
                   <input
-                    placeholder="Search by series title or slug..."
+                    type="text"
+                    placeholder="Search database series..."
                     value={seriesSearchTerm}
                     onChange={(e) => setSeriesSearchTerm(e.target.value)}
                     className="flex h-7 w-full bg-transparent text-xs text-white placeholder:text-muted-foreground outline-none"
@@ -684,9 +685,6 @@ export default function MangaImporterPage() {
                       <p className="text-xs text-muted-foreground font-medium">
                         No series found matching &quot;{seriesSearchTerm}&quot;
                       </p>
-                      <p className="text-[11px] text-muted-foreground/70 mt-1">
-                        Try a different search or create the series first.
-                      </p>
                     </div>
                   ) : (
                     <div className="space-y-0.5">
@@ -712,29 +710,20 @@ export default function MangaImporterPage() {
                                 <img
                                   src={s.cover_url}
                                   alt=""
-                                  className="h-8 w-6 rounded object-cover shrink-0 border border-neutral-800 bg-neutral-900"
-                                  loading="lazy"
+                                  className="h-8 w-6 rounded object-cover shrink-0 border border-neutral-700 bg-neutral-800"
                                 />
                               ) : (
-                                <div className="h-8 w-6 rounded bg-neutral-900 border border-neutral-800 shrink-0 flex items-center justify-center text-muted-foreground">
-                                  <BookOpen className="h-3 w-3" />
+                                <div className="h-8 w-6 rounded bg-neutral-800 border border-neutral-700 shrink-0 flex items-center justify-center">
+                                  <BookOpen className="h-3 w-3 text-purple-400" />
                                 </div>
                               )}
                               <div className="min-w-0 flex-1">
-                                <p
-                                  className={`text-xs font-semibold truncate ${
-                                    isSelected ? "text-purple-200" : "text-white"
-                                  }`}
-                                >
-                                  {s.title}
-                                </p>
-                                <p className="text-[10px] text-muted-foreground truncate font-mono">
-                                  {s.slug}
-                                </p>
+                                <p className="text-xs font-semibold text-white truncate">{s.title}</p>
+                                <p className="text-[10px] text-muted-foreground truncate">{s.slug}</p>
                               </div>
                             </div>
                             {isSelected && (
-                              <Check className="h-4 w-4 text-purple-400 shrink-0 ml-2" />
+                              <Check className="h-3.5 w-3.5 text-purple-400 shrink-0" />
                             )}
                           </button>
                         );
@@ -768,37 +757,38 @@ export default function MangaImporterPage() {
       </div>
 
       {/* Main Navigation Tabs */}
-      <div className="flex gap-2 border-b border-border/40 pb-3">
+      <div className="flex gap-1.5 sm:gap-2 border-b border-border/40 pb-3 overflow-x-auto no-scrollbar flex-nowrap">
         <button
           type="button"
           onClick={() => setActiveTab("metadata")}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+          className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer shrink-0 ${
             activeTab === "metadata"
               ? "bg-purple-600/20 text-purple-200 border border-purple-500/40 shadow-sm"
               : "text-muted-foreground hover:text-white hover:bg-card/50 border border-transparent"
           }`}
         >
-          <Sparkles className="h-4 w-4 text-purple-400" />
+          <Sparkles className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-purple-400 shrink-0" />
           <span>Metadata Explorer</span>
         </button>
 
         <button
           type="button"
           onClick={() => setActiveTab("chapters")}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+          className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer shrink-0 ${
             activeTab === "chapters"
               ? "bg-blue-600/20 text-blue-200 border border-blue-500/40 shadow-sm"
               : "text-muted-foreground hover:text-white hover:bg-card/50 border border-transparent"
           }`}
         >
-          <Zap className="h-4 w-4 text-blue-400" />
-          <span>Comix.to Chapter Importer</span>
+          <Zap className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-blue-400 shrink-0" />
+          <span className="hidden sm:inline">Comix.to Chapter Importer</span>
+          <span className="sm:hidden">Chapters</span>
         </button>
 
         <button
           type="button"
           onClick={() => setActiveTab("sources")}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+          className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer shrink-0 ${
             activeTab === "sources"
               ? "bg-emerald-600/20 text-emerald-200 border border-emerald-500/40 shadow-sm"
               : "text-muted-foreground hover:text-white hover:bg-card/50 border border-transparent"

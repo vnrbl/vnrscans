@@ -789,35 +789,36 @@ export default function AdminSeries() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
         <h1 className="text-2xl font-bold tracking-tight">Titles</h1>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button
             variant="outline"
             size="sm"
             onClick={() => { setSyncLogsOpen(true); }}
-            className="border-border/40"
+            className="border-border/40 text-xs h-8"
           >
-            <History className="mr-1.5 h-4 w-4" />
+            <History className="mr-1.5 h-3.5 w-3.5" />
             Sync Logs
           </Button>
           <Button
             variant="outline"
+            size="sm"
             onClick={handleSyncAll}
             disabled={isSyncingAll}
-            className="border-purple-500/40 hover:border-purple-500 text-purple-300 hover:text-purple-200 bg-purple-950/20"
+            className="border-purple-500/40 hover:border-purple-500 text-purple-300 hover:text-purple-200 bg-purple-950/20 text-xs h-8"
           >
-            <RefreshCw className={`mr-1.5 h-4 w-4 ${isSyncingAll ? "animate-spin" : ""}`} />
+            <RefreshCw className={`mr-1.5 h-3.5 w-3.5 ${isSyncingAll ? "animate-spin" : ""}`} />
             {isSyncingAll ? "Syncing..." : "Sync All Series"}
           </Button>
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-              <Button>
-                <Plus className="mr-1 h-4 w-4" />
+              <Button size="sm" className="text-xs h-8">
+                <Plus className="mr-1 h-3.5 w-3.5" />
                 New title
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
+            <DialogContent className="w-[calc(100vw-1rem)] sm:w-full max-h-[90dvh] sm:max-h-[85vh] max-w-2xl overflow-y-auto p-3.5 sm:p-6">
               <DialogHeader>
                 <DialogTitle>Create title</DialogTitle>
               </DialogHeader>

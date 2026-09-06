@@ -28,6 +28,7 @@ import {
   type ComickExtractedMetadata,
 } from "@/lib/api/comick-import.actions";
 import {
+  $searchComixList,
   $previewComixMetadata,
   $importComixMetadataToSeries,
   type ComixExtractedMetadata,
@@ -256,20 +257,15 @@ export function AddNewSeriesDialog({ trigger }: AddNewSeriesDialogProps) {
       setShowComixFallbackNotice(false);
 
       if (activeSource === "comix") {
-        const res = await $previewComixMetadata({
+        const res = await $searchComixList({
           data: {
             query: q,
             accessToken: session.access_token,
           },
         });
 
-        if (!res.success || !res.metadata) {
-          setComickResults([]);
-          setSelectedComic(null);
-          toast.error(res.error || `No titles found on Comix.to for "${q}"`);
-        } else {
-          const meta = res.metadata;
-          const mapped: ComickExtractedMetadata = {
+        if (res.success && res.results && res.results.length > 0) {
+          const mappedList: ComickExtractedMetadata[] = res.results.map((meta) => ({
             title: meta.title,
             slug: meta.slug,
             description: meta.description,
@@ -281,13 +277,48 @@ export function AddNewSeriesDialog({ trigger }: AddNewSeriesDialogProps) {
             coverUrl: meta.coverUrl,
             author: meta.author,
             artist: meta.artist,
-          };
-          setComickResults([mapped]);
-          handleSelectComic(mapped);
-          setSelectedType(meta.type);
+          }));
+          setComickResults(mappedList);
+          handleSelectComic(mappedList[0]);
+          setSelectedType(res.results[0].type);
           setSelectedScanProvider("comix");
-          setScanSourceUrl(meta.comixUrl);
-          toast.success(`Found "${meta.title}" on Comix.to!`);
+          setScanSourceUrl(res.results[0].comixUrl);
+          toast.success(`Found "${res.results[0].title}" on Comix.to!`);
+        } else {
+          // Fallback: try preview
+          const prevRes = await $previewComixMetadata({
+            data: {
+              query: q,
+              accessToken: session.access_token,
+            },
+          });
+
+          if (prevRes.success && prevRes.metadata) {
+            const meta = prevRes.metadata;
+            const mapped: ComickExtractedMetadata = {
+              title: meta.title,
+              slug: meta.slug,
+              description: meta.description,
+              alternativeTitles: meta.alternativeTitles,
+              genres: meta.genres,
+              tags: meta.tags,
+              status: meta.status,
+              releaseYear: meta.releaseYear,
+              coverUrl: meta.coverUrl,
+              author: meta.author,
+              artist: meta.artist,
+            };
+            setComickResults([mapped]);
+            handleSelectComic(mapped);
+            setSelectedType(meta.type);
+            setSelectedScanProvider("comix");
+            setScanSourceUrl(meta.comixUrl);
+            toast.success(`Found "${meta.title}" on Comix.to!`);
+          } else {
+            setComickResults([]);
+            setSelectedComic(null);
+            toast.error(prevRes.error || `No titles found on Comix.to for "${q}"`);
+          }
         }
       } else {
         const res = await $searchComickList({
@@ -576,17 +607,17 @@ export function AddNewSeriesDialog({ trigger }: AddNewSeriesDialogProps) {
         )}
       </DialogTrigger>
 
-      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto bg-background/95 border-purple-500/30 backdrop-blur-xl">
+      <DialogContent className="w-[calc(100vw-1rem)] sm:w-full sm:max-w-2xl max-h-[90dvh] sm:max-h-[85vh] overflow-y-auto p-3.5 sm:p-6 bg-background/95 border-purple-500/30 backdrop-blur-xl">
         <DialogHeader className="pb-2">
-          <div className="flex items-center gap-3">
-            <div className="grid h-10 w-10 place-items-center rounded-xl bg-purple-500/10 text-purple-400 border border-purple-500/20 shrink-0 shadow-sm">
-              <Sparkles className="h-5 w-5" />
+          <div className="flex items-center gap-2.5 sm:gap-3">
+            <div className="grid h-9 w-9 sm:h-10 sm:w-10 place-items-center rounded-xl bg-purple-500/10 text-purple-400 border border-purple-500/20 shrink-0 shadow-sm">
+              <Sparkles className="h-4 w-4 sm:h-5 sm:w-5" />
             </div>
-            <div>
-              <DialogTitle className="text-xl font-bold tracking-tight text-white">
+            <div className="min-w-0">
+              <DialogTitle className="text-lg sm:text-xl font-bold tracking-tight text-white truncate">
                 Add New Series
               </DialogTitle>
-              <DialogDescription className="text-xs text-muted-foreground/90 font-normal">
+              <DialogDescription className="text-[11px] sm:text-xs text-muted-foreground/90 font-normal line-clamp-1 sm:line-clamp-none">
                 Import complete official metadata from Comick & attach scan sources for chapters
               </DialogDescription>
             </div>
@@ -594,30 +625,31 @@ export function AddNewSeriesDialog({ trigger }: AddNewSeriesDialogProps) {
         </DialogHeader>
 
         {/* Tab Selector */}
-        <div className="flex gap-2 border-b border-border/30 pb-3">
+        <div className="grid grid-cols-2 gap-1.5 sm:gap-2 border-b border-border/30 pb-2.5 sm:pb-3">
           <button
             type="button"
             onClick={() => setActiveTab("smart")}
-            className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-semibold tracking-wide transition-all cursor-pointer ${
+            className={`flex items-center justify-center gap-1.5 sm:gap-2 px-2.5 sm:px-3.5 py-2 rounded-lg text-xs font-semibold tracking-wide transition-all cursor-pointer ${
               activeTab === "smart"
                 ? "bg-purple-600/20 text-purple-200 border border-purple-500/40 shadow-sm"
                 : "text-neutral-400 hover:text-white hover:bg-neutral-800/50 border border-transparent"
             }`}
           >
-            <Zap className="h-3.5 w-3.5 text-purple-400" />
-            <span>1-Click Comick & Scans Importer</span>
+            <Zap className="h-3.5 w-3.5 text-purple-400 shrink-0" />
+            <span className="hidden sm:inline">1-Click Comick & Scans Importer</span>
+            <span className="sm:hidden">1-Click Import</span>
           </button>
 
           <button
             type="button"
             onClick={() => setActiveTab("manual")}
-            className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-semibold tracking-wide transition-all cursor-pointer ${
+            className={`flex items-center justify-center gap-1.5 sm:gap-2 px-2.5 sm:px-3.5 py-2 rounded-lg text-xs font-semibold tracking-wide transition-all cursor-pointer ${
               activeTab === "manual"
                 ? "bg-purple-600/20 text-purple-200 border border-purple-500/40 shadow-sm"
                 : "text-neutral-400 hover:text-white hover:bg-neutral-800/50 border border-transparent"
             }`}
           >
-            <Layers className="h-3.5 w-3.5 text-purple-400" />
+            <Layers className="h-3.5 w-3.5 text-purple-400 shrink-0" />
             <span>Manual Creation</span>
           </button>
         </div>
@@ -845,13 +877,13 @@ export function AddNewSeriesDialog({ trigger }: AddNewSeriesDialogProps) {
                     Workable Scrapers
                   </Badge>
                 </div>
-                <p className="text-xs text-neutral-400 font-normal leading-relaxed pl-7">
+                <p className="text-xs text-neutral-400 font-normal leading-relaxed pl-0 sm:pl-7">
                   Choose a verified scanlation provider to import chapters from, or paste a custom URL.
                 </p>
               </div>
 
               {/* Workable Provider Selection Grid */}
-              <div className="pl-7 space-y-3">
+              <div className="pl-0 sm:pl-7 space-y-3">
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                   {WORKABLE_SCAN_PROVIDERS.map((provider) => {
                     const isSelected = selectedScanProvider === provider.id;
@@ -967,8 +999,8 @@ export function AddNewSeriesDialog({ trigger }: AddNewSeriesDialogProps) {
 
             {/* Summary & Create Button */}
             {selectedComic && (
-              <div className="p-3.5 rounded-xl bg-secondary/30 border border-border/30 flex items-center justify-between gap-3 text-xs">
-                <div className="min-w-0 flex items-center gap-2.5">
+              <div className="p-3.5 rounded-xl bg-secondary/30 border border-border/30 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 text-xs">
+                <div className="min-w-0 flex items-center gap-2">
                   <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
                   <span className="font-medium text-neutral-200 truncate text-xs">
                     Ready to create <strong className="text-purple-300 font-semibold">{selectedComic.title}</strong>
@@ -978,7 +1010,7 @@ export function AddNewSeriesDialog({ trigger }: AddNewSeriesDialogProps) {
                   type="button"
                   onClick={handleHybridCreate}
                   disabled={isHybridSubmitting}
-                  className="h-9 px-4 font-semibold bg-primary hover:bg-primary/90 text-primary-foreground text-xs gap-1.5 shrink-0 cursor-pointer rounded-lg shadow-md transition-all"
+                  className="h-9 px-4 font-semibold bg-primary hover:bg-primary/90 text-primary-foreground text-xs gap-1.5 shrink-0 cursor-pointer rounded-lg shadow-md transition-all w-full sm:w-auto"
                 >
                   {isHybridSubmitting ? (
                     <>

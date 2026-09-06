@@ -199,7 +199,7 @@ export function SeriesReviewsSection({
           console.warn("[SeriesReviews] Fetch error:", error);
           return [];
         }
-        return (data || []) as any[];
+        return ((data || []) as any[]).filter((c) => !c.content?.startsWith("[RECOMMENDATION:"));
       } catch (err) {
         console.warn("[SeriesReviews] Query catch:", err);
         return [];

@@ -294,41 +294,43 @@ export function ScanCoverImporter({
           </Button>
         )}
       </DialogTrigger>
-      <DialogContent className="max-w-xl bg-[#0e0e12] border-border/40 text-foreground overflow-hidden">
+      <DialogContent className="w-[calc(100vw-1rem)] sm:w-full max-w-xl max-h-[90dvh] overflow-y-auto p-3.5 sm:p-6 bg-[#0e0e12] border-border/40 text-foreground">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-base font-bold">
-            <Globe className="h-5 w-5 text-purple-400" />
-            Import Cover Art & Alternative Covers
+          <DialogTitle className="flex items-center gap-2 text-sm sm:text-base font-bold">
+            <Globe className="h-4 w-4 sm:h-5 sm:w-5 text-purple-400 shrink-0" />
+            <span>Import Cover Art & Alternatives</span>
           </DialogTitle>
-          <DialogDescription className="text-xs text-muted-foreground">
+          <DialogDescription className="text-[11px] sm:text-xs text-muted-foreground line-clamp-2 sm:line-clamp-none">
             Fetch high-resolution covers from Scan sources or Comick.dev, select your favorite, and preserve all in Cover Selection.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-2">
           {/* Source Tabs */}
-          <div className="flex rounded-xl bg-secondary/40 p-1 border border-border/30">
+          <div className="flex rounded-xl bg-secondary/40 p-1 border border-border/30 gap-1">
             <button
               type="button"
               onClick={() => setSourceType("scans")}
-              className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+              className={`flex-1 py-1.5 px-2 text-[11px] sm:text-xs font-bold rounded-lg transition-all cursor-pointer truncate ${
                 sourceType === "scans"
                   ? "bg-purple-600 text-white shadow-sm"
                   : "text-muted-foreground hover:text-foreground"
               }`}
             >
-              🌐 Scan Source (Asura / Flame / Qi)
+              <span className="hidden sm:inline">🌐 Scan Source (Asura / Flame / Qi)</span>
+              <span className="sm:hidden">🌐 Scan Source</span>
             </button>
             <button
               type="button"
               onClick={() => setSourceType("comick")}
-              className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+              className={`flex-1 py-1.5 px-2 text-[11px] sm:text-xs font-bold rounded-lg transition-all cursor-pointer truncate ${
                 sourceType === "comick"
                   ? "bg-emerald-600 text-white shadow-sm"
                   : "text-muted-foreground hover:text-foreground"
               }`}
             >
-              📗 Comick.dev (Search Title)
+              <span className="hidden sm:inline">📗 Comick.dev (Search Title)</span>
+              <span className="sm:hidden">📗 Comick.dev</span>
             </button>
           </div>
 

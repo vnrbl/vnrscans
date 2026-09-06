@@ -88,47 +88,47 @@ export default function AdminHome() {
       <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
       <p className="text-sm text-muted-foreground">Overview of your platform.</p>
 
-      <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="mt-4 sm:mt-6 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5 sm:gap-3">
         {cards.map((card) => (
-          <div key={card.label} className="rounded-lg border border-border/40 bg-card p-5">
+          <div key={card.label} className="rounded-xl border border-border/40 bg-card p-3 sm:p-5 shadow-sm">
             <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">{card.label}</span>
-              <card.icon className="h-4 w-4 text-primary" />
+              <span className="text-xs sm:text-sm text-muted-foreground font-medium truncate">{card.label}</span>
+              <card.icon className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-primary shrink-0 ml-1" />
             </div>
-            <div className="mt-2 text-3xl font-bold">{card.value ?? "-"}</div>
+            <div className="mt-1.5 sm:mt-2 text-xl sm:text-3xl font-bold tracking-tight">{card.value ?? "-"}</div>
           </div>
         ))}
       </div>
 
       <div className="mt-6">
-        <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
+        <div className="mb-3 flex flex-wrap items-end justify-between gap-2.5">
           <div>
-            <h2 className="text-lg font-semibold tracking-tight">Management Queue</h2>
-            <p className="text-sm text-muted-foreground">
+            <h2 className="text-base sm:text-lg font-semibold tracking-tight">Management Queue</h2>
+            <p className="text-xs sm:text-sm text-muted-foreground">
               Quick links for the work that usually needs admin attention first.
             </p>
           </div>
-          <Button asChild variant="outline" size="sm">
+          <Button asChild variant="outline" size="sm" className="h-8 text-xs">
             <Link to="/admin/comments">Review comments</Link>
           </Button>
         </div>
 
-        <div className="grid gap-3 md:grid-cols-2">
+        <div className="grid gap-2.5 sm:gap-3 sm:grid-cols-2">
           {managementQueues.map((item) => (
             <Link
               key={item.label}
               to={item.to}
-              className="rounded-lg border border-border/40 bg-card p-4 transition-colors hover:border-primary/40 hover:bg-secondary/50"
+              className="rounded-xl border border-border/40 bg-card p-3 sm:p-4 transition-colors hover:border-primary/40 hover:bg-secondary/50 shadow-sm"
             >
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
+              <div className="flex items-start justify-between gap-2.5">
+                <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
-                    <item.icon className={`h-4 w-4 ${item.tone}`} />
-                    <span className="font-semibold">{item.label}</span>
+                    <item.icon className={`h-4 w-4 ${item.tone} shrink-0`} />
+                    <span className="font-semibold text-xs sm:text-sm">{item.label}</span>
                   </div>
-                  <p className="mt-1 text-sm text-muted-foreground">{item.description}</p>
+                  <p className="mt-1 text-xs sm:text-sm text-muted-foreground line-clamp-2">{item.description}</p>
                 </div>
-                <span className="rounded-md bg-secondary px-2 py-1 text-sm font-bold">
+                <span className="rounded-md bg-secondary px-2 py-1 text-xs sm:text-sm font-bold shrink-0">
                   {item.value ?? "-"}
                 </span>
               </div>

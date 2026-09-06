@@ -2,7 +2,7 @@
 
 import React from "react";
 import Link from "next/link";
-import { Star, BookOpen, Trophy, Users, Heart } from "lucide-react";
+import { Star, BookOpen, Trophy, Users, Heart, ChevronDown, ChevronUp, Tag } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { LiveSeriesEditor } from "@/components/admin/LiveSeriesEditor";
 import { FormattedText } from "@/components/FormattedText";
@@ -49,6 +49,7 @@ export const SeriesHeader = React.memo(function SeriesHeader({
 }: SeriesHeaderProps) {
   const { user } = useAuth();
   const qc = useQueryClient();
+  const [showMobileMetadata, setShowMobileMetadata] = React.useState(false);
 
   const isFavorited = useQuery({
     queryKey: ["is-favorited", s.id, user?.id],
@@ -267,49 +268,72 @@ export const SeriesHeader = React.memo(function SeriesHeader({
         </div>
       )}
 
-      {coreGenres.length > 0 && (
-        <MetaSection label="Genres">
-          <LimitedGenrePills genres={coreGenres} />
-        </MetaSection>
-      )}
+      {/* Mobile Toggle Button for Metadata (Genres, Tags, Authors, Artists, Details) */}
+      <div className="sm:hidden mt-3 flex items-center justify-center">
+        <button
+          type="button"
+          onClick={() => setShowMobileMetadata((prev) => !prev)}
+          className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-sans font-semibold border border-purple-500/30 bg-purple-950/40 text-purple-200 hover:bg-purple-900/50 hover:text-white transition-all shadow-sm active:scale-95 cursor-pointer"
+        >
+          <Tag className="h-3.5 w-3.5 text-purple-400" />
+          <span>{showMobileMetadata ? "Hide Details & Tags" : "Show Details & Tags"}</span>
+          <span className="rounded-full bg-purple-900/60 px-1.5 py-0.5 text-[10px] font-mono text-purple-300">
+            {coreGenres.length + tropeTags.length}
+          </span>
+          {showMobileMetadata ? (
+            <ChevronUp className="h-3.5 w-3.5 text-purple-400" />
+          ) : (
+            <ChevronDown className="h-3.5 w-3.5 text-purple-400" />
+          )}
+        </button>
+      </div>
 
-      {tropeTags.length > 0 && (
-        <MetaSection label="Tags">
-          <LimitedTagPills tags={tropeTags} />
-        </MetaSection>
-      )}
-
-      {authors.length > 0 && (
-        <MetaSection label="Authors">
-          {authors.map((name) => (
-            <MetaPill key={name}>{name}</MetaPill>
-          ))}
-        </MetaSection>
-      )}
-
-      {artists.length > 0 && (
-        <MetaSection label="Artists">
-          {artists.map((name) => (
-            <MetaPill key={name}>{name}</MetaPill>
-          ))}
-        </MetaSection>
-      )}
-
-      <MetaSection label="Details">
-        <MetaPill>Updated {formatAppDate(s.updated_at)}</MetaPill>
-        {uniqueChapterCount > 0 && (
-          <button
-            onClick={() => {
-              const chaptersSection = document.getElementById('chapters-section');
-              chaptersSection?.scrollIntoView({ behavior: 'smooth' });
-            }}
-            className="inline-flex items-center rounded-md border border-purple-500/30 bg-purple-950/40 px-2.5 py-1 text-xs font-mono font-bold text-purple-300 transition-colors hover:bg-purple-900/60 hover:text-white cursor-pointer"
-          >
-            {uniqueChapterCount} chapters
-          </button>
+      {/* Metadata Container: Collapsible on mobile, always visible on desktop */}
+      <div className={`${showMobileMetadata ? "block" : "hidden"} sm:block space-y-0 animate-in fade-in-50 duration-200`}>
+        {coreGenres.length > 0 && (
+          <MetaSection label="Genres">
+            <LimitedGenrePills genres={coreGenres} />
+          </MetaSection>
         )}
-        <MetaPill className="capitalize">{s.type}</MetaPill>
-      </MetaSection>
+
+        {tropeTags.length > 0 && (
+          <MetaSection label="Tags">
+            <LimitedTagPills tags={tropeTags} />
+          </MetaSection>
+        )}
+
+        {authors.length > 0 && (
+          <MetaSection label="Authors">
+            {authors.map((name) => (
+              <MetaPill key={name}>{name}</MetaPill>
+            ))}
+          </MetaSection>
+        )}
+
+        {artists.length > 0 && (
+          <MetaSection label="Artists">
+            {artists.map((name) => (
+              <MetaPill key={name}>{name}</MetaPill>
+            ))}
+          </MetaSection>
+        )}
+
+        <MetaSection label="Details">
+          <MetaPill>Updated {formatAppDate(s.updated_at)}</MetaPill>
+          {uniqueChapterCount > 0 && (
+            <button
+              onClick={() => {
+                const chaptersSection = document.getElementById('chapters-section');
+                chaptersSection?.scrollIntoView({ behavior: 'smooth' });
+              }}
+              className="inline-flex items-center rounded-md border border-purple-500/30 bg-purple-950/40 px-2.5 py-1 text-xs font-mono font-bold text-purple-300 transition-colors hover:bg-purple-900/60 hover:text-white cursor-pointer"
+            >
+              {uniqueChapterCount} chapters
+            </button>
+          )}
+          <MetaPill className="capitalize">{s.type}</MetaPill>
+        </MetaSection>
+      </div>
     </main>
   );
 });

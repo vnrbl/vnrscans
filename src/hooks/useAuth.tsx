@@ -229,7 +229,7 @@ export function useIsAdmin() {
           return;
         }
         const roles = (data ?? []).map((r) => r.role);
-        const adminRole = roles.includes("admin") || roles.includes("creator");
+        const adminRole = roles.includes("admin") || (roles as string[]).includes("creator");
         const modRole = roles.includes("moderator");
         const uploaderRole = roles.includes("uploader");
 

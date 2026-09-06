@@ -1472,24 +1472,24 @@ export default function UserProfileContent({ username }: { username: string }) {
       {showStatistics && (
         <div className="container mx-auto max-w-5xl px-4 sm:px-6 md:px-12 lg:px-16 mt-6">
           <div
-            className="rounded-xl border border-border/40 p-4 bg-card/25 backdrop-blur-md"
+            className="rounded-xl border border-border/40 p-3 sm:p-4 bg-card/25 backdrop-blur-md"
           >
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-2">
-                <Trophy className="h-5 w-5" style={{ color: accentColor }} />
+            <div className="flex flex-wrap items-center justify-between gap-1 mb-2">
+              <div className="flex items-center gap-2 min-w-0">
+                <Trophy className="h-4 w-4 sm:h-5 sm:w-5 shrink-0" style={{ color: accentColor }} />
                 {roles.includes("admin") ? (
-                  <span className="font-bold text-foreground">Maxed Out</span>
+                  <span className="font-bold text-foreground text-xs sm:text-sm">Maxed Out</span>
                 ) : (
-                  <span className="font-bold">Level {level}</span>
+                  <span className="font-bold text-xs sm:text-sm">Level {level}</span>
                 )}
-                <Sparkles className="h-4 w-4 text-muted-foreground/60" />
+                <Sparkles className="h-3.5 w-3.5 text-muted-foreground/60 shrink-0" />
               </div>
               {roles.includes("admin") ? (
-                <span className="text-sm font-semibold" style={{ color: accentColor }}>
+                <span className="text-xs sm:text-sm font-semibold truncate" style={{ color: accentColor }}>
                   Infinite Qi & Boundless Dao Aura
                 </span>
               ) : (
-                <span className="text-sm text-muted-foreground">
+                <span className="text-xs sm:text-sm text-muted-foreground truncate">
                   {xp} / {xpForNextLevel} Qi
                 </span>
               )}
@@ -1511,7 +1511,7 @@ export default function UserProfileContent({ username }: { username: string }) {
       {/* Stats */}
       {showStatsStrip && (
         <div className="container mx-auto max-w-5xl px-4 sm:px-6 md:px-12 lg:px-16 mt-6">
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid grid-cols-3 gap-2 sm:gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <PublicStatCard label="Reading Streak" value={profile.data.reading_streak || 0} suffix=" days" icon={<Flame className="h-6 w-6" />} color="#F97316" />
             <PublicStatCard label="Chapters Read" value={publicStats.data?.chapters_read || 0} icon={<BookOpen className="h-6 w-6" />} color="#3B82F6" />
             <PublicStatCard label="Series Followed" value={publicStats.data?.series_followed || 0} icon={<Star className="h-6 w-6" />} color="#F59E0B" />
@@ -1536,50 +1536,52 @@ export default function UserProfileContent({ username }: { username: string }) {
           suppressHydrationWarning
         >
           {/* Column bar */}
-          <TabsList className={`grid h-11 w-full ${showLibraries ? "grid-cols-4" : "grid-cols-3"} gap-1 p-1`}>
-            <TabsTrigger value="uploaded" className="h-9 min-w-0 gap-1.5 px-0 sm:px-3">
-              <Upload className="h-4 w-4" />
-              <span>Uploaded</span>
-              {uploadedSeries.data && uploadedSeries.data.length > 0 && (
-                <span
-                  className="ml-1 hidden sm:inline-flex h-4 min-w-4 items-center justify-center rounded-full px-1.5 text-[10px] font-bold"
-                  style={{ backgroundColor: `${accentColor}25`, color: accentColor }}
-                >
-                  {uploadedSeries.data.length}
-                </span>
-              )}
-            </TabsTrigger>
-            <TabsTrigger value="preferences" className="h-9 min-w-0 gap-1.5 px-0 sm:px-3">
-              <BarChart3 className="h-4 w-4" />
-              <span>Preferences</span>
-            </TabsTrigger>
-            <TabsTrigger value="comments" className="h-9 min-w-0 gap-1.5 px-0 sm:px-3">
-              <MessageSquare className="h-4 w-4" />
-              <span>Comments</span>
-              {(commentHistory.data?.length ?? publicCommentsCount.data ?? 0) > 0 && (
-                <span
-                  className="ml-1 hidden sm:inline-flex h-4 min-w-4 items-center justify-center rounded-full px-1.5 text-[10px] font-bold"
-                  style={{ backgroundColor: `${accentColor}25`, color: accentColor }}
-                >
-                  {commentHistory.data?.length ?? publicCommentsCount.data ?? 0}
-                </span>
-              )}
-            </TabsTrigger>
-            {showLibraries && (
-              <TabsTrigger value="library" className="h-9 min-w-0 gap-1.5 px-0 sm:px-3">
-                <BookOpen className="h-4 w-4" />
-                <span>Library</span>
-                {(publicLibrary.data?.length ?? publicStats.data?.series_followed ?? 0) > 0 && (
+          <div className="w-full overflow-x-auto no-scrollbar py-1">
+            <TabsList className="inline-flex sm:flex sm:w-full h-11 items-center justify-start sm:justify-center gap-1.5 p-1 bg-muted/60 rounded-xl min-w-full sm:min-w-0">
+              <TabsTrigger value="uploaded" className="h-9 shrink-0 gap-1.5 px-3 sm:px-4 text-xs sm:text-sm font-medium">
+                <Upload className="h-4 w-4 shrink-0" />
+                <span>Uploaded</span>
+                {uploadedSeries.data && uploadedSeries.data.length > 0 && (
                   <span
-                    className="ml-1 hidden sm:inline-flex h-4 min-w-4 items-center justify-center rounded-full px-1.5 text-[10px] font-bold"
+                    className="ml-1 inline-flex h-4 min-w-4 items-center justify-center rounded-full px-1.5 text-[10px] font-bold"
                     style={{ backgroundColor: `${accentColor}25`, color: accentColor }}
                   >
-                    {publicLibrary.data?.length ?? publicStats.data?.series_followed ?? 0}
+                    {uploadedSeries.data.length}
                   </span>
                 )}
               </TabsTrigger>
-            )}
-          </TabsList>
+              <TabsTrigger value="preferences" className="h-9 shrink-0 gap-1.5 px-3 sm:px-4 text-xs sm:text-sm font-medium">
+                <BarChart3 className="h-4 w-4 shrink-0" />
+                <span>Preferences</span>
+              </TabsTrigger>
+              <TabsTrigger value="comments" className="h-9 shrink-0 gap-1.5 px-3 sm:px-4 text-xs sm:text-sm font-medium">
+                <MessageSquare className="h-4 w-4 shrink-0" />
+                <span>Comments</span>
+                {(commentHistory.data?.length ?? publicCommentsCount.data ?? 0) > 0 && (
+                  <span
+                    className="ml-1 inline-flex h-4 min-w-4 items-center justify-center rounded-full px-1.5 text-[10px] font-bold"
+                    style={{ backgroundColor: `${accentColor}25`, color: accentColor }}
+                  >
+                    {commentHistory.data?.length ?? publicCommentsCount.data ?? 0}
+                  </span>
+                )}
+              </TabsTrigger>
+              {showLibraries && (
+                <TabsTrigger value="library" className="h-9 shrink-0 gap-1.5 px-3 sm:px-4 text-xs sm:text-sm font-medium">
+                  <BookOpen className="h-4 w-4 shrink-0" />
+                  <span>Library</span>
+                  {(publicLibrary.data?.length ?? publicStats.data?.series_followed ?? 0) > 0 && (
+                    <span
+                      className="ml-1 inline-flex h-4 min-w-4 items-center justify-center rounded-full px-1.5 text-[10px] font-bold"
+                      style={{ backgroundColor: `${accentColor}25`, color: accentColor }}
+                    >
+                      {publicLibrary.data?.length ?? publicStats.data?.series_followed ?? 0}
+                    </span>
+                  )}
+                </TabsTrigger>
+              )}
+            </TabsList>
+          </div>
 
           {/* ─── Uploaded Series Tab ─── */}
           <TabsContent value="uploaded" className="mt-6">
@@ -2142,21 +2144,37 @@ function PublicStatCard({
   color: string;
 }) {
   return (
-    <Card className="group relative overflow-hidden p-4" style={{ borderColor: `${color}20` }}>
+    <Card className="group relative overflow-hidden p-2.5 sm:p-4" style={{ borderColor: `${color}20` }}>
       <div
-        className="pointer-events-none absolute -right-4 -top-4 h-20 w-20 rounded-full opacity-20 blur-2xl"
+        className="pointer-events-none absolute -right-4 -top-4 h-14 w-14 sm:h-20 sm:w-20 rounded-full opacity-20 blur-2xl"
         style={{ background: color }}
       />
-      <div className="relative flex items-center justify-between">
-        <div>
-          <p className="text-sm text-muted-foreground">{label}</p>
-          <p className="text-2xl font-bold">
+      {/* Mobile view (< sm) */}
+      <div className="relative flex flex-col items-center text-center sm:hidden">
+        <div
+          className="grid h-7 w-7 place-items-center rounded-lg mb-1.5 [&>svg]:h-3.5 [&>svg]:w-3.5"
+          style={{ backgroundColor: `${color}15`, color }}
+        >
+          {icon}
+        </div>
+        <p className="text-base font-bold tracking-tight leading-none">
+          {value}
+          {suffix && <span className="text-[11px] font-normal text-muted-foreground ml-0.5">{suffix}</span>}
+        </p>
+        <p className="text-[10px] text-muted-foreground font-medium mt-1 leading-tight">{label}</p>
+      </div>
+
+      {/* Desktop view (>= sm) */}
+      <div className="relative hidden sm:flex items-center justify-between gap-2">
+        <div className="min-w-0 flex-1">
+          <p className="text-sm text-muted-foreground font-medium truncate">{label}</p>
+          <p className="text-2xl font-bold tracking-tight truncate">
             {value}
-            {suffix && <span className="text-base font-normal text-muted-foreground">{suffix}</span>}
+            {suffix && <span className="text-sm font-normal text-muted-foreground">{suffix}</span>}
           </p>
         </div>
         <div
-          className="grid h-12 w-12 place-items-center rounded-xl"
+          className="grid h-12 w-12 place-items-center rounded-xl shrink-0 [&>svg]:h-6 [&>svg]:w-6"
           style={{ backgroundColor: `${color}15`, color }}
         >
           {icon}

@@ -12,21 +12,130 @@ type PageProps = {
 
 // Server-side helper to fetch series + chapter + pages in one deduplicated request
 const getChapterFullData = cache(async (seriesSlug: string, chapterSlug: string) => {
-  const { data: chapter } = await supabase
-    .from("chapters")
-    .select(`
-      *,
-      series:series_id (
-        id,
-        slug,
-        title,
-        cover_url,
-        type,
-        description
-      )
-    `)
-    .eq("slug", chapterSlug)
+  // 1. Resolve series by slug (with hyphen/punctuation-insensitive fallback)
+  let { data: series } = await supabase
+    .from("series")
+    .select("id, slug, title, cover_url, type, description")
+    .eq("slug", seriesSlug)
     .maybeSingle();
+
+  if (!series) {
+    const normalized = seriesSlug.replace(/[^a-z0-9]/g, "").toLowerCase();
+    const { data: candidates } = await supabase
+      .from("series")
+      .select("id, slug, title, cover_url, type, description")
+      .limit(100);
+
+    if (candidates) {
+      series =
+        candidates.find(
+          (s) =>
+            s.slug === seriesSlug ||
+            s.slug.replace(/[^a-z0-9]/g, "").toLowerCase() === normalized
+        ) ?? null;
+    }
+  }
+
+  let chapter: any = null;
+
+  // 2. If series is resolved, look up chapter within that series
+  if (series) {
+    // 2a. Match exact series_id and chapter slug (use limit(1) to avoid PGRST116)
+    const { data: chExact } = await supabase
+      .from("chapters")
+      .select(`
+        *,
+        series:series_id (
+          id,
+          slug,
+          title,
+          cover_url,
+          type,
+          description
+        )
+      `)
+      .eq("series_id", series.id)
+      .eq("slug", chapterSlug)
+      .limit(1);
+
+    if (chExact && chExact.length > 0) {
+      chapter = chExact[0];
+    } else {
+      // 2b. Try partial slug match within series
+      const { data: chPartial } = await supabase
+        .from("chapters")
+        .select(`
+          *,
+          series:series_id (
+            id,
+            slug,
+            title,
+            cover_url,
+            type,
+            description
+          )
+        `)
+        .eq("series_id", series.id)
+        .ilike("slug", `%${chapterSlug}%`)
+        .limit(1);
+
+      if (chPartial && chPartial.length > 0) {
+        chapter = chPartial[0];
+      } else {
+        // 2c. Try chapter number match within series
+        const match =
+          chapterSlug.match(/chapter[_-]?([0-9]+(?:\.[0-9]+)?)/i) ||
+          chapterSlug.match(/^([0-9]+(?:\.[0-9]+)?)$/);
+        if (match) {
+          const num = parseFloat(match[1]);
+          const { data: chByNum } = await supabase
+            .from("chapters")
+            .select(`
+              *,
+              series:series_id (
+                id,
+                slug,
+                title,
+                cover_url,
+                type,
+                description
+              )
+            `)
+            .eq("series_id", series.id)
+            .eq("chapter_number", num)
+            .order("created_at", { ascending: false })
+            .limit(1);
+
+          if (chByNum && chByNum.length > 0) {
+            chapter = chByNum[0];
+          }
+        }
+      }
+    }
+  }
+
+  // 3. Global fallback if series was not found or chapter wasn't found in series
+  if (!chapter) {
+    const { data: chGlobal } = await supabase
+      .from("chapters")
+      .select(`
+        *,
+        series:series_id (
+          id,
+          slug,
+          title,
+          cover_url,
+          type,
+          description
+        )
+      `)
+      .eq("slug", chapterSlug)
+      .limit(1);
+
+    if (chGlobal && chGlobal.length > 0) {
+      chapter = chGlobal[0];
+    }
+  }
 
   if (!chapter) return null;
 

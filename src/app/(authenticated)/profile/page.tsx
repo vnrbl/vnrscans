@@ -1817,7 +1817,7 @@ export default function ProfilePage() {
         className="container mx-auto max-w-5xl px-4 sm:px-6 md:px-12 lg:px-16 mt-6"
         style={{ animation: "profileFadeInUp 0.6s ease-out 0.1s both" }}
       >
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
           <StatCard
             label="Reading Streak"
             value={streaks.current}
@@ -2919,26 +2919,42 @@ function StatCard({
 }) {
   return (
     <Card
-      className="group relative overflow-hidden p-4 transition-all duration-300 hover:shadow-lg"
+      className="group relative overflow-hidden p-2.5 sm:p-4 transition-all duration-300 hover:shadow-lg"
       style={{
         borderColor: `${accentColor}20`,
       }}
     >
       {/* Subtle accent glow */}
       <div
-        className="pointer-events-none absolute -right-4 -top-4 h-20 w-20 rounded-full opacity-20 blur-2xl transition-opacity group-hover:opacity-40"
+        className="pointer-events-none absolute -right-4 -top-4 h-14 w-14 sm:h-20 sm:w-20 rounded-full opacity-20 blur-2xl transition-opacity group-hover:opacity-40"
         style={{ background: accentColor }}
       />
-      <div className="relative flex items-center justify-between">
-        <div>
-          <p className="text-sm text-muted-foreground">{label}</p>
-          <p className="text-2xl font-bold">
+      {/* Mobile view (< sm) */}
+      <div className="relative flex flex-col items-center text-center sm:hidden">
+        <div
+          className="grid h-7 w-7 place-items-center rounded-lg mb-1.5 [&>svg]:h-3.5 [&>svg]:w-3.5"
+          style={{ backgroundColor: `${accentColor}15`, color: accentColor }}
+        >
+          {icon}
+        </div>
+        <p className="text-base font-bold tracking-tight leading-none">
+          {value}
+          {suffix && <span className="text-[11px] font-normal text-muted-foreground ml-0.5">{suffix}</span>}
+        </p>
+        <p className="text-[10px] text-muted-foreground font-medium mt-1 leading-tight">{label}</p>
+      </div>
+
+      {/* Desktop view (>= sm) */}
+      <div className="relative hidden sm:flex items-center justify-between gap-2">
+        <div className="min-w-0 flex-1">
+          <p className="text-sm text-muted-foreground font-medium truncate">{label}</p>
+          <p className="text-2xl font-bold tracking-tight truncate">
             {value}
-            {suffix && <span className="text-base font-normal text-muted-foreground">{suffix}</span>}
+            {suffix && <span className="text-sm font-normal text-muted-foreground">{suffix}</span>}
           </p>
         </div>
         <div
-          className="grid h-12 w-12 place-items-center rounded-xl transition-transform duration-300 group-hover:scale-110"
+          className="grid h-12 w-12 place-items-center rounded-xl transition-transform duration-300 group-hover:scale-110 shrink-0 [&>svg]:h-6 [&>svg]:w-6"
           style={{
             backgroundColor: `${accentColor}15`,
             color: accentColor,
