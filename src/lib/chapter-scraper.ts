@@ -3054,9 +3054,33 @@ async function extractComixChapterImages(chapterUrl: string): Promise<string[]> 
       'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
     );
 
-    // Capture image network requests in real-time as the reader lazy-loads them
+    // Set up request interception for anti-tamper bypass and Axios hook
+    await page.setRequestInterception(true);
+    page.on('request', async (req: any) => {
+      const u = req.url();
+      try {
+        if (u.includes('secure-') && u.endsWith('.js')) {
+          const res = await fetch(u);
+          let text = await res.text();
+          text = text.replace('Ο_=void 0,O0={},T2=α$', 'Ο_=34,O0={},T2=α$');
+          text = text.replace('case 8:Z_=!Ο_||T2&&F7?20:28;break;', 'case 8:Z_=28;break;');
+          req.respond({ status: 200, contentType: 'application/javascript', body: text });
+          return;
+        }
+        if (u.includes('env-') && u.endsWith('.js')) {
+          const res = await fetch(u);
+          let text = await res.text();
+          text += '\nwindow.__comixAxios = Ui;\n';
+          req.respond({ status: 200, contentType: 'application/javascript', body: text });
+          return;
+        }
+      } catch {}
+      req.continue();
+    });
+
+    // Capture image network requests in real-time as secondary fallback
     const networkImages: string[] = [];
-    page.on('response', (res) => {
+    const onResponse = (res: any) => {
       try {
         const u = res.url();
         if (
@@ -3070,7 +3094,8 @@ async function extractComixChapterImages(chapterUrl: string): Promise<string[]> 
           }
         }
       } catch {}
-    });
+    };
+    page.on('response', onResponse);
 
     await page.goto(chapterUrl, { waitUntil: 'networkidle2', timeout: 35000 });
     if (page.url().includes('@waf/challenge')) {
@@ -3079,9 +3104,36 @@ async function extractComixChapterImages(chapterUrl: string): Promise<string[]> 
         await page.goto(chapterUrl, { waitUntil: 'networkidle2', timeout: 35000 });
       }
     }
+
+    // Method 1: Instant extraction via hooked window.__comixAxios
+    const match = chapterUrl.match(/\/(\d+)-chapter-/);
+    const chapterId = match ? match[1] : null;
+    if (chapterId) {
+      await new Promise((r) => setTimeout(r, 1200));
+      const apiResult = await page.evaluate(async (chId: string) => {
+        if (!(window as any).__comixAxios) return null;
+        try {
+          const res = await (window as any).__comixAxios.get(`/chapters/${chId}`);
+          const p = res.data?.pages;
+          if (p && Array.isArray(p.items) && p.items.length > 0) {
+            const base = p.baseUrl || '';
+            return p.items.map((item: any) => (item.url.startsWith('http') ? item.url : base + item.url));
+          }
+        } catch {
+          return null;
+        }
+        return null;
+      }, chapterId);
+
+      if (Array.isArray(apiResult) && apiResult.length > 0) {
+        page.off('response', onResponse);
+        return apiResult;
+      }
+    }
+
     await page.waitForSelector('.rpage-page__img, .rpage-page', { timeout: 15000 }).catch(() => {});
 
-    // Progressive auto-scroll to trigger virtualized reader lazy loading for all chapter pages
+    // Method 2: Progressive auto-scroll fallback
     await page.evaluate(async () => {
       await new Promise<void>((resolve) => {
         let currentPos = 0;
@@ -3126,6 +3178,7 @@ async function extractComixChapterImages(chapterUrl: string): Promise<string[]> 
       if (!merged.includes(img)) merged.push(img);
     }
 
+    page.off('response', onResponse);
     return merged;
   } finally {
     await browser.close();

@@ -63,7 +63,14 @@ async function fetchHomeInitialData(): Promise<HomeInitialData> {
   const rpcMap = new Map((latestRes.data ?? []).map((s: any) => [s.id, s]));
   const fullSeriesList = (allSeriesRes.data ?? []).map((s: any) => {
     const existing = rpcMap.get(s.id);
-    if (existing) return existing;
+    if (existing) {
+      // Ensure sorting strictly matches the actual latest visible chapter on the card
+      const visibleLatestTime = existing.recent_chapters?.[0]?.created_at;
+      return {
+        ...existing,
+        latest_chapter_created_at: visibleLatestTime || existing.latest_chapter_created_at,
+      };
+    }
     return {
       id: s.id,
       slug: s.slug,

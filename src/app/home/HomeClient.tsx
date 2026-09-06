@@ -362,7 +362,14 @@ function HomeContent({ initialData }: { initialData?: HomeInitialData }) {
       const rpcMap = new Map((rpcRes.data ?? []).map((s: any) => [s.id, s]));
       let fullSeriesList = (allSeriesRes.data ?? []).map((s: any) => {
         const existing = rpcMap.get(s.id);
-        if (existing) return existing;
+        if (existing) {
+          // Ensure sorting strictly matches the actual latest visible chapter on the card
+          const visibleLatestTime = existing.recent_chapters?.[0]?.created_at;
+          return {
+            ...existing,
+            latest_chapter_created_at: visibleLatestTime || existing.latest_chapter_created_at,
+          };
+        }
         return {
           id: s.id,
           slug: s.slug,

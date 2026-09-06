@@ -24,6 +24,7 @@ import {
   DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
+import { toast } from "sonner";
 const NotificationBell = lazy(() => import("@/components/notifications/NotificationBell").then(m => ({ default: m.NotificationBell })));
 
 
@@ -201,20 +202,22 @@ export function Navbar() {
               </span>
             </Link>
 
-            {/* + SVG Icon Button for Add New Series on the right side of Logo */}
+            {/* + SVG Icon Button for Add New Series on the right side of Logo (Desktop only, mobile has it in bottom navbar) */}
             {showPanel && (
-              <AddNewSeriesDialog
-                trigger={
-                  <button
-                    type="button"
-                    title="Add New Series"
-                    aria-label="Add New Series"
-                    className="grid h-7 w-7 place-items-center rounded-lg border border-purple-500/40 bg-purple-950/30 text-purple-300 hover:bg-purple-900/60 hover:text-white hover:border-purple-400 transition-all duration-200 hover:scale-110 shadow-sm cursor-pointer shrink-0"
-                  >
-                    <Plus className="h-4 w-4 stroke-[2.5]" />
-                  </button>
-                }
-              />
+              <div className="hidden sm:flex items-center">
+                <AddNewSeriesDialog
+                  trigger={
+                    <button
+                      type="button"
+                      title="Add New Series"
+                      aria-label="Add New Series"
+                      className="grid h-7 w-7 place-items-center rounded-lg border border-purple-500/40 bg-purple-950/30 text-purple-300 hover:bg-purple-900/60 hover:text-white hover:border-purple-400 transition-all duration-200 hover:scale-110 shadow-sm cursor-pointer shrink-0"
+                    >
+                      <Plus className="h-4 w-4 stroke-[2.5]" />
+                    </button>
+                  }
+                />
+              </div>
             )}
           </div>
 
@@ -515,7 +518,7 @@ export function Navbar() {
       </aside>
 
       {/* Mobile Bottom Navigation Bar */}
-      <nav className="fixed bottom-0 left-0 right-0 z-50 flex sm:hidden h-[calc(3.5rem+env(safe-area-inset-bottom,0px))] pb-[env(safe-area-inset-bottom,0px)] items-center justify-around navbar-ios-glass border-t border-white/10 px-2 shadow-2xl">
+      <nav className="fixed bottom-0 left-0 right-0 z-50 flex sm:hidden h-[calc(3.5rem+env(safe-area-inset-bottom,0px))] pb-[env(safe-area-inset-bottom,0px)] items-center justify-around navbar-ios-glass border-t border-white/10 px-1 shadow-2xl">
         <Link
           to="/home"
           className="flex flex-col items-center justify-center gap-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground hover:text-primary transition-colors py-1 flex-1"
@@ -534,32 +537,72 @@ export function Navbar() {
           <span>Browse</span>
         </Link>
 
-        <Link
-          to="/library"
-          className="flex flex-col items-center justify-center gap-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground hover:text-primary transition-colors py-1 flex-1"
-          activeProps={{ className: "text-primary font-black" }}
-        >
-          <Library className="h-5 w-5 stroke-[1.8]" />
-          <span>Library</span>
-        </Link>
+        {showPanel ? (
+          <>
+            {/* Center Floating Action Button for Add Series (Admin Only) */}
+            <div className="relative flex items-center justify-center shrink-0 -mt-6 z-20 px-1">
+              <AddNewSeriesDialog
+                trigger={
+                  <button
+                    type="button"
+                    title="Add New Series (Admin Only)"
+                    aria-label="Add New Series"
+                    className="group relative flex h-[52px] w-[52px] items-center justify-center rounded-full bg-gradient-to-tr from-purple-600 via-violet-500 to-pink-500 text-white shadow-[0_4px_20px_rgba(168,85,247,0.65)] ring-4 ring-background hover:scale-110 active:scale-95 transition-all duration-200 cursor-pointer select-none"
+                  >
+                    <Plus className="h-7 w-7 stroke-[3] transition-transform duration-200 group-hover:rotate-90 text-white" />
+                  </button>
+                }
+              />
+            </div>
 
-        <Link
-          to="/novels"
-          className="flex flex-col items-center justify-center gap-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground hover:text-primary transition-colors py-1 flex-1"
-          activeProps={{ className: "text-primary font-black" }}
-        >
-          <BookOpen className="h-5 w-5 stroke-[1.8]" />
-          <span>Novels</span>
-        </Link>
+            <Link
+              to="/library"
+              className="flex flex-col items-center justify-center gap-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground hover:text-primary transition-colors py-1 flex-1"
+              activeProps={{ className: "text-primary font-black" }}
+            >
+              <Library className="h-5 w-5 stroke-[1.8]" />
+              <span>Library</span>
+            </Link>
 
-        <Link
-          to={user ? "/profile" : "/auth"}
-          className="flex flex-col items-center justify-center gap-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground hover:text-primary transition-colors py-1 flex-1"
-          activeProps={{ className: "text-primary font-black" }}
-        >
-          <UserIcon className="h-5 w-5 stroke-[1.8]" />
-          <span>{user ? "Profile" : "Sign In"}</span>
-        </Link>
+            <Link
+              to={user ? "/profile" : "/auth"}
+              className="flex flex-col items-center justify-center gap-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground hover:text-primary transition-colors py-1 flex-1"
+              activeProps={{ className: "text-primary font-black" }}
+            >
+              <UserIcon className="h-5 w-5 stroke-[1.8]" />
+              <span>{user ? "Profile" : "Sign In"}</span>
+            </Link>
+          </>
+        ) : (
+          <>
+            <Link
+              to="/library"
+              className="flex flex-col items-center justify-center gap-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground hover:text-primary transition-colors py-1 flex-1"
+              activeProps={{ className: "text-primary font-black" }}
+            >
+              <Library className="h-5 w-5 stroke-[1.8]" />
+              <span>Library</span>
+            </Link>
+
+            <Link
+              to="/novels"
+              className="flex flex-col items-center justify-center gap-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground hover:text-primary transition-colors py-1 flex-1"
+              activeProps={{ className: "text-primary font-black" }}
+            >
+              <BookOpen className="h-5 w-5 stroke-[1.8]" />
+              <span>Novels</span>
+            </Link>
+
+            <Link
+              to={user ? "/profile" : "/auth"}
+              className="flex flex-col items-center justify-center gap-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground hover:text-primary transition-colors py-1 flex-1"
+              activeProps={{ className: "text-primary font-black" }}
+            >
+              <UserIcon className="h-5 w-5 stroke-[1.8]" />
+              <span>{user ? "Profile" : "Sign In"}</span>
+            </Link>
+          </>
+        )}
       </nav>
     </>
   );

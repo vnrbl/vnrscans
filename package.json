@@ -19,6 +19,7 @@
     "auto-import:watch": "npx tsx scripts/auto-import-sources.ts --watch",
     "auto-import:30m": "npx tsx scripts/auto-import-sources.ts --watch --interval 30",
     "auto-import:edk": "edk run -- npx tsx scripts/auto-import-sources.ts",
+    "import:comix": "node scripts/import-comix.cjs",
     "sync-chapters": "npx tsx scripts/sync-all-chapters.ts",
     "sync-scheduled": "npx tsx scripts/auto-import-sources.ts",
     "cf:login": "wrangler login",
