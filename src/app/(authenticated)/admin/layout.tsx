@@ -109,6 +109,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { to: "/admin", label: "Dashboard", icon: LayoutDashboard, exact: true, roles: ["admin", "moderator", "uploader"] },
     { to: "/admin/analytics", label: "Analytics", icon: TrendingUp, roles: ["admin"] },
     { to: "/admin/scrape-terminal", label: "Scrape Terminal", icon: TerminalSquare, roles: ["admin", "moderator", "uploader"] },
+    { to: "/admin/importer", label: "Comick & Comix", icon: Globe2, roles: ["admin", "moderator", "uploader"] },
     { to: "/admin/site-import", label: "Site Import", icon: Globe2, roles: ["admin"] },
     { to: "/admin/announcements", label: "Announcements", icon: Megaphone, roles: ["admin", "moderator"] },
     { to: "/admin/banners", label: "Banners", icon: Image, roles: ["admin", "moderator"] },

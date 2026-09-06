@@ -24,6 +24,11 @@ import {
   $importComickMetadataToSeries,
   type ComickExtractedMetadata,
 } from "@/lib/api/comick-import.actions";
+import {
+  $previewComixMetadata,
+  $importComixMetadataToSeries,
+  type ComixExtractedMetadata,
+} from "@/lib/api/comix-import.actions";
 import { useProcessingTask } from "@/contexts/ProcessingTaskContext";
 import { $syncImportSource } from "@/lib/api/scraper.actions";
 import { detectImportSource } from "@/lib/import-source-utils";
@@ -119,6 +124,15 @@ const WORKABLE_SCAN_PROVIDERS: ScanProviderOption[] = [
     getSearchUrl: (title) => `https://qimanga.com/search?q=${encodeURIComponent(title)}`,
   },
   {
+    id: "comix",
+    name: "Comix.to",
+    icon: "⚡",
+    badge: "Direct Scan",
+    domain: "comix.to",
+    getUrl: (slug) => `https://comix.to/title/${slug}`,
+    getSearchUrl: (title) => `https://comix.to/browse?keyword=${encodeURIComponent(title)}`,
+  },
+  {
     id: "custom",
     name: "Custom URL",
     icon: "🌐",
@@ -147,6 +161,7 @@ export function AddNewSeriesDialog({ trigger }: AddNewSeriesDialogProps) {
   const [activeTab, setActiveTab] = useState<"smart" | "manual">("smart");
 
   // Smart Hybrid State
+  const [metadataSource, setMetadataSource] = useState<"comick" | "comix">("comick");
   const [comickSearch, setComickSearch] = useState("");
   const [isSearchingComick, setIsSearchingComick] = useState(false);
   const [comickResults, setComickResults] = useState<ComickExtractedMetadata[]>([]);
@@ -157,6 +172,7 @@ export function AddNewSeriesDialog({ trigger }: AddNewSeriesDialogProps) {
   const [autoSyncChapters, setAutoSyncChapters] = useState(true);
   const [syncMaxChapters, setSyncMaxChapters] = useState<number>(50);
   const [isHybridSubmitting, setIsHybridSubmitting] = useState(false);
+  const [showComixFallbackNotice, setShowComixFallbackNotice] = useState(false);
 
   // Manual Form State
   const [title, setTitle] = useState("");
@@ -194,11 +210,12 @@ export function AddNewSeriesDialog({ trigger }: AddNewSeriesDialogProps) {
     }
   };
 
-  // Search Comick for official metadata
-  const handleSearchComick = async () => {
+  // Search Comick or Comix.to for official metadata
+  const handleSearchMetadata = async (overrideSource?: "comick" | "comix") => {
+    const activeSource = overrideSource || metadataSource;
     const q = comickSearch.trim();
     if (!q) {
-      toast.error("Please enter a title or keyword to search Comick");
+      toast.error(`Please enter a title or URL to search ${activeSource === "comick" ? "Comick" : "Comix.to"}`);
       return;
     }
 
@@ -210,24 +227,63 @@ export function AddNewSeriesDialog({ trigger }: AddNewSeriesDialogProps) {
       }
 
       setIsSearchingComick(true);
-      const res = await $searchComickList({
-        data: {
-          query: q,
-          accessToken: session.access_token,
-        },
-      });
+      setShowComixFallbackNotice(false);
 
-      if (!res.success || !res.results || res.results.length === 0) {
-        setComickResults([]);
-        setSelectedComic(null);
-        toast.error(res.error || `No titles found on Comick for "${q}"`);
+      if (activeSource === "comix") {
+        const res = await $previewComixMetadata({
+          data: {
+            query: q,
+            accessToken: session.access_token,
+          },
+        });
+
+        if (!res.success || !res.metadata) {
+          setComickResults([]);
+          setSelectedComic(null);
+          toast.error(res.error || `No titles found on Comix.to for "${q}"`);
+        } else {
+          const meta = res.metadata;
+          const mapped: ComickExtractedMetadata = {
+            title: meta.title,
+            slug: meta.slug,
+            description: meta.description,
+            alternativeTitles: meta.alternativeTitles,
+            genres: meta.genres,
+            tags: meta.tags,
+            status: meta.status,
+            releaseYear: meta.releaseYear,
+            coverUrl: meta.coverUrl,
+            author: meta.author,
+            artist: meta.artist,
+          };
+          setComickResults([mapped]);
+          handleSelectComic(mapped);
+          setSelectedType(meta.type);
+          setSelectedScanProvider("comix");
+          setScanSourceUrl(meta.comixUrl);
+          toast.success(`Found "${meta.title}" on Comix.to!`);
+        }
       } else {
-        setComickResults(res.results);
-        handleSelectComic(res.results[0]);
-        toast.success(`Found ${res.results.length} comic(s) on Comick!`);
+        const res = await $searchComickList({
+          data: {
+            query: q,
+            accessToken: session.access_token,
+          },
+        });
+
+        if (!res.success || !res.results || res.results.length === 0) {
+          setComickResults([]);
+          setSelectedComic(null);
+          setShowComixFallbackNotice(true);
+          toast.error(res.error || `No titles found on Comick for "${q}". Try Comix.to!`);
+        } else {
+          setComickResults(res.results);
+          handleSelectComic(res.results[0]);
+          toast.success(`Found ${res.results.length} comic(s) on Comick!`);
+        }
       }
     } catch (err: any) {
-      toast.error(err.message || "Failed to search Comick");
+      toast.error(err.message || "Search failed");
     } finally {
       setIsSearchingComick(false);
     }
@@ -312,20 +368,35 @@ export function AddNewSeriesDialog({ trigger }: AddNewSeriesDialogProps) {
       }
       processing.setStepStatus("series", "done", `Registered with slug /${newSeries.slug}`);
 
-      // 2. Attach genres & tags from Comick
+      // 2. Attach genres & tags from Comick or Comix.to
       processing.setStepStatus("meta", "active", "Importing cover art and synopsis...");
       if (selectedComic.genres && selectedComic.genres.length > 0) {
-        await $importComickMetadataToSeries({
-          data: {
-            seriesId: newSeries.id,
-            accessToken: session.access_token,
-            importCover: true,
-            importSynopsis: true,
-            importGenresAndTags: true,
-            importAlternativeTitles: true,
-            overrideMetadata: selectedComic,
-          },
-        });
+        if (metadataSource === "comix") {
+          await $importComixMetadataToSeries({
+            data: {
+              seriesId: newSeries.id,
+              accessToken: session.access_token,
+              importCover: true,
+              importSynopsis: true,
+              importGenresAndTags: true,
+              importAlternativeTitles: true,
+              importStatusAndType: true,
+              overrideMetadata: selectedComic,
+            },
+          });
+        } else {
+          await $importComickMetadataToSeries({
+            data: {
+              seriesId: newSeries.id,
+              accessToken: session.access_token,
+              importCover: true,
+              importSynopsis: true,
+              importGenresAndTags: true,
+              importAlternativeTitles: true,
+              overrideMetadata: selectedComic,
+            },
+          });
+        }
       }
       processing.setStepStatus("meta", "done", "Official synopsis & cover synchronized");
       processing.setStepStatus("genres", "done", `${selectedComic.genres?.length || 0} genres and taxonomy tags linked`);
@@ -526,31 +597,63 @@ export function AddNewSeriesDialog({ trigger }: AddNewSeriesDialogProps) {
         {/* ── TAB 1: SMART HYBRID IMPORTER ───────────────────────────── */}
         {activeTab === "smart" && (
           <div className="space-y-4 pt-1">
-            {/* Step 1: Comick Metadata Search */}
+            {/* Step 1: Comick / Comix.to Metadata Search */}
             <div className="p-4 rounded-xl bg-purple-950/20 border border-purple-500/25 space-y-3">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
                 <div className="flex items-center gap-2">
                   <span className="flex h-5 w-5 items-center justify-center rounded-full bg-purple-500/20 text-[11px] font-bold text-purple-300">1</span>
                   <span className="text-sm font-semibold tracking-tight text-purple-100">
-                    Search Series on Comick.dev
+                    Search Metadata ({metadataSource === "comick" ? "Comick.dev" : "Comix.to"})
                   </span>
                 </div>
-                <span className="text-xs text-neutral-400 font-normal">
-                  Fetches official metadata, genres, tags & HD cover
-                </span>
+                {/* Source Selection Buttons */}
+                <div className="flex items-center gap-1.5 p-0.5 rounded-lg bg-neutral-900/80 border border-neutral-800">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMetadataSource("comick");
+                      setShowComixFallbackNotice(false);
+                    }}
+                    className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-all cursor-pointer ${
+                      metadataSource === "comick"
+                        ? "bg-purple-600 text-white shadow-sm"
+                        : "text-neutral-400 hover:text-white"
+                    }`}
+                  >
+                    Comick.dev (Default)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMetadataSource("comix");
+                      setShowComixFallbackNotice(false);
+                    }}
+                    className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-all cursor-pointer ${
+                      metadataSource === "comix"
+                        ? "bg-purple-600 text-white shadow-sm"
+                        : "text-neutral-400 hover:text-white"
+                    }`}
+                  >
+                    Comix.to
+                  </button>
+                </div>
               </div>
 
               <div className="flex gap-2">
                 <Input
                   value={comickSearch}
                   onChange={(e) => setComickSearch(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && handleSearchComick()}
-                  placeholder="e.g. Solo Leveling, Eleceed, Return of the Mount Hua..."
+                  onKeyDown={(e) => e.key === "Enter" && handleSearchMetadata()}
+                  placeholder={
+                    metadataSource === "comix"
+                      ? "Enter Comix.to title URL (e.g. https://comix.to/title/...) or title name"
+                      : "e.g. Solo Leveling, Eleceed, Return of the Mount Hua..."
+                  }
                   className="h-10 text-sm bg-neutral-900/90 border-neutral-800 focus:border-purple-500 text-white placeholder:text-neutral-500 rounded-lg font-normal"
                 />
                 <Button
                   type="button"
-                  onClick={handleSearchComick}
+                  onClick={() => handleSearchMetadata()}
                   disabled={isSearchingComick || !comickSearch.trim()}
                   className="h-10 px-4 text-xs font-semibold bg-purple-600 hover:bg-purple-500 text-white shrink-0 rounded-lg cursor-pointer transition-colors shadow-sm"
                 >
@@ -558,11 +661,30 @@ export function AddNewSeriesDialog({ trigger }: AddNewSeriesDialogProps) {
                 </Button>
               </div>
 
-              {/* Comick Search Results Grid */}
+              {/* Comix.to Fallback Suggestion */}
+              {showComixFallbackNotice && (
+                <div className="flex items-center justify-between p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs">
+                  <span>No scan matches on Comick? Try searching Comix.to</span>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="h-7 text-xs border-amber-500/40 hover:bg-amber-500/20 text-amber-100"
+                    onClick={() => {
+                      setMetadataSource("comix");
+                      void handleSearchMetadata("comix");
+                    }}
+                  >
+                    Search Comix.to
+                  </Button>
+                </div>
+              )}
+
+              {/* Comick / Comix Search Results Grid */}
               {comickResults.length > 0 && (
                 <div className="space-y-2 pt-2 border-t border-purple-500/20">
                   <span className="text-xs font-medium text-neutral-400">
-                    Select the matching series from Comick ({comickResults.length} found):
+                    Select matching series ({comickResults.length} found on {metadataSource === "comick" ? "Comick.dev" : "Comix.to"}):
                   </span>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto p-1 scrollbar-thin">
                     {comickResults.map((comic) => {

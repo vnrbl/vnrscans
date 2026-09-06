@@ -26,6 +26,10 @@ import {
   $importComickMetadataToSeries,
   type ComickExtractedMetadata,
 } from "@/lib/api/comick-import.actions";
+import {
+  $previewComixMetadata,
+  $importComixMetadataToSeries,
+} from "@/lib/api/comix-import.actions";
 import { useProcessingTask } from "@/contexts/ProcessingTaskContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -64,6 +68,7 @@ export function ComickMetadataImporter({
   const processing = useProcessingTask();
 
   const [open, setOpen] = useState(false);
+  const [source, setSource] = useState<"comick" | "comix">("comick");
   const [comickQuery, setComickQuery] = useState(seriesTitle || "");
   const [isSearching, setIsSearching] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
@@ -122,7 +127,9 @@ export function ComickMetadataImporter({
   };
 
   // Search Comick by Name or URL
-  const handleSearch = async (overrideQuery?: string) => {
+  // Search Comick or Comix by Name or URL
+  const handleSearch = async (overrideQuery?: string, overrideSource?: "comick" | "comix") => {
+    const activeSource = overrideSource || source;
     const q = (overrideQuery ?? comickQuery).trim() || seriesTitle?.trim();
     if (!q) {
       toast.error("Please enter a title to search");
@@ -137,36 +144,70 @@ export function ComickMetadataImporter({
       }
 
       setIsSearching(true);
-      const res = await $searchComickList({
-        data: {
-          query: q,
-          accessToken: session.access_token,
-        },
-      });
 
-      if (!res.success || !res.results || res.results.length === 0) {
-        // Fallback: try single preview
-        const prevRes = await $previewComickMetadata({
+      if (activeSource === "comix") {
+        const res = await $previewComixMetadata({
           data: {
             query: q,
             accessToken: session.access_token,
           },
         });
 
-        if (prevRes.success && prevRes.metadata) {
-          setSearchResults([prevRes.metadata]);
-          void handleSelectComic(prevRes.metadata);
-        } else {
+        if (!res.success || !res.metadata) {
           setSearchResults([]);
           setSelectedComic(null);
-          toast.error(res.error || `No comics found for "${q}". Try another keyword.`);
+          toast.error(res.error || `No comics found on Comix.to for "${q}".`);
+        } else {
+          const meta = res.metadata;
+          const mapped: ComickExtractedMetadata = {
+            title: meta.title,
+            slug: meta.slug,
+            description: meta.description,
+            alternativeTitles: meta.alternativeTitles,
+            genres: meta.genres,
+            tags: meta.tags,
+            status: meta.status,
+            releaseYear: meta.releaseYear,
+            coverUrl: meta.coverUrl,
+            author: meta.author,
+            artist: meta.artist,
+          };
+          setSearchResults([mapped]);
+          setSelectedComic(mapped);
+          toast.success(`Found "${meta.title}" on Comix.to!`);
         }
       } else {
-        setSearchResults(res.results);
-        void handleSelectComic(res.results[0]);
+        const res = await $searchComickList({
+          data: {
+            query: q,
+            accessToken: session.access_token,
+          },
+        });
+
+        if (!res.success || !res.results || res.results.length === 0) {
+          // Fallback: try single preview
+          const prevRes = await $previewComickMetadata({
+            data: {
+              query: q,
+              accessToken: session.access_token,
+            },
+          });
+
+          if (prevRes.success && prevRes.metadata) {
+            setSearchResults([prevRes.metadata]);
+            void handleSelectComic(prevRes.metadata);
+          } else {
+            setSearchResults([]);
+            setSelectedComic(null);
+            toast.error(res.error || `No comics found for "${q}". Try switching to Comix.to.`);
+          }
+        } else {
+          setSearchResults(res.results);
+          void handleSelectComic(res.results[0]);
+        }
       }
     } catch (err: any) {
-      toast.error(err.message || "Failed to search Comick");
+      toast.error(err.message || "Failed to search metadata");
     } finally {
       setIsSearching(false);
     }
@@ -200,8 +241,8 @@ export function ComickMetadataImporter({
 
     setOpen(false);
     processing.startTask({
-      title: "Importing Comick Metadata",
-      description: `Updating series with official data from Comick`,
+      title: source === "comix" ? "Importing Comix.to Metadata" : "Importing Comick Metadata",
+      description: `Updating series with official data from ${source === "comix" ? "Comix.to" : "Comick"}`,
       steps,
     });
 
@@ -217,20 +258,34 @@ export function ComickMetadataImporter({
       processing.setStepStatus("meta", "done");
 
       processing.setStepStatus("cover", "active", "Applying cover and description...");
-      const res = await $importComickMetadataToSeries({
-        data: {
-          seriesId,
-          accessToken: session.access_token,
-          importCover,
-          importSynopsis,
-          importGenresAndTags,
-          importAlternativeTitles: importAltTitles,
-          overrideMetadata: comicToImport,
-        },
-      });
+      
+      const res = source === "comix"
+        ? await $importComixMetadataToSeries({
+            data: {
+              seriesId,
+              accessToken: session.access_token,
+              importCover,
+              importSynopsis,
+              importGenresAndTags,
+              importAlternativeTitles: importAltTitles,
+              importStatusAndType: true,
+              overrideMetadata: comicToImport,
+            },
+          })
+        : await $importComickMetadataToSeries({
+            data: {
+              seriesId,
+              accessToken: session.access_token,
+              importCover,
+              importSynopsis,
+              importGenresAndTags,
+              importAlternativeTitles: importAltTitles,
+              overrideMetadata: comicToImport,
+            },
+          });
 
       if (!res.success || !res.metadata) {
-        throw new Error(res.error || "Import from Comick failed");
+        throw new Error(res.error || `Import from ${source === "comix" ? "Comix.to" : "Comick"} failed`);
       }
 
       processing.setStepStatus("cover", "done", "Cover and synopsis updated");
@@ -299,18 +354,54 @@ export function ComickMetadataImporter({
         </DialogHeader>
 
         <div className="p-5 sm:p-6 space-y-4 max-h-[70vh] overflow-y-auto">
-          {/* Search Input */}
+          {/* Search Input with Source Switcher */}
           <div className="space-y-1.5">
-            <Label className="text-xs font-semibold text-foreground">
-              Series Title or Keyword
-            </Label>
+            <div className="flex items-center justify-between">
+              <Label className="text-xs font-semibold text-foreground">
+                Series Title or URL ({source === "comick" ? "Comick.dev" : "Comix.to"})
+              </Label>
+              <div className="flex items-center gap-1 bg-neutral-900 border border-neutral-800 p-0.5 rounded-lg">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSource("comick");
+                    void handleSearch(undefined, "comick");
+                  }}
+                  className={`px-2 py-0.5 text-[10px] font-bold rounded-md transition-all cursor-pointer ${
+                    source === "comick"
+                      ? "bg-purple-600 text-white shadow-sm"
+                      : "text-muted-foreground hover:text-white"
+                  }`}
+                >
+                  Comick.dev
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSource("comix");
+                    void handleSearch(undefined, "comix");
+                  }}
+                  className={`px-2 py-0.5 text-[10px] font-bold rounded-md transition-all cursor-pointer ${
+                    source === "comix"
+                      ? "bg-blue-600 text-white shadow-sm"
+                      : "text-muted-foreground hover:text-white"
+                  }`}
+                >
+                  Comix.to
+                </button>
+              </div>
+            </div>
             <div className="flex gap-2">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   value={comickQuery}
                   onChange={(e) => setComickQuery(e.target.value)}
-                  placeholder="e.g. Solo Leveling, Eleceed, Jujutsu Kaisen..."
+                  placeholder={
+                    source === "comix"
+                      ? "Enter title name or comix.to/title/... URL"
+                      : "e.g. Solo Leveling, Eleceed, Jujutsu Kaisen..."
+                  }
                   className="pl-9 h-10 text-xs bg-background/60 border-border/50"
                   onKeyDown={(e) => {
                     if (e.key === "Enter") {
@@ -325,7 +416,7 @@ export function ComickMetadataImporter({
                 variant="secondary"
                 onClick={() => void handleSearch()}
                 disabled={isSearching || isImporting || !comickQuery.trim()}
-                className="h-10 px-4 text-xs font-semibold gap-1.5 shrink-0"
+                className="h-10 px-4 text-xs font-semibold gap-1.5 shrink-0 cursor-pointer"
               >
                 {isSearching ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Search className="h-3.5 w-3.5" />}
                 <span>Search</span>

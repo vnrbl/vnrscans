@@ -128,6 +128,20 @@ export async function extractChaptersFromSeriesUrl(seriesUrl: string): Promise<C
       }
     }
 
+    // Custom extraction for Comix.to (stealth Puppeteer bypass & DOM chapter link extraction)
+    if (isComixToUrl(seriesUrl)) {
+      try {
+        console.log(`[Scraper] Using custom Comix.to chapter extraction for: ${seriesUrl}`);
+        const comixChapters = await extractComixChapters(seriesUrl);
+        if (comixChapters.length > 0) {
+          console.log(`[Scraper] Successfully extracted ${comixChapters.length} chapters from Comix.to (${seriesUrl})`);
+          return comixChapters;
+        }
+      } catch (comixErr) {
+        console.warn('[Scraper] Custom Comix.to chapter extraction failed:', comixErr);
+      }
+    }
+
     let html = '';
     let usePuppeteerFallback = false;
 
@@ -1303,6 +1317,20 @@ export async function extractImagesFromChapterUrl(
         }
       } catch (kaynErr) {
         console.warn('[Scraper] Kayn Scans custom image extraction error, falling back to HTML/Puppeteer:', kaynErr);
+      }
+    }
+
+    // Custom extraction for Comix.to chapter reader pages
+    if (isComixToUrl(chapterUrl)) {
+      try {
+        console.log(`[Scraper] Using custom Comix.to reader image extraction for: ${chapterUrl}`);
+        const comixImages = await extractComixChapterImages(chapterUrl);
+        if (comixImages.length > 0) {
+          console.log(`[Scraper] Successfully extracted ${comixImages.length} images for Comix.to (${chapterUrl})`);
+          return comixImages;
+        }
+      } catch (comixErr) {
+        console.warn('[Scraper] Comix.to reader image extraction error:', comixErr);
       }
     }
 
@@ -2650,3 +2678,161 @@ async function extractKaynScansChapterImages(chapterUrl: string): Promise<string
 
   return [];
 }
+
+export function isComixToUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    return parsed.hostname.toLowerCase().includes('comix.to');
+  } catch {
+    return url.toLowerCase().includes('comix.to');
+  }
+}
+
+async function extractComixChapters(seriesUrl: string): Promise<ChapterInfo[]> {
+  const puppeteer = await import('puppeteer');
+  const chrome = await resolveChromeExecutable(puppeteer.default);
+  const isHeadless = process.env.PUPPETEER_HEADLESS !== 'false';
+  const launchOptions: any = {
+    headless: isHeadless ? (chrome.headless === 'shell' ? 'shell' : true) : false,
+    pipe: true,
+    args: [
+      ...chrome.args.filter((a: string) => a !== '--headless' && !a.startsWith('--window-size')),
+      '--disable-blink-features=AutomationControlled',
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--window-size=1024,768',
+    ],
+    defaultViewport: isHeadless ? null : { width: 1024, height: 768 },
+  };
+
+  if (chrome.executablePath) {
+    launchOptions.executablePath = chrome.executablePath;
+  }
+
+  const browser = await puppeteer.default.launch(launchOptions);
+  try {
+    const page = await browser.newPage();
+    await page.evaluateOnNewDocument(() => {
+      Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+      (window as any).chrome = { runtime: {} };
+    });
+    await page.setUserAgent(
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+    );
+
+    await page.goto(seriesUrl, { waitUntil: 'networkidle2', timeout: 45000 });
+
+    const collectLinks = async () => {
+      return await page.evaluate(() => {
+        const links = Array.from(document.querySelectorAll('a[href*="-chapter-"]'));
+        const seen = new Set<number>();
+        const list: Array<{ chapterNumber: number; title?: string; url: string }> = [];
+        for (const a of links) {
+          const href = (a as HTMLAnchorElement).href;
+          const m = href.match(/-chapter-([0-9.]+)/i);
+          if (m) {
+            const num = parseFloat(m[1]);
+            if (!seen.has(num)) {
+              seen.add(num);
+              list.push({
+                chapterNumber: num,
+                title: (a as HTMLAnchorElement).innerText.trim().replace(/\n+/g, ' ') || `Chapter ${num}`,
+                url: href,
+              });
+            }
+          }
+        }
+        return list;
+      });
+    };
+
+    const allChapters = await collectLinks();
+
+    // Check if pagination exists (fetch up to 4 pages if needed)
+    const hasPagination = await page.evaluate(() => !!document.querySelector('.npager'));
+    if (hasPagination && allChapters.length < 60) {
+      for (let p = 2; p <= 4; p++) {
+        try {
+          const pageUrl = seriesUrl.includes('?') ? `${seriesUrl}&page=${p}` : `${seriesUrl}?page=${p}`;
+          await page.goto(pageUrl, { waitUntil: 'domcontentloaded', timeout: 20000 });
+          await new Promise((r) => setTimeout(r, 800));
+          const more = await collectLinks();
+          if (more.length === 0) break;
+          const existingNums = new Set(allChapters.map((c) => c.chapterNumber));
+          for (const ch of more) {
+            if (!existingNums.has(ch.chapterNumber)) {
+              existingNums.add(ch.chapterNumber);
+              allChapters.push(ch);
+            }
+          }
+        } catch {
+          break;
+        }
+      }
+    }
+
+    allChapters.sort((a, b) => a.chapterNumber - b.chapterNumber);
+    return allChapters;
+  } finally {
+    await browser.close();
+  }
+}
+
+async function extractComixChapterImages(chapterUrl: string): Promise<string[]> {
+  const puppeteer = await import('puppeteer');
+  const chrome = await resolveChromeExecutable(puppeteer.default);
+  const isHeadless = process.env.PUPPETEER_HEADLESS !== 'false';
+  const launchOptions: any = {
+    headless: isHeadless ? (chrome.headless === 'shell' ? 'shell' : true) : false,
+    pipe: true,
+    args: [
+      ...chrome.args.filter((a: string) => a !== '--headless' && !a.startsWith('--window-size')),
+      '--disable-blink-features=AutomationControlled',
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--window-size=1024,768',
+    ],
+    defaultViewport: isHeadless ? null : { width: 1024, height: 768 },
+  };
+
+  if (chrome.executablePath) {
+    launchOptions.executablePath = chrome.executablePath;
+  }
+
+  const browser = await puppeteer.default.launch(launchOptions);
+  try {
+    const page = await browser.newPage();
+    await page.evaluateOnNewDocument(() => {
+      Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+      (window as any).chrome = { runtime: {} };
+    });
+    await page.setUserAgent(
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+    );
+
+    await page.goto(chapterUrl, { waitUntil: 'networkidle2', timeout: 35000 });
+    await page.waitForSelector('.rpage-page__img', { timeout: 15000 }).catch(() => {});
+
+    const images = await page.evaluate(() => {
+      const imgs = Array.from(
+        document.querySelectorAll('.rpage-page__img, img[src*="wowpic"], img[src*="static.comix.to"]'),
+      );
+      return imgs
+        .map((i: any) => i.src || i.currentSrc)
+        .filter(
+          (src: string) =>
+            src &&
+            src.startsWith('http') &&
+            !src.includes('avatar') &&
+            !src.includes('logo') &&
+            !src.includes('icon'),
+        );
+    });
+
+    const uniqueImages = Array.from(new Set(images));
+    return uniqueImages;
+  } finally {
+    await browser.close();
+  }
+}
+

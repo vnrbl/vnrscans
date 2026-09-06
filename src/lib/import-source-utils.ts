@@ -11,6 +11,11 @@ const SOURCE_PRESETS: Array<{
   imageUrlExample?: string;
 }> = [
   {
+    hostIncludes: "comix.to",
+    sourceSite: "Comix.to",
+    scanlationGroup: "Comix",
+  },
+  {
     hostIncludes: "qimanhwa.com",
     sourceSite: "Qi Scans",
     scanlationGroup: "Qi Scans",
