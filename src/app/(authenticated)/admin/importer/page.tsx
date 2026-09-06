@@ -26,6 +26,8 @@ import {
   Filter,
   PenTool,
   Palette,
+  ChevronsUpDown,
+  X,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth, useIsAdmin } from "@/hooks/useAuth";
@@ -66,6 +68,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
   Table,
   TableBody,
   TableCell,
@@ -93,6 +100,7 @@ export default function MangaImporterPage() {
   const [loadingDbSeries, setLoadingDbSeries] = useState(false);
   const [selectedSeriesId, setSelectedSeriesId] = useState<string>("");
   const [seriesSearchTerm, setSeriesSearchTerm] = useState("");
+  const [seriesComboboxOpen, setSeriesComboboxOpen] = useState(false);
 
   // ── 1. METADATA IMPORTER STATE ──────────────────────────────────
   const [metaSource, setMetaSource] = useState<"comick" | "comix">("comick");
@@ -199,10 +207,22 @@ export default function MangaImporterPage() {
     void loadSources();
   }, [loadDbSeries, loadSources]);
 
-  // Filtered DB series for dropdown
-  const filteredDbSeries = dbSeries.filter((s) =>
-    s.title.toLowerCase().includes(seriesSearchTerm.toLowerCase()),
+  // Selected series object
+  const selectedDbSeries = useMemo(
+    () => dbSeries.find((s) => s.id === selectedSeriesId) || null,
+    [dbSeries, selectedSeriesId],
   );
+
+  // Filtered DB series for dropdown (search by title or slug)
+  const filteredDbSeries = useMemo(() => {
+    if (!seriesSearchTerm.trim()) return dbSeries;
+    const q = seriesSearchTerm.trim().toLowerCase();
+    return dbSeries.filter(
+      (s) =>
+        s.title.toLowerCase().includes(q) ||
+        (s.slug && s.slug.toLowerCase().includes(q)),
+    );
+  }, [dbSeries, seriesSearchTerm]);
 
   // Enrich Comick item details (author, artist, full tags)
   const enrichComickItem = async (c: ComickExtractedMetadata) => {
@@ -558,38 +578,191 @@ export default function MangaImporterPage() {
           </div>
 
           {/* Quick Target Series Selector in Header */}
-          <div className="bg-card/70 border border-border/40 rounded-xl p-3 min-w-[280px] shadow-sm backdrop-blur-md">
+          <div className="bg-card/70 border border-border/40 rounded-xl p-3 min-w-[300px] max-w-sm shadow-sm backdrop-blur-md">
             <div className="flex items-center justify-between mb-1.5">
-              <Label className="text-[11px] font-semibold text-neutral-300">Target Database Series:</Label>
+              <Label className="text-[11px] font-semibold text-neutral-300 flex items-center gap-1.5">
+                <span>Target Database Series:</span>
+                {selectedDbSeries && (
+                  <span className="text-[10px] text-purple-400 font-normal truncate max-w-[120px]">
+                    ({selectedDbSeries.slug})
+                  </span>
+                )}
+              </Label>
               <Button
                 variant="ghost"
                 size="sm"
+                title="Refresh series list"
                 className="h-5 px-1.5 text-[10px] text-muted-foreground hover:text-white"
                 onClick={loadDbSeries}
               >
                 <RefreshCw className={`h-3 w-3 ${loadingDbSeries ? "animate-spin" : ""}`} />
               </Button>
             </div>
-            <Select value={selectedSeriesId} onValueChange={setSelectedSeriesId}>
-              <SelectTrigger className="h-9 text-xs bg-neutral-900/80 border-neutral-800 text-white rounded-lg">
-                <SelectValue placeholder="Select target series..." />
-              </SelectTrigger>
-              <SelectContent className="max-h-64">
-                <div className="p-1 border-b border-border/30">
-                  <Input
-                    placeholder="Filter series..."
+
+            <Popover open={seriesComboboxOpen} onOpenChange={setSeriesComboboxOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  role="combobox"
+                  aria-expanded={seriesComboboxOpen}
+                  className="w-full h-9 justify-between bg-neutral-900/90 border-neutral-800 hover:bg-neutral-800 hover:text-white text-xs px-2.5 font-normal rounded-lg shadow-inner group"
+                >
+                  <div className="flex items-center gap-2 min-w-0 truncate text-left flex-1 mr-1">
+                    {selectedDbSeries ? (
+                      <>
+                        {selectedDbSeries.cover_url ? (
+                          <img
+                            src={selectedDbSeries.cover_url}
+                            alt=""
+                            className="h-6 w-4.5 rounded object-cover shrink-0 border border-neutral-700 bg-neutral-800"
+                          />
+                        ) : (
+                          <div className="h-6 w-4.5 rounded bg-neutral-800 border border-neutral-700 shrink-0 flex items-center justify-center">
+                            <BookOpen className="h-3 w-3 text-purple-400" />
+                          </div>
+                        )}
+                        <span className="truncate font-medium text-white">
+                          {selectedDbSeries.title}
+                        </span>
+                      </>
+                    ) : (
+                      <span className="text-muted-foreground">Select target series...</span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    {selectedDbSeries && (
+                      <span
+                        role="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedSeriesId("");
+                        }}
+                        className="p-0.5 rounded hover:bg-neutral-700 text-muted-foreground hover:text-white transition-colors cursor-pointer"
+                        title="Deselect series"
+                      >
+                        <X className="h-3 w-3" />
+                      </span>
+                    )}
+                    <ChevronsUpDown className="h-3.5 w-3.5 text-muted-foreground opacity-60" />
+                  </div>
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent
+                className="w-[320px] sm:w-[360px] p-0 bg-neutral-950/95 backdrop-blur-xl border-neutral-800 shadow-2xl rounded-xl overflow-hidden z-50"
+                align="end"
+              >
+                {/* Search Header */}
+                <div className="flex items-center border-b border-neutral-800/80 px-3 py-2 bg-neutral-900/40">
+                  <Search className="mr-2 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                  <input
+                    placeholder="Search by series title or slug..."
                     value={seriesSearchTerm}
                     onChange={(e) => setSeriesSearchTerm(e.target.value)}
-                    className="h-7 text-xs bg-neutral-900"
+                    className="flex h-7 w-full bg-transparent text-xs text-white placeholder:text-muted-foreground outline-none"
+                    autoFocus
                   />
+                  {seriesSearchTerm && (
+                    <button
+                      type="button"
+                      onClick={() => setSeriesSearchTerm("")}
+                      className="p-1 text-muted-foreground hover:text-white rounded"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  )}
                 </div>
-                {filteredDbSeries.map((s) => (
-                  <SelectItem key={s.id} value={s.id} className="text-xs">
-                    {s.title}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+
+                {/* Series List */}
+                <div className="max-h-72 overflow-y-auto p-1.5 divide-y divide-neutral-900/50">
+                  {loadingDbSeries ? (
+                    <div className="py-8 text-center text-xs text-muted-foreground flex items-center justify-center gap-2">
+                      <Loader2 className="h-4 w-4 animate-spin text-purple-400" />
+                      Loading series from database...
+                    </div>
+                  ) : filteredDbSeries.length === 0 ? (
+                    <div className="py-8 px-4 text-center">
+                      <p className="text-xs text-muted-foreground font-medium">
+                        No series found matching &quot;{seriesSearchTerm}&quot;
+                      </p>
+                      <p className="text-[11px] text-muted-foreground/70 mt-1">
+                        Try a different search or create the series first.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-0.5">
+                      {filteredDbSeries.map((s) => {
+                        const isSelected = selectedSeriesId === s.id;
+                        return (
+                          <button
+                            type="button"
+                            key={s.id}
+                            onClick={() => {
+                              setSelectedSeriesId(s.id);
+                              setSeriesSearchTerm("");
+                              setSeriesComboboxOpen(false);
+                            }}
+                            className={`w-full flex items-center justify-between gap-2.5 px-2.5 py-2 rounded-lg text-left transition-all cursor-pointer ${
+                              isSelected
+                                ? "bg-purple-600/25 text-purple-100 border border-purple-500/40 shadow-sm"
+                                : "hover:bg-neutral-900 text-neutral-200 border border-transparent"
+                            }`}
+                          >
+                            <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                              {s.cover_url ? (
+                                <img
+                                  src={s.cover_url}
+                                  alt=""
+                                  className="h-8 w-6 rounded object-cover shrink-0 border border-neutral-800 bg-neutral-900"
+                                  loading="lazy"
+                                />
+                              ) : (
+                                <div className="h-8 w-6 rounded bg-neutral-900 border border-neutral-800 shrink-0 flex items-center justify-center text-muted-foreground">
+                                  <BookOpen className="h-3 w-3" />
+                                </div>
+                              )}
+                              <div className="min-w-0 flex-1">
+                                <p
+                                  className={`text-xs font-semibold truncate ${
+                                    isSelected ? "text-purple-200" : "text-white"
+                                  }`}
+                                >
+                                  {s.title}
+                                </p>
+                                <p className="text-[10px] text-muted-foreground truncate font-mono">
+                                  {s.slug}
+                                </p>
+                              </div>
+                            </div>
+                            {isSelected && (
+                              <Check className="h-4 w-4 text-purple-400 shrink-0 ml-2" />
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                {/* Footer Count & Clear */}
+                <div className="border-t border-neutral-800/80 px-3 py-2 flex items-center justify-between text-[10px] text-muted-foreground bg-neutral-900/50">
+                  <span>
+                    Showing {filteredDbSeries.length} of {dbSeries.length} series
+                  </span>
+                  {selectedSeriesId && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedSeriesId("");
+                        setSeriesComboboxOpen(false);
+                      }}
+                      className="text-destructive hover:underline cursor-pointer"
+                    >
+                      Clear Selection
+                    </button>
+                  )}
+                </div>
+              </PopoverContent>
+            </Popover>
           </div>
         </div>
       </div>
@@ -740,10 +913,20 @@ export default function MangaImporterPage() {
                   ) : (
                     <div className="flex items-center gap-2">
                       <Download className="h-4 w-4" />
-                      <span>Apply Metadata to Selected Series</span>
+                      <span>
+                        {selectedDbSeries
+                          ? `Apply Metadata to "${selectedDbSeries.title}"`
+                          : "Apply Metadata to Selected Series"}
+                      </span>
                     </div>
                   )}
                 </Button>
+                {!selectedSeriesId && (
+                  <p className="text-[11px] text-amber-400/90 text-center flex items-center justify-center gap-1.5 pt-1">
+                    <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                    <span>Select a Target Database Series in the header above to apply metadata</span>
+                  </p>
+                )}
               </CardContent>
             </Card>
 
@@ -1237,20 +1420,32 @@ export default function MangaImporterPage() {
                       </label>
                     </div>
 
-                    <Button
-                      onClick={handleImportSelectedChapters}
-                      disabled={isImportingChapters || selectedChapterNums.size === 0 || !selectedSeriesId}
-                      className="h-10 px-6 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white font-bold cursor-pointer shadow-md text-xs shrink-0"
-                    >
-                      {isImportingChapters ? (
-                        <div className="flex items-center gap-2">
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                          <span>Importing...</span>
-                        </div>
-                      ) : (
-                        <span>Import {selectedChapterNums.size} Selected Chapter(s)</span>
+                    <div className="flex flex-col items-end gap-1 shrink-0">
+                      <Button
+                        onClick={handleImportSelectedChapters}
+                        disabled={isImportingChapters || selectedChapterNums.size === 0 || !selectedSeriesId}
+                        className="h-10 px-6 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white font-bold cursor-pointer shadow-md text-xs"
+                      >
+                        {isImportingChapters ? (
+                          <div className="flex items-center gap-2">
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            <span>Importing...</span>
+                          </div>
+                        ) : (
+                          <span>
+                            {selectedDbSeries
+                              ? `Import ${selectedChapterNums.size} Chapter(s) to "${selectedDbSeries.title}"`
+                              : `Import ${selectedChapterNums.size} Selected Chapter(s)`}
+                          </span>
+                        )}
+                      </Button>
+                      {!selectedSeriesId && (
+                        <p className="text-[11px] text-amber-400/90 flex items-center gap-1">
+                          <AlertTriangle className="h-3 w-3 shrink-0" />
+                          <span>Select a target series in the header above</span>
+                        </p>
                       )}
-                    </Button>
+                    </div>
                   </div>
                 </div>
               )}

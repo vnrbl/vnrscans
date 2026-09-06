@@ -361,6 +361,57 @@ export async function $autoImportSeriesCover(args: {
   }
 }
 
+async function mirrorPagesForChapter(
+  admin: ReturnType<typeof getAdminSupabase>,
+  seriesSlug: string,
+  chapterSlug: string,
+  images: string[]
+): Promise<string[]> {
+  return Promise.all(
+    images.map(async (rawImgUrl, idx) => {
+      const pageNum = idx + 1;
+      if (!rawImgUrl.includes("wowpic") && !rawImgUrl.includes("comix.to")) {
+        return rawImgUrl;
+      }
+      try {
+        const res = await fetch(rawImgUrl, {
+          headers: {
+            Referer: "https://comix.to/",
+            "User-Agent":
+              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+            Accept: "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
+          },
+          signal: AbortSignal.timeout(15_000),
+        });
+
+        if (res.ok) {
+          const contentType = res.headers.get("content-type") || "image/webp";
+          const ext = contentType.includes("jpeg") || contentType.includes("jpg") ? "jpg" : "webp";
+          const arrayBuffer = await res.arrayBuffer();
+          const storagePath = `${seriesSlug}/${chapterSlug}/page-${String(pageNum).padStart(3, "0")}.${ext}`;
+
+          const { error: upErr } = await admin.storage
+            .from("chapter-pages")
+            .upload(storagePath, Buffer.from(arrayBuffer), {
+              contentType,
+              upsert: true,
+            });
+
+          if (!upErr) {
+            const { data: { publicUrl } } = admin.storage
+              .from("chapter-pages")
+              .getPublicUrl(storagePath);
+            return publicUrl;
+          }
+        }
+      } catch (e) {
+        console.warn(`[StorageMirror] Failed for ${chapterSlug} p${pageNum}:`, e);
+      }
+      return rawImgUrl;
+    })
+  );
+}
+
 export async function $runCloudScrape(args: {
   data: {
     accessToken: string;
@@ -601,15 +652,26 @@ export async function $runCloudScrape(args: {
       };
     }
 
-    const pageRows = (insertedChapters ?? []).flatMap((chapter: any) => {
+    let seriesSlug = "series";
+    if (validated.seriesId) {
+      const { data: s } = await admin.from("series").select("slug").eq("id", validated.seriesId).maybeSingle();
+      if (s?.slug) seriesSlug = s.slug;
+    }
+
+    const pageRows: Array<{ chapter_id: string; page_number: number; image_url: string }> = [];
+    for (const chapter of insertedChapters ?? []) {
       const key = chapterScanKey(Number(chapter.chapter_number), chapter.scanlation_group);
-      const images = chapterImages.get(key) ?? [];
-      return images.map((imageUrl, index) => ({
-        chapter_id: chapter.id,
-        page_number: index + 1,
-        image_url: imageUrl,
-      }));
-    });
+      const rawImages = chapterImages.get(key) ?? [];
+      const chSlug = chapter.slug || `chapter-${chapter.chapter_number}`;
+      const mirroredUrls = await mirrorPagesForChapter(admin, seriesSlug, chSlug, rawImages);
+      mirroredUrls.forEach((url, index) => {
+        pageRows.push({
+          chapter_id: chapter.id,
+          page_number: index + 1,
+          image_url: url,
+        });
+      });
+    }
 
     const { error: pagesError } = await admin.from("chapter_pages").insert(pageRows);
 
@@ -915,15 +977,21 @@ export async function $syncImportSource(args: {
 
       if (insertedList.length > 0) {
         // Bulk insert all pages in chunks of 500
-        const pageRows = insertedList.flatMap((chapter: any) => {
+        const seriesSlug = (source as any)?.series?.slug || "series";
+        const pageRows: Array<{ chapter_id: string; page_number: number; image_url: string }> = [];
+        for (const chapter of insertedList) {
           const key = chapterScanKey(Number(chapter.chapter_number), chapter.scanlation_group);
-          const images = chapterImages.get(key) ?? [];
-          return images.map((imageUrl, index) => ({
-            chapter_id: chapter.id,
-            page_number: index + 1,
-            image_url: imageUrl,
-          }));
-        });
+          const rawImages = chapterImages.get(key) ?? [];
+          const chSlug = chapter.slug || `chapter-${chapter.chapter_number}`;
+          const mirroredUrls = await mirrorPagesForChapter(admin, seriesSlug, chSlug, rawImages);
+          mirroredUrls.forEach((url, index) => {
+            pageRows.push({
+              chapter_id: chapter.id,
+              page_number: index + 1,
+              image_url: url,
+            });
+          });
+        }
 
         const CHUNK_SIZE = 500;
         let pagesFailed = false;

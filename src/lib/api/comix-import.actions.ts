@@ -9,6 +9,7 @@ import {
   type ChapterInfo,
   type ComixGroupInfo,
 } from "@/lib/chapter-scraper";
+import { resolveChapterImageUrl } from "@/lib/chapter-utils";
 
 function getAdminSupabase() {
   const url = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
@@ -52,7 +53,20 @@ async function verifyAdmin(accessToken: string) {
   );
   if (!isAdmin) throw new Error("Unauthorized: Admin or Uploader access required");
 
-  return user;
+  // Fetch actual user profile username (e.g. vnr610)
+  const { data: profile } = await admin
+    .from("profiles")
+    .select("username")
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  (user as any).username =
+    profile?.username ||
+    user.user_metadata?.username ||
+    user.user_metadata?.name ||
+    "vnr610";
+
+  return user as typeof user & { username: string };
 }
 
 function slugify(text: string) {
@@ -660,7 +674,7 @@ export async function $importComixChaptersToSeries(args: {
             status: "published",
             scanlation_group: effectiveGroup,
             source_url: ch.url,
-            uploaded_by: (adminUser as any)?.username || "admin",
+            uploaded_by: adminUser.username || "vnr610",
           })
           .select("id")
           .single();
@@ -679,7 +693,7 @@ export async function $importComixChaptersToSeries(args: {
               status: "published",
               scanlation_group: effectiveGroup,
               source_url: ch.url,
-              uploaded_by: (adminUser as any)?.username || "admin",
+              uploaded_by: adminUser.username || "vnr610",
             })
             .select("id")
             .single();
@@ -692,16 +706,60 @@ export async function $importComixChaptersToSeries(args: {
           continue;
         }
 
-        // Insert chapter pages
-        const pagesPayload = images.map((imgUrl, idx) => ({
-          chapter_id: chapterRow.id,
-          page_number: idx + 1,
-          image_url: imgUrl,
-        }));
+        // Parallel mirror images to Supabase storage to bypass hotlink 403 blocks
+        const mirroredPages = await Promise.all(
+          images.map(async (rawImgUrl, idx) => {
+            const pageNum = idx + 1;
+            let finalUrl = rawImgUrl;
+
+            if (rawImgUrl.includes("wowpic") || rawImgUrl.includes("comix.to")) {
+              try {
+                const res = await fetch(rawImgUrl, {
+                  headers: {
+                    Referer: "https://comix.to/",
+                    "User-Agent":
+                      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+                    Accept: "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
+                  },
+                  signal: AbortSignal.timeout(12_000),
+                });
+
+                if (res.ok) {
+                  const contentType = res.headers.get("content-type") || "image/webp";
+                  const ext = contentType.includes("jpeg") || contentType.includes("jpg") ? "jpg" : "webp";
+                  const arrayBuffer = await res.arrayBuffer();
+                  const storagePath = `${series.slug}/${chapterSlug}/page-${String(pageNum).padStart(3, "0")}.${ext}`;
+
+                  const { error: upErr } = await admin.storage
+                    .from("chapter-pages")
+                    .upload(storagePath, Buffer.from(arrayBuffer), {
+                      contentType,
+                      upsert: true,
+                    });
+
+                  if (!upErr) {
+                    const { data: { publicUrl } } = admin.storage
+                      .from("chapter-pages")
+                      .getPublicUrl(storagePath);
+                    finalUrl = publicUrl;
+                  }
+                }
+              } catch (mirrorErr) {
+                console.warn(`[ComixImport] Storage mirror failed for page ${pageNum}:`, mirrorErr);
+              }
+            }
+
+            return {
+              chapter_id: chapterRow.id,
+              page_number: pageNum,
+              image_url: finalUrl,
+            };
+          }),
+        );
 
         const { error: pagesError } = await admin
           .from("chapter_pages")
-          .insert(pagesPayload);
+          .insert(mirroredPages);
 
         if (pagesError) {
           console.error(`[ComixImport] Error inserting pages for ch ${ch.chapterNumber}:`, pagesError);

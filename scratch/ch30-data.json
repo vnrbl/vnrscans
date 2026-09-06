@@ -1,0 +1,65 @@
+{
+  "page": "read",
+  "queries": {
+    "[\"manga\",\"detail\",18537]": {
+      "id": 18537,
+      "hid": "190ml",
+      "title": "The Legend of the Northern Blade",
+      "altTitles": [
+        "북검전기",
+        "北剣伝記",
+        "Legend of the Northern Blade",
+        "Buggeomjeongi",
+        "Легенда о северном клинке",
+        "Bắc Kiếm Giang Hồ",
+        "Солтүстік жүз аңызы",
+        "Biographie de l'épée du nord",
+        "Легенда про північний клинок"
+      ],
+      "type": "manhwa",
+      "status": "finished",
+      "originalLanguage": "ko",
+      "poster": {
+        "medium": "https://static.comix.to/570c/i/f/11/68dea13586134@280.jpg",
+        "large": "https://static.comix.to/570c/i/f/11/68dea13586134.jpg"
+      },
+      "latestChapter": 202.2,
+      "finalChapter": 202,
+      "finalVolume": 2,
+      "hasChapters": true,
+      "chapterUpdatedAtFormatted": "8mos ago",
+      "createdAtFormatted": "11mos ago",
+      "updatedAtFormatted": "4m ago",
+      "startDate": "2019",
+      "endDate": "?",
+      "year": 2019,
+      "rank": 69,
+      "synopsis": "When the world was plunged into darkness by the ‘Silent Night’, Martial Artists from all over the place gathered to form the ‘Northern Heavenly Sect’. With overwhelming strength from the Northern Heavenly Sect, the Silent Night was pushed away and the people began to enjoy peace once more. However, as time passed the martial artists from the mainlands began to conspire against the ‘Northern Heavenly Sect’, and eventually caused the death of the Fourth Generation Sect Leader, Jin Kwan-Ho, destroying the sect with it. As everyone left the sect, Jin Kwan-Ho’s only son, Jin Mu-Won was left behind. Mu-Won has never learned anything about martial arts, but he eventually finds the Martial Techniques secretly left behind by his father and begins to acquire the martial arts of the Northern Heavenly Sect. Then one day, a mysterious girl appears before Mu-Won…!!\n\n---\n- [Webtoon Trailer](https://www.youtube.com/watch?v=A1DyXT9AZt8)\n- [Original Webtoon <Webtoon kakao>](https://webtoon.kakao.com/content/%EB%B6%81%EA%B2%80%EC%A0%84%EA%B8%B0/2362)\n- [Official Japanese Translation](https://piccoma.com/web/product/47964)\n- [Official French Translation](https://www.tappytoon.com/fr/comics/legend-of-northern-blade-fr)\n- [Official German Translation](https://www.tappytoon.com/de/comics/legend-of-northern-blade-de)\n- [Original Book <Aladin>](https://www.aladin.co.kr/shop/wproduct.aspx?ItemId=266454987)\n- [Original Book <Yes24>](http://www.yes24.com/Product/Goods/97912943)",
+      "synopsisHtml": "When the world was plunged into darkness by the ‘Silent Night’, Martial Artists from all over the place gathered to form the ‘Northern Heavenly Sect’. With overwhelming strength from the Northern Heavenly Sect, the Silent Night was pushed away and the people began to enjoy peace once more. However, as time passed the martial artists from the mainlands began to conspire against the ‘Northern Heavenly Sect’, and eventually caused the death of the Fourth Generation Sect Leader, Jin Kwan-Ho, destroying the sect with it. As everyone left the sect, Jin Kwan-Ho’s only son, Jin Mu-Won was left behind. Mu-Won has never learned anything about martial arts, but he eventually finds the Martial Techniques secretly left behind by his father and begins to acquire the martial arts of the Northern Heavenly Sect. Then one day, a mysterious girl appears before Mu-Won…!!<br>\n<br>\n---<br>\n- <a href=\"https://www.youtube.com/watch?v=A1DyXT9AZt8\" target=\"_blank\" rel=\"noopener noreferrer\">Webtoon Trailer</a><br>\n- <a href=\"https://webtoon.kakao.com/content/%EB%B6%81%EA%B2%80%EC%A0%84%EA%B8%B0/2362\" target=\"_blank\" rel=\"noopener noreferrer\">Original Webtoon &lt;Webtoon kakao&gt;</a><br>\n- <a href=\"https://piccoma.com/web/product/47964\" target=\"_blank\" rel=\"noopener noreferrer\">Official Japanese Translation</a><br>\n- <a href=\"https://www.tappytoon.com/fr/comics/legend-of-northern-blade-fr\" target=\"_blank\" rel=\"noopener noreferrer\">Official French Translation</a><br>\n- <a href=\"https://www.tappytoon.com/de/comics/legend-of-northern-blade-de\" target=\"_blank\" rel=\"noopener noreferrer\">Official German Translation</a><br>\n- <a href=\"https://www.aladin.co.kr/shop/wproduct.aspx?ItemId=266454987\" target=\"_blank\" rel=\"noopener noreferrer\">Original Book &lt;Aladin&gt;</a><br>\n- <a href=\"http://www.yes24.com/Product/Goods/97912943\" target=\"_blank\" rel=\"noopener noreferrer\">Original Book &lt;Yes24&gt;</a>",
+      "followsTotal": 27205,
+      "ratedAvg": 9.6,
+      "ratedScore": 9.28,
+      "ratedCount": 2015,
+      "contentRating": "safe",
+      "links": {
+        "al": "https://anilist.co/manga/119521/",
+        "mal": "https://myanimelist.net/manga/134744/",
+        "mu": "https://www.mangaupdates.com/series/mgnqe6t/",
+        "md": "https://mangadex.org/title/9ed16bc9-f570-4e71-8dda-aebc098b683b/",
+        "mb": "https://mangabaka.org/2960/"
+      },
+      "url": "/title/190ml-the-legend-of-the-northern-blade",
+      "uploadUrl": "/user/upload/190ml",
+      "editUrl": "/user/manga/190ml/edit"
+    }
+  },
+  "routes": {
+    "createCollectionUrl": "https://comix.to/user/collections/create"
+  },
+  "read": {
+    "mangaId": 18537,
+    "mangaHid": "190ml",
+    "chapterId": 6979899,
+    "chapterNumber": 30
+  }
+}

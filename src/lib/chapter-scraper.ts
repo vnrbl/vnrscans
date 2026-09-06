@@ -2750,6 +2750,12 @@ export async function extractComixChaptersWithGroups(
     }
 
     await page.goto(targetUrl, { waitUntil: 'networkidle2', timeout: 45000 });
+    if (page.url().includes('@waf/challenge')) {
+      const solved = await solveComixWafCaptchaIfNeeded(page);
+      if (solved) {
+        await page.goto(targetUrl, { waitUntil: 'networkidle2', timeout: 45000 });
+      }
+    }
     await page.waitForSelector('.mchap-list, a[href*="-chapter-"]', { timeout: 15000 }).catch(() => {});
 
     // 1. Extract scan groups from <script id="initial-data">
@@ -2868,6 +2874,91 @@ async function extractComixChapters(seriesUrl: string): Promise<ChapterInfo[]> {
   return res.chapters;
 }
 
+async function solveComixWafCaptchaIfNeeded(page: any): Promise<boolean> {
+  const currentUrl = page.url();
+  if (!currentUrl.includes('@waf/challenge')) return false;
+
+  console.log('[ComixScraper] Encountered WAF rotation captcha. Solving automatically in-browser...');
+  try {
+    const sharpModule = await import('sharp');
+    const sharp = sharpModule.default || sharpModule;
+    const data = await page.evaluate(async () => {
+      const res = await fetch('/@waf/generate', { headers: { Accept: 'application/json' } });
+      return await res.json();
+    });
+
+    if (!data || !data.captcha_id || !data.image_base64 || !data.thumb_base64) {
+      return false;
+    }
+
+    const mainBuf = Buffer.from(data.image_base64.split(',')[1], 'base64');
+    const thumbBuf = Buffer.from(data.thumb_base64.split(',')[1], 'base64');
+
+    const mainRaw = await sharp(mainBuf).raw().toBuffer({ resolveWithObject: true });
+    const thumbRaw = await sharp(thumbBuf).raw().toBuffer({ resolveWithObject: true });
+
+    const r = (data.thumb_size || 140) / 2;
+    const rThumb = r - 2;
+    const rMain = r + 2;
+
+    const N = 360;
+    const thumbRing: number[][] = [];
+    const mainRing: number[][] = [];
+
+    for (let i = 0; i < N; i++) {
+      const rad = (i * Math.PI) / 180;
+      const tx = Math.round(thumbRaw.info.width / 2 + rThumb * Math.cos(rad));
+      const ty = Math.round(thumbRaw.info.height / 2 + rThumb * Math.sin(rad));
+      const tIdx = (ty * thumbRaw.info.width + tx) * thumbRaw.info.channels;
+      thumbRing.push([thumbRaw.data[tIdx], thumbRaw.data[tIdx + 1], thumbRaw.data[tIdx + 2]]);
+
+      const mx = Math.round(mainRaw.info.width / 2 + rMain * Math.cos(rad));
+      const my = Math.round(mainRaw.info.height / 2 + rMain * Math.sin(rad));
+      const mIdx = (my * mainRaw.info.width + mx) * mainRaw.info.channels;
+      mainRing.push([mainRaw.data[mIdx], mainRaw.data[mIdx + 1], mainRaw.data[mIdx + 2]]);
+    }
+
+    let bestAngle = 0;
+    let minDiff = Infinity;
+
+    for (let angle = 0; angle < 360; angle++) {
+      let diff = 0;
+      for (let phi = 0; phi < N; phi++) {
+        const tPhi = (phi - angle + 360) % 360;
+        const tPix = thumbRing[tPhi];
+        const mPix = mainRing[phi];
+        const dr = tPix[0] - mPix[0];
+        const dg = tPix[1] - mPix[1];
+        const db = tPix[2] - mPix[2];
+        diff += dr * dr + dg * dg + db * db;
+      }
+      if (diff < minDiff) {
+        minDiff = diff;
+        bestAngle = angle;
+      }
+    }
+
+    console.log(`[ComixScraper] Computed best angle ${bestAngle}° for captcha ${data.captcha_id}. Submitting...`);
+
+    const verifyResult = await page.evaluate(async (payload: any) => {
+      const res = await fetch('/@waf/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      return await res.json();
+    }, { captcha_id: data.captcha_id, angle: bestAngle });
+
+    if (verifyResult && verifyResult.success) {
+      console.log('[ComixScraper] Captcha verified successfully!');
+      return true;
+    }
+  } catch (err) {
+    console.warn('[ComixScraper] Auto captcha solver warning:', err);
+  }
+  return false;
+}
+
 async function extractComixChapterImages(chapterUrl: string): Promise<string[]> {
   const puppeteer = await import('puppeteer');
   const chrome = await resolveChromeExecutable(puppeteer.default);
@@ -2900,10 +2991,54 @@ async function extractComixChapterImages(chapterUrl: string): Promise<string[]> 
       'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
     );
 
-    await page.goto(chapterUrl, { waitUntil: 'networkidle2', timeout: 35000 });
-    await page.waitForSelector('.rpage-page__img', { timeout: 15000 }).catch(() => {});
+    // Capture image network requests in real-time as the reader lazy-loads them
+    const networkImages: string[] = [];
+    page.on('response', (res) => {
+      try {
+        const u = res.url();
+        if (
+          (u.includes('wowpic') || u.includes('/i5/') || u.includes('static.comix.to')) &&
+          !u.includes('avatar') &&
+          !u.includes('logo') &&
+          !u.includes('icon')
+        ) {
+          if (!networkImages.includes(u)) {
+            networkImages.push(u);
+          }
+        }
+      } catch {}
+    });
 
-    const images = await page.evaluate(() => {
+    await page.goto(chapterUrl, { waitUntil: 'networkidle2', timeout: 35000 });
+    if (page.url().includes('@waf/challenge')) {
+      const solved = await solveComixWafCaptchaIfNeeded(page);
+      if (solved) {
+        await page.goto(chapterUrl, { waitUntil: 'networkidle2', timeout: 35000 });
+      }
+    }
+    await page.waitForSelector('.rpage-page__img, .rpage-page', { timeout: 15000 }).catch(() => {});
+
+    // Progressive auto-scroll to trigger virtualized reader lazy loading for all chapter pages
+    await page.evaluate(async () => {
+      await new Promise<void>((resolve) => {
+        let currentPos = 0;
+        const step = 900;
+        const timer = setInterval(() => {
+          window.scrollBy(0, step);
+          currentPos += step;
+          const maxScroll = Math.max(document.body.scrollHeight, document.documentElement.scrollHeight);
+          if (currentPos >= maxScroll + 3000) {
+            clearInterval(timer);
+            resolve();
+          }
+        }, 120);
+      });
+    });
+
+    // Brief pause to allow the final images to mount
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+
+    const domImages = await page.evaluate(() => {
       const imgs = Array.from(
         document.querySelectorAll('.rpage-page__img, img[src*="wowpic"], img[src*="static.comix.to"]'),
       );
@@ -2919,8 +3054,16 @@ async function extractComixChapterImages(chapterUrl: string): Promise<string[]> 
         );
     });
 
-    const uniqueImages = Array.from(new Set(images));
-    return uniqueImages;
+    // Merge network-captured and DOM-extracted images in sequence
+    const merged: string[] = [];
+    for (const img of networkImages) {
+      if (!merged.includes(img)) merged.push(img);
+    }
+    for (const img of domImages) {
+      if (!merged.includes(img)) merged.push(img);
+    }
+
+    return merged;
   } finally {
     await browser.close();
   }

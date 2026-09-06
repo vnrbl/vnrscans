@@ -51,3 +51,29 @@ export function scanlationGroupToSelectValue(
   }
   return { selectValue: SCANLATION_GROUP_NEW, newGroupName: group };
 }
+
+/**
+ * Resolves chapter image URLs, routing hotlink-protected sources (e.g. wowpic1.store / comix.to)
+ * through our safe server-side image proxy with appropriate Referer headers.
+ */
+export function resolveChapterImageUrl(url: string | null | undefined): string {
+  if (!url) return "";
+  const trimmed = url.trim();
+  if (!trimmed) return "";
+
+  // If already proxied, return as-is
+  if (trimmed.startsWith("/api/proxy/image")) {
+    return trimmed;
+  }
+
+  // Detect hotlink-protected CDNs that block foreign referrers or require comix.to referer
+  if (
+    trimmed.includes("wowpic1.store") ||
+    trimmed.includes("wowpic") ||
+    (trimmed.includes("comix.to") && !trimmed.includes("static.comix.to"))
+  ) {
+    return `/api/proxy/image?url=${encodeURIComponent(trimmed)}`;
+  }
+
+  return trimmed;
+}

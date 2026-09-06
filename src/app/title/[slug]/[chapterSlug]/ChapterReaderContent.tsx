@@ -75,6 +75,7 @@ import { toast } from "sonner";
 import { safeUrlOrNull, serializeAttachmentUrls, parseSafeAttachmentUrls } from "@/lib/safe-url";
 import { CommentAttachmentGrid } from "@/components/comments/CommentAttachmentGrid";
 import { sanitizeHtml } from "@/lib/html-sanitizer";
+import { resolveChapterImageUrl } from "@/lib/chapter-utils";
 import NovelSettingsPanel from "@/components/NovelSettingsPanel";
 
 const isVideoUrl = (url: string) => {
@@ -250,10 +251,19 @@ export default function Reader({
         .eq("chapter_id", chapterQ.data.id)
         .order("page_number");
       if (error) throw error;
-      return data ?? [];
+      return (data ?? []).map((p) => ({
+        ...p,
+        image_url: resolveChapterImageUrl(p.image_url),
+      }));
     },
     enabled: !!chapterQ.data?.id,
-    initialData: initialPagesData && initialPagesData.length > 0 ? initialPagesData : undefined,
+    initialData:
+      initialPagesData && initialPagesData.length > 0
+        ? initialPagesData.map((p) => ({
+            ...p,
+            image_url: resolveChapterImageUrl(p.image_url),
+          }))
+        : undefined,
     staleTime: 1000 * 60 * 5,
     gcTime: 1000 * 60 * 30,
   });

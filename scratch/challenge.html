@@ -1,0 +1,289 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Security check</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #0f1115;
+    color: #e6e6e6;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+    padding: 16px;
+  }
+  .card {
+    width: 100%;
+    max-width: 320px;
+    background: #1a1d24;
+    border: 1px solid #2a2e37;
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: 0 8px 30px rgba(0,0,0,.4);
+  }
+  h1 { font-size: 18px; margin: 0 0 4px; }
+  .hint { font-size: 13px; color: #9aa0aa; margin: 0 0 16px; }
+  @keyframes captcha-shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+  }
+  .stage {
+    position: relative;
+    width: 220px;
+    height: 220px;
+    max-width: 100%;
+    margin: 0 auto;
+    border-radius: 50%;
+    overflow: hidden;
+    background: linear-gradient(100deg, #20242c 30%, #2a2f3a 50%, #20242c 70%);
+    background-size: 200% 100%;
+    animation: captcha-shimmer 1.4s ease-in-out infinite;
+    touch-action: none;
+    user-select: none;
+  }
+  /* Images are inline data URIs: once src is set they render immediately, so
+     hiding the src-less <img> is enough to never expose a broken-image icon. */
+  #main:not([src]), #thumb:not([src]) { display: none; }
+  #main {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+    pointer-events: none;
+  }
+  .thumbWrap {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+  }
+  #thumbBlock {
+    width: 150px;
+    height: 150px;
+    border-radius: 50%;
+    overflow: hidden;
+    box-shadow: 0 0 0 2px rgba(255,255,255,.5);
+  }
+  #thumb {
+    display: block;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+  }
+  .ring {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    border: 6px solid rgba(224,224,224,.15);
+    pointer-events: none;
+  }
+  .pointer {
+    position: absolute;
+    top: 4px;
+    left: 50%;
+    width: 2px;
+    height: 12px;
+    margin-left: -1px;
+    background: #3b82f6;
+    pointer-events: none;
+  }
+  .dragLayer {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    cursor: grab;
+  }
+  .dragLayer:active { cursor: grabbing; }
+  .angle-readout {
+    text-align: center;
+    font-size: 12px;
+    color: #9aa0aa;
+    margin-top: 10px;
+  }
+  .actions { display: flex; gap: 8px; margin-top: 12px; }
+  button {
+    flex: 1;
+    padding: 10px;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    cursor: pointer;
+  }
+  #refresh { background: #2a2e37; color: #e6e6e6; }
+  #verify { background: #3b82f6; color: #fff; }
+  button:disabled { opacity: .5; cursor: default; }
+  .status { margin-top: 12px; font-size: 13px; min-height: 18px; text-align: center; }
+  .status.error { color: #f87171; }
+  .status.ok { color: #4ade80; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <h1>Verify you're human</h1>
+    <p class="hint">Drag to rotate the circle until the picture lines up</p>
+    <div class="stage" id="stage">
+      <img id="main" alt="captcha" draggable="false">
+      <div class="thumbWrap">
+        <div id="thumbBlock">
+          <img id="thumb" alt="rotating piece" draggable="false">
+        </div>
+      </div>
+      <div class="ring"></div>
+      <div class="pointer"></div>
+      <div class="dragLayer" id="dragLayer"></div>
+    </div>
+    <div class="angle-readout" id="angleReadout">0°</div>
+    <div class="actions">
+      <button id="refresh" type="button">Refresh</button>
+      <button id="verify" type="button">Verify</button>
+    </div>
+    <div class="status" id="status"></div>
+  </div>
+<script>
+(function () {
+  var stage = document.getElementById('stage');
+  var dragLayer = document.getElementById('dragLayer');
+  var mainImg = document.getElementById('main');
+  var thumbImg = document.getElementById('thumb');
+  var thumbBlock = document.getElementById('thumbBlock');
+  var angleReadout = document.getElementById('angleReadout');
+  var statusEl = document.getElementById('status');
+  var refreshBtn = document.getElementById('refresh');
+  var verifyBtn = document.getElementById('verify');
+
+  var captchaId = '';
+  var currentAngle = 0;
+  var dragging = false;
+  var busy = false;
+
+  function setStatus(msg, kind) {
+    statusEl.textContent = msg || '';
+    statusEl.className = 'status' + (kind ? ' ' + kind : '');
+  }
+
+  function setAngle(deg) {
+    currentAngle = ((deg % 360) + 360) % 360;
+    thumbBlock.style.transform = 'rotate(' + currentAngle + 'deg)';
+    angleReadout.textContent = Math.round(currentAngle) + '°';
+  }
+
+  function resetImageState() {
+    mainImg.removeAttribute('src');
+    thumbImg.removeAttribute('src');
+    setAngle(0);
+  }
+
+  function loadChallenge() {
+    if (busy) { return; }
+    busy = true;
+    resetImageState();
+    setStatus('Loading…');
+    fetch('/@waf/generate', { headers: { 'Accept': 'application/json' } })
+      .then(function (res) { return res.json(); })
+      .then(function (data) {
+        captchaId = data.captcha_id;
+        var size = data.thumb_size > 0 ? data.thumb_size : 150;
+        thumbBlock.style.width = size + 'px';
+        thumbBlock.style.height = size + 'px';
+        mainImg.src = data.image_base64;
+        thumbImg.src = data.thumb_base64;
+        setStatus('');
+      })
+      .catch(function () {
+        setStatus('Failed to load. Please try again.', 'error');
+      })
+      .then(function () { busy = false; });
+  }
+
+  function submit() {
+    if (busy || !captchaId) { return; }
+    setStatus('Verifying…');
+    busy = true;
+    fetch('/@waf/verify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ captcha_id: captchaId, angle: Math.round(currentAngle) })
+    })
+      .then(function (res) { return res.json(); })
+      .then(function (data) {
+        busy = false;
+        if (data && data.success) {
+          setStatus('Success, redirecting…', 'ok');
+          window.location.href = safeReturnTarget();
+        } else {
+          setStatus('Verification failed. Please try again.', 'error');
+          loadChallenge();
+        }
+      })
+      .catch(function () {
+        busy = false;
+        setStatus('Connection error. Please try again.', 'error');
+        loadChallenge();
+      });
+  }
+
+  function safeReturnTarget() {
+    var params = new URLSearchParams(window.location.search);
+    var target = params.get('return');
+    if (!target) { return '/'; }
+    if (target.charAt(0) !== '/') { return '/'; }
+    if (target.charAt(1) === '/' || target.charAt(1) === '\\') { return '/'; }
+    return target;
+  }
+
+  function angleFromEvent(event) {
+    var rect = stage.getBoundingClientRect();
+    var cx = rect.left + rect.width / 2;
+    var cy = rect.top + rect.height / 2;
+    var dx = event.clientX - cx;
+    var dy = event.clientY - cy;
+    var deg = Math.atan2(dx, -dy) * 180 / Math.PI;
+    return (deg + 360) % 360;
+  }
+
+  function onPointerDown(event) {
+    if (busy || !captchaId) { return; }
+    dragging = true;
+    if (dragLayer.setPointerCapture) {
+      dragLayer.setPointerCapture(event.pointerId);
+    }
+    setAngle(angleFromEvent(event));
+    event.preventDefault();
+  }
+
+  function onPointerMove(event) {
+    if (!dragging) { return; }
+    setAngle(angleFromEvent(event));
+    event.preventDefault();
+  }
+
+  function onPointerUp(event) {
+    if (!dragging) { return; }
+    dragging = false;
+    if (dragLayer.releasePointerCapture) {
+      try { dragLayer.releasePointerCapture(event.pointerId); } catch (e) {}
+    }
+  }
+
+  dragLayer.addEventListener('pointerdown', onPointerDown);
+  dragLayer.addEventListener('pointermove', onPointerMove);
+  dragLayer.addEventListener('pointerup', onPointerUp);
+  dragLayer.addEventListener('pointercancel', onPointerUp);
+
+  refreshBtn.addEventListener('click', loadChallenge);
+  verifyBtn.addEventListener('click', submit);
+
+  loadChallenge();
+})();
+</script>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a36f8381195cede5',t:'MTc4ODcxOTA5OQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>
