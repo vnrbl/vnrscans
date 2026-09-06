@@ -211,7 +211,7 @@ export function Navbar() {
                       type="button"
                       title="Add New Series"
                       aria-label="Add New Series"
-                      className="grid h-7 w-7 place-items-center rounded-lg border border-purple-500/40 bg-purple-950/30 text-purple-300 hover:bg-purple-900/60 hover:text-white hover:border-purple-400 transition-all duration-200 hover:scale-110 shadow-sm cursor-pointer shrink-0"
+                      className="grid h-7 w-7 place-items-center rounded-lg border border-white/20 bg-white/10 text-white hover:bg-white hover:text-black hover:border-white transition-all duration-200 hover:scale-110 shadow-sm cursor-pointer shrink-0"
                     >
                       <Plus className="h-4 w-4 stroke-[2.5]" />
                     </button>
@@ -226,7 +226,7 @@ export function Navbar() {
             <button
               onClick={() => setSearchOpen(true)}
               title="Search (Ctrl+K)"
-              className="flex items-center gap-2.5 w-[200px] md:w-[260px] lg:w-[320px] h-9 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 hover:border-purple-500/40 px-3 text-xs text-neutral-400 hover:text-white transition-all focus:outline-none shadow-sm cursor-pointer"
+              className="flex items-center gap-2.5 w-[200px] md:w-[260px] lg:w-[320px] h-9 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 hover:border-white/30 px-3 text-xs text-neutral-400 hover:text-white transition-all focus:outline-none shadow-sm cursor-pointer"
             >
               <Search className="h-3.5 w-3.5 shrink-0 text-neutral-400 stroke-[1.8]" />
               <span className="flex-1 truncate text-left font-sans font-normal tracking-normal text-neutral-400">
@@ -540,16 +540,16 @@ export function Navbar() {
         {showPanel ? (
           <>
             {/* Center Floating Action Button for Add Series (Admin Only) */}
-            <div className="relative flex items-center justify-center shrink-0 -mt-6 z-20 px-1">
+            <div className="relative flex items-center justify-center shrink-0 -mt-8 z-20 px-1">
               <AddNewSeriesDialog
                 trigger={
                   <button
                     type="button"
                     title="Add New Series (Admin Only)"
                     aria-label="Add New Series"
-                    className="group relative flex h-[52px] w-[52px] items-center justify-center rounded-full bg-gradient-to-tr from-purple-600 via-violet-500 to-pink-500 text-white shadow-[0_4px_20px_rgba(168,85,247,0.65)] ring-4 ring-background hover:scale-110 active:scale-95 transition-all duration-200 cursor-pointer select-none"
+                    className="group relative flex h-[50px] w-[50px] items-center justify-center rounded-full bg-white text-black ring-[5px] ring-background hover:bg-neutral-200 active:scale-95 transition-all duration-150 cursor-pointer select-none shadow-md shadow-black/60"
                   >
-                    <Plus className="h-7 w-7 stroke-[3] transition-transform duration-200 group-hover:rotate-90 text-white" />
+                    <Plus className="h-6 w-6 stroke-[2.8] text-black transition-transform duration-200 group-hover:rotate-90" />
                   </button>
                 }
               />

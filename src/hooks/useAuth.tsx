@@ -27,15 +27,29 @@ const AuthContext = createContext<AuthState>({
   loading: true,
 });
 
+const VNR_CACHED_USER_KEY = "vnr_cached_user";
+
+function getInitialUser(): User | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(VNR_CACHED_USER_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch {}
+  return null;
+}
+
 /**
  * Mount this ONCE in the root Providers tree.
  * It creates a single `onAuthStateChange` listener instead of one per component.
  */
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<AuthState>({
-    session: null,
-    user: null,
-    loading: true,
+  const [state, setState] = useState<AuthState>(() => {
+    const initialUser = getInitialUser();
+    return {
+      session: null,
+      user: initialUser,
+      loading: initialUser ? false : true,
+    };
   });
 
   useEffect(() => {
@@ -60,6 +74,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (profile?.is_banned) {
           console.warn("useAuth: user is banned, signing out...");
           await supabase.auth.signOut();
+          try {
+            localStorage.removeItem(VNR_CACHED_USER_KEY);
+            localStorage.removeItem("vnr_is_admin");
+            localStorage.removeItem("vnr_is_mod");
+            localStorage.removeItem("vnr_is_uploader");
+          } catch {}
           setState({ session: null, user: null, loading: false });
           toast.error("Your account has been suspended. Contact support if you believe this is a mistake.");
         }
@@ -75,6 +95,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (error) {
         console.error("useAuth: getSession error:", error);
         setState({ session: null, user: null, loading: false });
+        try {
+          localStorage.removeItem(VNR_CACHED_USER_KEY);
+        } catch {}
         return;
       }
 
@@ -85,7 +108,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
 
       if (data.session?.user) {
+        try {
+          localStorage.setItem(VNR_CACHED_USER_KEY, JSON.stringify(data.session.user));
+        } catch {}
         checkBan(data.session);
+      } else {
+        try {
+          localStorage.removeItem(VNR_CACHED_USER_KEY);
+        } catch {}
       }
     }
 
@@ -106,7 +136,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       // Run ban check in the background without blocking the UI state transition
       if (session?.user) {
+        try {
+          localStorage.setItem(VNR_CACHED_USER_KEY, JSON.stringify(session.user));
+        } catch {}
         checkBan(session);
+      } else if (event === "SIGNED_OUT" || !session) {
+        try {
+          localStorage.removeItem(VNR_CACHED_USER_KEY);
+          localStorage.removeItem("vnr_is_admin");
+          localStorage.removeItem("vnr_is_mod");
+          localStorage.removeItem("vnr_is_uploader");
+        } catch {}
       }
     });
 
@@ -133,21 +173,51 @@ export function useAuth() {
 
 export function useIsAdmin() {
   const { user, loading: authLoading } = useAuth();
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [isMod, setIsMod] = useState(false);
-  const [isUploader, setIsUploader] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(() => {
+    if (typeof window !== "undefined") {
+      try {
+        return localStorage.getItem("vnr_is_admin") === "true";
+      } catch {}
+    }
+    return false;
+  });
+  const [isMod, setIsMod] = useState(() => {
+    if (typeof window !== "undefined") {
+      try {
+        return localStorage.getItem("vnr_is_mod") === "true";
+      } catch {}
+    }
+    return false;
+  });
+  const [isUploader, setIsUploader] = useState(() => {
+    if (typeof window !== "undefined") {
+      try {
+        return localStorage.getItem("vnr_is_uploader") === "true";
+      } catch {}
+    }
+    return false;
+  });
+  const [loading, setLoading] = useState(() => {
+    if (typeof window !== "undefined") {
+      try {
+        return localStorage.getItem("vnr_is_admin") === null;
+      } catch {}
+    }
+    return true;
+  });
 
   useEffect(() => {
     if (authLoading) return;
     if (!user) {
-      setIsAdmin(false);
-      setIsMod(false);
-      setIsUploader(false);
-      setLoading(false);
+      // If auth is done and truly no user, reset in-memory state
+      if (!authLoading) {
+        setIsAdmin(false);
+        setIsMod(false);
+        setIsUploader(false);
+        setLoading(false);
+      }
       return;
     }
-    setLoading(true);
     supabase
       .from("user_roles")
       .select("role")
@@ -159,10 +229,20 @@ export function useIsAdmin() {
           return;
         }
         const roles = (data ?? []).map((r) => r.role);
-        setIsAdmin(roles.includes("admin"));
-        setIsMod(roles.includes("moderator"));
-        setIsUploader(roles.includes("uploader"));
+        const adminRole = roles.includes("admin") || roles.includes("creator");
+        const modRole = roles.includes("moderator");
+        const uploaderRole = roles.includes("uploader");
+
+        setIsAdmin(adminRole);
+        setIsMod(modRole);
+        setIsUploader(uploaderRole);
         setLoading(false);
+
+        try {
+          localStorage.setItem("vnr_is_admin", String(adminRole));
+          localStorage.setItem("vnr_is_mod", String(modRole));
+          localStorage.setItem("vnr_is_uploader", String(uploaderRole));
+        } catch {}
       });
   }, [user, authLoading]);
 

@@ -653,36 +653,29 @@ function ChapterCarouselSection({
 
   return (
     <section className="container mx-auto px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16 py-6 border-b border-border/20">
-      <div className="mb-5 flex items-center justify-between">
-        <div>
-          <div className="flex items-center gap-2.5">
-            <span className="h-2 w-2 rounded-full bg-purple-400 shadow-[0_0_8px_rgba(168,85,247,0.8)] animate-pulse" />
-            {icon && <span className="text-purple-400">{icon}</span>}
-            <h2 className="text-xl sm:text-2xl font-bold uppercase tracking-[0.04em] text-white">{title}</h2>
+      <div className="mb-4 sm:mb-5 flex items-center justify-between gap-2 sm:gap-4">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="h-2 w-2 rounded-full bg-cyan-400 shadow-[0_0_8px_rgba(6,182,212,0.8)] animate-pulse shrink-0" />
+            {icon && <span className="text-cyan-400 shrink-0">{icon}</span>}
+            <h2 className="text-base sm:text-lg md:text-xl font-bold text-white tracking-tight truncate" title={title}>
+              {title}
+            </h2>
           </div>
           {description && (
-            <p className="mt-1 text-xs text-muted-foreground font-light tracking-[0.01em]">{description}</p>
+            <p className="mt-0.5 text-xs text-muted-foreground font-light tracking-[0.01em] truncate" title={description}>
+              {description}
+            </p>
           )}
         </div>
-        <div className="flex items-center gap-2">
-          <Button
-            asChild
-            variant="ghost"
-            size="sm"
-            className="h-8 text-xs font-semibold text-purple-400 hover:text-purple-300 hover:bg-purple-950/20 px-2.5"
-          >
-            <Link to="/home/history/$section" params={{ section: "reading-history" }}>
-              View All
-              <ChevronRight className="ml-1 h-3.5 w-3.5" />
-            </Link>
-          </Button>
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
           {chapters.length > 0 && (
             <div className="hidden gap-2 md:flex">
               <Button
                 variant="outline"
                 size="icon"
                 onClick={() => scrollBy("left")}
-                className="h-8 w-8 rounded-[4px] border-border/60 bg-surface-1/80 hover:border-purple-500/50 hover:text-purple-300 transition-colors"
+                className="h-8 w-8 rounded-[4px] border-border/60 bg-surface-1/80 hover:border-cyan-500/50 hover:text-cyan-300 transition-colors"
               >
                 <ChevronLeft className="h-4 w-4" />
               </Button>
@@ -690,37 +683,37 @@ function ChapterCarouselSection({
                 variant="outline"
                 size="icon"
                 onClick={() => scrollBy("right")}
-                className="h-8 w-8 rounded-[4px] border-border/60 bg-surface-1/80 hover:border-purple-500/50 hover:text-purple-300 transition-colors"
+                className="h-8 w-8 rounded-[4px] border-border/60 bg-surface-1/80 hover:border-cyan-500/50 hover:text-cyan-300 transition-colors"
               >
                 <ChevronRight className="h-4 w-4" />
               </Button>
             </div>
           )}
-          {sectionId && onHide && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-[4px] text-muted-foreground hover:text-white">
-                  <MoreVertical className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="glass-panel">
-                <DropdownMenuItem asChild className="text-xs cursor-pointer">
-                  <Link
-                    to="/home/history/$section"
-                    params={{ section: "reading-history" }}
-                    className="flex items-center"
-                  >
-                    <ExternalLink className="mr-2 h-4 w-4 text-purple-400" />
-                    View Full History
-                  </Link>
-                </DropdownMenuItem>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-[4px] text-muted-foreground hover:text-white" aria-label="Section options">
+                <MoreVertical className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="glass-panel">
+              <DropdownMenuItem asChild className="text-xs cursor-pointer">
+                <Link
+                  to="/home/history/$section"
+                  params={{ section: "reading-history" }}
+                  className="flex items-center"
+                >
+                  <ExternalLink className="mr-2 h-4 w-4 text-cyan-400" />
+                  View All History
+                </Link>
+              </DropdownMenuItem>
+              {sectionId && onHide && (
                 <DropdownMenuItem onClick={onHide} className="text-xs cursor-pointer">
                   <EyeOff className="mr-2 h-4 w-4" />
                   Hide this section
                 </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
@@ -783,28 +776,21 @@ function FollowedUpdatesCarouselSection({
 
   return (
     <section className="container mx-auto px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16 py-6 border-b border-border/20">
-      <div className="mb-5 flex items-center justify-between">
-        <div>
-          <div className="flex items-center gap-2.5">
-            <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)] animate-pulse" />
-            <h2 className="text-xl sm:text-2xl font-bold uppercase tracking-[0.04em] text-white">{title}</h2>
+      <div className="mb-4 sm:mb-5 flex items-center justify-between gap-2 sm:gap-4">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)] animate-pulse shrink-0" />
+            <h2 className="text-base sm:text-lg md:text-xl font-bold text-white tracking-tight truncate" title={title}>
+              {title}
+            </h2>
           </div>
           {description && (
-            <p className="mt-1 text-xs text-muted-foreground font-light tracking-[0.01em]">{description}</p>
+            <p className="mt-0.5 text-xs text-muted-foreground font-light tracking-[0.01em] truncate" title={description}>
+              {description}
+            </p>
           )}
         </div>
-        <div className="flex items-center gap-2">
-          <Button
-            asChild
-            variant="ghost"
-            size="sm"
-            className="h-8 text-xs font-semibold text-emerald-400 hover:text-emerald-300 hover:bg-emerald-950/20 px-2.5"
-          >
-            <Link to="/home/history/$section" params={{ section: "followed-chapters" }}>
-              View All
-              <ChevronRight className="ml-1 h-3.5 w-3.5" />
-            </Link>
-          </Button>
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
           {chapters.length > 0 && (
             <div className="hidden gap-2 md:flex">
               <Button
@@ -825,31 +811,31 @@ function FollowedUpdatesCarouselSection({
               </Button>
             </div>
           )}
-          {sectionId && onHide && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-[4px] text-muted-foreground hover:text-white">
-                  <MoreVertical className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="glass-panel">
-                <DropdownMenuItem asChild className="text-xs cursor-pointer">
-                  <Link
-                    to="/home/history/$section"
-                    params={{ section: "followed-chapters" }}
-                    className="flex items-center"
-                  >
-                    <ExternalLink className="mr-2 h-4 w-4 text-emerald-400" />
-                    View All Followed Updates
-                  </Link>
-                </DropdownMenuItem>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-[4px] text-muted-foreground hover:text-white" aria-label="Section options">
+                <MoreVertical className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="glass-panel">
+              <DropdownMenuItem asChild className="text-xs cursor-pointer">
+                <Link
+                  to="/home/history/$section"
+                  params={{ section: "followed-chapters" }}
+                  className="flex items-center"
+                >
+                  <ExternalLink className="mr-2 h-4 w-4 text-emerald-400" />
+                  View All Followed Updates
+                </Link>
+              </DropdownMenuItem>
+              {sectionId && onHide && (
                 <DropdownMenuItem onClick={onHide} className="text-xs cursor-pointer">
                   <EyeOff className="mr-2 h-4 w-4" />
                   Hide this section
                 </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
@@ -913,38 +899,28 @@ function SeriesCarouselSection({
 
   return (
     <section className="container mx-auto px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16 py-6 border-b border-border/20">
-      <div className="mb-5 flex items-center justify-between">
-        <div>
-          <div className="flex items-center gap-2.5">
-            <span className="h-2 w-2 rounded-full bg-purple-400 shadow-[0_0_8px_rgba(168,85,247,0.8)] animate-pulse" />
-            <h2 className="text-xl sm:text-2xl font-bold uppercase tracking-[0.04em] text-white">{title}</h2>
+      <div className="mb-4 sm:mb-5 flex items-center justify-between gap-2 sm:gap-4">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="h-2 w-2 rounded-full bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.8)] animate-pulse shrink-0" />
+            <h2 className="text-base sm:text-lg md:text-xl font-bold text-white tracking-tight truncate" title={title}>
+              {title}
+            </h2>
           </div>
           {description && (
-            <p className="mt-1 text-xs text-muted-foreground font-light tracking-[0.01em]">{description}</p>
+            <p className="mt-0.5 text-xs text-muted-foreground font-light tracking-[0.01em] truncate" title={description}>
+              {description}
+            </p>
           )}
         </div>
-        <div className="flex items-center gap-2">
-          <Button
-            asChild
-            variant="ghost"
-            size="sm"
-            className="h-8 text-xs font-semibold text-amber-400 hover:text-amber-300 hover:bg-amber-950/20 px-2.5"
-          >
-            <Link
-              to="/rankings"
-              search={{ tab: sectionId === "popular" ? "most-viewed" : "top-rated" }}
-            >
-              Rankings
-              <ChevronRight className="ml-1 h-3.5 w-3.5" />
-            </Link>
-          </Button>
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
           {series.length > 0 && (
             <div className="hidden gap-2 md:flex">
               <Button
                 variant="outline"
                 size="icon"
                 onClick={() => scrollBy("left")}
-                className="h-8 w-8 rounded-[4px] border-border/60 bg-surface-1/80 hover:border-purple-500/50 hover:text-purple-300 transition-colors"
+                className="h-8 w-8 rounded-[4px] border-border/60 bg-surface-1/80 hover:border-amber-500/50 hover:text-amber-300 transition-colors"
               >
                 <ChevronLeft className="h-4 w-4" />
               </Button>
@@ -952,37 +928,37 @@ function SeriesCarouselSection({
                 variant="outline"
                 size="icon"
                 onClick={() => scrollBy("right")}
-                className="h-8 w-8 rounded-[4px] border-border/60 bg-surface-1/80 hover:border-purple-500/50 hover:text-purple-300 transition-colors"
+                className="h-8 w-8 rounded-[4px] border-border/60 bg-surface-1/80 hover:border-amber-500/50 hover:text-amber-300 transition-colors"
               >
                 <ChevronRight className="h-4 w-4" />
               </Button>
             </div>
           )}
-          {sectionId && onHide && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-[4px] text-muted-foreground hover:text-white">
-                  <MoreVertical className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="glass-panel">
-                <DropdownMenuItem asChild className="text-xs cursor-pointer">
-                  <Link
-                    to="/rankings"
-                    search={{ tab: sectionId === "popular" ? "most-viewed" : "top-rated" }}
-                    className="flex items-center"
-                  >
-                    <Trophy className="mr-2 h-4 w-4 text-amber-400" />
-                    View in Rankings
-                  </Link>
-                </DropdownMenuItem>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-[4px] text-muted-foreground hover:text-white" aria-label="Section options">
+                <MoreVertical className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="glass-panel">
+              <DropdownMenuItem asChild className="text-xs cursor-pointer">
+                <Link
+                  to="/rankings"
+                  search={{ tab: sectionId === "popular" ? "most-viewed" : "top-rated" }}
+                  className="flex items-center"
+                >
+                  <Trophy className="mr-2 h-4 w-4 text-amber-400" />
+                  View in Rankings
+                </Link>
+              </DropdownMenuItem>
+              {sectionId && onHide && (
                 <DropdownMenuItem onClick={onHide} className="text-xs cursor-pointer">
                   <EyeOff className="mr-2 h-4 w-4" />
                   Hide this section
                 </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
@@ -1120,53 +1096,46 @@ function LatestUpdatesSection({
 
   return (
     <section className="container mx-auto px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16 py-6 border-b border-border/20">
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <div className="flex items-center gap-2.5">
-            <span className="h-2 w-2 rounded-full bg-purple-400 shadow-[0_0_8px_rgba(168,85,247,0.8)] animate-pulse" />
-            <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight">{title}</h2>
+      <div className="mb-4 sm:mb-5 flex items-center justify-between gap-2 sm:gap-4">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)] animate-pulse shrink-0" />
+            <h2 className="text-base sm:text-lg md:text-xl font-bold text-white tracking-tight truncate" title={title}>
+              {title}
+            </h2>
           </div>
           {description && (
-            <p className="mt-1 text-xs text-neutral-400">{description}</p>
+            <p className="mt-0.5 text-xs text-neutral-400 truncate" title={description}>
+              {description}
+            </p>
           )}
         </div>
-        <div className="flex items-center gap-2">
-          <Button
-            asChild
-            variant="ghost"
-            size="sm"
-            className="h-8 text-xs font-semibold text-purple-400 hover:text-purple-300 hover:bg-purple-950/20 px-2.5"
-          >
-            <Link to="/home/history/$section" params={{ section: "latest-updates" }}>
-              View All
-              <ChevronRight className="ml-1 h-3.5 w-3.5" />
-            </Link>
-          </Button>
-          {sectionId && onHide && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8 rounded text-neutral-400 hover:text-white">
-                  <MoreVertical className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="glass-panel">
-                <DropdownMenuItem asChild className="text-xs cursor-pointer">
-                  <Link
-                    to="/home/history/$section"
-                    params={{ section: "latest-updates" }}
-                    className="flex items-center"
-                  >
-                    <ExternalLink className="mr-2 h-4 w-4 text-purple-400" />
-                    View All Updates
-                  </Link>
-                </DropdownMenuItem>
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-8 w-8 rounded text-neutral-400 hover:text-white" aria-label="Section options">
+                <MoreVertical className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="glass-panel">
+              <DropdownMenuItem asChild className="text-xs cursor-pointer">
+                <Link
+                  to="/home/history/$section"
+                  params={{ section: "latest-updates" }}
+                  className="flex items-center"
+                >
+                  <ExternalLink className="mr-2 h-4 w-4 text-emerald-400" />
+                  View All Updates
+                </Link>
+              </DropdownMenuItem>
+              {sectionId && onHide && (
                 <DropdownMenuItem onClick={onHide} className="text-xs cursor-pointer">
                   <EyeOff className="mr-2 h-4 w-4" />
                   Hide this section
                 </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
@@ -1368,13 +1337,17 @@ function ChapterFeedSection({
 }) {
   return (
     <section className="container mx-auto px-4 py-4">
-      <div className="mb-4">
-        <div className="flex items-center gap-2">
-          {icon}
-          <h2 className="text-2xl font-bold">{title}</h2>
+      <div className="mb-4 min-w-0">
+        <div className="flex items-center gap-2 min-w-0">
+          {icon && <span className="shrink-0">{icon}</span>}
+          <h2 className="text-base sm:text-lg md:text-xl font-bold text-white tracking-tight truncate" title={title}>
+            {title}
+          </h2>
         </div>
         {description && (
-          <p className="mt-1 text-sm text-muted-foreground">{description}</p>
+          <p className="mt-0.5 text-xs text-muted-foreground truncate" title={description}>
+            {description}
+          </p>
         )}
       </div>
       {loading ? (
