@@ -5,7 +5,9 @@ import { z } from "zod";
 import {
   extractChaptersFromSeriesUrl,
   extractImagesFromChapterUrl,
+  extractComixChaptersWithGroups,
   type ChapterInfo,
+  type ComixGroupInfo,
 } from "@/lib/chapter-scraper";
 
 function getAdminSupabase() {
@@ -83,6 +85,14 @@ export interface ComixChapterItem {
   chapterNumber: number;
   title?: string;
   url: string;
+  scanGroup?: string;
+  time?: string;
+}
+
+export interface ComixGroupItem {
+  id: number;
+  name: string;
+  slug?: string | null;
 }
 
 /**
@@ -286,6 +296,7 @@ const ImportComixToSeriesSchema = z.object({
   importGenresAndTags: z.boolean().optional(),
   importAlternativeTitles: z.boolean().optional(),
   importStatusAndType: z.boolean().optional(),
+  importAuthorAndArtist: z.boolean().optional(),
   overrideMetadata: z.any().optional(),
 });
 
@@ -328,6 +339,11 @@ export async function $importComixMetadataToSeries(args: {
 
     if (validated.importSynopsis && metadata.description) {
       updatePayload.description = metadata.description;
+    }
+
+    if (validated.importAuthorAndArtist ?? true) {
+      if (metadata.author) updatePayload.author = metadata.author;
+      if (metadata.artist) updatePayload.artist = metadata.artist;
     }
 
     if (validated.importCover && metadata.coverUrl) {
@@ -381,8 +397,6 @@ export async function $importComixMetadataToSeries(args: {
     if (validated.importStatusAndType) {
       if (metadata.status) updatePayload.status = metadata.status;
       if (metadata.type) updatePayload.type = metadata.type;
-      if (metadata.author && !series.author) updatePayload.author = metadata.author;
-      if (metadata.artist && !series.artist) updatePayload.artist = metadata.artist;
     }
 
     if (Object.keys(updatePayload).length > 0) {
@@ -506,11 +520,13 @@ export async function $importComixMetadataToSeries(args: {
 
 const FetchComixChaptersSchema = z.object({
   seriesUrl: z.string().min(1, "Series URL required"),
+  groupId: z.union([z.number(), z.string()]).optional(),
+  maxPages: z.number().optional(),
   accessToken: z.string().min(1),
 });
 
 /**
- * Discovers and lists chapters from a Comix.to series page
+ * Discovers and lists chapters from a Comix.to series page with scan group breakdown
  */
 export async function $fetchComixChaptersList(args: {
   data: z.infer<typeof FetchComixChaptersSchema>;
@@ -524,17 +540,22 @@ export async function $fetchComixChaptersList(args: {
       url = `https://comix.to/title/${url.replace(/^\/title\//, "")}`;
     }
 
-    const chapters = await extractChaptersFromSeriesUrl(url);
+    const { chapters, groups } = await extractComixChaptersWithGroups(url, {
+      groupId: validated.groupId,
+      maxPages: validated.maxPages,
+    });
 
     return {
       success: true,
       chapters,
+      groups,
       count: chapters.length,
     };
   } catch (error) {
     return {
       success: false,
       chapters: [],
+      groups: [],
       count: 0,
       error: error instanceof Error ? error.message : "Failed to discover Comix.to chapters",
     };
@@ -548,6 +569,8 @@ const ImportComixChaptersSchema = z.object({
       chapterNumber: z.number(),
       title: z.string().optional(),
       url: z.string(),
+      scanGroup: z.string().optional(),
+      time: z.string().optional(),
     }),
   ),
   scanlationGroup: z.string().default("Comix"),
@@ -604,7 +627,8 @@ export async function $importComixChaptersToSeries(args: {
     );
 
     const toImport = validated.chapters.filter((c) => {
-      const key = `${Number(c.chapterNumber)}_${validated.scanlationGroup.toLowerCase()}`;
+      const effGroup = (c.scanGroup || validated.scanlationGroup || "Comix").toLowerCase();
+      const key = `${Number(c.chapterNumber)}_${effGroup}`;
       return !existingSet.has(key);
     });
 
@@ -619,9 +643,13 @@ export async function $importComixChaptersToSeries(args: {
           continue;
         }
 
-        const chapterSlug = `${series.slug}-chapter-${ch.chapterNumber}`;
+        const effectiveGroup = ch.scanGroup || validated.scanlationGroup || "Comix";
+        let chapterSlug = `${series.slug}-chapter-${ch.chapterNumber}`;
+        if (effectiveGroup && effectiveGroup.toLowerCase() !== "official" && effectiveGroup.toLowerCase() !== "comix") {
+          chapterSlug = `${series.slug}-chapter-${ch.chapterNumber}-${slugify(effectiveGroup)}`;
+        }
 
-        const { data: chapterRow, error: chInsertError } = await admin
+        let { data: chapterRow, error: chInsertError } = await admin
           .from("chapters")
           .insert({
             series_id: validated.seriesId,
@@ -630,12 +658,34 @@ export async function $importComixChaptersToSeries(args: {
             slug: chapterSlug,
             chapter_type: "image",
             status: "published",
-            scanlation_group: validated.scanlationGroup,
+            scanlation_group: effectiveGroup,
             source_url: ch.url,
             uploaded_by: (adminUser as any)?.username || "admin",
           })
           .select("id")
           .single();
+
+        if (chInsertError && (chInsertError.message?.includes("slug") || chInsertError.message?.includes("unique"))) {
+          // Retry with unique hash appended
+          chapterSlug = `${chapterSlug}-${Math.random().toString(36).slice(2, 6)}`;
+          const retry = await admin
+            .from("chapters")
+            .insert({
+              series_id: validated.seriesId,
+              chapter_number: ch.chapterNumber,
+              title: ch.title || `Chapter ${ch.chapterNumber}`,
+              slug: chapterSlug,
+              chapter_type: "image",
+              status: "published",
+              scanlation_group: effectiveGroup,
+              source_url: ch.url,
+              uploaded_by: (adminUser as any)?.username || "admin",
+            })
+            .select("id")
+            .single();
+          chapterRow = retry.data;
+          chInsertError = retry.error;
+        }
 
         if (chInsertError || !chapterRow) {
           errors.push(`Chapter ${ch.chapterNumber} DB insert failed: ${chInsertError?.message}`);

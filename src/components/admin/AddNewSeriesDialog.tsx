@@ -16,11 +16,14 @@ import {
   Layers,
   ArrowRight,
   ExternalLink,
+  PenTool,
+  Palette,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth, useIsAdmin } from "@/hooks/useAuth";
 import {
   $searchComickList,
+  $enrichComickItemDetails,
   $importComickMetadataToSeries,
   type ComickExtractedMetadata,
 } from "@/lib/api/comick-import.actions";
@@ -186,12 +189,35 @@ export function AddNewSeriesDialog({ trigger }: AddNewSeriesDialogProps) {
   const [description, setDescription] = useState("");
   const [coverUrl, setCoverUrl] = useState("");
 
-  const handleSelectComic = (comic: ComickExtractedMetadata) => {
+  const handleSelectComic = async (comic: ComickExtractedMetadata) => {
     setSelectedComic(comic);
     const cleanSlug = toCleanSlug(comic.slug || comic.title);
     const provider = WORKABLE_SCAN_PROVIDERS.find((p) => p.id === selectedScanProvider);
     if (provider && provider.id !== "none" && provider.id !== "custom") {
       setScanSourceUrl(provider.getUrl(cleanSlug));
+    }
+    if ((!comic.author || !comic.artist) && comic.slug && metadataSource === "comick") {
+      try {
+        const session = (await supabase.auth.getSession()).data.session;
+        if (session?.access_token) {
+          const res = await $enrichComickItemDetails({
+            data: { slug: comic.slug, title: comic.title, accessToken: session.access_token },
+          });
+          if (res.success) {
+            const updated = {
+              ...comic,
+              author: res.author || comic.author,
+              artist: res.artist || comic.artist,
+              tags: res.tags?.length ? Array.from(new Set([...comic.tags, ...res.tags])) : comic.tags,
+              genres: res.genres?.length ? Array.from(new Set([...comic.genres, ...res.genres])) : comic.genres,
+            };
+            setSelectedComic((curr) => (curr?.slug === comic.slug ? updated : curr));
+            setComickResults((prev) => prev.map((p) => (p.slug === comic.slug ? updated : p)));
+          }
+        }
+      } catch {
+        // silent
+      }
     }
   };
 
@@ -370,7 +396,7 @@ export function AddNewSeriesDialog({ trigger }: AddNewSeriesDialogProps) {
 
       // 2. Attach genres & tags from Comick or Comix.to
       processing.setStepStatus("meta", "active", "Importing cover art and synopsis...");
-      if (selectedComic.genres && selectedComic.genres.length > 0) {
+      if (selectedComic) {
         if (metadataSource === "comix") {
           await $importComixMetadataToSeries({
             data: {
@@ -381,6 +407,7 @@ export function AddNewSeriesDialog({ trigger }: AddNewSeriesDialogProps) {
               importGenresAndTags: true,
               importAlternativeTitles: true,
               importStatusAndType: true,
+              importAuthorAndArtist: true,
               overrideMetadata: selectedComic,
             },
           });
@@ -393,6 +420,7 @@ export function AddNewSeriesDialog({ trigger }: AddNewSeriesDialogProps) {
               importSynopsis: true,
               importGenresAndTags: true,
               importAlternativeTitles: true,
+              importAuthorAndArtist: true,
               overrideMetadata: selectedComic,
             },
           });
@@ -733,6 +761,72 @@ export function AddNewSeriesDialog({ trigger }: AddNewSeriesDialogProps) {
                       </SelectContent>
                     </Select>
                   </div>
+
+                  {/* Selected Comic Metadata Preview Card */}
+                  {selectedComic && (
+                    <div className="p-3 rounded-xl bg-purple-950/30 border border-purple-500/30 space-y-2.5 mt-2">
+                      <div className="flex items-start gap-3">
+                        <img
+                          src={selectedComic.coverUrl || ""}
+                          alt={selectedComic.title}
+                          className="h-20 w-14 object-cover rounded-lg border border-purple-500/30 shadow shrink-0"
+                        />
+                        <div className="min-w-0 flex-1 space-y-1.5">
+                          <div className="flex items-center justify-between gap-2">
+                            <h4 className="text-xs font-bold text-white truncate">{selectedComic.title}</h4>
+                            <Badge variant="outline" className="text-[10px] text-purple-300 border-purple-500/40 shrink-0">
+                              {selectedComic.releaseYear || "N/A"}
+                            </Badge>
+                          </div>
+
+                          {/* Author & Artist Badges */}
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                            <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-purple-500/10 border border-purple-500/20 text-xs">
+                              <PenTool className="h-3 w-3 text-purple-400 shrink-0" />
+                              <div className="min-w-0 flex-1">
+                                <span className="text-[9px] text-purple-400/80 block uppercase font-bold tracking-wider leading-none">
+                                  Author
+                                </span>
+                                <span className="text-white font-medium text-[11px] truncate block">
+                                  {selectedComic.author || "Detecting / Not specified"}
+                                </span>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-pink-500/10 border border-pink-500/20 text-xs">
+                              <Palette className="h-3 w-3 text-pink-400 shrink-0" />
+                              <div className="min-w-0 flex-1">
+                                <span className="text-[9px] text-pink-400/80 block uppercase font-bold tracking-wider leading-none">
+                                  Artist
+                                </span>
+                                <span className="text-white font-medium text-[11px] truncate block">
+                                  {selectedComic.artist || "Detecting / Not specified"}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Genres tags preview */}
+                          {selectedComic.genres && selectedComic.genres.length > 0 && (
+                            <div className="flex flex-wrap gap-1 pt-0.5">
+                              {selectedComic.genres.slice(0, 5).map((g) => (
+                                <span
+                                  key={g}
+                                  className="px-1.5 py-0.5 rounded text-[10px] bg-purple-500/20 text-purple-200 border border-purple-500/30 font-medium"
+                                >
+                                  {g}
+                                </span>
+                              ))}
+                              {selectedComic.genres.length > 5 && (
+                                <span className="text-[10px] text-neutral-400">
+                                  +{selectedComic.genres.length - 5} more
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

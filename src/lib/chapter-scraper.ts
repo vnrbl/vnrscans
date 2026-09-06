@@ -39,6 +39,8 @@ export interface ChapterInfo {
   chapterNumber: number;
   title?: string;
   url: string;
+  scanGroup?: string;
+  time?: string;
 }
 
 export interface ExtractChapterImagesOptions {
@@ -2688,7 +2690,21 @@ export function isComixToUrl(url: string): boolean {
   }
 }
 
-async function extractComixChapters(seriesUrl: string): Promise<ChapterInfo[]> {
+export interface ComixGroupInfo {
+  id: number;
+  name: string;
+  slug?: string | null;
+}
+
+export interface ComixChapterExtractionResult {
+  chapters: ChapterInfo[];
+  groups: ComixGroupInfo[];
+}
+
+export async function extractComixChaptersWithGroups(
+  seriesUrl: string,
+  options?: { groupId?: number | string; maxPages?: number },
+): Promise<ComixChapterExtractionResult> {
   const puppeteer = await import('puppeteer');
   const chrome = await resolveChromeExecutable(puppeteer.default);
   const isHeadless = process.env.PUPPETEER_HEADLESS !== 'false';
@@ -2700,9 +2716,9 @@ async function extractComixChapters(seriesUrl: string): Promise<ChapterInfo[]> {
       '--disable-blink-features=AutomationControlled',
       '--no-sandbox',
       '--disable-setuid-sandbox',
-      '--window-size=1024,768',
+      '--window-size=1280,800',
     ],
-    defaultViewport: isHeadless ? null : { width: 1024, height: 768 },
+    defaultViewport: isHeadless ? null : { width: 1280, height: 800 },
   };
 
   if (chrome.executablePath) {
@@ -2720,62 +2736,136 @@ async function extractComixChapters(seriesUrl: string): Promise<ChapterInfo[]> {
       'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
     );
 
-    await page.goto(seriesUrl, { waitUntil: 'networkidle2', timeout: 45000 });
-
-    const collectLinks = async () => {
-      return await page.evaluate(() => {
-        const links = Array.from(document.querySelectorAll('a[href*="-chapter-"]'));
-        const seen = new Set<number>();
-        const list: Array<{ chapterNumber: number; title?: string; url: string }> = [];
-        for (const a of links) {
-          const href = (a as HTMLAnchorElement).href;
-          const m = href.match(/-chapter-([0-9.]+)/i);
-          if (m) {
-            const num = parseFloat(m[1]);
-            if (!seen.has(num)) {
-              seen.add(num);
-              list.push({
-                chapterNumber: num,
-                title: (a as HTMLAnchorElement).innerText.trim().replace(/\n+/g, ' ') || `Chapter ${num}`,
-                url: href,
-              });
-            }
-          }
-        }
-        return list;
-      });
-    };
-
-    const allChapters = await collectLinks();
-
-    // Check if pagination exists (fetch up to 4 pages if needed)
-    const hasPagination = await page.evaluate(() => !!document.querySelector('.npager'));
-    if (hasPagination && allChapters.length < 60) {
-      for (let p = 2; p <= 4; p++) {
-        try {
-          const pageUrl = seriesUrl.includes('?') ? `${seriesUrl}&page=${p}` : `${seriesUrl}?page=${p}`;
-          await page.goto(pageUrl, { waitUntil: 'domcontentloaded', timeout: 20000 });
-          await new Promise((r) => setTimeout(r, 800));
-          const more = await collectLinks();
-          if (more.length === 0) break;
-          const existingNums = new Set(allChapters.map((c) => c.chapterNumber));
-          for (const ch of more) {
-            if (!existingNums.has(ch.chapterNumber)) {
-              existingNums.add(ch.chapterNumber);
-              allChapters.push(ch);
-            }
-          }
-        } catch {
-          break;
-        }
+    let targetUrl = seriesUrl;
+    if (options?.groupId !== undefined && options.groupId !== 'all' && Number(options.groupId) >= 0) {
+      try {
+        const urlObj = new URL(seriesUrl);
+        urlObj.searchParams.set('group_id', String(options.groupId));
+        targetUrl = urlObj.toString();
+      } catch {
+        targetUrl = seriesUrl.includes('?')
+          ? `${seriesUrl}&group_id=${options.groupId}`
+          : `${seriesUrl}?group_id=${options.groupId}`;
       }
     }
 
-    allChapters.sort((a, b) => a.chapterNumber - b.chapterNumber);
-    return allChapters;
+    await page.goto(targetUrl, { waitUntil: 'networkidle2', timeout: 45000 });
+    await page.waitForSelector('.mchap-list, a[href*="-chapter-"]', { timeout: 15000 }).catch(() => {});
+
+    // 1. Extract scan groups from <script id="initial-data">
+    const groups: ComixGroupInfo[] = await page.evaluate(() => {
+      const el = document.getElementById('initial-data');
+      if (!el) return [];
+      try {
+        const json = JSON.parse(el.textContent || '{}');
+        for (const [k, v] of Object.entries(json.queries || {})) {
+          if (k.includes('"manga","groups"') && Array.isArray(v)) {
+            return (v as any[]).map((g) => ({
+              id: Number(g.id),
+              name: String(g.name || 'Unknown group'),
+              slug: g.slug || null,
+            }));
+          }
+        }
+      } catch {}
+      return [];
+    });
+
+    // 2. Paginate and collect all chapters
+    const allChapters: ChapterInfo[] = [];
+    const maxPages = options?.maxPages || 40;
+    const seenUrls = new Set<string>();
+
+    for (let p = 1; p <= maxPages; p++) {
+      const chaptersOnPage: ChapterInfo[] = await page.evaluate(() => {
+        const items = Array.from(document.querySelectorAll('.mchap-item'));
+        return items.map((el) => {
+          const link = (el.querySelector('a.mchap-row__primary') || el.querySelector('a[href*="-chapter-"]')) as HTMLAnchorElement | null;
+          const chEl = el.querySelector('.mchap-row__ch') as HTMLElement | null;
+          const titleEl = el.querySelector('.mchap-row__title') as HTMLElement | null;
+          const groupEl = el.querySelector('.mchap-row__group') as HTMLElement | null;
+          const timeEl = el.querySelector('.mchap-row__time') as HTMLElement | null;
+          const href = link ? link.href : '';
+          const m = href.match(/-chapter-([0-9.]+)/i);
+          const num = m ? parseFloat(m[1]) : 0;
+          const groupName = groupEl ? groupEl.innerText.trim() : (el.querySelector('.is-official') ? 'Official' : 'Comix');
+          const titleText = titleEl ? titleEl.innerText.trim() : (chEl ? chEl.innerText.trim() : `Chapter ${num}`);
+          return {
+            chapterNumber: num,
+            title: titleText,
+            url: href,
+            scanGroup: groupName,
+            time: timeEl ? timeEl.innerText.trim() : undefined,
+          };
+        });
+      });
+
+      if (chaptersOnPage.length === 0) {
+        // Fallback: collect any generic chapter links if custom .mchap-item was not found
+        const fallback = await page.evaluate(() => {
+          const links = Array.from(document.querySelectorAll('a[href*="-chapter-"]')) as HTMLAnchorElement[];
+          return links.map((a) => {
+            const m = a.href.match(/-chapter-([0-9.]+)/i);
+            const num = m ? parseFloat(m[1]) : 0;
+            return {
+              chapterNumber: num,
+              title: a.innerText.trim() || `Chapter ${num}`,
+              url: a.href,
+              scanGroup: 'Comix',
+            };
+          });
+        });
+        for (const ch of fallback) {
+          if (ch.url && !seenUrls.has(ch.url)) {
+            seenUrls.add(ch.url);
+            allChapters.push(ch);
+          }
+        }
+        break;
+      }
+
+      for (const ch of chaptersOnPage) {
+        if (ch.url && !seenUrls.has(ch.url)) {
+          seenUrls.add(ch.url);
+          allChapters.push(ch);
+        }
+      }
+
+      // Click Next page button if available
+      const firstHref = chaptersOnPage[0]?.url || '';
+      const hasNext = await page.evaluate(() => {
+        const nextBtn = document.querySelector('.npager button[aria-label="Next page"]') as HTMLButtonElement | null;
+        if (nextBtn && !nextBtn.disabled && !nextBtn.classList.contains('is-disabled')) {
+          nextBtn.click();
+          return true;
+        }
+        return false;
+      });
+
+      if (!hasNext) break;
+      await page
+        .waitForFunction(
+          (oldHref) => {
+            const first = (document.querySelector('.mchap-item a.mchap-row__primary') ||
+              document.querySelector('.mchap-item a[href*="-chapter-"]')) as HTMLAnchorElement | null;
+            return first && first.href !== oldHref;
+          },
+          { timeout: 3500 },
+          firstHref,
+        )
+        .catch(() => new Promise((r) => setTimeout(r, 600)));
+    }
+
+    allChapters.sort((a, b) => b.chapterNumber - a.chapterNumber);
+    return { chapters: allChapters, groups };
   } finally {
     await browser.close();
   }
+}
+
+async function extractComixChapters(seriesUrl: string): Promise<ChapterInfo[]> {
+  const res = await extractComixChaptersWithGroups(seriesUrl);
+  return res.chapters;
 }
 
 async function extractComixChapterImages(chapterUrl: string): Promise<string[]> {

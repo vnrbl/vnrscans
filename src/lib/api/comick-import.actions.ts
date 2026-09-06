@@ -448,49 +448,147 @@ export async function searchComickComics(query: string): Promise<ComickExtracted
 }
 
 /**
- * Scrape full rich tags and genres directly from Comick comic page via Jina reader
+ * Helper to extract person names from a text line like 'Authors:[Name](url), [Name2](url)' or 'Author: Name, Name2'
  */
-export async function fetchComickFullTagsAndGenres(slug: string): Promise<{ tags: string[]; genres: string[] } | null> {
+function extractNamesFromSection(text: string, prefix: "Authors?" | "Artists?"): string[] {
+  const lineMatch = text.match(new RegExp(`${prefix}:\\s*([^\\r\\n]+)`, "i"));
+  if (!lineMatch || !lineMatch[1]) return [];
+  const line = lineMatch[1].trim();
+
+  // 1. Extract markdown links [Name](url)
+  const linkMatches: string[] = [];
+  const linkRegex = /\[([^\]]+)\](?:\([^)]+\))?/g;
+  let match: RegExpExecArray | null;
+  while ((match = linkRegex.exec(line)) !== null) {
+    const name = match[1].trim();
+    if (name && !name.startsWith("http")) {
+      linkMatches.push(name);
+    }
+  }
+  if (linkMatches.length > 0) {
+    return linkMatches;
+  }
+
+  // 2. Fallback to comma/bullet/slash separated text
+  return line
+    .split(/[,/|•]/)
+    .map((s) => s.trim())
+    .filter((s) => s && !s.startsWith("http") && s !== "N/A" && s !== "-");
+}
+
+/**
+ * Fast supplementary author/artist resolver from MangaDex API
+ */
+export async function fetchMangaDexAuthorsAndArtists(
+  query: string
+): Promise<{ author?: string; artist?: string } | null> {
+  const clean = query.trim();
+  if (!clean) return null;
+  try {
+    const res = await fetch(
+      `https://api.mangadex.org/manga?title=${encodeURIComponent(clean)}&limit=1&includes[]=author&includes[]=artist`,
+      {
+        headers: { "User-Agent": "VNRScans/1.0" },
+        signal: AbortSignal.timeout(4000),
+      }
+    );
+    if (!res.ok) return null;
+    const json = (await res.json()) as any;
+    const manga = json?.data?.[0];
+    if (!manga) return null;
+
+    const authors = (manga.relationships || [])
+      .filter((r: any) => r.type === "author")
+      .map((r: any) => r.attributes?.name?.trim())
+      .filter(Boolean);
+    const artists = (manga.relationships || [])
+      .filter((r: any) => r.type === "artist")
+      .map((r: any) => r.attributes?.name?.trim())
+      .filter(Boolean);
+
+    return {
+      author: authors.join(", ") || undefined,
+      artist: artists.join(", ") || undefined,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Scrape full rich tags, genres, author and artist directly from Comick comic page via Jina reader
+ * with MangaDex fallback for 100% reliable author/artist detection.
+ */
+export async function fetchComickFullTagsAndGenres(
+  slug: string,
+  title?: string,
+): Promise<{ tags: string[]; genres: string[]; author?: string; artist?: string } | null> {
   if (!slug) return null;
+  let authors: string[] = [];
+  let artists: string[] = [];
+  let tags: string[] = [];
+  let genres: string[] = [];
+
   try {
     const url = `https://r.jina.ai/https://comick.dev/comic/${slug}`;
     const res = await fetch(url, { signal: AbortSignal.timeout(12000) });
-    if (!res.ok) return null;
-    const text = await res.text();
+    if (res.ok) {
+      const text = await res.text();
 
-    // 1. Extract all tags matching * [TagName](https://comick.../search?tags=...)
-    const tagMatches = [...text.matchAll(/\*\s+\[(.*?)\]\(https:\/\/comick\.(?:dev|cc|ink)\/search\?tags=[^)]+\)/g)];
-    const tags = tagMatches.map((m) => m[1].trim()).filter(Boolean);
+      // 1. Extract all tags matching * [TagName](https://comick.../search?tags=...)
+      const tagMatches = [...text.matchAll(/\*\s+\[(.*?)\]\(https:\/\/comick\.(?:dev|cc|ink)\/search\?tags=[^)]+\)/g)];
+      tags = tagMatches.map((m) => m[1].trim()).filter(Boolean);
 
-    // 2. Extract Genres
-    const genreLine = text.match(/Genres:\s*([^\n]+)/i);
-    const genres = genreLine
-      ? [...genreLine[1].matchAll(/\[(.*?)\]/g)].map((x) => x[1].trim()).filter(Boolean)
-      : [];
+      // 2. Extract Genres
+      const genreLine = text.match(/Genres:\s*([^\r\n]+)/i);
+      if (genreLine) {
+        genres = [...genreLine[1].matchAll(/\[(.*?)\]/g)].map((x) => x[1].trim()).filter(Boolean);
+      }
 
-    // 3. Extract Theme & Format lines (supplement tags)
-    const themeLine = text.match(/Theme:\s*([^\n]+)/i);
-    if (themeLine) {
-      const themes = [...themeLine[1].matchAll(/\[(.*?)\]/g)].map((x) => x[1].trim()).filter(Boolean);
-      tags.push(...themes);
-    }
+      // 3. Extract Theme & Format lines (supplement tags)
+      const themeLine = text.match(/Theme:\s*([^\r\n]+)/i);
+      if (themeLine) {
+        const themes = [...themeLine[1].matchAll(/\[(.*?)\]/g)].map((x) => x[1].trim()).filter(Boolean);
+        tags.push(...themes);
+      }
 
-    const formatLine = text.match(/Format:\s*([^\n]+)/i);
-    if (formatLine) {
-      const formats = [...formatLine[1].matchAll(/\[(.*?)\]/g)].map((x) => x[1].trim()).filter(Boolean);
-      tags.push(...formats);
-    }
+      const formatLine = text.match(/Format:\s*([^\r\n]+)/i);
+      if (formatLine) {
+        const formats = [...formatLine[1].matchAll(/\[(.*?)\]/g)].map((x) => x[1].trim()).filter(Boolean);
+        tags.push(...formats);
+      }
 
-    const uniqueTags = Array.from(new Set(tags));
-    const uniqueGenres = Array.from(new Set(genres));
-
-    if (uniqueTags.length > 0 || uniqueGenres.length > 0) {
-      return { tags: uniqueTags, genres: uniqueGenres };
+      // 4. Extract Authors and Artists from Comick page markdown
+      authors = extractNamesFromSection(text, "Authors?");
+      artists = extractNamesFromSection(text, "Artists?");
     }
   } catch (err) {
-    console.warn(`[fetchComickFullTagsAndGenres] Error scraping tags for "${slug}":`, err);
+    console.warn(`[fetchComickFullTagsAndGenres] Error scraping Comick page for "${slug}":`, err);
   }
-  return null;
+
+  // 5. Fallback/supplement author and artist with MangaDex if needed
+  if (authors.length === 0 || artists.length === 0) {
+    const searchTarget = title || slug.replace(/^\d+-/, "").replace(/-/g, " ");
+    const md = await fetchMangaDexAuthorsAndArtists(searchTarget);
+    if (md) {
+      if (authors.length === 0 && md.author) {
+        authors = md.author.split(",").map((s) => s.trim()).filter(Boolean);
+      }
+      if (artists.length === 0 && md.artist) {
+        artists = md.artist.split(",").map((s) => s.trim()).filter(Boolean);
+      }
+    }
+  }
+
+  const uniqueTags = Array.from(new Set(tags));
+  const uniqueGenres = Array.from(new Set(genres));
+
+  return {
+    tags: uniqueTags,
+    genres: uniqueGenres,
+    author: authors.join(", ") || undefined,
+    artist: artists.join(", ") || undefined,
+  };
 }
 
 /**
@@ -509,7 +607,7 @@ export async function fetchComickData(urlOrQuery: string): Promise<ComickExtract
 
   const chosen = exactMatch || results[0];
   if (chosen?.slug) {
-    const full = await fetchComickFullTagsAndGenres(chosen.slug);
+    const full = await fetchComickFullTagsAndGenres(chosen.slug, chosen.title);
     if (full) {
       if (full.tags.length > 0) {
         chosen.tags = Array.from(new Set([...chosen.tags, ...full.tags]));
@@ -517,6 +615,8 @@ export async function fetchComickData(urlOrQuery: string): Promise<ComickExtract
       if (full.genres.length > 0) {
         chosen.genres = Array.from(new Set([...chosen.genres, ...full.genres]));
       }
+      if (full.author) chosen.author = full.author;
+      if (full.artist) chosen.artist = full.artist;
     }
   }
 
@@ -539,9 +639,9 @@ export async function $searchComickList(args: { data: z.infer<typeof PreviewComi
     await verifyAdmin(validated.accessToken);
 
     const results = await searchComickComics(validated.query);
-    if (results.length > 0 && results[0]?.slug && results[0].tags.length <= 5) {
+    if (results.length > 0 && results[0]?.slug) {
       try {
-        const full = await fetchComickFullTagsAndGenres(results[0].slug);
+        const full = await fetchComickFullTagsAndGenres(results[0].slug, results[0].title);
         if (full) {
           if (full.tags.length > 0) {
             results[0].tags = Array.from(new Set([...results[0].tags, ...full.tags]));
@@ -549,6 +649,8 @@ export async function $searchComickList(args: { data: z.infer<typeof PreviewComi
           if (full.genres.length > 0) {
             results[0].genres = Array.from(new Set([...results[0].genres, ...full.genres]));
           }
+          if (full.author) results[0].author = full.author;
+          if (full.artist) results[0].artist = full.artist;
         }
       } catch {
         // Fallback to basic tags
@@ -570,11 +672,12 @@ export async function $searchComickList(args: { data: z.infer<typeof PreviewComi
 
 const EnrichComickSchema = z.object({
   slug: z.string().min(1, "Slug is required"),
+  title: z.string().optional(),
   accessToken: z.string(),
 });
 
 /**
- * Enrich a specific Comick item with all rich tags & genres
+ * Enrich a specific Comick item with all rich tags, genres, author & artist
  */
 export async function $enrichComickItemDetails(args: {
   data: z.infer<typeof EnrichComickSchema>;
@@ -583,11 +686,13 @@ export async function $enrichComickItemDetails(args: {
     const validated = EnrichComickSchema.parse(args.data);
     await verifyAdmin(validated.accessToken);
 
-    const full = await fetchComickFullTagsAndGenres(validated.slug);
+    const full = await fetchComickFullTagsAndGenres(validated.slug, validated.title);
     return {
       success: true,
       tags: full?.tags || [],
       genres: full?.genres || [],
+      author: full?.author,
+      artist: full?.artist,
     };
   } catch (error) {
     return {
@@ -631,13 +736,14 @@ export async function $previewComickMetadata(args: {
 }
 
 const ImportComickToSeriesSchema = z.object({
-  seriesId: z.string().uuid("Invalid series ID"),
+  seriesId: z.string().min(1, "Series ID is required"),
   query: z.string().optional(),
   accessToken: z.string(),
   importCover: z.boolean().default(true),
   importSynopsis: z.boolean().default(true),
   importGenresAndTags: z.boolean().default(true),
   importAlternativeTitles: z.boolean().default(true),
+  importAuthorAndArtist: z.boolean().default(true).optional(),
   overrideMetadata: z.any().optional(), // Can pass selected metadata directly
 });
 
@@ -656,7 +762,7 @@ export async function $importComickMetadataToSeries(args: {
     // 1. Get existing series info
     const { data: series, error: seriesError } = await admin
       .from("series")
-      .select("id, title, description, cover_url, alternative_titles, slug, type")
+      .select("id, title, description, cover_url, alternative_titles, slug, type, author, artist")
       .eq("id", validated.seriesId)
       .single();
 
@@ -679,11 +785,11 @@ export async function $importComickMetadataToSeries(args: {
       };
     }
 
-    // 2b. Always ensure ALL rich tags and genres are fetched directly from Comick page
+    // 2b. Always ensure ALL rich tags, genres, author & artist are fetched directly from Comick page
     const comickSlug = metadata.slug || series.slug;
     if (comickSlug) {
       try {
-        const full = await fetchComickFullTagsAndGenres(comickSlug);
+        const full = await fetchComickFullTagsAndGenres(comickSlug, metadata.title || series.title);
         if (full) {
           if (full.tags.length > 0) {
             metadata.tags = Array.from(new Set([...metadata.tags, ...full.tags]));
@@ -691,17 +797,24 @@ export async function $importComickMetadataToSeries(args: {
           if (full.genres.length > 0) {
             metadata.genres = Array.from(new Set([...metadata.genres, ...full.genres]));
           }
+          if (full.author) metadata.author = full.author;
+          if (full.artist) metadata.artist = full.artist;
         }
       } catch (err) {
         console.warn("[ComickImport] Failed to scrape rich tags:", err);
       }
     }
 
-    // 3. Update Series Table Columns (Synopsis, Cover, Alt Titles, Status)
+    // 3. Update Series Table Columns (Synopsis, Cover, Alt Titles, Status, Author, Artist)
     const updatePayload: Record<string, any> = {};
 
     if (validated.importSynopsis && metadata.description) {
       updatePayload.description = metadata.description;
+    }
+
+    if (validated.importAuthorAndArtist ?? true) {
+      if (metadata.author) updatePayload.author = metadata.author;
+      if (metadata.artist) updatePayload.artist = metadata.artist;
     }
 
     if (validated.importCover && metadata.coverUrl) {

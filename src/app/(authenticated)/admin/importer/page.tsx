@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import Image from "next/image";
 import { toast } from "sonner";
 import {
@@ -24,11 +24,14 @@ import {
   Zap,
   Clock,
   Filter,
+  PenTool,
+  Palette,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth, useIsAdmin } from "@/hooks/useAuth";
 import {
   $searchComickList,
+  $enrichComickItemDetails,
   $importComickMetadataToSeries,
   type ComickExtractedMetadata,
 } from "@/lib/api/comick-import.actions";
@@ -39,6 +42,7 @@ import {
   $importComixChaptersToSeries,
   type ComixExtractedMetadata,
   type ComixChapterItem,
+  type ComixGroupItem,
 } from "@/lib/api/comix-import.actions";
 import { $syncImportSource } from "@/lib/api/scraper.actions";
 import { Button } from "@/components/ui/button";
@@ -105,11 +109,15 @@ export default function MangaImporterPage() {
   const [optGenresTags, setOptGenresTags] = useState(true);
   const [optAltTitles, setOptAltTitles] = useState(true);
   const [optStatusType, setOptStatusType] = useState(true);
+  const [optAuthorArtist, setOptAuthorArtist] = useState(true);
+  const [isEnrichingComick, setIsEnrichingComick] = useState(false);
 
   // ── 2. CHAPTER IMPORTER STATE (COMIX.TO) ────────────────────────
   const [comixChapterUrl, setComixChapterUrl] = useState("");
   const [isFetchingChapters, setIsFetchingChapters] = useState(false);
   const [discoveredChapters, setDiscoveredChapters] = useState<ComixChapterItem[]>([]);
+  const [discoveredGroups, setDiscoveredGroups] = useState<ComixGroupItem[]>([]);
+  const [selectedGroupFilter, setSelectedGroupFilter] = useState<string>("all");
   const [selectedChapterNums, setSelectedChapterNums] = useState<Set<number>>(new Set());
   const [scanGroup, setScanGroup] = useState("Comix");
   const [autoSyncScheduled, setAutoSyncScheduled] = useState(true);
@@ -117,6 +125,37 @@ export default function MangaImporterPage() {
   const [importProgress, setImportProgress] = useState(0);
   const [importStatusMsg, setImportStatusMsg] = useState("");
   const [importLogs, setImportLogs] = useState<string[]>([]);
+
+  // Unique groups across discovered chapters & initial-data
+  const availableGroups = useMemo(() => {
+    const list: Array<{ id: string; name: string }> = [{ id: "all", name: "All Groups" }];
+    const seen = new Set<string>(["all"]);
+    for (const g of discoveredGroups) {
+      const key = (g.name || String(g.id)).trim().toLowerCase();
+      if (!seen.has(key)) {
+        seen.add(key);
+        list.push({ id: g.name || String(g.id), name: g.name || `Group ${g.id}` });
+      }
+    }
+    for (const c of discoveredChapters) {
+      if (c.scanGroup) {
+        const key = c.scanGroup.trim().toLowerCase();
+        if (!seen.has(key)) {
+          seen.add(key);
+          list.push({ id: c.scanGroup, name: c.scanGroup });
+        }
+      }
+    }
+    return list;
+  }, [discoveredGroups, discoveredChapters]);
+
+  // Client-filtered chapters according to active group filter
+  const filteredChapters = useMemo(() => {
+    if (selectedGroupFilter === "all") return discoveredChapters;
+    return discoveredChapters.filter(
+      (c) => (c.scanGroup || "Comix").toLowerCase() === selectedGroupFilter.toLowerCase(),
+    );
+  }, [discoveredChapters, selectedGroupFilter]);
 
   // ── 3. SOURCES & TRACKING STATE ────────────────────────────────
   const [activeSources, setActiveSources] = useState<any[]>([]);
@@ -165,6 +204,55 @@ export default function MangaImporterPage() {
     s.title.toLowerCase().includes(seriesSearchTerm.toLowerCase()),
   );
 
+  // Enrich Comick item details (author, artist, full tags)
+  const enrichComickItem = async (c: ComickExtractedMetadata) => {
+    if (!c.slug) return;
+    try {
+      setIsEnrichingComick(true);
+      const session = (await supabase.auth.getSession()).data.session;
+      if (!session?.access_token) return;
+      const res = await $enrichComickItemDetails({
+        data: { slug: c.slug, title: c.title, accessToken: session.access_token },
+      });
+      if (res.success) {
+        setSelectedComick((prev) => {
+          if (!prev || prev.slug !== c.slug) return prev;
+          return {
+            ...prev,
+            tags: res.tags?.length ? Array.from(new Set([...prev.tags, ...res.tags])) : prev.tags,
+            genres: res.genres?.length ? Array.from(new Set([...prev.genres, ...res.genres])) : prev.genres,
+            author: res.author || prev.author,
+            artist: res.artist || prev.artist,
+          };
+        });
+        setComickResults((prev) =>
+          prev.map((item) =>
+            item.slug === c.slug
+              ? {
+                  ...item,
+                  tags: res.tags?.length ? Array.from(new Set([...item.tags, ...res.tags])) : item.tags,
+                  genres: res.genres?.length ? Array.from(new Set([...item.genres, ...res.genres])) : item.genres,
+                  author: res.author || item.author,
+                  artist: res.artist || item.artist,
+                }
+              : item
+          )
+        );
+      }
+    } catch {
+      // quiet fallback
+    } finally {
+      setIsEnrichingComick(false);
+    }
+  };
+
+  const handleSelectComickItem = (c: ComickExtractedMetadata) => {
+    setSelectedComick(c);
+    if (!c.author || !c.artist || !c.tags || c.tags.length <= 5) {
+      void enrichComickItem(c);
+    }
+  };
+
   // ── METADATA SEARCH ─────────────────────────────────────────────
   const handleSearchMetadata = async (targetSource?: "comick" | "comix") => {
     const src = targetSource || metaSource;
@@ -207,6 +295,9 @@ export default function MangaImporterPage() {
           setComickResults(res.results);
           setSelectedComick(res.results[0]);
           toast.success(`Found ${res.results.length} series on Comick!`);
+          if (res.results[0] && (!res.results[0].author || !res.results[0].artist)) {
+            void enrichComickItem(res.results[0]);
+          }
         }
       }
     } catch (err: any) {
@@ -247,6 +338,7 @@ export default function MangaImporterPage() {
             importGenresAndTags: optGenresTags,
             importAlternativeTitles: optAltTitles,
             importStatusAndType: optStatusType,
+            importAuthorAndArtist: optAuthorArtist,
           },
         });
 
@@ -271,6 +363,7 @@ export default function MangaImporterPage() {
             importSynopsis: optSynopsis,
             importGenresAndTags: optGenresTags,
             importAlternativeTitles: optAltTitles,
+            importAuthorAndArtist: optAuthorArtist,
           },
         });
 
@@ -321,10 +414,12 @@ export default function MangaImporterPage() {
 
       if (!res.success || !res.chapters || res.chapters.length === 0) {
         setDiscoveredChapters([]);
+        setDiscoveredGroups(res.groups || []);
         setSelectedChapterNums(new Set());
         toast.error(res.error || "No chapters could be discovered for this URL");
       } else {
         setDiscoveredChapters(res.chapters);
+        setDiscoveredGroups(res.groups || []);
         // Default select all discovered
         setSelectedChapterNums(new Set(res.chapters.map((c) => c.chapterNumber)));
         toast.success(`Discovered ${res.chapters.length} chapter(s) from Comix.to!`);
@@ -354,7 +449,7 @@ export default function MangaImporterPage() {
       return;
     }
 
-    const chaptersToImport = discoveredChapters.filter((c) =>
+    const chaptersToImport = filteredChapters.filter((c) =>
       selectedChapterNums.has(c.chapterNumber),
     );
 
@@ -617,6 +712,10 @@ export default function MangaImporterPage() {
                       <span>Synopsis / Description</span>
                     </label>
                     <label className="flex items-center gap-2 text-neutral-300 cursor-pointer">
+                      <Checkbox checked={optAuthorArtist} onCheckedChange={(v) => setOptAuthorArtist(!!v)} />
+                      <span>Authors & Artists</span>
+                    </label>
+                    <label className="flex items-center gap-2 text-neutral-300 cursor-pointer">
                       <Checkbox checked={optGenresTags} onCheckedChange={(v) => setOptGenresTags(!!v)} />
                       <span>Genres & Taxonomy Tags</span>
                     </label>
@@ -662,7 +761,7 @@ export default function MangaImporterPage() {
                     return (
                       <div
                         key={c.slug}
-                        onClick={() => setSelectedComick(c)}
+                        onClick={() => handleSelectComickItem(c)}
                         className={`flex items-center gap-3 p-2 rounded-xl border cursor-pointer transition-all ${
                           isSel
                             ? "bg-purple-600/20 border-purple-500 ring-1 ring-purple-500"
@@ -682,7 +781,10 @@ export default function MangaImporterPage() {
                         )}
                         <div className="min-w-0 flex-1">
                           <h4 className="text-xs font-bold text-white truncate">{c.title}</h4>
-                          <span className="text-[11px] text-muted-foreground">{c.releaseYear || "N/A"}</span>
+                          <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                            <span>{c.releaseYear || "N/A"}</span>
+                            {c.author && <span className="truncate text-purple-300 font-medium">by {c.author}</span>}
+                          </div>
                         </div>
                         {isSel && <Check className="h-4 w-4 text-purple-400 shrink-0" />}
                       </div>
@@ -726,12 +828,33 @@ export default function MangaImporterPage() {
                           <span className="font-semibold text-neutral-300">Alts:</span> {selectedComick.alternativeTitles}
                         </p>
                       )}
-                      {(selectedComick.author || selectedComick.artist) && (
-                        <div className="text-xs text-neutral-300 flex items-center gap-3">
-                          {selectedComick.author && <span>Author: <strong>{selectedComick.author}</strong></span>}
-                          {selectedComick.artist && <span>Artist: <strong>{selectedComick.artist}</strong></span>}
+
+                      {/* Author & Artist Badges */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1.5">
+                        <div className="flex items-center gap-2.5 px-3 py-2 rounded-xl bg-purple-500/10 border border-purple-500/20 shadow-sm">
+                          <div className="h-7 w-7 rounded-lg bg-purple-500/20 flex items-center justify-center text-purple-300 shrink-0">
+                            <PenTool className="h-3.5 w-3.5" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="text-[10px] uppercase font-bold tracking-wider text-purple-400/80">Author</div>
+                            <div className="text-xs font-semibold text-white truncate">
+                              {selectedComick.author || (isEnrichingComick ? "Detecting author..." : "Not specified")}
+                            </div>
+                          </div>
                         </div>
-                      )}
+
+                        <div className="flex items-center gap-2.5 px-3 py-2 rounded-xl bg-pink-500/10 border border-pink-500/20 shadow-sm">
+                          <div className="h-7 w-7 rounded-lg bg-pink-500/20 flex items-center justify-center text-pink-300 shrink-0">
+                            <Palette className="h-3.5 w-3.5" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="text-[10px] uppercase font-bold tracking-wider text-pink-400/80">Artist</div>
+                            <div className="text-xs font-semibold text-white truncate">
+                              {selectedComick.artist || (isEnrichingComick ? "Detecting artist..." : "Not specified")}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   </div>
 
@@ -809,10 +932,32 @@ export default function MangaImporterPage() {
                           <span className="font-semibold text-neutral-300">Alts:</span> {comixResult.alternativeTitles}
                         </p>
                       )}
-                      <div className="text-xs text-neutral-300 flex items-center gap-3">
-                        {comixResult.author && <span>Author: <strong>{comixResult.author}</strong></span>}
-                        {comixResult.artist && <span>Artist: <strong>{comixResult.artist}</strong></span>}
-                        {comixResult.latestChapter && <span>Latest: <strong>Ch.{comixResult.latestChapter}</strong></span>}
+
+                      {/* Author & Artist Badges */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1.5">
+                        <div className="flex items-center gap-2.5 px-3 py-2 rounded-xl bg-blue-500/10 border border-blue-500/20 shadow-sm">
+                          <div className="h-7 w-7 rounded-lg bg-blue-500/20 flex items-center justify-center text-blue-300 shrink-0">
+                            <PenTool className="h-3.5 w-3.5" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="text-[10px] uppercase font-bold tracking-wider text-blue-400/80">Author</div>
+                            <div className="text-xs font-semibold text-white truncate">
+                              {comixResult.author || "Not specified"}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2.5 px-3 py-2 rounded-xl bg-cyan-500/10 border border-cyan-500/20 shadow-sm">
+                          <div className="h-7 w-7 rounded-lg bg-cyan-500/20 flex items-center justify-center text-cyan-300 shrink-0">
+                            <Palette className="h-3.5 w-3.5" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="text-[10px] uppercase font-bold tracking-wider text-cyan-400/80">Artist</div>
+                            <div className="text-xs font-semibold text-white truncate">
+                              {comixResult.artist || "Not specified"}
+                            </div>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -936,22 +1081,48 @@ export default function MangaImporterPage() {
               {/* Discovered Chapters Table */}
               {discoveredChapters.length > 0 && (
                 <div className="space-y-4 pt-4 border-t border-border/40">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div className="flex items-center gap-3">
                       <span className="text-sm font-bold text-white">
-                        Discovered Chapters ({discoveredChapters.length})
+                        Discovered Chapters ({filteredChapters.length}
+                        {filteredChapters.length !== discoveredChapters.length && ` of ${discoveredChapters.length}`})
                       </span>
                       <Badge variant="outline" className="text-xs text-blue-300 border-blue-500/30">
                         {selectedChapterNums.size} Selected
                       </Badge>
                     </div>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                      {availableGroups.length > 1 && (
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-xs text-neutral-400 font-medium">Filter Group:</span>
+                          <Select
+                            value={selectedGroupFilter}
+                            onValueChange={(val) => {
+                              setSelectedGroupFilter(val);
+                              if (val !== "all") {
+                                setScanGroup(val);
+                              }
+                            }}
+                          >
+                            <SelectTrigger className="h-7 text-xs bg-neutral-900 border-neutral-800 text-neutral-200 min-w-[130px]">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {availableGroups.map((g) => (
+                                <SelectItem key={g.id} value={g.id} className="text-xs">
+                                  {g.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
                       <Button
                         size="sm"
                         variant="outline"
                         className="h-7 text-xs border-neutral-800 hover:bg-neutral-800"
-                        onClick={() => setSelectedChapterNums(new Set(discoveredChapters.map((c) => c.chapterNumber)))}
+                        onClick={() => setSelectedChapterNums(new Set(filteredChapters.map((c) => c.chapterNumber)))}
                       >
                         Select All
                       </Button>
@@ -972,10 +1143,12 @@ export default function MangaImporterPage() {
                         <TableRow>
                           <TableHead className="w-12 text-center">
                             <Checkbox
-                              checked={selectedChapterNums.size === discoveredChapters.length && discoveredChapters.length > 0}
+                              checked={
+                                selectedChapterNums.size === filteredChapters.length && filteredChapters.length > 0
+                              }
                               onCheckedChange={(v) => {
                                 if (v) {
-                                  setSelectedChapterNums(new Set(discoveredChapters.map((c) => c.chapterNumber)));
+                                  setSelectedChapterNums(new Set(filteredChapters.map((c) => c.chapterNumber)));
                                 } else {
                                   setSelectedChapterNums(new Set());
                                 }
@@ -984,12 +1157,15 @@ export default function MangaImporterPage() {
                           </TableHead>
                           <TableHead className="w-24">Chapter #</TableHead>
                           <TableHead>Title</TableHead>
+                          <TableHead className="w-36">Scan Group</TableHead>
+                          <TableHead className="w-28">Released</TableHead>
                           <TableHead className="text-right">Action</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {discoveredChapters.map((ch) => {
+                        {filteredChapters.map((ch) => {
                           const isChecked = selectedChapterNums.has(ch.chapterNumber);
+                          const isOfficial = ch.scanGroup?.toLowerCase() === "official";
                           return (
                             <TableRow key={ch.url} className={isChecked ? "bg-blue-950/10" : ""}>
                               <TableCell className="text-center">
@@ -1006,8 +1182,22 @@ export default function MangaImporterPage() {
                               <TableCell className="font-bold text-white text-xs">
                                 Ch.{ch.chapterNumber}
                               </TableCell>
-                              <TableCell className="text-xs text-neutral-300">
+                              <TableCell className="text-xs text-neutral-300 font-medium">
                                 {ch.title || `Chapter ${ch.chapterNumber}`}
+                              </TableCell>
+                              <TableCell>
+                                <span
+                                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold ${
+                                    isOfficial
+                                      ? "bg-amber-500/20 text-amber-300 border border-amber-500/30"
+                                      : "bg-blue-500/15 text-blue-300 border border-blue-500/25"
+                                  }`}
+                                >
+                                  {ch.scanGroup || "Comix"}
+                                </span>
+                              </TableCell>
+                              <TableCell className="text-[11px] text-neutral-400">
+                                {ch.time || "—"}
                               </TableCell>
                               <TableCell className="text-right">
                                 <a

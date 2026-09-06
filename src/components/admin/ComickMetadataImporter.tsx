@@ -95,24 +95,27 @@ export function ComickMetadataImporter({
     }
   }, [open, seriesTitle]);
 
-  // Select comic & enrich with full tags if not already loaded
+  // Select comic & enrich with full tags, author & artist if not already loaded
   const handleSelectComic = async (item: ComickExtractedMetadata) => {
     setSelectedComic(item);
-    if (item.tags.length <= 5 && item.slug) {
+    if ((item.tags.length <= 5 || !item.author || !item.artist) && item.slug) {
       try {
         const session = (await supabase.auth.getSession()).data.session;
         if (session?.access_token) {
           const res = await $enrichComickItemDetails({
             data: {
               slug: item.slug,
+              title: item.title,
               accessToken: session.access_token,
             },
           });
-          if (res.success && res.tags.length > 0) {
+          if (res.success) {
             const updated: ComickExtractedMetadata = {
               ...item,
-              tags: Array.from(new Set([...item.tags, ...res.tags])),
+              tags: res.tags.length > 0 ? Array.from(new Set([...item.tags, ...res.tags])) : item.tags,
               genres: res.genres.length > 0 ? Array.from(new Set([...item.genres, ...res.genres])) : item.genres,
+              author: res.author || item.author,
+              artist: res.artist || item.artist,
             };
             setSelectedComic((curr) => (curr?.slug === item.slug ? updated : curr));
             setSearchResults((prev) =>
@@ -545,6 +548,17 @@ export function ComickMetadataImporter({
                     <p className="text-[11px] text-muted-foreground truncate">
                       Alt: {selectedComic.alternativeTitles}
                     </p>
+                  )}
+
+                  {(selectedComic.author || selectedComic.artist) && (
+                    <div className="flex items-center gap-3 text-[11px] text-neutral-300 pt-0.5">
+                      {selectedComic.author && (
+                        <span>Author: <strong className="text-white">{selectedComic.author}</strong></span>
+                      )}
+                      {selectedComic.artist && (
+                        <span>Artist: <strong className="text-white">{selectedComic.artist}</strong></span>
+                      )}
+                    </div>
                   )}
 
                   {/* Genres Preview */}
