@@ -4,29 +4,19 @@ import { useState, useEffect, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useNavigate } from "@/lib/router-compat";
 import { supabase } from "@/integrations/supabase/client";
-import { useQuery } from "@tanstack/react-query";
-import { toast } from "sonner";
 import {
   BookOpen,
   Books,
   Buildings,
   Compass,
-  DiceFive,
-  FileArrowDown,
   Flame,
-  Globe,
-  ListPlus,
-  ShareFat,
   Sparkle,
-  Trophy,
   Users,
 } from "@phosphor-icons/react";
 import {
   SearchModal,
   SearchTag,
   SearchResult,
-  QuickAction,
-  SearchFile,
 } from "@/components/ui/search-modal";
 import {
   buildSeriesSearchOrFilter,
@@ -63,45 +53,9 @@ export function NavbarSearch({ open, onOpenChange }: NavbarSearchProps) {
   useEffect(() => {
     if (open) {
       router.prefetch("/browse");
-      router.prefetch("/library");
       router.prefetch("/rankings");
-      router.prefetch("/request-series");
     }
   }, [open, router]);
-
-  // Fetch trending/hot series from VNR SCANS
-  const hotSeries = useQuery({
-    queryKey: ["navbar-hot-series"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("series")
-        .select("id,slug,title,cover_url,type,rating_average,view_count,is_trending")
-        .eq("is_hidden", false)
-        .order("is_trending", { ascending: false })
-        .order("view_count", { ascending: false })
-        .limit(20);
-      if (error) throw error;
-      return data ?? [];
-    },
-    enabled: open,
-    staleTime: 10 * 60 * 1000,
-  });
-
-  // Fetch recent chapter releases from VNR SCANS
-  const recentReleases = useQuery({
-    queryKey: ["navbar-recent-releases"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("chapters")
-        .select("id,chapter_number,title,created_at,series:series_id(title,slug)")
-        .order("created_at", { ascending: false })
-        .limit(4);
-      if (error) return [];
-      return data ?? [];
-    },
-    enabled: open,
-    staleTime: 5 * 60 * 1000,
-  });
 
   // In-memory search cache for instant sub-millisecond response on backspace/repeat
   const searchCacheRef = useRef<Map<string, { series: any[]; users: any[]; groups: string[] }>>(new Map());
@@ -120,7 +74,7 @@ export function NavbarSearch({ open, onOpenChange }: NavbarSearchProps) {
     const prepared = prepareSearchInput(rawQ);
     const cacheKey = `${selectedCategory}:${prepared.normalized}`;
 
-    // 1. Instant Cache Hit (0ms latency)
+    // Instant Cache Hit (0ms latency)
     const cached = searchCacheRef.current.get(cacheKey);
     if (cached) {
       setSeriesResults(cached.series);
@@ -213,18 +167,6 @@ export function NavbarSearch({ open, onOpenChange }: NavbarSearchProps) {
     navigate({ to: "/browse", search: { group: groupName } });
   };
 
-  const handleRandomSeries = () => {
-    const pool = hotSeries.data ?? [];
-    if (pool.length > 0) {
-      const pick = pool[Math.floor(Math.random() * pool.length)];
-      handleNavigateSeries(pick.slug);
-      toast.success(`Rolling into: ${pick.title}`);
-    } else {
-      handleClose();
-      navigate({ to: "/browse" });
-    }
-  };
-
   // Build Filter Tags ("I'm looking for...")
   const tags: SearchTag[] = useMemo(() => [
     {
@@ -276,9 +218,12 @@ export function NavbarSearch({ open, onOpenChange }: NavbarSearchProps) {
     setSelectedCategory((prev) => (prev === tagId ? "all" : tagId));
   };
 
-  // Format website series/users results
+  // Format search results (only when actively queried)
   const results: SearchResult[] = useMemo(() => {
     const isQuerying = searchQuery.trim().length >= 2;
+    if (!isQuerying) {
+      return [];
+    }
 
     if (selectedCategory === "users") {
       return userResults.map((u) => ({
@@ -313,16 +258,12 @@ export function NavbarSearch({ open, onOpenChange }: NavbarSearchProps) {
       }));
     }
 
-    const itemsToDisplay = isQuerying
-      ? seriesResults
-      : (hotSeries.data ?? []).filter((s) => selectedCategory === "all" || s.type === selectedCategory);
-
-    return itemsToDisplay.map((series) => {
+    return seriesResults.map((series) => {
       const views = series.view_count
         ? series.view_count >= 1000
           ? `${(series.view_count / 1000).toFixed(0)}k views`
           : `${series.view_count} views`
-        : "Trending";
+        : "Popular";
       const rating = series.rating_average ? `★ ${Number(series.rating_average).toFixed(1)}` : "★ 4.8";
       const typeLabel = seriesTypeLabels[series.type] || series.type || "Manga";
 
@@ -339,104 +280,10 @@ export function NavbarSearch({ open, onOpenChange }: NavbarSearchProps) {
             label: "Read Series",
             onClick: () => handleNavigateSeries(series.slug),
           },
-          {
-            icon: <ShareFat className="h-4 w-4" />,
-            label: "Share",
-            onClick: () => {
-              if (typeof window !== "undefined") {
-                const url = `${window.location.origin}/title/${series.slug}`;
-                navigator.clipboard.writeText(url);
-                toast.success("Series link copied to clipboard!");
-              }
-            },
-          },
         ],
       };
     });
-  }, [searchQuery, selectedCategory, userResults, groupResults, seriesResults, hotSeries.data]);
-
-  // Real Quick Actions for VNR SCANS
-  const quickActions: QuickAction[] = useMemo(() => [
-    {
-      label: "Browse All Comics",
-      shortcut: "B",
-      icon: <Compass className="h-3.5 w-3.5" />,
-      onClick: () => {
-        handleClose();
-        navigate({ to: "/browse" });
-      },
-    },
-    {
-      label: "My Library & Bookmarks",
-      shortcut: "L",
-      icon: <BookOpen className="h-3.5 w-3.5" />,
-      onClick: () => {
-        handleClose();
-        navigate({ to: "/library" });
-      },
-    },
-    {
-      label: "Roll Random Series",
-      shortcut: "R",
-      icon: <DiceFive className="h-3.5 w-3.5" />,
-      onClick: handleRandomSeries,
-    },
-    {
-      label: "Top Rankings",
-      shortcut: "T",
-      icon: <Trophy className="h-3.5 w-3.5" />,
-      onClick: () => {
-        handleClose();
-        navigate({ to: "/rankings" });
-      },
-    },
-    {
-      label: "Novels Hub",
-      shortcut: "N",
-      icon: <Books className="h-3.5 w-3.5" />,
-      onClick: () => {
-        handleClose();
-        navigate({ to: "/novels" });
-      },
-    },
-    {
-      label: "Request Series",
-      shortcut: "S",
-      icon: <Globe className="h-3.5 w-3.5" />,
-      onClick: () => {
-        handleClose();
-        navigate({ to: "/request-series" });
-      },
-    },
-  ], [navigate, hotSeries.data]);
-
-  // Real Recent Releases for the "Files / Releases" section
-  const files: SearchFile[] = useMemo(() => {
-    return (recentReleases.data ?? []).map((ch: any) => {
-      const seriesTitle = ch.series?.title || ch.title || "Latest Chapter";
-      const chapterExt = ch.chapter_number ? `Ch. ${ch.chapter_number}` : "";
-
-      return {
-        name: seriesTitle,
-        ext: chapterExt,
-        icon: <FileArrowDown className="h-3.5 w-3.5" />,
-        verified: true, // Verified official scans
-        onClick: () => {
-          if (ch.series?.slug) {
-            handleClose();
-            navigate({ to: `/title/${ch.series.slug}` });
-          }
-        },
-        onShare: () => {
-          if (typeof window !== "undefined" && ch.series?.slug) {
-            const url = `${window.location.origin}/title/${ch.series.slug}`;
-            navigator.clipboard.writeText(url);
-            toast.success("Copied chapter link to clipboard!");
-          }
-        },
-      };
-    });
-  }, [recentReleases.data, navigate]);
+  }, [searchQuery, selectedCategory, userResults, groupResults, seriesResults]);
 
   const handleSubmitQuery = (q: string) => {
     const trimmed = q.trim();
@@ -454,14 +301,10 @@ export function NavbarSearch({ open, onOpenChange }: NavbarSearchProps) {
       tags={tags}
       onTagClick={handleTagClick}
       results={results}
-      resultsTitle={searchQuery.trim().length >= 2 ? "Search Results" : "Trending on VNR Scans"}
+      resultsTitle="Search Results"
       resultsCount={results.length}
-      quickActions={quickActions}
-      quickActionsTitle="Quick actions"
-      files={files}
-      filesTitle="Recent Chapter Releases"
       defaultQuery={searchQuery}
-      loading={searching || hotSeries.isLoading}
+      loading={searching}
       onQueryChange={setSearchQuery}
       onSubmitQuery={handleSubmitQuery}
       onSelectResult={(res) => {

@@ -181,12 +181,12 @@ export function SearchModal({
   tags = DEFAULT_TAGS,
   onTagClick,
   onTagRemove,
-  results = DEFAULT_RESULTS,
+  results = [],
   resultsTitle,
   resultsCount,
-  quickActions = DEFAULT_QUICK_ACTIONS,
+  quickActions = [],
   quickActionsTitle = "Quick actions",
-  files = DEFAULT_FILES,
+  files = [],
   filesTitle = "Recent Releases",
   defaultQuery = "",
   loading = false,
@@ -283,20 +283,21 @@ export function SearchModal({
     }
   };
 
-  const resolvedResultsTitle = resultsTitle || (query.trim().length >= 2 ? "Search Results" : "Trending Series");
+  const resolvedResultsTitle = resultsTitle || (query.trim().length >= 2 ? "Search Results" : "Results");
   const countToShow = resultsCount !== undefined ? resultsCount : filteredResults.length;
+  const showResultsSection = query.trim().length >= 2 || filteredResults.length > 0 || loading;
 
   const panel = (
     <div
       role={modal ? "dialog" : undefined}
       aria-modal={modal ? true : undefined}
       className={cn(
-        "mx-auto w-full max-w-xl overflow-hidden rounded-2xl liquid-glass-window text-neutral-900 dark:text-white",
+        "mx-auto w-full max-w-xl overflow-hidden rounded-2xl search-console-ios-glass text-white",
         className,
       )}
     >
       {/* Search bar */}
-      <div className="flex items-center gap-1.5 border-b border-black/[0.06] px-4 py-3.5 dark:border-white/[0.06]">
+      <div className="flex items-center gap-2 border-b border-white/[0.08] px-4 py-3.5">
         {loading ? (
           <CircleNotch className={cn(ICON, "animate-spin text-purple-400")} />
         ) : (
@@ -310,7 +311,7 @@ export function SearchModal({
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
           aria-label="Search"
-          className="min-w-0 flex-1 bg-transparent px-3 text-sm text-current outline-none placeholder:text-neutral-400 dark:placeholder:text-neutral-500 font-normal"
+          className="min-w-0 flex-1 bg-transparent px-2 text-sm text-white outline-none placeholder:text-neutral-400 font-normal"
         />
         <div className="flex shrink-0 items-center gap-2">
           {query.trim().length > 0 && (
@@ -318,12 +319,12 @@ export function SearchModal({
               type="button"
               onClick={() => handleQuery("")}
               aria-label="Clear query"
-              className="text-neutral-400 hover:text-neutral-700 dark:text-neutral-500 dark:hover:text-neutral-200 transition-colors p-1"
+              className="text-neutral-400 hover:text-white transition-colors p-1"
             >
               <X className="h-3.5 w-3.5" />
             </button>
           )}
-          <kbd className="hidden sm:flex items-center gap-0.5 rounded-md border border-black/[0.06] bg-black/[0.03] px-1.5 py-0.5 font-sans text-[11px] font-medium text-neutral-400 dark:border-white/[0.08] dark:bg-white/[0.06] dark:text-neutral-500">
+          <kbd className="hidden sm:flex items-center gap-0.5 rounded-md border border-white/[0.10] bg-white/[0.06] px-1.5 py-0.5 font-sans text-[11px] font-medium text-neutral-400">
             <span className="text-[13px] leading-none">⌘</span>
             {modal && hotkey ? hotkey.toUpperCase() : "K"}
           </kbd>
@@ -332,43 +333,45 @@ export function SearchModal({
 
       {/* Tags ("I'm looking for...") */}
       {activeTags.length > 0 ? (
-        <div className="border-b border-black/[0.06] px-4 py-3 dark:border-white/[0.06]">
-          <span className="text-[12px] font-medium text-neutral-400 dark:text-neutral-500">I&apos;m looking for...</span>
+        <div className={cn("px-4 py-3", showResultsSection ? "border-b border-white/[0.08]" : "")}>
+          <span className="text-[12px] font-medium text-neutral-400">I&apos;m looking for...</span>
           <div className="mt-2.5 flex flex-wrap gap-2">
             {activeTags.map((tag, i) => {
               const isActive = tag.active ?? false;
               return (
                 <button
-                  key={`${tag.label}-${i}`}
+                  key={`${tag.id || tag.label}-${i}`}
                   type="button"
                   onClick={() => onTagClick?.(tag, i)}
                   className={cn(
-                    "flex items-center gap-1.5 rounded-full py-1 pl-2.5 pr-2 text-[12px] font-medium transition-all cursor-pointer ring-1 ring-inset",
+                    "flex items-center gap-1.5 rounded-full py-1 px-3 text-[12px] font-medium transition-all cursor-pointer ring-1 ring-inset select-none",
                     isActive
-                      ? "bg-purple-600 text-white ring-purple-500 shadow-sm"
-                      : "bg-black/[0.04] text-neutral-600 ring-black/[0.06] hover:bg-black/[0.08] dark:bg-white/[0.06] dark:text-neutral-300 dark:ring-white/[0.08] dark:hover:bg-white/[0.1] dark:hover:text-white"
+                      ? "bg-purple-600/80 text-white ring-purple-400/50 shadow-sm shadow-purple-500/20"
+                      : "bg-white/[0.06] text-neutral-300 ring-white/[0.08] hover:bg-white/[0.12] hover:text-white"
                   )}
                 >
                   {tag.icon}
                   <span>{tag.label}</span>
-                  <span
-                    role="button"
-                    tabIndex={0}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      removeTag(i);
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
+                  {onTagRemove && (
+                    <span
+                      role="button"
+                      tabIndex={0}
+                      onClick={(e) => {
                         e.stopPropagation();
                         removeTag(i);
-                      }
-                    }}
-                    aria-label={`Remove ${tag.label}`}
-                    className="ml-0.5 text-current opacity-60 transition-opacity hover:opacity-100"
-                  >
-                    <X className="h-3 w-3" />
-                  </span>
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.stopPropagation();
+                          removeTag(i);
+                        }
+                      }}
+                      aria-label={`Remove ${tag.label}`}
+                      className="ml-0.5 text-current opacity-60 transition-opacity hover:opacity-100"
+                    >
+                      <X className="h-3 w-3" />
+                    </span>
+                  )}
                 </button>
               );
             })}
@@ -377,98 +380,105 @@ export function SearchModal({
       ) : null}
 
       {/* Results Section */}
-      <div className="border-b border-black/[0.06] dark:border-white/[0.06]">
-        <div className="flex items-center justify-between px-4 pt-3 pb-1.5 text-[12px] font-medium text-neutral-400 dark:text-neutral-500">
-          <span>{resolvedResultsTitle}</span>
-          <span className="rounded-full bg-black/[0.04] px-2 py-0.5 text-[11px] font-semibold text-neutral-600 dark:bg-white/[0.06] dark:text-neutral-300">
-            {countToShow}
-          </span>
-        </div>
+      {showResultsSection ? (
+        <div className="border-b border-white/[0.08]">
+          <div className="flex items-center justify-between px-4 pt-3 pb-1.5 text-[12px] font-medium text-neutral-400">
+            <span>{resolvedResultsTitle}</span>
+            <span className="rounded-full bg-white/[0.08] px-2 py-0.5 text-[11px] font-semibold text-neutral-300">
+              {countToShow}
+            </span>
+          </div>
 
-        {filteredResults.length > 0 ? (
-          <ul className="max-h-[290px] overflow-y-auto px-1.5 pb-1.5 overscroll-contain">
-            {filteredResults.map((result, i) => (
-              <li key={`${result.name}-${i}`}>
-                <a
-                  href={result.href ?? "#"}
-                  onClick={(e) => {
-                    if (!result.href || result.href === "#") e.preventDefault();
-                    onSelectResult?.(result, i);
-                  }}
-                  className="group relative flex items-center rounded-xl px-2.5 py-2 transition-colors hover:bg-black/[0.04] dark:hover:bg-white/[0.05]"
-                >
-                  {result.avatar ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={result.avatar}
-                      alt={result.name}
-                      className={cn(
-                        "shrink-0 object-cover ring-1 ring-black/10 dark:ring-white/10",
-                        result.avatarShape === "circle" ? "h-7 w-7 rounded-full" : "h-9 w-7 rounded-md"
-                      )}
-                    />
-                  ) : (
-                    <span
-                      className={cn(
-                        "shrink-0 bg-neutral-200 dark:bg-neutral-800 ring-1 ring-black/5 dark:ring-white/10 flex items-center justify-center text-neutral-400",
-                        result.avatarShape === "circle" ? "h-7 w-7 rounded-full" : "h-9 w-7 rounded-md"
-                      )}
-                    >
-                      <BookOpen className="h-4 w-4" />
-                    </span>
-                  )}
-                  <div className="ml-3 min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className="truncate text-sm font-semibold text-neutral-900 dark:text-neutral-100 group-hover:text-purple-400 transition-colors">
-                        {result.name}
+          {loading ? (
+            <div className="flex items-center justify-center gap-2 py-8 text-xs text-neutral-400">
+              <CircleNotch className="h-4 w-4 animate-spin text-purple-400" />
+              <span>Searching...</span>
+            </div>
+          ) : filteredResults.length > 0 ? (
+            <ul className="max-h-[340px] overflow-y-auto px-1.5 pb-1.5 overscroll-contain">
+              {filteredResults.map((result, i) => (
+                <li key={`${result.name}-${i}`}>
+                  <a
+                    href={result.href ?? "#"}
+                    onClick={(e) => {
+                      if (!result.href || result.href === "#") e.preventDefault();
+                      onSelectResult?.(result, i);
+                    }}
+                    className="group relative flex items-center rounded-xl px-2.5 py-2 transition-colors hover:bg-white/[0.08]"
+                  >
+                    {result.avatar ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={result.avatar}
+                        alt={result.name}
+                        className={cn(
+                          "shrink-0 object-cover ring-1 ring-white/10",
+                          result.avatarShape === "circle" ? "h-7 w-7 rounded-full" : "h-9 w-7 rounded-md"
+                        )}
+                      />
+                    ) : (
+                      <span
+                        className={cn(
+                          "shrink-0 bg-white/[0.08] ring-1 ring-white/10 flex items-center justify-center text-neutral-400",
+                          result.avatarShape === "circle" ? "h-7 w-7 rounded-full" : "h-9 w-7 rounded-md"
+                        )}
+                      >
+                        <BookOpen className="h-4 w-4" />
                       </span>
-                      {result.badge && (
-                        <span className="shrink-0 rounded bg-purple-500/10 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-purple-400 border border-purple-500/20">
-                          {result.badge}
+                    )}
+                    <div className="ml-3 min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="truncate text-sm font-semibold text-white group-hover:text-purple-300 transition-colors">
+                          {result.name}
                         </span>
+                        {result.badge && (
+                          <span className="shrink-0 rounded bg-purple-500/20 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-purple-300 border border-purple-500/30">
+                            {result.badge}
+                          </span>
+                        )}
+                      </div>
+                      {result.meta && (
+                        <p className="truncate text-xs text-neutral-400 mt-0.5">
+                          {result.meta}
+                        </p>
                       )}
                     </div>
-                    {result.meta && (
-                      <p className="truncate text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">
-                        {result.meta}
-                      </p>
-                    )}
-                  </div>
-                  {result.actions && result.actions.length > 0 ? (
-                    <span className="ml-auto flex items-center gap-1.5 pl-3 text-neutral-400 opacity-60 transition-opacity group-hover:opacity-100 dark:text-neutral-500">
-                      {result.actions.map((action, ai) => (
-                        <button
-                          key={ai}
-                          type="button"
-                          title={action.label}
-                          aria-label={action.label}
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            action.onClick?.();
-                          }}
-                          className="rounded-lg p-1.5 hover:bg-black/[0.06] hover:text-neutral-700 dark:hover:bg-white/[0.08] dark:hover:text-neutral-200 transition-all cursor-pointer"
-                        >
-                          {action.icon}
-                        </button>
-                      ))}
-                    </span>
-                  ) : null}
-                </a>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <div className="px-4 py-8 text-center text-xs text-neutral-500 dark:text-neutral-400">
-            No series matching &ldquo;{query}&rdquo;
-          </div>
-        )}
-      </div>
+                    {result.actions && result.actions.length > 0 ? (
+                      <span className="ml-auto flex items-center gap-1.5 pl-3 text-neutral-400 opacity-60 transition-opacity group-hover:opacity-100">
+                        {result.actions.map((action, ai) => (
+                          <button
+                            key={ai}
+                            type="button"
+                            title={action.label}
+                            aria-label={action.label}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              action.onClick?.();
+                            }}
+                            className="rounded-lg p-1.5 hover:bg-white/[0.10] hover:text-white transition-all cursor-pointer"
+                          >
+                            {action.icon}
+                          </button>
+                        ))}
+                      </span>
+                    ) : null}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <div className="px-4 py-8 text-center text-xs text-neutral-400">
+              No series matching &ldquo;{query}&rdquo;
+            </div>
+          )}
+        </div>
+      ) : null}
 
       {/* Quick actions */}
-      {quickActions.length > 0 ? (
-        <div className="border-b border-black/[0.06] px-1.5 py-1.5 dark:border-white/[0.06]">
-          <p className="px-2.5 pt-1.5 pb-1 text-[11px] font-semibold uppercase tracking-wider text-neutral-400 dark:text-neutral-500">
+      {quickActions && quickActions.length > 0 ? (
+        <div className="border-b border-white/[0.08] px-1.5 py-1.5">
+          <p className="px-2.5 pt-1.5 pb-1 text-[11px] font-semibold uppercase tracking-wider text-neutral-400">
             {quickActionsTitle}
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-1">
@@ -477,14 +487,14 @@ export function SearchModal({
                 key={`${action.label}-${i}`}
                 type="button"
                 onClick={action.onClick}
-                className="relative flex items-center rounded-lg px-2.5 py-1.5 text-left transition-colors hover:bg-black/[0.04] dark:hover:bg-white/[0.05] cursor-pointer"
+                className="relative flex items-center rounded-lg px-2.5 py-1.5 text-left transition-colors hover:bg-white/[0.06] cursor-pointer"
               >
-                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-black/[0.04] text-neutral-600 dark:bg-white/[0.06] dark:text-neutral-300">
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-white/[0.06] text-neutral-300">
                   {action.icon ?? <Plus className="h-3.5 w-3.5" />}
                 </span>
                 <span className="pl-2.5 text-xs font-medium truncate">{action.label}</span>
                 {action.shortcut ? (
-                  <kbd className="ml-auto flex h-5 w-5 items-center justify-center rounded bg-black/[0.04] font-sans text-[10px] font-bold text-neutral-500 ring-1 ring-inset ring-black/[0.04] dark:bg-white/[0.06] dark:text-neutral-400 dark:ring-white/[0.06]">
+                  <kbd className="ml-auto flex h-5 w-5 items-center justify-center rounded bg-white/[0.06] font-sans text-[10px] font-bold text-neutral-400 ring-1 ring-inset ring-white/[0.08]">
                     {action.shortcut}
                   </kbd>
                 ) : null}
@@ -495,9 +505,9 @@ export function SearchModal({
       ) : null}
 
       {/* Files / Recent Releases */}
-      {files.length > 0 ? (
+      {files && files.length > 0 ? (
         <div className="px-1.5 py-1.5">
-          <div className="flex items-center justify-between px-2.5 pt-1 pb-1 text-[11px] font-semibold uppercase tracking-wider text-neutral-400 dark:text-neutral-500">
+          <div className="flex items-center justify-between px-2.5 pt-1 pb-1 text-[11px] font-semibold uppercase tracking-wider text-neutral-400">
             <span>{filesTitle}</span>
             <span className="font-mono text-[10px]">{files.length}</span>
           </div>
@@ -506,19 +516,23 @@ export function SearchModal({
               <div
                 key={`${file.name}-${i}`}
                 onClick={file.onClick}
-                className="group relative flex items-center rounded-lg px-2.5 py-1.5 transition-colors hover:bg-black/[0.04] dark:hover:bg-white/[0.05] cursor-pointer"
+                className="group relative flex items-center rounded-lg px-2.5 py-1.5 transition-colors hover:bg-white/[0.06] cursor-pointer"
               >
-                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-purple-500/10 text-purple-400">
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-purple-500/20 text-purple-300">
                   {file.icon ?? <FileArrowDown className="h-3.5 w-3.5" />}
                 </span>
                 <span className="flex items-center gap-1.5 pl-2.5 text-xs font-medium truncate">
-                  <span className="truncate">{file.name}</span>
+                  <span className="truncate text-neutral-200">{file.name}</span>
                   {file.ext ? (
-                    <span className="shrink-0 text-neutral-400 dark:text-neutral-500 font-mono text-[11px]">
+                    <span className="shrink-0 text-neutral-400 font-mono text-[11px]">
                       {file.ext}
                     </span>
                   ) : null}
-                  {file.verified ? <Checks className="h-3.5 w-3.5 text-emerald-400 shrink-0" /> : null}
+                  {file.verified ? (
+                    <span className="flex shrink-0 items-center text-emerald-400" title="Verified Release">
+                      <Checks weight="bold" className="h-3.5 w-3.5" />
+                    </span>
+                  ) : null}
                 </span>
                 {file.onShare && (
                   <button
@@ -527,7 +541,7 @@ export function SearchModal({
                       e.stopPropagation();
                       file.onShare?.();
                     }}
-                    className="ml-auto flex items-center gap-1 text-xs text-neutral-400 opacity-60 transition-all hover:text-neutral-700 group-hover:opacity-100 dark:text-neutral-500 dark:hover:text-neutral-200 p-1"
+                    className="ml-auto flex items-center gap-1 text-xs text-neutral-400 opacity-60 transition-all hover:text-white group-hover:opacity-100 p-1"
                     title="Share"
                     aria-label={`Share ${file.name}`}
                   >
@@ -554,7 +568,7 @@ export function SearchModal({
         overlayClassName,
       )}
     >
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-md" />
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" />
       <div
         onClick={(e) => e.stopPropagation()}
         className={cn(
