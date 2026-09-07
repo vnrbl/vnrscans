@@ -458,8 +458,8 @@ export default function Reader({
         }
       }
 
-      if (user) {
-        // Record reading history on initial visit, and update when progress changes significantly (every 5%) or reaches completion
+      // To be added under reading history, the chapter must be read at least 50%
+      if (user && progress >= 50) {
         const lastDbProgressStr = localStorage.getItem(`chapter-db-progress-${ch.id}`);
         const lastDbProgress = lastDbProgressStr !== null ? parseInt(lastDbProgressStr, 10) : -1;
         if (lastDbProgress === -1 || Math.abs(progress - lastDbProgress) >= 5 || (progress >= 95 && lastDbProgress < 95)) {

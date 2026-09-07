@@ -79,6 +79,7 @@ import { SeriesHeader } from "./SeriesHeader";
 import { SeriesActions } from "./SeriesActions";
 import { ChapterList } from "./ChapterList";
 import { SeriesReviewsSection } from "./SeriesReviewsSection";
+import { SharedUniverseSection } from "./SharedUniverseSection";
 
 /* ------------------------------------------------------------------ */
 /*  TitleDetailPageContent — thin shell that:                         */
@@ -223,13 +224,14 @@ export default function TitleDetailPageContent({
         .select("chapter_id,chapters(slug,chapter_number)")
         .eq("user_id", user.id)
         .eq("series_id", seriesQ.data.id)
+        .gte("progress", 50)
         .order("updated_at", { ascending: false })
         .limit(1)
         .maybeSingle();
       return data;
     },
     enabled: !!user && !!seriesQ.data,
-    staleTime: 1000 * 60 * 2,
+    staleTime: 1000 * 5,
   });
 
   const libraryStatus = useQuery({
@@ -904,6 +906,19 @@ export default function TitleDetailPageContent({
           </div>
         )}
 
+        {/* Shared Universe Feature Section */}
+        <div id="shared-universe">
+          <SharedUniverseSection
+            currentSeries={{
+              id: s.id,
+              slug: s.slug,
+              title: s.title,
+              universe: (s as any).universe,
+              universe_role: (s as any).universe_role,
+            }}
+          />
+        </div>
+
         {/* Series Comments & Community Reviews Section */}
         <SeriesReviewsSection
           seriesId={s.id}
@@ -1020,13 +1035,14 @@ function ReadingProgressWidget({
         .from("reading_history")
         .select("chapter_id")
         .eq("user_id", user.id)
-        .eq("series_id", seriesId);
+        .eq("series_id", seriesId)
+        .gte("progress", 50);
 
       if (error) throw error;
       return new Set<string>((data || []).map((r) => r.chapter_id));
     },
     enabled: !!user,
-    staleTime: 1000 * 60 * 2,
+    staleTime: 1000 * 5,
   });
 
   // Calculate unique chapter numbers read across all scan sources

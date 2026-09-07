@@ -720,7 +720,29 @@ html.reader-filter-dim .reader-page-container img {
   filter: brightness(0.76) contrast(0.94) !important;
 }
 
+/* ==========================================================================
+   ✂️ Explicit Line Clamping Utilities
+   ========================================================================== */
+.line-clamp-1 {
+  display: -webkit-box !important;
+  -webkit-box-orient: vertical !important;
+  -webkit-line-clamp: 1 !important;
+  overflow: hidden !important;
+  word-break: break-word;
+}
 
+.line-clamp-2 {
+  display: -webkit-box !important;
+  -webkit-box-orient: vertical !important;
+  -webkit-line-clamp: 2 !important;
+  overflow: hidden !important;
+  word-break: break-word;
+}
 
-
-
+.line-clamp-3 {
+  display: -webkit-box !important;
+  -webkit-box-orient: vertical !important;
+  -webkit-line-clamp: 3 !important;
+  overflow: hidden !important;
+  word-break: break-word;
+}

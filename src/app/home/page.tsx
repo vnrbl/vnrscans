@@ -11,7 +11,7 @@ import HomeClient, {
 } from "./HomeClient";
 import { supabase } from "@/integrations/supabase/client";
 
-export const revalidate = 60; // ISR cache for 60s — instant edge delivery
+export const revalidate = 10; // ISR cache for 10s — ultra fast fresh edge delivery
 
 export const metadata: Metadata = {
   title: "Read Manga, Manhwa, Manhua & Novels Online Free — vnrscans",
@@ -64,11 +64,19 @@ async function fetchHomeInitialData(): Promise<HomeInitialData> {
   const fullSeriesList = (allSeriesRes.data ?? []).map((s: any) => {
     const existing = rpcMap.get(s.id);
     if (existing) {
-      // Ensure sorting strictly matches the actual latest visible chapter on the card
-      const visibleLatestTime = existing.recent_chapters?.[0]?.created_at;
+      // Ensure sorting strictly matches the newest timestamp between DB record and visible chapter cards
+      const chTimestamps = (existing.recent_chapters ?? [])
+        .map((c: any) => new Date(c.created_at || 0).getTime())
+        .filter((t: number) => !isNaN(t) && t > 0);
+      const dbTimestamp = existing.latest_chapter_created_at
+        ? new Date(existing.latest_chapter_created_at).getTime()
+        : 0;
+      const bestTimestamp = Math.max(dbTimestamp, ...chTimestamps);
+      const bestDateStr = bestTimestamp > 0 ? new Date(bestTimestamp).toISOString() : existing.latest_chapter_created_at;
+
       return {
         ...existing,
-        latest_chapter_created_at: visibleLatestTime || existing.latest_chapter_created_at,
+        latest_chapter_created_at: bestDateStr,
       };
     }
     return {

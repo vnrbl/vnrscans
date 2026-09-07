@@ -1,7 +1,6 @@
 import { cache } from "react";
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
-import TagDetailPageContent from "./TagDetailPageContent";
+import { redirect } from "next/navigation";
 import { supabase } from "@/integrations/supabase/client";
 
 export const revalidate = 120; // Edge ISR caching for 2 minutes
@@ -38,8 +37,7 @@ const getTagData = cache(async (slug: string) => {
           description
         )
       `)
-      .eq("tag_id", tag.id)
-      .limit(60);
+      .eq("tag_id", tag.id);
 
     const series = (seriesTags || [])
       .map((item: any) => item.series)
@@ -89,11 +87,5 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
 export default async function Page({ params }: PageProps) {
   const { slug } = await params;
-  const { tag, series } = await getTagData(slug);
-
-  if (!tag) {
-    notFound();
-  }
-
-  return <TagDetailPageContent slug={slug} initialTag={tag} initialSeries={series} />;
+  redirect(`/browse?tag=${encodeURIComponent(slug)}`);
 }

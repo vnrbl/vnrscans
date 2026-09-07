@@ -364,7 +364,7 @@ export function ComickMetadataImporter({
         )}
       </DialogTrigger>
 
-      <DialogContent className="w-[calc(100vw-1rem)] sm:w-full max-w-2xl max-h-[90dvh] bg-[#0d0d12] border-border/50 text-foreground overflow-hidden flex flex-col p-0 gap-0 shadow-2xl">
+      <DialogContent className="w-[calc(100vw-1rem)] sm:w-[94vw] md:max-w-4xl lg:max-w-5xl xl:max-w-6xl 2xl:max-w-7xl max-h-[92dvh] sm:max-h-[90vh] bg-[#0d0d12] border-border/50 text-foreground overflow-hidden flex flex-col p-0 gap-0 shadow-2xl transition-all duration-200">
         <DialogHeader className="p-3.5 sm:p-6 pb-3 sm:pb-4 border-b border-border/20 bg-card/60 shrink-0">
           <div className="flex items-center gap-2.5 sm:gap-3 pr-8 sm:pr-0">
             <div className="grid h-9 w-9 sm:h-10 sm:w-10 place-items-center rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-lg shadow-emerald-500/20 shrink-0">
@@ -501,7 +501,7 @@ export function ComickMetadataImporter({
               <span className="text-xs font-bold text-foreground block">
                 Found {searchResults.length} matches — Click to select:
               </span>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto pr-1">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2.5 max-h-56 lg:max-h-64 overflow-y-auto pr-1">
                 {searchResults.map((item, idx) => {
                   const isSelected = selectedComic?.slug === item.slug || selectedComic?.title === item.title;
                   return (
@@ -549,9 +549,9 @@ export function ComickMetadataImporter({
           {/* Selected Comic Detailed Preview */}
           {selectedComic && (
             <div className="rounded-xl border border-emerald-500/40 bg-emerald-500/10 p-4 space-y-3 animate-in fade-in duration-200">
-              <div className="flex items-start gap-4">
+              <div className="flex flex-col sm:flex-row items-start gap-4">
                 {selectedComic.coverUrl && (
-                  <div className="relative aspect-[2/3] w-20 shrink-0 rounded-lg overflow-hidden border border-border/40 bg-secondary shadow-md">
+                  <div className="relative aspect-[2/3] w-24 sm:w-28 shrink-0 rounded-lg overflow-hidden border border-border/40 bg-secondary shadow-md self-center sm:self-start">
                     <img
                       src={selectedComic.coverUrl}
                       alt={selectedComic.title}

@@ -488,11 +488,12 @@ export const ChapterList = React.memo(function ChapterList({
         .from("reading_history")
         .select("chapter_id")
         .eq("user_id", user.id)
-        .eq("series_id", seriesId);
+        .eq("series_id", seriesId)
+        .gte("progress", 50);
       return new Set<string>(data?.map((r) => r.chapter_id) ?? []);
     },
     enabled: !!user,
-    staleTime: 1000 * 60 * 2,
+    staleTime: 1000 * 5,
   });
 
   // Set of all unique chapter numbers read across ANY scan source

@@ -145,23 +145,25 @@ function HomeContent({ initialData }: { initialData?: HomeInitialData }) {
       );
 
       if (!rpcError && Array.isArray(rpcData) && rpcData.length > 0) {
-        return rpcData.map((row: any) => ({
-          id: row.id,
-          updated_at: row.updated_at,
-          progress: Number(row.progress || 0),
-          series_id: row.series_id,
-          series: {
-            id: row.series_id,
-            slug: row.series_slug,
-            title: row.series_title,
-            cover_url: row.series_cover_url,
-          },
-          chapters: {
-            slug: row.chapter_slug,
-            chapter_number: Number(row.chapter_number),
-            title: row.chapter_title,
-          },
-        })).slice(0, HOME_HORIZONTAL_CARD_LIMIT);
+        return rpcData
+          .filter((row: any) => Number(row.progress || 0) >= 50)
+          .map((row: any) => ({
+            id: row.id,
+            updated_at: row.updated_at,
+            progress: Number(row.progress || 0),
+            series_id: row.series_id,
+            series: {
+              id: row.series_id,
+              slug: row.series_slug,
+              title: row.series_title,
+              cover_url: row.series_cover_url,
+            },
+            chapters: {
+              slug: row.chapter_slug,
+              chapter_number: Number(row.chapter_number),
+              title: row.chapter_title,
+            },
+          })).slice(0, HOME_HORIZONTAL_CARD_LIMIT);
       }
 
       // 2. Resilient fallback: direct query with limit 1000 to prevent truncating distinct series
@@ -171,6 +173,7 @@ function HomeContent({ initialData }: { initialData?: HomeInitialData }) {
           "id,updated_at,progress,series_id,series:series_id(id,slug,title,cover_url),chapters:chapter_id(slug,chapter_number,title)"
         )
         .eq("user_id", user!.id)
+        .gte("progress", 50)
         .order("updated_at", { ascending: false })
         .limit(1000);
       if (error) throw error;
@@ -187,8 +190,10 @@ function HomeContent({ initialData }: { initialData?: HomeInitialData }) {
       return Array.from(seriesMap.values()).slice(0, HOME_HORIZONTAL_CARD_LIMIT);
     },
     enabled: !!user,
-    staleTime: 1000 * 60, // 1 minute
+    staleTime: 1000 * 5, // 5 seconds
     gcTime: 1000 * 60 * 5, // 5 minutes
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
   });
 
   const followedChapters = useQuery({
@@ -312,8 +317,11 @@ function HomeContent({ initialData }: { initialData?: HomeInitialData }) {
       return groupedChapters.slice(0, 50);
     },
     enabled: !!user,
-    staleTime: 1000 * 60 * 2, // 2 minutes
+    staleTime: 1000 * 3, // 3 seconds
     gcTime: 1000 * 60 * 5, // 5 minutes
+    refetchInterval: 10000, // 10 seconds background sync
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
   });
 
   // Popular manhwa
@@ -363,11 +371,19 @@ function HomeContent({ initialData }: { initialData?: HomeInitialData }) {
       let fullSeriesList = (allSeriesRes.data ?? []).map((s: any) => {
         const existing = rpcMap.get(s.id);
         if (existing) {
-          // Ensure sorting strictly matches the actual latest visible chapter on the card
-          const visibleLatestTime = existing.recent_chapters?.[0]?.created_at;
+          // Ensure sorting strictly matches the newest timestamp between DB record and visible chapter cards
+          const chTimestamps = (existing.recent_chapters ?? [])
+            .map((c: any) => new Date(c.created_at || 0).getTime())
+            .filter((t: number) => !isNaN(t) && t > 0);
+          const dbTimestamp = existing.latest_chapter_created_at
+            ? new Date(existing.latest_chapter_created_at).getTime()
+            : 0;
+          const bestTimestamp = Math.max(dbTimestamp, ...chTimestamps);
+          const bestDateStr = bestTimestamp > 0 ? new Date(bestTimestamp).toISOString() : existing.latest_chapter_created_at;
+
           return {
             ...existing,
-            latest_chapter_created_at: visibleLatestTime || existing.latest_chapter_created_at,
+            latest_chapter_created_at: bestDateStr,
           };
         }
         return {
@@ -409,8 +425,12 @@ function HomeContent({ initialData }: { initialData?: HomeInitialData }) {
       }));
     },
     initialData: latestUpdatesInitialData,
-    staleTime: 1000 * 60, // 1 minute
+    initialDataUpdatedAt: 0, // Immediately stale on client mount: triggers fast background refetch
+    staleTime: 1000 * 3, // 3 seconds
     gcTime: 1000 * 60 * 20,
+    refetchInterval: 10000, // 10 seconds polling fallback
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
   });
 
   // Realtime subscription: synchronize Latest Updates and Reading History with live DB updates
@@ -1073,12 +1093,13 @@ function LatestUpdatesSection({
       const { data, error } = await supabase
         .from("reading_history")
         .select("chapter_id")
-        .eq("user_id", userId);
+        .eq("user_id", userId)
+        .gte("progress", 50);
       if (error) throw error;
       return data?.map(d => d.chapter_id) ?? [];
     },
     enabled: !!userId,
-    staleTime: 1000 * 60 * 2, // 2 minutes
+    staleTime: 1000 * 5, // 5 seconds
   });
 
   const readChapterIds = new Set(readingHistoryQuery.data ?? []);
@@ -1203,12 +1224,21 @@ function LatestUpdatesSection({
 
                   {/* Series Info and Chapters */}
                   <div className="flex min-w-0 flex-1 flex-col justify-start">
-                    <div className="mb-2">
+                    <div className="mb-2 overflow-hidden">
                       <Link
                         to="/title/$slug"
                         params={{ slug: item.slug }}
                         title={item.title}
-                        className="block font-semibold text-sm leading-snug text-white hover:text-purple-400 transition-colors line-clamp-2"
+                        className="font-semibold text-sm text-white hover:text-purple-400 transition-colors line-clamp-2"
+                        style={{
+                          display: "-webkit-box",
+                          WebkitLineClamp: 2,
+                          WebkitBoxOrient: "vertical",
+                          overflow: "hidden",
+                          wordBreak: "break-word",
+                          lineHeight: "1.25rem",
+                          maxHeight: "2.5rem",
+                        }}
                       >
                         {item.title}
                       </Link>

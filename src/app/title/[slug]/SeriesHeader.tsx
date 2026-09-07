@@ -218,6 +218,18 @@ export const SeriesHeader = React.memo(function SeriesHeader({
           )}
           {statusLabel(s.status)}
         </span>
+        {s.universe && (
+          <a
+            href="#shared-universe"
+            className="inline-flex items-center gap-1 rounded-full text-[10px] font-mono font-bold tracking-wider px-2 py-0.5 border border-purple-500/40 bg-purple-950/40 text-purple-300 hover:bg-purple-900/60 hover:text-purple-100 transition-colors shadow-sm"
+          >
+            <span className="text-3xs">🌌</span>
+            <span>{s.universe}</span>
+            {s.universe_role && (
+              <span className="text-purple-400/80 font-normal">({s.universe_role})</span>
+            )}
+          </a>
+        )}
       </div>
 
       <h1 className="text-[clamp(1.5rem,3.2vw,2.5rem)] font-black tracking-tight text-white uppercase font-heading leading-[1.12]">
@@ -450,7 +462,7 @@ function LimitedTagPills({
     <>
       <span className="contents md:hidden">
         {mobileTags.map((tag) => (
-          <MetaPill key={tag.id || tag.slug} href={`/tags/${tag.slug}`}>
+          <MetaPill key={tag.id || tag.slug} href="/browse" search={{ tag: tag.slug }}>
             {tag.icon && <span className="mr-1">{tag.icon}</span>}
             {tag.name}
           </MetaPill>
@@ -459,7 +471,7 @@ function LimitedTagPills({
 
       <span className="hidden md:contents">
         {desktopTags.map((tag) => (
-          <MetaPill key={tag.id || tag.slug} href={`/tags/${tag.slug}`}>
+          <MetaPill key={tag.id || tag.slug} href="/browse" search={{ tag: tag.slug }}>
             {tag.icon && <span className="mr-1">{tag.icon}</span>}
             {tag.name}
           </MetaPill>

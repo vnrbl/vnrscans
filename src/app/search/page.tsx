@@ -56,10 +56,9 @@ function SearchPageContent() {
         .from("series")
         .select("id,slug,title,alternative_titles,description,cover_url,type,rating_average,status,view_count,author,artist,is_trending")
         .eq("is_hidden", false)
-        .or(searchFilter)
-        .limit(60);
+        .or(searchFilter);
       if (error) throw error;
-      return rankSeriesResults(data ?? [], prepared).slice(0, 40);
+      return rankSeriesResults(data ?? [], prepared);
     },
     enabled: prepared.primaryTerm.length >= 2,
     staleTime: 1000 * 60 * 5,

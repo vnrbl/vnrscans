@@ -19,6 +19,7 @@ import {
   Save,
   BookOpen,
   Zap,
+  Download,
   RefreshCw,
   Link2,
   Trash2,
@@ -28,7 +29,9 @@ import {
   Search,
   ChevronLeft,
   ChevronRight,
+  Globe2,
 } from "lucide-react";
+import { PRESET_UNIVERSES, UNIVERSE_ROLES } from "@/lib/universe-constants";
 import { supabase } from "@/integrations/supabase/client";
 import { useProcessingTask } from "@/contexts/ProcessingTaskContext";
 import { useAuth, useIsAdmin } from "@/hooks/useAuth";
@@ -124,6 +127,8 @@ export function LiveSeriesEditor({ series: initialSeries, slug, trigger }: LiveS
   const [coverUrl, setCoverUrl] = useState(initialSeries?.cover_url || "");
   const [importedGenres, setImportedGenres] = useState<string[]>([]);
   const [importedTags, setImportedTags] = useState<string[]>([]);
+  const [universe, setUniverse] = useState(initialSeries?.universe || "");
+  const [universeRole, setUniverseRole] = useState(initialSeries?.universe_role || "");
 
   // Chapter Management in Modal
   const [chapterSearch, setChapterSearch] = useState("");
@@ -140,7 +145,16 @@ export function LiveSeriesEditor({ series: initialSeries, slug, trigger }: LiveS
   // Sync / Scan Source state
   const [newSourceUrl, setNewSourceUrl] = useState("");
   const [isAddingSource, setIsAddingSource] = useState(false);
-  const [isSyncingSeries, setIsSyncingSeries] = useState(false);
+  const [syncingState, setSyncingState] = useState<{ sourceId: string; mode: "latest" | "all" } | null>(null);
+  const isSyncingSeries = !!syncingState;
+
+  const isSyncingSource = (sourceId: string, mode?: "latest" | "all") => {
+    if (!syncingState) return false;
+    if (syncingState.sourceId === "all_sources") {
+      return mode ? syncingState.mode === mode : true;
+    }
+    return syncingState.sourceId === sourceId && (!mode || syncingState.mode === mode);
+  };
 
   // Query existing import sources
   const importSourcesQ = useQuery({
@@ -189,6 +203,8 @@ export function LiveSeriesEditor({ series: initialSeries, slug, trigger }: LiveS
       setIsTrending(Boolean(initialSeries.is_trending));
       setIsHidden(Boolean(initialSeries.is_hidden));
       setCoverUrl(initialSeries.cover_url || "");
+      setUniverse(initialSeries.universe || "");
+      setUniverseRole(initialSeries.universe_role || "");
       setImportedGenres([]);
       setImportedTags([]);
       setSelectedChapterIds(new Set());
@@ -211,6 +227,8 @@ export function LiveSeriesEditor({ series: initialSeries, slug, trigger }: LiveS
     setIsTrending(false);
     setIsHidden(false);
     setCoverUrl("");
+    setUniverse("");
+    setUniverseRole("");
     setImportedGenres([]);
     setImportedTags([]);
     setActiveTab("general");
@@ -233,6 +251,8 @@ export function LiveSeriesEditor({ series: initialSeries, slug, trigger }: LiveS
       setIsTrending(Boolean(initialSeries.is_trending));
       setIsHidden(Boolean(initialSeries.is_hidden));
       setCoverUrl(initialSeries.cover_url || "");
+      setUniverse(initialSeries.universe || "");
+      setUniverseRole(initialSeries.universe_role || "");
     }
   };
 
@@ -331,47 +351,82 @@ export function LiveSeriesEditor({ series: initialSeries, slug, trigger }: LiveS
 
   const processing = useProcessingTask();
 
-  // Sync this series now
-  const handleSyncThisSeries = async (sourceId: string) => {
+  // Sync this series now (mode: "latest" = newest releases, "all" = all missing catalog chapters)
+  const handleSyncThisSeries = async (sourceId?: string, mode: "latest" | "all" = "latest") => {
+    const isAllSources = sourceId === "all_sources";
+    const sourcesToSync = isAllSources
+      ? (importSourcesQ.data || [])
+      : (importSourcesQ.data || []).filter((s: any) => !sourceId || s.id === sourceId);
+
+    if (sourcesToSync.length === 0) {
+      toast.error("No scan source found to import from");
+      return;
+    }
+
+    const modeLabel = mode === "all" ? "All Missing Chapters" : "Latest Chapters";
     const steps = [
       { id: "auth", label: "Verifying administrative authorization" },
-      { id: "source", label: "Connecting upstream scanlation source" },
-      { id: "scrape", label: "Scraping and ingesting new chapters" },
+      { id: "source", label: "Connecting scanlation source" },
+      { id: "scrape", label: `Scraping & importing ${modeLabel.toLowerCase()}` },
       { id: "index", label: "Indexing chapter pages & refreshing catalog" },
     ];
 
     processing.startTask({
-      title: "Syncing Chapters",
-      description: `Checking and syncing latest chapters for "${title || "series"}"`,
+      title: mode === "all" ? "Importing All Chapters" : "Importing Latest Chapters",
+      description: `Importing ${modeLabel.toLowerCase()} from ${sourcesToSync.length > 1 ? `${sourcesToSync.length} sources` : (sourcesToSync[0]?.source_site || "scan source")} for "${title || "series"}"`,
       steps,
     });
 
     try {
-      setIsSyncingSeries(true);
+      setSyncingState({ sourceId: sourceId || sourcesToSync[0]?.id, mode });
       const session = (await supabase.auth.getSession()).data.session;
       if (!session?.access_token) {
         throw new Error("Please sign in as admin");
       }
       processing.setStepStatus("auth", "done", "Authorized");
 
-      processing.setStepStatus("source", "active", "Contacting source site...");
-      processing.setStepStatus("source", "done", "Connected");
+      let totalImported = 0;
+      let totalSkipped = 0;
 
-      processing.setStepStatus("scrape", "active", "Extracting chapters and pages...");
-      const res = await $syncImportSource({
-        data: {
-          sourceId,
-          accessToken: session.access_token,
-          maxChapters: 50,
-        },
-      });
+      for (let i = 0; i < sourcesToSync.length; i++) {
+        const src = sourcesToSync[i];
+        const srcName = src.source_site || "Source";
+        processing.setStepStatus(
+          "source",
+          "active",
+          `Connecting to ${srcName} (${i + 1}/${sourcesToSync.length})...`
+        );
 
-      if (!res.success) {
-        throw new Error(res.error || "Sync failed");
+        processing.setStepStatus(
+          "scrape",
+          "active",
+          `Extracting ${mode === "all" ? "full catalog" : "latest"} chapters from ${srcName}...`
+        );
+
+        const res = await $syncImportSource({
+          data: {
+            sourceId: src.id,
+            accessToken: session.access_token,
+            mode,
+            maxChapters: mode === "all" ? 500 : 10,
+          },
+        });
+
+        if (!res.success) {
+          console.warn(`[Sync] Source ${src.id} failed:`, res.error);
+          if (sourcesToSync.length === 1) {
+            throw new Error(res.error || "Sync failed");
+          }
+        } else {
+          totalImported += res.imported ?? 0;
+          totalSkipped += res.skipped ?? 0;
+        }
       }
 
-      processing.setStepStatus("scrape", "done", `Imported ${res.imported ?? 0} new chapter(s)`);
+      processing.setStepStatus("source", "done", "Connected");
+      processing.setStepStatus("scrape", "done", `Imported ${totalImported} chapter(s)`);
       processing.setStepStatus("index", "active", "Refreshing chapter index...");
+
       qc.invalidateQueries({ queryKey: ["series"] });
       qc.invalidateQueries({ queryKey: ["series", "detail", slug] });
       qc.invalidateQueries({ queryKey: ["chapters"] });
@@ -382,13 +437,18 @@ export function LiveSeriesEditor({ series: initialSeries, slug, trigger }: LiveS
       qc.invalidateQueries({ queryKey: ["admin", "series-import-sources", initialSeries?.id] });
 
       processing.setStepStatus("index", "done");
-      await processing.completeTask("Chapters Synchronized Successfully! ✓");
-      toast.success(`Sync complete! Imported ${res.imported ?? 0} new chapter(s), ${res.skipped ?? 0} skipped.`);
+      await processing.completeTask(`${mode === "all" ? "All Chapters" : "Latest Chapters"} Imported Successfully! ✓`);
+
+      if (totalImported > 0) {
+        toast.success(`Sync complete! Imported ${totalImported} ${mode === "all" ? "chapter(s)" : "latest chapter(s)"} (${totalSkipped} skipped).`);
+      } else {
+        toast.info(`Source up to date (${totalSkipped} existing chapters verified).`);
+      }
     } catch (err: any) {
-      processing.failTask(err.message || "Sync failed");
-      toast.error(err.message || "Sync failed");
+      processing.failTask(err.message || "Import failed");
+      toast.error(err.message || "Import failed");
     } finally {
-      setIsSyncingSeries(false);
+      setSyncingState(null);
     }
   };
 
@@ -521,6 +581,8 @@ export function LiveSeriesEditor({ series: initialSeries, slug, trigger }: LiveS
         is_trending: isTrending,
         is_hidden: isHidden,
         cover_url: coverUrl.trim() || null,
+        universe: universe.trim() || null,
+        universe_role: universeRole.trim() || null,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
@@ -603,6 +665,8 @@ export function LiveSeriesEditor({ series: initialSeries, slug, trigger }: LiveS
         is_trending: isTrending,
         is_hidden: isHidden,
         cover_url: coverUrl.trim() || null,
+        universe: universe.trim() || null,
+        universe_role: universeRole.trim() || null,
         updated_at: new Date().toISOString(),
       };
 
@@ -952,6 +1016,79 @@ export function LiveSeriesEditor({ series: initialSeries, slug, trigger }: LiveS
                   </div>
                 </div>
 
+                {/* Shared Universe / Connected Franchise */}
+                <div className="rounded-xl border border-purple-500/30 bg-purple-950/15 p-3.5 sm:p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-purple-300 flex items-center gap-1.5">
+                      <Globe2 className="h-4 w-4 text-purple-400" />
+                      Shared Universe / Connected Franchise
+                    </span>
+                    {universe && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setUniverse("");
+                          setUniverseRole("");
+                        }}
+                        className="text-[10px] text-muted-foreground hover:text-rose-400 cursor-pointer"
+                      >
+                        Clear Universe
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Preset quick buttons */}
+                  <div className="space-y-1">
+                    <span className="text-[11px] text-muted-foreground">Quick Select Universe:</span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {PRESET_UNIVERSES.map((preset) => (
+                        <button
+                          key={preset.slug}
+                          type="button"
+                          onClick={() => {
+                            setUniverse(preset.name);
+                            if (!universeRole) setUniverseRole("Connected Series");
+                          }}
+                          className={`px-2 py-0.5 rounded text-[11px] font-semibold transition-colors cursor-pointer border ${
+                            universe.toLowerCase() === preset.name.toLowerCase()
+                              ? "bg-purple-600 border-purple-500 text-white"
+                              : "bg-secondary/60 hover:bg-secondary border-border/40 text-muted-foreground hover:text-foreground"
+                          }`}
+                        >
+                          {preset.name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                    <div className="space-y-1">
+                      <Label className="text-xs font-semibold">Universe Name</Label>
+                      <Input
+                        value={universe}
+                        onChange={(e) => setUniverse(e.target.value)}
+                        placeholder="e.g. PTJ Universe, Blue String, Nano Machine Murim..."
+                        className="text-xs h-8.5 bg-background/60"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs font-semibold">Role / Order in Universe</Label>
+                      <Select value={universeRole} onValueChange={setUniverseRole}>
+                        <SelectTrigger className="text-xs h-8.5 bg-background/60">
+                          <SelectValue placeholder="Select role (e.g. Main Story, Prequel)" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {UNIVERSE_ROLES.map((role) => (
+                            <SelectItem key={role} value={role} className="text-xs">
+                              {role}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                </div>
+
                 {/* Flags and Visibility */}
                 <div className="rounded-xl border border-border/30 bg-card/40 p-4 space-y-3">
                   <span className="text-xs font-bold text-foreground block">Visibility & Discovery Toggles</span>
@@ -1202,20 +1339,45 @@ export function LiveSeriesEditor({ series: initialSeries, slug, trigger }: LiveS
                       </Button>
                     )}
                     {(importSourcesQ.data || []).length > 0 ? (
-                      <Button
-                        type="button"
-                        size="sm"
-                        onClick={() => {
-                          const srcId = importSourcesQ.data?.[0]?.id;
-                          if (srcId) handleSyncThisSeries(srcId);
-                        }}
-                        disabled={isSyncingSeries}
-                        className="h-8 text-xs font-bold bg-purple-600 hover:bg-purple-500 text-white gap-1.5 cursor-pointer shadow-sm flex-1 sm:flex-none"
-                        title="Check scan source and auto-import latest chapters"
-                      >
-                        <RefreshCw className={`h-3.5 w-3.5 ${isSyncingSeries ? "animate-spin" : ""}`} />
-                        <span>{isSyncingSeries ? "Syncing..." : "Sync Chapters"}</span>
-                      </Button>
+                      <div className="flex items-center gap-1.5 flex-1 sm:flex-none">
+                        <Button
+                          type="button"
+                          size="sm"
+                          onClick={() => {
+                            const srcId = importSourcesQ.data?.[0]?.id;
+                            if (srcId) handleSyncThisSeries(srcId, "latest");
+                          }}
+                          disabled={isSyncingSeries}
+                          className="h-8 text-xs font-bold bg-purple-600 hover:bg-purple-500 text-white gap-1.5 cursor-pointer shadow-sm flex-1 sm:flex-none"
+                          title="Import newest missing chapters (latest releases)"
+                        >
+                          {syncingState?.mode === "latest" ? (
+                            <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <Zap className="h-3.5 w-3.5 text-amber-300" />
+                          )}
+                          <span>{syncingState?.mode === "latest" ? "Syncing..." : "Sync Latest"}</span>
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            const srcId = importSourcesQ.data?.[0]?.id;
+                            if (srcId) handleSyncThisSeries(srcId, "all");
+                          }}
+                          disabled={isSyncingSeries}
+                          className="h-8 text-xs font-bold border-purple-500/40 bg-purple-950/40 hover:bg-purple-900/60 text-purple-200 hover:text-white gap-1.5 cursor-pointer shadow-sm flex-1 sm:flex-none"
+                          title="Import all missing chapters across the full catalog"
+                        >
+                          {syncingState?.mode === "all" ? (
+                            <RefreshCw className="h-3.5 w-3.5 animate-spin text-purple-300" />
+                          ) : (
+                            <Download className="h-3.5 w-3.5 text-purple-300" />
+                          )}
+                          <span>{syncingState?.mode === "all" ? "Syncing..." : "Sync All"}</span>
+                        </Button>
+                      </div>
                     ) : (
                       <Button
                         type="button"
@@ -1338,11 +1500,43 @@ export function LiveSeriesEditor({ series: initialSeries, slug, trigger }: LiveS
             {activeTab === "sources" && !isCreatingNew && (
               <div className="space-y-4">
                 <div className="rounded-xl border border-border/30 bg-card/40 p-3 sm:p-4 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-sm font-bold flex items-center gap-2">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
                       <Link2 className="h-4 w-4 text-purple-400" />
-                      Linked Scan Sources
-                    </h3>
+                      <h3 className="text-sm font-bold">Linked Scan Sources</h3>
+                      {(importSourcesQ.data || []).length > 0 && (
+                        <span className="text-2xs font-mono px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                          {(importSourcesQ.data || []).length}
+                        </span>
+                      )}
+                    </div>
+                    {(importSourcesQ.data || []).length > 1 && (
+                      <div className="flex items-center gap-1.5 w-full sm:w-auto justify-end">
+                        <Button
+                          type="button"
+                          size="sm"
+                          onClick={() => handleSyncThisSeries("all_sources", "latest")}
+                          disabled={isSyncingSeries}
+                          className="h-7 text-2xs font-semibold bg-purple-600/80 hover:bg-purple-600 text-white gap-1 cursor-pointer"
+                          title="Sync latest releases from all linked sources"
+                        >
+                          <Zap className="h-3 w-3 text-amber-300" />
+                          <span>Sync Latest (All)</span>
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleSyncThisSeries("all_sources", "all")}
+                          disabled={isSyncingSeries}
+                          className="h-7 text-2xs font-semibold border-purple-500/30 text-purple-300 hover:bg-purple-900/40 gap-1 cursor-pointer"
+                          title="Sync all missing chapters from all linked sources"
+                        >
+                          <Download className="h-3 w-3 text-purple-300" />
+                          <span>Sync All Sources</span>
+                        </Button>
+                      </div>
+                    )}
                   </div>
 
                   {(importSourcesQ.data || []).length === 0 ? (
@@ -1350,30 +1544,55 @@ export function LiveSeriesEditor({ series: initialSeries, slug, trigger }: LiveS
                       No scan sources linked to this series yet. Add one below to enable 1-click chapter scraping & cover auto-import.
                     </p>
                   ) : (
-                    <div className="space-y-2">
+                    <div className="space-y-2.5">
                       {(importSourcesQ.data || []).map((src: any) => (
-                        <div key={src.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 p-3 rounded-lg border border-border/40 bg-secondary/20">
+                        <div key={src.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 sm:p-3.5 rounded-xl border border-border/40 bg-secondary/20 hover:bg-secondary/30 transition-all">
                           <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs font-bold uppercase font-mono">{src.source_site || "Source"}</span>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="text-xs font-bold uppercase font-mono px-2 py-0.5 rounded bg-purple-500/10 text-purple-300 border border-purple-500/20">
+                                {src.source_site || "Source"}
+                              </span>
                               {src.last_checked_at && (
                                 <span className="text-2xs text-muted-foreground">
                                   Last checked: {formatAppDate(src.last_checked_at)}
                                 </span>
                               )}
                             </div>
-                            <p className="text-xs font-mono text-muted-foreground truncate mt-0.5">{src.source_url}</p>
+                            <p className="text-xs font-mono text-muted-foreground truncate mt-1">{src.source_url}</p>
                           </div>
-                          <Button
-                            type="button"
-                            size="sm"
-                            onClick={() => handleSyncThisSeries(src.id)}
-                            disabled={isSyncingSeries}
-                            className="w-full sm:w-auto shrink-0 h-8 text-xs font-bold bg-purple-600 hover:bg-purple-500 gap-1.5 cursor-pointer"
-                          >
-                            <RefreshCw className={`h-3 w-3 ${isSyncingSeries ? "animate-spin" : ""}`} />
-                            {isSyncingSeries ? "Syncing..." : "Sync Chapters"}
-                          </Button>
+                          <div className="flex items-center gap-1.5 w-full sm:w-auto shrink-0">
+                            <Button
+                              type="button"
+                              size="sm"
+                              onClick={() => handleSyncThisSeries(src.id, "latest")}
+                              disabled={isSyncingSeries}
+                              className="flex-1 sm:flex-none h-8 text-xs font-bold bg-purple-600 hover:bg-purple-500 text-white gap-1.5 cursor-pointer shadow-sm"
+                              title="Import newest missing chapters (latest releases)"
+                            >
+                              {isSyncingSource(src.id, "latest") ? (
+                                <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                              ) : (
+                                <Zap className="h-3.5 w-3.5 text-amber-300" />
+                              )}
+                              <span>{isSyncingSource(src.id, "latest") ? "Importing..." : "Import Latest"}</span>
+                            </Button>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleSyncThisSeries(src.id, "all")}
+                              disabled={isSyncingSeries}
+                              className="flex-1 sm:flex-none h-8 text-xs font-bold border-purple-500/40 bg-purple-950/40 hover:bg-purple-900/60 text-purple-200 hover:text-white gap-1.5 cursor-pointer shadow-sm"
+                              title="Import all missing chapters across the full catalog"
+                            >
+                              {isSyncingSource(src.id, "all") ? (
+                                <RefreshCw className="h-3.5 w-3.5 animate-spin text-purple-300" />
+                              ) : (
+                                <Download className="h-3.5 w-3.5 text-purple-300" />
+                              )}
+                              <span>{isSyncingSource(src.id, "all") ? "Importing..." : "Import All"}</span>
+                            </Button>
+                          </div>
                         </div>
                       ))}
                     </div>

@@ -99,12 +99,13 @@ export default function NovelsClient({ initialNovels }: NovelsClientProps) {
       const { data, error } = await supabase
         .from("reading_history")
         .select("chapter_id")
-        .eq("user_id", user.id);
+        .eq("user_id", user.id)
+        .gte("progress", 50);
       if (error) throw error;
       return data?.map(d => d.chapter_id) ?? [];
     },
     enabled: !!user?.id,
-    staleTime: 1000 * 60 * 2, // 2 minutes
+    staleTime: 1000 * 5, // 5 seconds
   });
 
   const readChapterIds = useMemo(() => new Set(readingHistoryQuery.data ?? []), [readingHistoryQuery.data]);

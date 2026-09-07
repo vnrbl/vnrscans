@@ -23,6 +23,7 @@ import {
   Heart,
   Lock,
   Unlock,
+  Zap,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { logAdminAction } from "@/lib/adminLog";
@@ -733,7 +734,7 @@ export default function ChapterManager({ seriesId, onBack }: { seriesId: string;
     onError: (error: Error) => toast.error(error.message),
   });
 
-  const checkImportSourceNow = async (sourceId: string) => {
+  const checkImportSourceNow = async (sourceId: string, mode: "latest" | "all" = "latest") => {
     setSyncingSourceId(sourceId);
     try {
       const { data: sessionData } = await supabase.auth.getSession();
@@ -741,7 +742,12 @@ export default function ChapterManager({ seriesId, onBack }: { seriesId: string;
       if (!accessToken) throw new Error("Please sign in again before running auto import.");
 
       const result = await $syncImportSource({
-        data: { sourceId, accessToken, maxChapters: 50 },
+        data: {
+          sourceId,
+          accessToken,
+          mode,
+          maxChapters: mode === "all" ? 500 : 10,
+        },
       });
 
       if (!result.success) {
@@ -754,7 +760,7 @@ export default function ChapterManager({ seriesId, onBack }: { seriesId: string;
         );
       } else {
         toast.success(
-          `Sync complete: ${result.imported} new chapter(s) imported, ${result.skipped ?? 0} skipped.`,
+          `Sync complete: ${result.imported} ${mode === "all" ? "chapter(s)" : "latest chapter(s)"} imported, ${result.skipped ?? 0} skipped.`,
         );
       }
       qc.invalidateQueries({ queryKey: ["admin", "chapters", seriesId] });
@@ -1878,14 +1884,29 @@ export default function ChapterManager({ seriesId, onBack }: { seriesId: string;
                       <Button
                         type="button"
                         size="sm"
-                        onClick={() => checkImportSourceNow(source.id)}
+                        onClick={() => checkImportSourceNow(source.id, "latest")}
                         disabled={syncingSourceId === source.id}
-                        className="bg-violet-600 hover:bg-violet-700"
+                        className="bg-violet-600 hover:bg-violet-700 text-xs font-semibold gap-1.5"
+                        title="Import newest missing chapters (latest releases)"
                       >
-                        <RefreshCw
-                          className={`mr-1 h-3.5 w-3.5 ${syncingSourceId === source.id ? "animate-spin" : ""}`}
-                        />
-                        {syncingSourceId === source.id ? "Checking..." : "Check Now"}
+                        {syncingSourceId === source.id ? (
+                          <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <Zap className="h-3.5 w-3.5 text-amber-300" />
+                        )}
+                        <span>{syncingSourceId === source.id ? "Checking..." : "Import Latest"}</span>
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => checkImportSourceNow(source.id, "all")}
+                        disabled={syncingSourceId === source.id}
+                        className="border-violet-500/40 text-violet-300 hover:bg-violet-900/40 text-xs font-semibold gap-1.5"
+                        title="Import all missing chapters across the full catalog"
+                      >
+                        <Download className="h-3.5 w-3.5 text-violet-300" />
+                        <span>Import All</span>
                       </Button>
                       <Button
                         type="button"

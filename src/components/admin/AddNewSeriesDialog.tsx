@@ -18,6 +18,7 @@ import {
   ExternalLink,
   PenTool,
   Palette,
+  BookOpen,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth, useIsAdmin } from "@/hooks/useAuth";
@@ -135,6 +136,42 @@ const WORKABLE_SCAN_PROVIDERS: ScanProviderOption[] = [
     domain: "comix.to",
     getUrl: (slug) => `https://comix.to/title/${slug}`,
     getSearchUrl: (title) => `https://comix.to/browse?keyword=${encodeURIComponent(title)}`,
+  },
+  {
+    id: "kayn",
+    name: "Kayn Scans",
+    icon: "⚡",
+    badge: "Super Fast",
+    domain: "kaynscans.com",
+    getUrl: (slug) => `https://kaynscans.com/series/${slug}`,
+    getSearchUrl: (title) => `https://kaynscans.com/search?query=${encodeURIComponent(title)}`,
+  },
+  {
+    id: "witchtoons",
+    name: "WitchToons",
+    icon: "🧙‍♀️",
+    badge: "Super Fast",
+    domain: "witchtoons.net",
+    getUrl: (slug) => `https://witchtoons.net/series/comic/${slug}`,
+    getSearchUrl: (title) => `https://witchtoons.net/search?q=${encodeURIComponent(title)}`,
+  },
+  {
+    id: "duskscans",
+    name: "Dusk Scans",
+    icon: "🌆",
+    badge: "Super Fast",
+    domain: "duskscans.com",
+    getUrl: (slug) => `https://duskscans.com/series/${slug}`,
+    getSearchUrl: (title) => `https://duskscans.com/search?q=${encodeURIComponent(title)}`,
+  },
+  {
+    id: "elftoon",
+    name: "ElfToon",
+    icon: "🧝",
+    badge: "Fast Scraper",
+    domain: "elftoon.com",
+    getUrl: (slug) => `https://elftoon.com/manga/${slug}/`,
+    getSearchUrl: (title) => `https://elftoon.com/?s=${encodeURIComponent(title)}`,
   },
   {
     id: "custom",
@@ -607,7 +644,7 @@ export function AddNewSeriesDialog({ trigger }: AddNewSeriesDialogProps) {
         )}
       </DialogTrigger>
 
-      <DialogContent className="w-[calc(100vw-1rem)] sm:w-full sm:max-w-2xl max-h-[90dvh] sm:max-h-[85vh] overflow-y-auto p-3.5 sm:p-6 bg-background/95 border-purple-500/30 backdrop-blur-xl">
+      <DialogContent className="w-[calc(100vw-1rem)] sm:w-[94vw] md:max-w-4xl lg:max-w-5xl xl:max-w-6xl 2xl:max-w-7xl max-h-[92dvh] sm:max-h-[90vh] overflow-y-auto p-3.5 sm:p-6 lg:p-7 bg-background/95 border-purple-500/30 backdrop-blur-xl transition-all duration-200">
         <DialogHeader className="pb-2">
           <div className="flex items-center gap-2.5 sm:gap-3">
             <div className="grid h-9 w-9 sm:h-10 sm:w-10 place-items-center rounded-xl bg-purple-500/10 text-purple-400 border border-purple-500/20 shrink-0 shadow-sm">
@@ -746,7 +783,7 @@ export function AddNewSeriesDialog({ trigger }: AddNewSeriesDialogProps) {
                   <span className="text-xs font-medium text-neutral-400">
                     Select matching series ({comickResults.length} found on {metadataSource === "comick" ? "Comick.dev" : "Comix.to"}):
                   </span>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto p-1 scrollbar-thin">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2.5 max-h-56 lg:max-h-64 overflow-y-auto p-1 scrollbar-thin">
                     {comickResults.map((comic) => {
                       const isSelected = selectedComic?.slug === comic.slug;
                       return (
@@ -755,14 +792,14 @@ export function AddNewSeriesDialog({ trigger }: AddNewSeriesDialogProps) {
                           onClick={() => handleSelectComic(comic)}
                           className={`flex items-center gap-3 p-2.5 rounded-xl border cursor-pointer transition-all ${
                             isSelected
-                              ? "bg-purple-600/20 border-purple-500 ring-1 ring-purple-500"
+                              ? "bg-purple-600/20 border-purple-500 ring-1 ring-purple-500 shadow-sm"
                               : "bg-card/40 border-border/40 hover:border-purple-500/40"
                           }`}
                         >
                           <img
                             src={comic.coverUrl || ""}
                             alt={comic.title}
-                            className="h-14 w-10 object-cover rounded-md bg-secondary shrink-0 shadow-sm"
+                            className="h-16 w-11 object-cover rounded-md bg-secondary shrink-0 shadow-sm"
                           />
                           <div className="min-w-0 flex-1">
                             <h4 className="text-xs font-semibold text-white truncate">{comic.title}</h4>
@@ -796,42 +833,53 @@ export function AddNewSeriesDialog({ trigger }: AddNewSeriesDialogProps) {
 
                   {/* Selected Comic Metadata Preview Card */}
                   {selectedComic && (
-                    <div className="p-3 rounded-xl bg-purple-950/30 border border-purple-500/30 space-y-2.5 mt-2">
-                      <div className="flex items-start gap-3">
+                    <div className="p-3 sm:p-4 rounded-xl bg-purple-950/30 border border-purple-500/30 space-y-3 mt-2">
+                      <div className="flex flex-col sm:flex-row items-start gap-3 sm:gap-4">
                         <img
                           src={selectedComic.coverUrl || ""}
                           alt={selectedComic.title}
-                          className="h-20 w-14 object-cover rounded-lg border border-purple-500/30 shadow shrink-0"
+                          className="h-28 w-20 sm:h-32 sm:w-24 object-cover rounded-lg border border-purple-500/30 shadow shrink-0 self-center sm:self-start"
                         />
-                        <div className="min-w-0 flex-1 space-y-1.5">
-                          <div className="flex items-center justify-between gap-2">
-                            <h4 className="text-xs font-bold text-white truncate">{selectedComic.title}</h4>
+                        <div className="min-w-0 flex-1 space-y-2 w-full">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <h4 className="text-xs sm:text-sm font-bold text-white leading-snug">{selectedComic.title}</h4>
                             <Badge variant="outline" className="text-[10px] text-purple-300 border-purple-500/40 shrink-0">
                               {selectedComic.releaseYear || "N/A"}
                             </Badge>
                           </div>
 
                           {/* Author & Artist Badges */}
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-                            <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-purple-500/10 border border-purple-500/20 text-xs">
-                              <PenTool className="h-3 w-3 text-purple-400 shrink-0" />
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                            <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-purple-500/10 border border-purple-500/20 text-xs">
+                              <PenTool className="h-3.5 w-3.5 text-purple-400 shrink-0" />
                               <div className="min-w-0 flex-1">
                                 <span className="text-[9px] text-purple-400/80 block uppercase font-bold tracking-wider leading-none">
                                   Author
                                 </span>
-                                <span className="text-white font-medium text-[11px] truncate block">
+                                <span className="text-white font-medium text-[11px] sm:text-xs truncate block mt-0.5">
                                   {selectedComic.author || "Detecting / Not specified"}
                                 </span>
                               </div>
                             </div>
-                            <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-pink-500/10 border border-pink-500/20 text-xs">
-                              <Palette className="h-3 w-3 text-pink-400 shrink-0" />
+                            <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-pink-500/10 border border-pink-500/20 text-xs">
+                              <Palette className="h-3.5 w-3.5 text-pink-400 shrink-0" />
                               <div className="min-w-0 flex-1">
                                 <span className="text-[9px] text-pink-400/80 block uppercase font-bold tracking-wider leading-none">
                                   Artist
                                 </span>
-                                <span className="text-white font-medium text-[11px] truncate block">
+                                <span className="text-white font-medium text-[11px] sm:text-xs truncate block mt-0.5">
                                   {selectedComic.artist || "Detecting / Not specified"}
+                                </span>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-xs col-span-1 sm:col-span-2 lg:col-span-1">
+                              <BookOpen className="h-3.5 w-3.5 text-indigo-400 shrink-0" />
+                              <div className="min-w-0 flex-1">
+                                <span className="text-[9px] text-indigo-400/80 block uppercase font-bold tracking-wider leading-none">
+                                  Format
+                                </span>
+                                <span className="text-white font-medium text-[11px] sm:text-xs truncate block capitalize mt-0.5">
+                                  {selectedType}
                                 </span>
                               </div>
                             </div>
@@ -839,18 +887,18 @@ export function AddNewSeriesDialog({ trigger }: AddNewSeriesDialogProps) {
 
                           {/* Genres tags preview */}
                           {selectedComic.genres && selectedComic.genres.length > 0 && (
-                            <div className="flex flex-wrap gap-1 pt-0.5">
-                              {selectedComic.genres.slice(0, 5).map((g) => (
+                            <div className="flex flex-wrap gap-1.5 pt-0.5">
+                              {selectedComic.genres.slice(0, 10).map((g) => (
                                 <span
                                   key={g}
-                                  className="px-1.5 py-0.5 rounded text-[10px] bg-purple-500/20 text-purple-200 border border-purple-500/30 font-medium"
+                                  className="px-2 py-0.5 rounded-md text-[10px] sm:text-[11px] bg-purple-500/20 text-purple-200 border border-purple-500/30 font-medium"
                                 >
                                   {g}
                                 </span>
                               ))}
-                              {selectedComic.genres.length > 5 && (
-                                <span className="text-[10px] text-neutral-400">
-                                  +{selectedComic.genres.length - 5} more
+                              {selectedComic.genres.length > 10 && (
+                                <span className="text-[10px] text-neutral-400 self-center">
+                                  +{selectedComic.genres.length - 10} more
                                 </span>
                               )}
                             </div>
@@ -884,7 +932,7 @@ export function AddNewSeriesDialog({ trigger }: AddNewSeriesDialogProps) {
 
               {/* Workable Provider Selection Grid */}
               <div className="pl-0 sm:pl-7 space-y-3">
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2 sm:gap-2.5">
                   {WORKABLE_SCAN_PROVIDERS.map((provider) => {
                     const isSelected = selectedScanProvider === provider.id;
                     return (
@@ -1032,33 +1080,33 @@ export function AddNewSeriesDialog({ trigger }: AddNewSeriesDialogProps) {
         {/* ── TAB 2: MANUAL SERIES CREATION ──────────────────────────── */}
         {activeTab === "manual" && (
           <div className="space-y-4 pt-2">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <Label className="text-xs font-bold">Series Title *</Label>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div className="space-y-1.5 md:col-span-2">
+                <Label className="text-xs font-bold text-neutral-200">Series Title *</Label>
                 <Input
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   placeholder="e.g. Magic Emperor"
-                  className="text-xs"
+                  className="text-xs sm:text-sm h-10 bg-neutral-900/80 border-neutral-800"
                 />
               </div>
 
-              <div className="space-y-1">
-                <Label className="text-xs font-bold">URL Slug</Label>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-bold text-neutral-200">URL Slug</Label>
                 <Input
                   value={slug}
                   onChange={(e) => setSlug(e.target.value)}
                   placeholder="magic-emperor"
-                  className="text-xs font-mono"
+                  className="text-xs sm:text-sm h-10 font-mono bg-neutral-900/80 border-neutral-800"
                 />
               </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div className="space-y-1">
-                <Label className="text-xs font-bold">Format</Label>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-bold text-neutral-200">Format</Label>
                 <Select value={type} onValueChange={(v: any) => setType(v)}>
-                  <SelectTrigger className="text-xs">
+                  <SelectTrigger className="text-xs sm:text-sm h-10 bg-neutral-900/80 border-neutral-800">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -1071,10 +1119,10 @@ export function AddNewSeriesDialog({ trigger }: AddNewSeriesDialogProps) {
                 </Select>
               </div>
 
-              <div className="space-y-1">
-                <Label className="text-xs font-bold">Status</Label>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-bold text-neutral-200">Status</Label>
                 <Select value={status} onValueChange={(v: any) => setStatus(v)}>
-                  <SelectTrigger className="text-xs">
+                  <SelectTrigger className="text-xs sm:text-sm h-10 bg-neutral-900/80 border-neutral-800">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -1087,56 +1135,55 @@ export function AddNewSeriesDialog({ trigger }: AddNewSeriesDialogProps) {
                 </Select>
               </div>
 
-              <div className="space-y-1">
-                <Label className="text-xs font-bold">Release Year</Label>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-bold text-neutral-200">Release Year</Label>
                 <Input
                   value={releaseYear}
                   onChange={(e) => setReleaseYear(e.target.value)}
                   placeholder="2026"
-                  className="text-xs"
+                  className="text-xs sm:text-sm h-10 bg-neutral-900/80 border-neutral-800"
                 />
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <Label className="text-xs font-bold">Author</Label>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs font-bold text-neutral-200">Author</Label>
                 <Input
                   value={author}
                   onChange={(e) => setAuthor(e.target.value)}
                   placeholder="Author name"
-                  className="text-xs"
+                  className="text-xs sm:text-sm h-10 bg-neutral-900/80 border-neutral-800"
                 />
               </div>
-              <div className="space-y-1">
-                <Label className="text-xs font-bold">Artist</Label>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-bold text-neutral-200">Artist</Label>
                 <Input
                   value={artist}
                   onChange={(e) => setArtist(e.target.value)}
                   placeholder="Artist name"
-                  className="text-xs"
+                  className="text-xs sm:text-sm h-10 bg-neutral-900/80 border-neutral-800"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-bold text-neutral-200">Cover Image URL</Label>
+                <Input
+                  value={coverUrl}
+                  onChange={(e) => setCoverUrl(e.target.value)}
+                  placeholder="https://example.com/cover.jpg"
+                  className="text-xs sm:text-sm h-10 bg-neutral-900/80 border-neutral-800"
                 />
               </div>
             </div>
 
-            <div className="space-y-1">
-              <Label className="text-xs font-bold">Cover Image URL</Label>
-              <Input
-                value={coverUrl}
-                onChange={(e) => setCoverUrl(e.target.value)}
-                placeholder="https://example.com/cover.jpg"
-                className="text-xs"
-              />
-            </div>
-
-            <div className="space-y-1">
-              <Label className="text-xs font-bold">Synopsis / Description</Label>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-bold text-neutral-200">Synopsis / Description</Label>
               <Textarea
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="Write synopsis here..."
-                rows={3}
-                className="text-xs whitespace-pre-wrap resize-none"
+                rows={4}
+                className="text-xs sm:text-sm whitespace-pre-wrap resize-none bg-neutral-900/80 border-neutral-800"
               />
             </div>
 

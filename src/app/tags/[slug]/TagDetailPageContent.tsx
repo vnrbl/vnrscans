@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, Tag as TagIcon } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { SeriesCard } from "@/components/SeriesCard";
+import { SeriesGrid } from "@/components/SeriesGrid";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
@@ -161,33 +162,11 @@ export default function TagDetailPageContent({
 
         {/* Series grid */}
         <div>
-          {series.isLoading && (
-            <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-              {[...Array(10)].map((_, i) => (
-                <div key={i} className="aspect-[2/3] animate-pulse rounded-xl bg-card/45 border border-border/40" />
-              ))}
-            </div>
-          )}
-          
-          {series.data && series.data.length === 0 && (
-            <div className="rounded-2xl border border-dashed border-border/40 bg-card/25 p-12 text-center max-w-md mx-auto">
-              <div className="mx-auto mb-4 grid h-12 w-12 place-items-center rounded-xl bg-secondary/40 text-muted-foreground">
-                <TagIcon className="h-6 w-6" />
-              </div>
-              <h3 className="text-lg font-bold">No titles yet</h3>
-              <p className="mt-1 text-sm text-muted-foreground leading-relaxed">
-                No titles have been tagged with "{tag.data.name}" yet.
-              </p>
-            </div>
-          )}
-
-          {series.data && series.data.length > 0 && (
-            <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-              {series.data.map((s: any) => (
-                <SeriesCard key={s.id} s={s} />
-              ))}
-            </div>
-          )}
+          <SeriesGrid
+            items={series.data}
+            loading={series.isLoading}
+            emptyMessage={`No titles have been tagged with "${tag.data.name}" yet.`}
+          />
         </div>
       </div>
     </div>

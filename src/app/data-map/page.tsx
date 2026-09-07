@@ -142,7 +142,7 @@ export default async function DataMapPage() {
                   {data.genres.map((genre) => (
                     <Link
                       key={genre.slug}
-                      href={`/tags/${genre.slug}`}
+                      href={`/browse?genre=${encodeURIComponent(genre.slug)}`}
                       className="text-xs text-neutral-400 hover:text-white transition-colors truncate block"
                       title={genre.name}
                     >

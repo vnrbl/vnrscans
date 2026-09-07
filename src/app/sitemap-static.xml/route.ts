@@ -77,7 +77,7 @@ export async function GET() {
       for (const tag of tags ?? []) {
         if (!tag.slug) continue;
         entries.push({
-          path: `/tags/${tag.slug}`,
+          path: `/browse?tag=${tag.slug}`,
           changefreq: "weekly",
           priority: "0.6",
           lastmod: tag.updated_at

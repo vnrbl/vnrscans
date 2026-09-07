@@ -163,12 +163,13 @@ export default function HomeHistoryContent({
       const { data, error } = await supabase
         .from("reading_history")
         .select("chapter_id")
-        .eq("user_id", user.id);
+        .eq("user_id", user.id)
+        .gte("progress", 50);
       if (error) throw error;
       return data?.map((d) => d.chapter_id) ?? [];
     },
     enabled: !!user?.id,
-    staleTime: 1000 * 60 * 2,
+    staleTime: 1000 * 5,
   });
 
   const readChapterIds = useMemo(
@@ -625,6 +626,7 @@ async function fetchReadingHistory(
       "id,updated_at,progress,series_id,series:series_id(id,slug,title,cover_url),chapters:chapter_id(slug,chapter_number,title)"
     )
     .eq("user_id", userId)
+    .gte("progress", 50)
     .order("updated_at", { ascending: false })
     .limit(1000);
 
@@ -634,7 +636,7 @@ async function fetchReadingHistory(
   if (error) throw error;
 
   return (data ?? [])
-    .filter((row: any) => row.series?.slug && row.chapters?.slug)
+    .filter((row: any) => row.series?.slug && row.chapters?.slug && Number(row.progress || 0) >= 50)
     .map((row: any) => ({
       id: row.id,
       slug: row.chapters.slug,
@@ -708,11 +710,21 @@ function GroupedSeriesCard({
 
         {/* Series Info & Chapters */}
         <div className="flex min-w-0 flex-1 flex-col justify-start">
-          <div>
+          <div className="overflow-hidden">
             <Link
               to="/title/$slug"
               params={{ slug: item.slug }}
-              className="line-clamp-2 text-base font-bold leading-tight hover:text-primary transition-colors text-white"
+              title={item.title}
+              className="line-clamp-2 text-base font-bold text-white hover:text-primary transition-colors"
+              style={{
+                display: "-webkit-box",
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: "vertical",
+                overflow: "hidden",
+                wordBreak: "break-word",
+                lineHeight: "1.375rem",
+                maxHeight: "2.75rem",
+              }}
             >
               {item.title}
             </Link>

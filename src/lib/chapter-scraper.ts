@@ -130,6 +130,48 @@ export async function extractChaptersFromSeriesUrl(seriesUrl: string): Promise<C
       }
     }
 
+    // Custom extraction for WitchToons (Next.js RSC streaming)
+    if (isWitchToonsUrl(seriesUrl)) {
+      try {
+        console.log(`[Scraper] Using custom WitchToons chapter extraction for: ${seriesUrl}`);
+        const wtChapters = await extractWitchToonsChapters(seriesUrl);
+        if (wtChapters.length > 0) {
+          console.log(`[Scraper] Successfully extracted ${wtChapters.length} free chapters for WitchToons (${seriesUrl})`);
+          return wtChapters;
+        }
+      } catch (wtErr) {
+        console.warn('[Scraper] Custom WitchToons chapter extraction failed, falling back to standard extraction:', wtErr);
+      }
+    }
+
+    // Custom extraction for DuskScans (Next.js RSC stream / HTML extraction)
+    if (isDuskScansUrl(seriesUrl)) {
+      try {
+        console.log(`[Scraper] Using custom DuskScans chapter extraction for: ${seriesUrl}`);
+        const dsChapters = await extractDuskScansChapters(seriesUrl);
+        if (dsChapters.length > 0) {
+          console.log(`[Scraper] Successfully extracted ${dsChapters.length} free chapters for DuskScans (${seriesUrl})`);
+          return dsChapters;
+        }
+      } catch (dsErr) {
+        console.warn('[Scraper] Custom DuskScans chapter extraction failed, falling back to standard extraction:', dsErr);
+      }
+    }
+
+    // Custom extraction for ElfToon (Fast MangaThemesia chapter list extraction)
+    if (isElftoonUrl(seriesUrl)) {
+      try {
+        console.log(`[Scraper] Using custom ElfToon chapter extraction for: ${seriesUrl}`);
+        const elfChapters = await extractElftoonChapters(seriesUrl);
+        if (elfChapters.length > 0) {
+          console.log(`[Scraper] Successfully extracted ${elfChapters.length} chapters for ElfToon (${seriesUrl})`);
+          return elfChapters;
+        }
+      } catch (elfErr) {
+        console.warn('[Scraper] Custom ElfToon chapter extraction failed, falling back to standard extraction:', elfErr);
+      }
+    }
+
     // Custom extraction for Comix.to (stealth Puppeteer bypass & DOM chapter link extraction)
     if (isComixToUrl(seriesUrl)) {
       try {
@@ -431,6 +473,36 @@ async function collectLiveReaderImageUrls(page: any): Promise<string[]> {
     const urls = await page.evaluate(`
       (() => {
         try {
+          // 1. Check if page is locked / paywalled
+          const text = document.body ? (document.body.innerText || '') : '';
+          if (
+            /this\\s+chapter\\s+is\\s+locked|please\\s+purchase\\s+it\\s+to\\s+read|buy\\s+now\\s+for\\s+\\d+\\s*coins?|not\\s+enough\\s+coins|lockedChapterModal|unlock\\s+with\\s+\\d+\\s*coins?|coins\\s+to\\s+unlock|chapter-locked|wp-manga-chapter-locked/i.test(text) ||
+            document.querySelector('.chapter-locked, .wp-manga-chapter-locked, #lockedChapterModal, [data-bs-target="#lockedChapterModal"]') !== null
+          ) {
+            console.warn('[Scraper] Locked or paywalled chapter detected in browser. Returning empty image list.');
+            return [];
+          }
+
+          // 2. Check for ts_reader engine (e.g. Thunder Scans, MangaReader themes)
+          if (window.ts_reader && window.ts_reader.params && window.ts_reader.params.sources) {
+            const sources = window.ts_reader.params.sources;
+            if (Array.isArray(sources) && sources[0] && Array.isArray(sources[0].images)) {
+              const tsImages = sources[0].images.filter((u) => typeof u === 'string' && u.startsWith('http'));
+              if (tsImages.length > 0) return tsImages;
+            }
+          }
+
+          // 3. Check for Madara preloaded images
+          if (Array.isArray(window.chapter_preloaded_images) && window.chapter_preloaded_images.length > 0) {
+            const mImgs = window.chapter_preloaded_images.filter((u) => typeof u === 'string' && u.startsWith('http'));
+            if (mImgs.length > 0) return mImgs;
+          }
+          if (Array.isArray(window.chapter_images) && window.chapter_images.length > 0) {
+            const mImgs = window.chapter_images.filter((u) => typeof u === 'string' && u.startsWith('http'));
+            if (mImgs.length > 0) return mImgs;
+          }
+
+          // 4. Qi Manga / Qi Scans ng-state
           const isAsuraPage = location.hostname.toLowerCase().includes('asura');
           if (!isAsuraPage) {
             const scriptEl = document.getElementById('ng-state');
@@ -455,111 +527,85 @@ async function collectLiveReaderImageUrls(page: any): Promise<string[]> {
             }
           }
         } catch (e) {
-          console.warn('Failed to parse ng-state in browser:', e);
+          console.warn('Failed in preliminary reader extraction:', e);
         }
 
-        const isAsuraPage = location.hostname.toLowerCase().includes('asura');
+        // 5. Container-aware DOM extraction (filtering out banners, headers, footers, sidebars, comments)
+        const readerContainer = document.querySelector('#readerarea, .reading-content, .reader-area, #chapter-video-frame, .chapter-content, .entry-content .page-break, .comic-page, .read-container, .viewer-cnt');
+        const root = readerContainer || document.body;
 
-        const imageEntries = Array.from(document.images).map((img, index) => {
+        const isNonComicUrl = (u) => {
+          const l = String(u || '').toLowerCase();
+          return (
+            l.includes('logo') || l.includes('icon') || l.includes('avatar') || l.includes('gravatar') ||
+            l.includes('banner') || l.includes('promo') || l.includes('discord') || l.includes('patreon') ||
+            l.includes('kofi') || l.includes('paypal') || l.includes('donate') || l.includes('badge') ||
+            l.includes('rating') || l.includes('shop_img') || l.includes('readerarea.svg') ||
+            l.includes('en-th-web') || l.includes('aaaaaaaaaaaaaaaa') || l.includes('favicon') ||
+            l.includes('apple-touch') || l.includes('loading.gif') || l.includes('spinner') ||
+            l.includes('ts-post-image') || l.includes('wp-post-image') || l.includes('attachment-medium') ||
+            l.includes('size-medium') || l.includes('footer-img') || l.includes('/sidebar') ||
+            l.includes('sidebar-') || l.includes('/widget') || l.includes('widget-') ||
+            /-\\d{2,4}x\\d{2,4}\\.(?:jpe?g|png|webp)/i.test(l)
+          );
+        };
+
+        const imageEntries = Array.from(root.querySelectorAll('img')).map((img, index) => {
+          // Reject images inside navigation, header, footer, sidebar, comments, ads
+          if (img.closest('header, footer, nav, aside, .sidebar, #sidebar, .comments, #comments, .comment-list, .author-box, .related-manga, .navigation, .navbar, .footer-img, .footer, .ad-container, .adsbygoogle')) {
+            return null;
+          }
+
           const rect = img.getBoundingClientRect();
           const className = String(img.className || '').toLowerCase();
           const alt = String(img.alt || '').toLowerCase();
           const nw = img.naturalWidth || 0;
           const nh = img.naturalHeight || 0;
+          const w = rect.width || img.width || 0;
+          const h = rect.height || img.height || 0;
+
+          // Reject tiny images (avatars, icons) and wide short horizontal banners
+          if (nw > 0 && nh > 0) {
+            if (nw < 250 || nh < 250) return null;
+            if (nw / nh > 2.5) return null;
+          } else if (w > 0 && h > 0) {
+            if (w < 250 || h < 250) return null;
+            if (w / h > 2.5) return null;
+          }
+
           const values = [
             img.currentSrc,
             img.src,
             img.getAttribute('data-src'),
             img.getAttribute('data-lazy-src'),
             img.getAttribute('data-original'),
-            ...Array.from(img.attributes)
-              .map(attr => attr.value)
-              // eslint-disable-next-line no-useless-escape
-              .filter(val => typeof val === 'string' && (val.startsWith('http') || val.startsWith('//') || val.includes('/') || val.includes('.')) && /\.(?:jpe?g|png|webp)(?:$|[?#])/i.test(val))
-          ].filter(Boolean);
-          const src = String(values[0] || '');
-          const lowercaseSrc = src.toLowerCase();
-          const filename = (() => {
-            try {
-              return new URL(src).pathname.split('/').pop()?.toLowerCase() || '';
-            } catch {
-              return lowercaseSrc.split('/').pop() || '';
-            }
-          })();
-          const isVortexReaderImage =
-            (lowercaseSrc.includes('storage.vortexscans.org/upload/series/') ||
-             lowercaseSrc.includes('storage.vortexscans.org//upload/series/')) &&
-            !lowercaseSrc.includes('/featured/') &&
-            !lowercaseSrc.includes('logo') &&
-            !lowercaseSrc.includes('avatar') &&
-            !lowercaseSrc.includes('banner');
+          ]
+            .filter((val) => typeof val === 'string' && val.length > 0 && !val.startsWith('data:') && !isNonComicUrl(val));
 
-          const isAsuraReaderImage = values.some((val) => {
-            const lVal = String(val).toLowerCase();
-            return (
-              lVal.includes('asura-images/chapters/') ||
-              lVal.includes('asura-images/chapters-restored/') ||
-              (lVal.includes('asura') && lVal.includes('/chapters/'))
-            );
-          });
+          if (values.length === 0) return null;
 
-          const isHivetoonReaderImage = img.hasAttribute('data-reader-page-image') ||
-            values.some((val) => {
-              const lVal = String(val).toLowerCase();
-              return (
-                lVal.includes('storage.hivetoon.com') &&
-                lVal.includes('/public/upload/series/')
-              );
-            });
-
-          const isKaynReaderImage = values.some((val) => {
-            const lVal = String(val).toLowerCase();
-            return (
-              (lVal.includes('kaynscan') || lVal.includes('/uploads/series/')) &&
-              lVal.includes('/uploads/series/')
-            );
-          });
+          const chosenUrl = values[0];
+          if (!chosenUrl.startsWith('http://') && !chosenUrl.startsWith('https://')) return null;
 
           return {
             index,
             top: rect.top + window.scrollY,
-            width: rect.width || img.width || nw || 0,
-            nw,
-            nh,
-            values,
-            isVortexReaderImage,
-            isGenericReaderImage:
-              className.includes('r-page-img') ||
-              className.includes('reader') ||
-              className.includes('chapter') ||
-              alt.startsWith('page ') ||
-              (alt.includes('chapter') && alt.includes('page')) ||
-              (nw >= 500 && nh >= 800) ||
-              isAsuraReaderImage ||
-              isHivetoonReaderImage ||
-              isKaynReaderImage
+            url: chosenUrl,
           };
-        });
+        }).filter(Boolean);
 
-        const vortexReaderImages = imageEntries
-          .filter((entry) => entry.isVortexReaderImage && entry.width >= 250)
-          .sort((a, b) => a.top - b.top || a.index - b.index)
-          .flatMap((entry) => entry.values);
-
-        const candidates = vortexReaderImages.length > 0
-          ? vortexReaderImages
-          : imageEntries
-              .filter((entry) => entry.isGenericReaderImage)
-              .sort((a, b) => a.top - b.top || a.index - b.index)
-              .flatMap((entry) => entry.values);
-
-        return candidates.filter((value, index, all) =>
-          value &&
-          (String(value).startsWith('http://') || String(value).startsWith('https://')) &&
-          all.indexOf(value) === index
-        );
+        imageEntries.sort((a, b) => a.top - b.top || a.index - b.index);
+        const unique = [];
+        for (const entry of imageEntries) {
+          if (!unique.includes(entry.url)) {
+            unique.push(entry.url);
+          }
+        }
+        return unique;
       })()
     `);
+
+    return urls as string[];
 
     return urls as string[];
   } catch (error) {
@@ -959,11 +1005,14 @@ export function isPremiumOrLockedChapter(chapter: {
   const urlLower = (chapter.url || "").toLowerCase();
   const rawLower = (chapter.rawHtml || "").toLowerCase();
 
-  // If explicitly marked free / unlocked and has no lock emoji
+  // If explicitly marked free / unlocked and has no lock emoji or coin attributes
   if (
     (titleLower.includes("free") || titleLower.includes("unlocked")) &&
     !/[🔒🔐]/.test(titleLower) &&
-    !/[🔒🔐]/.test(rawLower)
+    !/[🔒🔐]/.test(rawLower) &&
+    !rawLower.includes("lockedchaptermodal") &&
+    !rawLower.includes("data-coin") &&
+    !rawLower.includes("coin")
   ) {
     return false;
   }
@@ -980,15 +1029,24 @@ export function isPremiumOrLockedChapter(chapter: {
   ) {
     return true;
   }
-  if (/\b(?:locked|unlock\s*with|subscriber\s*only|paid\s*chapter|early\s*access)\b/i.test(titleLower) || /\b(?:locked|unlock\s*with|subscriber\s*only|paid\s*chapter|early\s*access)\b/i.test(rawLower)) {
+  if (
+    /\b(?:locked|unlock\s*with|subscriber\s*only|paid\s*chapter|early\s*access|coins?\s*required)\b/i.test(titleLower) ||
+    /\b(?:locked|unlock\s*with|subscriber\s*only|paid\s*chapter|early\s*access|coins?\s*required|this\s+chapter\s+is\s+locked|please\s+purchase\s+it\s+to\s+read)\b/i.test(rawLower)
+  ) {
     return true;
   }
 
-  // 3. HTML attribute patterns
+  // 3. HTML attribute and class patterns
   if (
-    /class=["'][^"']*\b(locked|is-locked|lock-icon|chapter-locked|has-lock|paid-chapter|premium-chapter)\b[^"']*["']/i.test(rawLower) ||
+    /class=["'][^"']*\b(locked|is-locked|lock-icon|chapter-locked|has-lock|paid-chapter|premium-chapter|has-thumb\s+lock|locked-tag|wp-manga-chapter-locked|modal-lock|badge-lock)\b[^"']/i.test(rawLower) ||
     /data-(?:locked|paid|premium)=["']true["']/i.test(rawLower) ||
-    /fa-lock|icon-lock|lucide-lock|svg[^>]*lock/i.test(rawLower)
+    /data-(?:coin|coins|price|cost)=["'][0-9]+["']/i.test(rawLower) ||
+    /data-bs-target=["']#lockedChapterModal["']/i.test(rawLower) ||
+    /lockedchaptermodal/i.test(rawLower) ||
+    /fa-lock|icon-lock|lucide-lock|svg[^>]*lock/i.test(rawLower) ||
+    /class=["'][^"']*text-gold[^"']*["'][\s\S]*?(?:svg|<i\b)[\s\S]*?\d+/i.test(rawLower) ||
+    /&quot;isLocked&quot;:\[0,true\]|&quot;isLockedByCoins&quot;:\[0,true\]|&quot;isAccessible&quot;:\[0,false\]/i.test(rawLower) ||
+    /\/chapter-(?:lock|coin|paid|buy)\b/i.test(urlLower)
   ) {
     return true;
   }
@@ -1000,14 +1058,55 @@ export function extractChapterLinks(html: string, baseUrl: string): ChapterInfo[
   const chapters: ChapterInfo[] = [];
   const seenUrls = new Set<string>();
 
-  const addChapter = (inputUrl: string, rawText: string) => {
+  // Pre-pass: Discover all locked chapter numbers from list items, cards, and tables
+  const lockedChapterNums = new Set<number>();
+
+  // 1. Check <li data-num="..."> or similar items with locked attributes (Thunder Scans / MangaReader)
+  const liPattern = /<li\b[^>]*data-num=["']([0-9.]+)["'][^>]*>([\s\S]*?)<\/li>/gi;
+  let lm;
+  while ((lm = liPattern.exec(html)) !== null) {
+    const num = parseFloat(lm[1]);
+    const block = lm[2];
+    if (
+      block.includes('lockedChapterModal') ||
+      block.includes('data-coin') ||
+      block.includes('text-gold') ||
+      /class=["'][^"']*\b(lock|locked|locked-tag|has-thumb\s+lock|coin)\b/i.test(block) ||
+      isPremiumOrLockedChapter({ url: '', title: '', rawHtml: block })
+    ) {
+      if (!isNaN(num)) lockedChapterNums.add(num);
+    }
+  }
+
+  // 2. Check Madara theme chapters: <li class="wp-manga-chapter ...">
+  const madaraLiPattern = /<li\b[^>]*class=["'][^"']*wp-manga-chapter[^"']*["'][^>]*>([\s\S]*?)<\/li>/gi;
+  let mm;
+  while ((mm = madaraLiPattern.exec(html)) !== null) {
+    const fullTag = mm[0];
+    const block = mm[1];
+    if (
+      /class=["'][^"']*\b(lock|locked|locked-tag|has-thumb\s+lock|premium-block)\b/i.test(fullTag) ||
+      block.includes('fa-lock') ||
+      block.includes('coin-wrap') ||
+      isPremiumOrLockedChapter({ url: '', title: '', rawHtml: fullTag + ' ' + block })
+    ) {
+      const numMatch = (fullTag + ' ' + block).match(/chapter[-_ ]?([0-9.]+)/i);
+      if (numMatch) {
+        const num = parseFloat(numMatch[1]);
+        if (!isNaN(num)) lockedChapterNums.add(num);
+      }
+    }
+  }
+
+  const addChapter = (inputUrl: string, rawText: string, contextHtml?: string) => {
     let url = inputUrl.trim();
     if (!url) return;
 
     const cleanText = rawText.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+    const combinedHtml = (contextHtml ? contextHtml + ' ' : '') + rawText;
 
     // Skip chapters that are explicitly locked / coin / buy / unlock / paywalled / premium
-    if (isPremiumOrLockedChapter({ url, title: cleanText, rawHtml: rawText })) {
+    if (isPremiumOrLockedChapter({ url, title: cleanText, rawHtml: combinedHtml })) {
       return;
     }
 
@@ -1052,6 +1151,9 @@ export function extractChapterLinks(html: string, baseUrl: string): ChapterInfo[
 
     const chapterNum = extractChapterNumber(url, cleanText);
     if (chapterNum !== null) {
+      if (lockedChapterNums.has(chapterNum)) {
+        return; // Locked chapter verified from container
+      }
       seenUrls.add(url);
       const title = extractChapterTitle(cleanText);
       chapters.push({
@@ -1071,7 +1173,11 @@ export function extractChapterLinks(html: string, baseUrl: string): ChapterInfo[
   while ((match = aTagPattern.exec(html)) !== null) {
     const url = (match[1] || match[2] || match[3] || '')?.trim();
     const rawContent = match[4] || '';
-    addChapter(url, rawContent);
+    const matchIndex = match.index;
+    const contextStart = Math.max(0, matchIndex - 300);
+    const contextEnd = Math.min(html.length, matchIndex + match[0].length + 300);
+    const surroundingHtml = html.slice(contextStart, contextEnd);
+    addChapter(url, rawContent, match[0] + ' ' + surroundingHtml);
   }
 
   // Extract Markdown links from readable fallbacks.
@@ -1339,6 +1445,48 @@ export async function extractImagesFromChapterUrl(
       }
     }
 
+    // Direct WitchToons RSC extraction (super fast, clean pages, no waste images)
+    if (isWitchToonsUrl(chapterUrl)) {
+      try {
+        console.log(`[Scraper] Using custom WitchToons image extraction for: ${chapterUrl}`);
+        const wtImages = await extractWitchToonsChapterImages(chapterUrl);
+        if (wtImages.length > 0) {
+          console.log(`[Scraper] Successfully extracted ${wtImages.length} images for WitchToons (${chapterUrl})`);
+          return wtImages;
+        }
+      } catch (wtErr) {
+        console.warn('[Scraper] WitchToons custom image extraction error, falling back to HTML/Puppeteer:', wtErr);
+      }
+    }
+
+    // Direct DuskScans RSC / HTML extraction (strictly series-scoped, no waste images)
+    if (isDuskScansUrl(chapterUrl)) {
+      try {
+        console.log(`[Scraper] Using custom DuskScans image extraction for: ${chapterUrl}`);
+        const dsImages = await extractDuskScansChapterImages(chapterUrl);
+        if (dsImages.length > 0) {
+          console.log(`[Scraper] Successfully extracted ${dsImages.length} images for DuskScans (${chapterUrl})`);
+          return dsImages;
+        }
+      } catch (dsErr) {
+        console.warn('[Scraper] DuskScans custom image extraction error, falling back to HTML/Puppeteer:', dsErr);
+      }
+    }
+
+    // Direct ElfToon ts_reader.run extraction (instant, no slow Puppeteer, 100% accurate)
+    if (isElftoonUrl(chapterUrl)) {
+      try {
+        console.log(`[Scraper] Using custom ElfToon image extraction for: ${chapterUrl}`);
+        const elfImages = await extractElftoonChapterImages(chapterUrl);
+        if (elfImages.length > 0) {
+          console.log(`[Scraper] Successfully extracted ${elfImages.length} images for ElfToon (${chapterUrl})`);
+          return elfImages;
+        }
+      } catch (elfErr) {
+        console.warn('[Scraper] ElfToon custom image extraction error, falling back to HTML/Puppeteer:', elfErr);
+      }
+    }
+
     // Custom extraction for Comix.to chapter reader pages
     if (isComixToUrl(chapterUrl)) {
       try {
@@ -1375,10 +1523,11 @@ export async function extractImagesFromChapterUrl(
       // Fetch the chapter page HTML
       const response = await fetch(chapterUrl, {
         headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
           'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
           'Accept-Language': 'en-US,en;q=0.5',
         },
+        signal: AbortSignal.timeout(20_000),
       });
 
       if (!response.ok) {
@@ -1389,6 +1538,61 @@ export async function extractImagesFromChapterUrl(
         }
       } else {
         html = await response.text();
+
+        // 1. Upfront check: Is this chapter locked, paywalled, or requiring coins?
+        if (isLockedChapterHtml(html)) {
+          throw new Error('This chapter is locked or paywalled on the source website (coins or purchase required). Skipping waster images.');
+        }
+
+        // 2. Direct MangaReader / ts_reader.run engine extraction (e.g. Thunder Scans)
+        const tsReaderMatch = html.match(/ts_reader\.run\((\{[\s\S]*?\})\);/);
+        if (tsReaderMatch) {
+          try {
+            const readerData = JSON.parse(tsReaderMatch[1]);
+            const sourceImages = readerData.sources?.[0]?.images;
+            if (Array.isArray(sourceImages) && sourceImages.length > 0) {
+              const cleanImages = sourceImages
+                .filter((u: any): u is string => typeof u === 'string' && u.startsWith('http') && !isNonChapterImageUrl(u.toLowerCase()));
+              if (cleanImages.length > 0) {
+                console.log(`[Scraper] Successfully extracted ${cleanImages.length} comic pages via ts_reader.run (${chapterUrl})`);
+                return cleanImages;
+              }
+            }
+          } catch (tsErr) {
+            console.warn('[Scraper] ts_reader parse error:', tsErr);
+          }
+        }
+
+        // 3. Direct Madara theme preloaded images
+        const madaraPreloadMatch = html.match(/var\s+chapter_preloaded_images\s*=\s*(\[[^\]]+\])/i) ||
+                                   html.match(/var\s+chapter_images\s*=\s*(\[[^\]]+\])/i);
+        if (madaraPreloadMatch) {
+          try {
+            const preloadData = JSON.parse(madaraPreloadMatch[1]);
+            if (Array.isArray(preloadData) && preloadData.length > 0) {
+              const cleanPreload = preloadData
+                .filter((u: any): u is string => typeof u === 'string' && u.startsWith('http') && !isNonChapterImageUrl(u.toLowerCase()));
+              if (cleanPreload.length > 0) {
+                console.log(`[Scraper] Successfully extracted ${cleanPreload.length} comic pages via Madara preloaded images (${chapterUrl})`);
+                return cleanPreload;
+              }
+            }
+          } catch {}
+        }
+
+        // 4. Direct Madara reading-content extraction
+        const madaraContentMatch = html.match(/<div[^>]*class=["'][^"']*reading-content[^"']*["'][^>]*>([\s\S]*?)<\/div>/i);
+        if (madaraContentMatch) {
+          const readingHtml = madaraContentMatch[1];
+          const madaraImgs = [...readingHtml.matchAll(/<img[^>]+(?:src|data-src|data-lazy-src)=["']([^"']+)["'][^>]*>/gi)]
+            .map((m) => m[1])
+            .filter((u) => u.startsWith('http') && !isNonChapterImageUrl(u.toLowerCase()));
+          if (madaraImgs.length > 0) {
+            console.log(`[Scraper] Successfully extracted ${madaraImgs.length} comic pages via Madara reading-content (${chapterUrl})`);
+            return [...new Set(madaraImgs)];
+          }
+        }
+
         const exampleModeImages = extractImageUrls(html, chapterUrl);
         const exampleMatches = findImagesMatchingExampleUrl(exampleModeImages, imageUrlExample);
         const sourceImages = filterReaderImagesForSource(exampleModeImages, chapterUrl, imageUrlExample);
@@ -1417,6 +1621,9 @@ export async function extractImagesFromChapterUrl(
         }
       }
     } catch (fetchError) {
+      if (fetchError instanceof Error && fetchError.message.includes('locked or paywalled')) {
+        throw fetchError;
+      }
       console.warn('[Scraper] Direct fetch failed, trying Puppeteer fallback:', fetchError);
       usePuppeteerFallback = true;
     }
@@ -1437,7 +1644,7 @@ export async function extractImagesFromChapterUrl(
     const images = filterReaderImagesForSource(extractImageUrls(html, chapterUrl), chapterUrl, imageUrlExample);
     
     if (images.length === 0) {
-      throw new Error('No images found on the chapter page. Please check the URL or use manual URL input.');
+      throw new Error('No genuine chapter images found on the page. If the chapter is locked or paywalled, only unlocked chapters can be imported.');
     }
 
     return images;
@@ -1447,6 +1654,16 @@ export async function extractImagesFromChapterUrl(
     }
     throw new Error('Failed to extract images from chapter URL');
   }
+}
+
+export function isLockedChapterHtml(html: string): boolean {
+  return (
+    /this\s+chapter\s+is\s+locked|please\s+purchase\s+it\s+to\s+read|buy\s+now\s+for\s+\d+\s*coins?|not\s+enough\s+coins|lockedChapterModal|unlock\s+with\s+\d+\s*coins?|coins\s+to\s+unlock|wp-manga-chapter-locked|\bchapter-locked\b/i.test(html) ||
+    html.includes('&quot;isLocked&quot;:[0,true]') ||
+    html.includes('&quot;isLockedByCoins&quot;:[0,true]') ||
+    html.includes('&quot;isAccessible&quot;:[0,false]') ||
+    html.includes('&quot;chapterStatus&quot;:[0,&quot;LOCKED&quot;]')
+  );
 }
 
 export async function extractImagesFromChapterUrls(
@@ -1990,6 +2207,18 @@ function filterReaderImagesForSource(
     return sourceImages.filter(isKaynReaderPageImage);
   }
 
+  if (isWitchToonsUrl(pageUrl) || isWitchToonsUrl(exampleUrl || '')) {
+    return sourceImages.filter(isWitchToonsReaderPageImage);
+  }
+
+  if (isDuskScansUrl(pageUrl) || isDuskScansUrl(exampleUrl || '')) {
+    return sourceImages.filter(isDuskScansReaderPageImage);
+  }
+
+  if (isElftoonUrl(pageUrl) || isElftoonUrl(exampleUrl || '')) {
+    return sourceImages.filter(isElftoonReaderPageImage);
+  }
+
   if (isVortexLikeUrl(pageUrl) || isVortexLikeUrl(exampleUrl || '')) {
     return sourceImages.filter(isVortexReaderPageImage);
   }
@@ -2025,6 +2254,21 @@ function findImagesMatchingExampleUrl(images: string[], exampleUrl?: string | nu
   if (isKaynScansUrl(cleanExampleUrl)) {
     const kaynImages = images.filter((url) => isKaynReaderPageImage(url));
     if (kaynImages.length > 0) return kaynImages;
+  }
+
+  if (isWitchToonsUrl(cleanExampleUrl)) {
+    const wtImages = images.filter(isWitchToonsReaderPageImage);
+    if (wtImages.length > 0) return wtImages;
+  }
+
+  if (isDuskScansUrl(cleanExampleUrl)) {
+    const dsImages = images.filter(isDuskScansReaderPageImage);
+    if (dsImages.length > 0) return dsImages;
+  }
+
+  if (isElftoonUrl(cleanExampleUrl)) {
+    const elfImages = images.filter(isElftoonReaderPageImage);
+    if (elfImages.length > 0) return elfImages;
   }
 
   if (isVortexLikeUrl(cleanExampleUrl)) {
@@ -2119,22 +2363,19 @@ function isLikelyChapterReaderImage(url: string, pageUrl: string = '', exampleUr
       return isKaynReaderPageImage(url);
     }
 
-    // Custom check for Elftoon
-    const isElftoon =
-      lowercaseUrl.includes('elftoon.com') ||
-      lowercaseUrl.includes('elftoon.xyz') ||
-      lowercasePageUrl.includes('elftoon.com') ||
-      lowercasePageUrl.includes('elftoon.xyz') ||
-      lowercaseExampleUrl.includes('elftoon.com') ||
-      lowercaseExampleUrl.includes('elftoon.xyz');
+    // Custom check for WitchToons
+    if (isWitchToonsUrl(url) || isWitchToonsUrl(pageUrl) || isWitchToonsUrl(exampleUrl || '')) {
+      return isWitchToonsReaderPageImage(url);
+    }
 
-    if (isElftoon) {
-      const isUploads = lowercaseUrl.includes('/wp-content/uploads/');
-      const hasNumberPrefix = /^\d+/.test(filename);
-      const isImage = isReaderImageFile(filename);
-      if (isUploads && hasNumberPrefix && isImage) {
-        return true;
-      }
+    // Custom check for DuskScans
+    if (isDuskScansUrl(url) || isDuskScansUrl(pageUrl) || isDuskScansUrl(exampleUrl || '')) {
+      return isDuskScansReaderPageImage(url);
+    }
+
+    // Custom check for Elftoon
+    if (isElftoonUrl(url) || isElftoonUrl(pageUrl) || isElftoonUrl(exampleUrl || '')) {
+      return isElftoonReaderPageImage(url);
     }
 
     if (!isReaderImageFile(filename)) return false;
@@ -2190,6 +2431,7 @@ function isNonChapterImageUrl(lowercaseUrl: string): boolean {
     lowercaseUrl.includes('logo') ||
     lowercaseUrl.includes('icon') ||
     lowercaseUrl.includes('avatar') ||
+    lowercaseUrl.includes('gravatar') ||
     lowercaseUrl.includes('banner') ||
     lowercaseUrl.includes('brand') ||
     lowercaseUrl.includes('button') ||
@@ -2204,7 +2446,40 @@ function isNonChapterImageUrl(lowercaseUrl: string): boolean {
     lowercaseUrl.includes('thumb') ||
     lowercaseUrl.includes('thumbnail') ||
     lowercaseUrl.includes('cover') ||
+    lowercaseUrl.includes('discord') ||
+    lowercaseUrl.includes('patreon') ||
+    lowercaseUrl.includes('kofi') ||
+    lowercaseUrl.includes('ko-fi') ||
+    lowercaseUrl.includes('paypal') ||
+    lowercaseUrl.includes('donate') ||
+    lowercaseUrl.includes('donation') ||
+    lowercaseUrl.includes('badge') ||
+    lowercaseUrl.includes('rating') ||
+    lowercaseUrl.includes('shop_img') ||
+    lowercaseUrl.includes('readerarea.svg') ||
+    lowercaseUrl.includes('en-th-web') ||
+    lowercaseUrl.includes('aaaaaaaaaaaaaaaa') ||
+    lowercaseUrl.includes('favicon') ||
+    lowercaseUrl.includes('apple-touch') ||
+    lowercaseUrl.includes('loading') ||
+    lowercaseUrl.includes('spinner') ||
+    lowercaseUrl.includes('ts-post-image') ||
+    lowercaseUrl.includes('wp-post-image') ||
+    lowercaseUrl.includes('attachment-medium') ||
+    lowercaseUrl.includes('size-medium') ||
+    lowercaseUrl.includes('footer-img') ||
+    lowercaseUrl.includes('/sidebar') ||
+    lowercaseUrl.includes('sidebar-') ||
+    lowercaseUrl.includes('/widget') ||
+    lowercaseUrl.includes('widget-') ||
+    lowercaseUrl.includes('404') ||
+    lowercaseUrl.includes('notfound') ||
+    lowercaseUrl.includes('not-found') ||
+    lowercaseUrl.includes('bookmark') ||
+    lowercaseUrl.includes('watermark') ||
+    /-\d{2,4}x\d{2,4}\.(?:jpe?g|png|webp)/i.test(lowercaseUrl) ||
     lowercaseUrl.includes('/ads/') ||
+    lowercaseUrl.includes('/ad/') ||
     lowercaseUrl.includes('/advert') ||
     lowercaseUrl.includes('/banners/') ||
     lowercaseUrl.includes('/covers/') ||
@@ -2744,6 +3019,463 @@ async function extractKaynScansChapterImages(chapterUrl: string): Promise<string
   return [];
 }
 
+// ==========================================
+// WITCHTOONS EXTRACTOR (Next.js App Router RSC)
+// ==========================================
+
+export function isWitchToonsUrl(url: string): boolean {
+  try {
+    const hostname = new URL(url).hostname.toLowerCase();
+    return hostname.includes('witchtoons.net') || hostname.includes('witchtoons');
+  } catch {
+    return url.toLowerCase().includes('witchtoons');
+  }
+}
+
+export function isWitchToonsReaderPageImage(url: string): boolean {
+  try {
+    const pathname = new URL(url).pathname.toLowerCase();
+    const isUploadPath = pathname.includes('/uploads/comic-pages/') || pathname.includes('/uploads/series/');
+    const isImage = /\.(?:jpe?g|png|webp|avif)(?:$|[?#])/i.test(pathname);
+    return isUploadPath && isImage && !isNonChapterImageUrl(url.toLowerCase());
+  } catch {
+    const lower = url.toLowerCase();
+    return (lower.includes('/uploads/comic-pages/') || lower.includes('/uploads/series/')) && !isNonChapterImageUrl(lower);
+  }
+}
+
+function parseWitchToonsChaptersFromText(rscText: string, baseUrl: string): ChapterInfo[] {
+  const cleanBase = baseUrl.split('?')[0].replace(/\/+$/, '');
+  const list: ChapterInfo[] = [];
+  const seen = new Set<number>();
+
+  // 1. Structured chapters array
+  const arrayMatch = rscText.match(/"chapters":\s*(\[\{.*?"id":\s*"cm[a-z0-9]+".*?\}\])/);
+  if (arrayMatch) {
+    try {
+      const arr = JSON.parse(arrayMatch[1]);
+      if (Array.isArray(arr)) {
+        for (const item of arr) {
+          const num = typeof item.number === 'number' ? item.number : parseFloat(item.number);
+          const isLocked = Boolean(item.isLocked);
+          const coinPrice = typeof item.coinPrice === 'number' ? item.coinPrice : parseFloat(item.coinPrice || '0');
+          if (isNaN(num) || isLocked || coinPrice > 0 || seen.has(num)) continue;
+          seen.add(num);
+          list.push({
+            chapterNumber: num,
+            title: typeof item.title === 'string' && item.title.trim() && item.title !== String(num) ? item.title.trim() : undefined,
+            url: `${cleanBase}/chapter/${num}`,
+          });
+        }
+      }
+    } catch {}
+  }
+
+  // 2. Streaming RSC chapter objects regex
+  const chRegex = /\{"id":"([^"]+)","number":([0-9.]+)(?:,"title":(null|"[^"]*"))?[^{}]*?"isLocked":(true|false)(?:,"coinPrice":([0-9.]+))?[^{}]*?\}/g;
+  let match: RegExpExecArray | null;
+  while ((match = chRegex.exec(rscText)) !== null) {
+    const num = parseFloat(match[2]);
+    const titleRaw = match[3];
+    const isLocked = match[4] === 'true';
+    const coinPrice = match[5] ? parseFloat(match[5]) : 0;
+
+    if (isLocked || coinPrice > 0 || isNaN(num) || seen.has(num)) continue;
+    seen.add(num);
+
+    let title: string | undefined;
+    if (titleRaw && titleRaw !== 'null') {
+      try {
+        title = JSON.parse(titleRaw);
+      } catch {
+        title = titleRaw.replace(/^"|"$/g, '');
+      }
+    }
+
+    list.push({
+      chapterNumber: num,
+      title: title && title.trim() && title !== String(num) ? title.trim() : undefined,
+      url: `${cleanBase}/chapter/${num}`,
+    });
+  }
+
+  return list;
+}
+
+async function extractWitchToonsChapters(seriesUrl: string): Promise<ChapterInfo[]> {
+  const res = await fetch(seriesUrl, {
+    headers: {
+      'RSC': '1',
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+      'Accept': '*/*',
+    },
+    redirect: 'follow',
+    signal: AbortSignal.timeout(20_000),
+  });
+
+  if (!res.ok) {
+    throw new Error(`Failed to fetch WitchToons series page: ${res.status} ${res.statusText}`);
+  }
+
+  const text = await res.text();
+  const canonicalBaseUrl = (res.url || seriesUrl).split('?')[0].replace(/\/+$/, '');
+  const allChapters = parseWitchToonsChaptersFromText(text, canonicalBaseUrl);
+  const seen = new Set<number>(allChapters.map((c) => c.chapterNumber));
+
+  // Check pagination if totalPages > 1
+  const totalPagesMatch = text.match(/"totalPages":\s*([0-9]+)/);
+  const totalPages = Math.min(30, Math.max(1, totalPagesMatch ? parseInt(totalPagesMatch[1], 10) : 1));
+
+  if (totalPages > 1) {
+    const pageNumbers = Array.from({ length: totalPages - 1 }, (_, i) => i + 2);
+    const additionalPayloads = await Promise.all(
+      pageNumbers.map(async (page) => {
+        try {
+          const pageRes = await fetch(`${canonicalBaseUrl}?page=${page}`, {
+            headers: {
+              'RSC': '1',
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/122.0.0.0 Safari/537.36',
+              'Accept': '*/*',
+            },
+            signal: AbortSignal.timeout(15_000),
+          });
+          if (pageRes.ok) return await pageRes.text();
+        } catch (err) {
+          console.warn(`[Scraper] Failed to fetch WitchToons chapters page ${page}:`, err);
+        }
+        return '';
+      }),
+    );
+
+    for (const payload of additionalPayloads) {
+      if (payload) {
+        const moreChapters = parseWitchToonsChaptersFromText(payload, canonicalBaseUrl);
+        for (const ch of moreChapters) {
+          if (!seen.has(ch.chapterNumber)) {
+            seen.add(ch.chapterNumber);
+            allChapters.push(ch);
+          }
+        }
+      }
+    }
+  }
+
+  const freeChapters = allChapters.filter((c) => !isPremiumOrLockedChapter(c));
+  freeChapters.sort((a, b) => b.chapterNumber - a.chapterNumber);
+  return freeChapters;
+}
+
+async function extractWitchToonsChapterImages(chapterUrl: string): Promise<string[]> {
+  const origin = new URL(chapterUrl).origin;
+  const res = await fetch(chapterUrl, {
+    headers: {
+      'RSC': '1',
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/122.0.0.0 Safari/537.36',
+      'Accept': '*/*',
+    },
+    redirect: 'follow',
+    signal: AbortSignal.timeout(20_000),
+  });
+
+  if (!res.ok) {
+    throw new Error(`Failed to fetch WitchToons chapter: ${res.status} ${res.statusText}`);
+  }
+
+  const text = await res.text();
+  const canonicalOrigin = res.url ? new URL(res.url).origin : origin;
+
+  // 1. Extract from the structured pages JSON array
+  const pagesMatch = text.match(/"pages":\s*(\[\{.*?"imageUrl".*?\}\])/);
+  if (pagesMatch) {
+    try {
+      const pages = JSON.parse(pagesMatch[1]);
+      if (Array.isArray(pages) && pages.length > 0) {
+        pages.sort((a: any, b: any) => (Number(a.pageNumber) || 0) - (Number(b.pageNumber) || 0));
+        const urls = pages
+          .filter((p: any) => !p.isRedacted)
+          .map((p: any) => (typeof p.imageUrl === 'string' ? p.imageUrl.trim() : ''))
+          .filter((u: string) => u.length > 0)
+          .map((u: string) => (u.startsWith('http') ? u : `${canonicalOrigin}${u.startsWith('/') ? '' : '/'}${u}`))
+          .filter((u: string) => !isNonChapterImageUrl(u.toLowerCase()));
+        if (urls.length > 0) return urls;
+      }
+    } catch {}
+  }
+
+  // 2. Regex fallback for /uploads/comic-pages/
+  const rawMatches = text.match(/\/uploads\/(?:comic-pages|series)\/[^"'\\\s<>]+\.(?:webp|jpe?g|png|avif)[^"'\\\s<>]*/gi);
+  if (rawMatches && rawMatches.length > 0) {
+    const unique = Array.from(new Set(rawMatches));
+    return unique
+      .map((u) => (u.startsWith('http') ? u : `${canonicalOrigin}${u.startsWith('/') ? '' : '/'}${u}`))
+      .filter((u) => !isNonChapterImageUrl(u.toLowerCase()));
+  }
+
+  return [];
+}
+
+// ==========================================
+// DUSKSCANS EXTRACTOR (Next.js App Router RSC / HTML)
+// ==========================================
+
+export function isDuskScansUrl(url: string): boolean {
+  try {
+    const hostname = new URL(url).hostname.toLowerCase();
+    return hostname.includes('duskscans.com') || hostname.includes('duskscans');
+  } catch {
+    return url.toLowerCase().includes('duskscans');
+  }
+}
+
+export function isDuskScansReaderPageImage(url: string): boolean {
+  try {
+    const pathname = new URL(url).pathname.toLowerCase();
+    return (
+      (url.includes('duskscans.com') || pathname.includes('/storage/uploads/chapters/')) &&
+      pathname.includes('/storage/uploads/chapters/') &&
+      /\.(?:jpe?g|png|webp|avif)(?:$|[?#])/i.test(pathname) &&
+      !isNonChapterImageUrl(url.toLowerCase())
+    );
+  } catch {
+    return url.toLowerCase().includes('/storage/uploads/chapters/') && !isNonChapterImageUrl(url.toLowerCase());
+  }
+}
+
+async function extractDuskScansChapters(seriesUrl: string): Promise<ChapterInfo[]> {
+  const cleanBase = seriesUrl.split('?')[0].replace(/\/+$/, '');
+  const slugMatch = cleanBase.match(/\/series\/([^/?#]+)/i);
+  const seriesSlug = slugMatch ? slugMatch[1] : '';
+
+  const res = await fetch(seriesUrl, {
+    headers: {
+      'RSC': '1',
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/122.0.0.0 Safari/537.36',
+      'Accept': '*/*',
+    },
+    redirect: 'follow',
+    signal: AbortSignal.timeout(20_000),
+  });
+
+  if (!res.ok) {
+    throw new Error(`Failed to fetch DuskScans series page: ${res.status} ${res.statusText}`);
+  }
+
+  const text = await res.text();
+  const list: ChapterInfo[] = [];
+  const seen = new Set<number>();
+
+  // 1. Match chapter objects from RSC text
+  const chRegex = /\{"id":"([^"]+)","mangaId":"([^"]+)","number":([0-9.]+)(?:,"title":"([^"]*)")?[^{}]*?(?:,"price":([0-9.]+))?[^{}]*?\}/g;
+  let match: RegExpExecArray | null;
+  while ((match = chRegex.exec(text)) !== null) {
+    const num = parseFloat(match[3]);
+    const title = match[4];
+    const price = match[5] ? parseFloat(match[5]) : 0;
+    if (price > 0 || isNaN(num) || seen.has(num)) continue;
+    seen.add(num);
+    list.push({
+      chapterNumber: num,
+      title: title && title.trim() && title !== String(num) ? title.trim() : undefined,
+      url: `https://duskscans.com/series/${seriesSlug}/chapter-${num}`,
+    });
+  }
+
+  // 2. Fallback: match from HTML links
+  if (list.length === 0) {
+    const htmlRegex = /href="(\/series\/[^"]*?\/chapter-([0-9.]+)[^"]*)"/g;
+    while ((match = htmlRegex.exec(text)) !== null) {
+      const num = parseFloat(match[2]);
+      if (isNaN(num) || seen.has(num)) continue;
+      seen.add(num);
+      list.push({
+        chapterNumber: num,
+        url: `https://duskscans.com${match[1]}`,
+      });
+    }
+  }
+
+  list.sort((a, b) => b.chapterNumber - a.chapterNumber);
+  return list;
+}
+
+async function extractDuskScansChapterImages(chapterUrl: string): Promise<string[]> {
+  const urlMatch = chapterUrl.match(/\/series\/([^/?#]+)\/chapter-([0-9.]+)/i);
+  const seriesSlug = urlMatch ? urlMatch[1] : '';
+
+  // 1. Try RSC header
+  try {
+    const rscRes = await fetch(chapterUrl, {
+      headers: {
+        'RSC': '1',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/122.0.0.0 Safari/537.36',
+        'Accept': '*/*',
+      },
+      redirect: 'follow',
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (rscRes.ok) {
+      const text = await rscRes.text();
+      const pagesMatch = text.match(/"pages":\s*("\[.*?\]"|\[.*?\])/);
+      if (pagesMatch) {
+        let raw = pagesMatch[1];
+        if (raw.startsWith('"')) raw = JSON.parse(raw);
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const valid = parsed
+            .filter((u) => typeof u === 'string' && (!seriesSlug || u.includes(seriesSlug)))
+            .filter((u) => !isNonChapterImageUrl(u.toLowerCase()));
+          if (valid.length > 0) return valid;
+        }
+      }
+    }
+  } catch {}
+
+  // 2. Fetch standard HTML
+  const htmlRes = await fetch(chapterUrl, {
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/122.0.0.0 Safari/537.36',
+      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+    },
+    redirect: 'follow',
+    signal: AbortSignal.timeout(15_000),
+  });
+
+  if (!htmlRes.ok) {
+    throw new Error(`Failed to fetch DuskScans chapter: ${htmlRes.status} ${htmlRes.statusText}`);
+  }
+
+  const html = await htmlRes.text();
+  const pattern = seriesSlug
+    ? new RegExp(`https:\\/\\/cdn\\.duskscans\\.com\\/storage\\/uploads\\/chapters\\/${seriesSlug}\\/[^"\'\\s<>]+\\.(?:webp|jpg|jpeg|png|avif)`, 'gi')
+    : /https:\/\/cdn\.duskscans\.com\/storage\/uploads\/chapters\/[^"'\s<>]+\.(?:webp|jpg|jpeg|png|avif)/gi;
+
+  const matches = [...html.matchAll(pattern)].map((m) => m[0]);
+  return Array.from(new Set(matches)).filter((u) => !isNonChapterImageUrl(u.toLowerCase()));
+}
+
+// ==========================================
+// ELFTOON EXTRACTOR (Fast MangaThemesia ts_reader / DOM)
+// ==========================================
+
+export function isElftoonUrl(url: string): boolean {
+  try {
+    const hostname = new URL(url).hostname.toLowerCase();
+    return hostname.includes('elftoon.com') || hostname.includes('elftoon.xyz') || hostname.includes('elftoon');
+  } catch {
+    const lower = url.toLowerCase();
+    return lower.includes('elftoon.com') || lower.includes('elftoon.xyz');
+  }
+}
+
+export function isElftoonReaderPageImage(url: string): boolean {
+  try {
+    const lower = url.toLowerCase();
+    return (
+      (lower.includes('elftoon.com') || lower.includes('elftoon.xyz') || isElftoonUrl(url)) &&
+      lower.includes('/wp-content/uploads/') &&
+      /\.(?:jpe?g|png|webp|avif)(?:$|[?#])/i.test(lower) &&
+      !isNonChapterImageUrl(lower)
+    );
+  } catch {
+    return false;
+  }
+}
+
+async function extractElftoonChapters(seriesUrl: string): Promise<ChapterInfo[]> {
+  const res = await fetch(seriesUrl, {
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/122.0.0.0 Safari/537.36',
+      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+    },
+    redirect: 'follow',
+    signal: AbortSignal.timeout(20_000),
+  });
+
+  if (!res.ok) {
+    throw new Error(`Failed to fetch ElfToon series page: ${res.status} ${res.statusText}`);
+  }
+
+  const html = await res.text();
+  const list: ChapterInfo[] = [];
+  const seen = new Set<number>();
+
+  const chListMatch = html.match(/id="chapterlist"[\s\S]*?<\/ul>/i);
+  const searchArea = chListMatch ? chListMatch[0] : html;
+
+  // 1. Match li data-num with a href
+  const liRegex = /<li[^>]*data-num="([0-9.]+)"[^>]*>[\s\S]*?<a[^>]*href="([^"]+)"/g;
+  let m: RegExpExecArray | null;
+  while ((m = liRegex.exec(searchArea)) !== null) {
+    const num = parseFloat(m[1]);
+    const href = m[2].trim();
+    if (isNaN(num) || seen.has(num)) continue;
+    seen.add(num);
+    list.push({ chapterNumber: num, url: href });
+  }
+
+  // 2. Fallback: match any chapter links inside searchArea
+  if (list.length === 0) {
+    const linkRegex = /href="(https?:\/\/[^"/]+(?:\/[^"/]+)?-chapter-([0-9.]+)\/?)"/gi;
+    while ((m = linkRegex.exec(searchArea)) !== null) {
+      const href = m[1].trim();
+      const num = parseFloat(m[2]);
+      if (isNaN(num) || seen.has(num)) continue;
+      seen.add(num);
+      list.push({ chapterNumber: num, url: href });
+    }
+  }
+
+  list.sort((a, b) => b.chapterNumber - a.chapterNumber);
+  return list;
+}
+
+async function extractElftoonChapterImages(chapterUrl: string): Promise<string[]> {
+  const res = await fetch(chapterUrl, {
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/122.0.0.0 Safari/537.36',
+      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+    },
+    redirect: 'follow',
+    signal: AbortSignal.timeout(20_000),
+  });
+
+  if (!res.ok) {
+    throw new Error(`Failed to fetch ElfToon chapter: ${res.status} ${res.statusText}`);
+  }
+
+  const html = await res.text();
+
+  // 1. Fast & precise: extract ts_reader.run JSON payload directly
+  const tsMatch = html.match(/ts_reader\.run\(([\s\S]*?)\);/i);
+  if (tsMatch) {
+    try {
+      const data = JSON.parse(tsMatch[1]);
+      const rawImages: string[] = data.sources?.[0]?.images || [];
+      const images = rawImages
+        .filter((u) => typeof u === 'string' && u.startsWith('http'))
+        .filter((u) => !isNonChapterImageUrl(u.toLowerCase()));
+      if (images.length > 0) return images;
+    } catch {}
+  }
+
+  // 2. Check readerarea img tags
+  const readerArea = html.match(/id="readerarea"[\s\S]*?<\/div>/i);
+  if (readerArea) {
+    const imgs = [...readerArea[0].matchAll(/<img[^>]+(?:data-src|src|data-lazy-src)="([^">]+)"/gi)]
+      .map((m) => m[1])
+      .filter((u) => u.startsWith('http') && !isNonChapterImageUrl(u.toLowerCase()));
+    if (imgs.length > 0) return Array.from(new Set(imgs));
+  }
+
+  // 3. Fallback regex for uploads
+  const wpMatches = html.match(/https?:\/\/(?:elftoon\.com|elftoon\.xyz)\/wp-content\/uploads\/\d{4}\/\d{2}\/[^"'\\\s<>]+\.(?:webp|jpg|jpeg|png)/gi);
+  if (wpMatches) {
+    return Array.from(new Set(wpMatches)).filter((u) => !isNonChapterImageUrl(u.toLowerCase()));
+  }
+
+  return [];
+}
+
 export function isComixToUrl(url: string): boolean {
   try {
     const parsed = new URL(url);
@@ -3201,32 +3933,56 @@ async function extractVortexChapters(seriesUrl: string): Promise<ChapterInfo[]> 
   const chapters: ChapterInfo[] = [];
   const seenSlugs = new Set<string>();
 
-  // 1. Primary: Parse embedded hydration data from Astro island props
-  const regex = /&quot;id&quot;:\[0,(\d+)\],&quot;number&quot;:\[0,([0-9.]+)\],&quot;slug&quot;:\[0,&quot;([^&]+)&quot;\],(?:&quot;title&quot;:\[0,(?:&quot;([^&]+)&quot;|null)\],)?/g;
+  // 1. Primary: Parse embedded hydration data from Astro island props, inspecting lock attributes
+  const chapObjRegex = /\[0,\{&quot;id&quot;:\[0,\d+\],&quot;number&quot;:\[0,([0-9.]+)\],&quot;slug&quot;:\[0,&quot;([^&]+)&quot;\]([\s\S]*?)(?=\[0,\{&quot;id&quot;|\]\]\})/g;
   let m: RegExpExecArray | null;
-  while ((m = regex.exec(html)) !== null) {
-    const num = parseFloat(m[2]);
-    const slug = m[3];
-    const rawTitle = m[4];
-    const title = rawTitle && rawTitle !== 'null' ? rawTitle : undefined;
+  while ((m = chapObjRegex.exec(html)) !== null) {
+    const num = parseFloat(m[1]);
+    const slug = m[2];
+    const props = m[3];
+
+    // Check if locked/paywalled/coins required
+    const isLocked =
+      props.includes('&quot;isLocked&quot;:[0,true]') ||
+      props.includes('&quot;isLockedByCoins&quot;:[0,true]') ||
+      props.includes('&quot;isAccessible&quot;:[0,false]') ||
+      props.includes('&quot;chapterStatus&quot;:[0,&quot;LOCKED&quot;]') ||
+      /&quot;(?:price|finalPrice)&quot;:\[0,([1-9]\d*)\]/.test(props);
+
+    if (isLocked) {
+      continue; // Skip locked/paywalled chapter
+    }
+
     if (!seenSlugs.has(slug)) {
       seenSlugs.add(slug);
       chapters.push({
         chapterNumber: num,
-        title,
         url: `${urlObj.origin}${urlObj.pathname.replace(/\/+$/, '')}/${slug}`,
       });
     }
   }
 
-  // 2. Fallback: Parse HTML anchor links if any additional exist
-  const anchorRegex = /href="([^"]*\/chapter-([0-9.]+)[^"]*)"/gi;
+  // 2. Fallback: Parse HTML anchor links if any additional exist (checking for lock badges)
+  const anchorRegex = /<a\b[^>]*?href=["']([^"']*\/chapter-([0-9.]+)[^"']*)["'][^>]*>([\s\S]*?)<\/a>/gi;
   let am: RegExpExecArray | null;
   while ((am = anchorRegex.exec(html)) !== null) {
     const rawHref = am[1];
     const num = parseFloat(am[2]);
+    const linkContent = am[3];
     const cleanUrl = rawHref.startsWith('http') ? rawHref : `${urlObj.origin}${rawHref.startsWith('/') ? '' : '/'}${rawHref}`;
     const slug = cleanUrl.split('/').pop() || '';
+
+    // Check if the link itself or surrounding HTML is locked
+    const matchIndex = am.index;
+    const surrounding = html.slice(Math.max(0, matchIndex - 200), Math.min(html.length, matchIndex + am[0].length + 200));
+    if (
+      isPremiumOrLockedChapter({ url: cleanUrl, title: linkContent, rawHtml: am[0] + ' ' + surrounding }) ||
+      surrounding.includes('locked') ||
+      surrounding.includes('coin')
+    ) {
+      continue;
+    }
+
     if (!seenSlugs.has(slug)) {
       seenSlugs.add(slug);
       chapters.push({
@@ -3252,6 +4008,18 @@ async function extractVortexChapterImages(chapterUrl: string): Promise<string[]>
   }
   const html = await response.text();
 
+  // Check if locked chapter page
+  if (
+    html.includes('&quot;isLocked&quot;:[0,true]') ||
+    html.includes('&quot;isLockedByCoins&quot;:[0,true]') ||
+    html.includes('&quot;isAccessible&quot;:[0,false]') ||
+    html.includes('This chapter is locked') ||
+    html.includes('Purchase coins') ||
+    html.includes('Store - {siteName}')
+  ) {
+    throw new Error('This chapter is locked or paywalled on Vortex Scans (coins required). Skipping waster images.');
+  }
+
   // Extract from <img ... data-reader-page-image ...>
   const readerImgMatches = [...html.matchAll(/<img[^>]+data-reader-page-image[^>]+>/gi)].map((m) => m[0]);
   const pageUrls: string[] = [];
@@ -3270,11 +4038,26 @@ async function extractVortexChapterImages(chapterUrl: string): Promise<string[]>
     return pageUrls;
   }
 
-  // Fallback: extract all storage.vortexscans.org/upload/series/ links
+  // Fallback: extract genuine storage.vortexscans.org/upload/series/... images (must have series/id/page path)
   const storageMatches = [...html.matchAll(/https?:\/\/storage\.vortexscans\.org\/{1,2}upload\/series\/[^"'\s\\]+/gi)].map((m) => m[0]);
   const filtered = storageMatches
     .map((u) => u.replace(/storage\.vortexscans\.org\/+/i, 'storage.vortexscans.org/'))
-    .filter((u) => !u.includes('/featured/') && !u.includes('/logo') && !u.includes('/avatar') && !u.includes('banner') && !u.includes('cover'));
+    .filter((u) =>
+      !u.includes('/featured/') &&
+      !u.includes('/logo') &&
+      !u.includes('/avatar') &&
+      !u.includes('banner') &&
+      !u.includes('cover') &&
+      !u.includes('favicon') &&
+      !u.includes('apple-touch') &&
+      !u.includes('shop_img') &&
+      !u.includes('/upload/20') &&
+      /\/series\/[^\/]+\/[^\/]+\/page/i.test(u)
+    );
+
+  if (filtered.length === 0) {
+    throw new Error('No genuine comic reader pages found for this chapter on Vortex Scans.');
+  }
 
   return Array.from(new Set(filtered));
 }

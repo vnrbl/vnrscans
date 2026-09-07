@@ -450,8 +450,11 @@ export type Database = {
           type: Database["public"]["Enums"]["series_type"]
           updated_at: string
           view_count: number
+          chapter_count: number | null
           estimated_next_release_at: string | null
           release_cadence: string | null
+          universe: string | null
+          universe_role: string | null
         }
         Insert: {
           alternative_titles?: string | null
@@ -473,8 +476,11 @@ export type Database = {
           type?: Database["public"]["Enums"]["series_type"]
           updated_at?: string
           view_count?: number
+          chapter_count?: number | null
           estimated_next_release_at?: string | null
           release_cadence?: string | null
+          universe?: string | null
+          universe_role?: string | null
         }
         Update: {
           alternative_titles?: string | null
@@ -496,8 +502,11 @@ export type Database = {
           type?: Database["public"]["Enums"]["series_type"]
           updated_at?: string
           view_count?: number
+          chapter_count?: number | null
           estimated_next_release_at?: string | null
           release_cadence?: string | null
+          universe?: string | null
+          universe_role?: string | null
         }
         Relationships: []
       }

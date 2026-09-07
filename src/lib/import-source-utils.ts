@@ -79,6 +79,18 @@ const SOURCE_PRESETS: Array<{
     imageUrlExample:
       "https://kaynscans.com/uploads/series/echoes-of-the-reverse-planet/0044/p-6247461e-5129-40be-a735-9b5684e60237.webp",
   },
+  {
+    hostIncludes: "witchtoons",
+    sourceSite: "WitchToons",
+    scanlationGroup: "WitchToons",
+    imageUrlExample: "https://witchtoons.net/uploads/comic-pages/example/1/page-001.webp",
+  },
+  {
+    hostIncludes: "duskscans",
+    sourceSite: "Dusk Scans",
+    scanlationGroup: "Dusk Scans",
+    imageUrlExample: "https://cdn.duskscans.com/storage/uploads/chapters/example/ch_1/001.webp",
+  },
 ];
 
 export function detectImportSource(url: string): ImportSourcePreset {

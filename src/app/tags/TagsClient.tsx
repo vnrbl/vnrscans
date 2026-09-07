@@ -80,7 +80,7 @@ export function TagsClient({ initialData }: { initialData: TagsInitialData }) {
               {(tags.data || []).map((tag) => (
                 <Link
                   key={tag.id}
-                  href={`/tags/${tag.slug}`}
+                  href={`/browse?tag=${encodeURIComponent(tag.slug)}`}
                 >
                   <Card className="group h-full border-border/30 bg-card/35 transition-all duration-300 hover:border-primary/50 hover:bg-card/65 hover:shadow-lg hover:shadow-primary/5 hover:translate-y-[-2px]">
                     <CardContent className="p-5 flex flex-col justify-between h-full">

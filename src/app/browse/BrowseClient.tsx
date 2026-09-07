@@ -52,7 +52,7 @@ function BrowsePageContent({ initialData }: { initialData?: BrowseInitialData })
   const searchParams = useSearchParams();
   const pathname = usePathname();
 
-  // Real-time synchronization: automatically update the catalog when any series is added, updated, or removed in the DB
+  // Real-time synchronization: automatically update the catalog when any series or chapter is added, updated, or removed in the DB
   useEffect(() => {
     const channel = supabase
       .channel("browse-catalog-realtime")
@@ -63,6 +63,13 @@ function BrowsePageContent({ initialData }: { initialData?: BrowseInitialData })
           qc.invalidateQueries({ queryKey: ["browse-manhwa"] });
           qc.invalidateQueries({ queryKey: ["genres"] });
           qc.invalidateQueries({ queryKey: ["tags"] });
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "chapters" },
+        () => {
+          qc.invalidateQueries({ queryKey: ["browse-manhwa"] });
         }
       )
       .subscribe();
@@ -305,6 +312,9 @@ function BrowsePageContent({ initialData }: { initialData?: BrowseInitialData })
   const allManhwa = useQuery({
     queryKey: ["browse-manhwa", typeFilters, statusFilter, contentRating, genreFilters, tagFilters, sortBy, duration, debouncedSearchQuery, groupFilter],
     initialData: isDefaultBrowseState ? initialData?.defaultManhwa : undefined,
+    initialDataUpdatedAt: 0,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
     queryFn: async () => {
       let query = supabase
         .from("series")
@@ -456,7 +466,7 @@ function BrowsePageContent({ initialData }: { initialData?: BrowseInitialData })
       
       return debouncedSearchQuery ? rankSeriesResults(filtered, preparedSearch) : filtered;
     },
-    staleTime: 1000 * 30, // 30s stale time for snappy browsing with fast cache updates
+    staleTime: 1000 * 5, // 5s stale time for snappy browsing always in sync with DB
     gcTime: 1000 * 60 * 20,
   });
 

@@ -201,6 +201,25 @@ export async function $extractCoversFromScanUrl(args: {
             candidateCovers.unshift(fullCover);
           }
         }
+
+        // Match Next.js /uploads/series cover images for WitchToons
+        if (isWitchToonsUrl(targetUrl)) {
+          const coverMatch = html.match(/\/uploads\/series\/[^\/&"']+\/cover\.(?:jpe?g|png|webp|avif)/i) ||
+            html.match(/url=(?:%2F|\/)uploads(?:%2F|\/)series(?:%2F|\/)[^&"']+/i);
+          if (coverMatch) {
+            const rawCover = decodeURIComponent(coverMatch[0].replace(/^url=/, ''));
+            const fullCover = rawCover.startsWith('http') ? rawCover : `https://witchtoons.net${rawCover.startsWith('/') ? '' : '/'}${rawCover}`;
+            candidateCovers.unshift(fullCover);
+          }
+        }
+
+        // Match DuskScans cover images
+        if (isDuskScansUrl(targetUrl)) {
+          const coverMatch = html.match(/https:\/\/cdn\.duskscans\.com\/storage\/uploads\/covers\/[^\s"']+\.(?:webp|jpe?g|png|avif)/i);
+          if (coverMatch) {
+            candidateCovers.unshift(coverMatch[0]);
+          }
+        }
       }
     } catch (fetchErr) {
       console.warn("[CoverExtractor] HTML cover fetch error:", fetchErr);
@@ -732,16 +751,18 @@ export async function $syncImportSource(args: {
     sourceId: string;
     accessToken: string;
     maxChapters?: number;
+    mode?: "latest" | "all";
   };
 }) {
   try {
-  const { data } = args;
-  const validated = z
-    .object({
-      sourceId: z.string().uuid(),
-      accessToken: z.string().min(1),
-      maxChapters: z.number().int().min(1).max(500).optional(),
-    })
+    const { data } = args;
+    const validated = z
+      .object({
+        sourceId: z.string().uuid(),
+        accessToken: z.string().min(1),
+        maxChapters: z.number().int().min(1).max(1000).optional(),
+        mode: z.enum(["latest", "all"]).optional(),
+      })
     .parse(data);
 
   let uploaderUsername = "vnr610";
@@ -751,7 +772,6 @@ export async function $syncImportSource(args: {
   }
 
   const admin = getAdminSupabase();
-  const maxChapters = validated.maxChapters ?? 50;
   const startedAt = new Date().toISOString();
 
   const { data: source, error: sourceError } = await admin
@@ -824,7 +844,7 @@ export async function $syncImportSource(args: {
     );
 
     const seenKeys = new Set<string>();
-    const missing = discovered
+    const missingCandidates = discovered
       .filter((chapter) => {
         const num = Number(chapter.chapterNumber);
         const key = chapterScanKey(num, scanlationGroup);
@@ -841,8 +861,19 @@ export async function $syncImportSource(args: {
         seenKeys.add(key);
         return true;
       })
-      .sort((a, b) => a.chapterNumber - b.chapterNumber)
-      .slice(0, maxChapters);
+      .sort((a, b) => a.chapterNumber - b.chapterNumber);
+
+    const importMode = validated.mode || "latest";
+    const limit = importMode === "all" ? (validated.maxChapters ?? 500) : Math.min(validated.maxChapters ?? 10, 10);
+
+    // "latest" mode takes the highest chapter numbers (newest releases)
+    // "all" mode takes all missing chapters across the entire catalog
+    const missing =
+      importMode === "latest"
+        ? missingCandidates.length > limit
+          ? missingCandidates.slice(missingCandidates.length - limit)
+          : [...missingCandidates]
+        : missingCandidates.slice(0, limit);
 
     skipped = discovered.length - missing.length;
     const isAsuraSource = source.source_url.toLowerCase().includes('asura');
@@ -981,15 +1012,12 @@ export async function $syncImportSource(args: {
       }
 
       if (insertedList.length > 0) {
-        // Bulk insert all pages in chunks of 500
-        const seriesSlug = (source as any)?.series?.slug || "series";
+        // Bulk insert all pages directly in chunks of 500
         const pageRows: Array<{ chapter_id: string; page_number: number; image_url: string }> = [];
         for (const chapter of insertedList) {
           const key = chapterScanKey(Number(chapter.chapter_number), chapter.scanlation_group);
           const rawImages = chapterImages.get(key) ?? [];
-          const chSlug = chapter.slug || `chapter-${chapter.chapter_number}`;
-          const mirroredUrls = await mirrorPagesForChapter(admin, seriesSlug, chSlug, rawImages);
-          mirroredUrls.forEach((url, index) => {
+          rawImages.forEach((url, index) => {
             pageRows.push({
               chapter_id: chapter.id,
               page_number: index + 1,
@@ -1121,6 +1149,8 @@ export async function $syncImportSource(args: {
       imported,
       skipped,
       failed,
+      mode: importMode,
+      totalMissing: missingCandidates.length,
       details,
     };
   } catch (error) {
@@ -1299,6 +1329,20 @@ function filterImagesByExampleUrl(images: string[], exampleUrl: string) {
     if (kaynImages.length > 0) return kaynImages;
   }
 
+  if (isWitchToonsUrl(exampleUrl)) {
+    const wtImages = images.filter(
+      (url) => isWitchToonsUrl(url) && (url.includes("/uploads/comic-pages/") || url.includes("/uploads/series/")),
+    );
+    if (wtImages.length > 0) return wtImages;
+  }
+
+  if (isDuskScansUrl(exampleUrl)) {
+    const dsImages = images.filter(
+      (url) => isDuskScansUrl(url) && url.includes("/storage/uploads/chapters/"),
+    );
+    if (dsImages.length > 0) return dsImages;
+  }
+
   if (exampleUrl.toLowerCase().includes("vortex")) {
     return images;
   }
@@ -1354,6 +1398,24 @@ function isKaynScansUrl(url: string) {
     return hostname.includes("kaynscans") || hostname.includes("kaynscan");
   } catch {
     return url.toLowerCase().includes("kaynscans") || url.toLowerCase().includes("kaynscan");
+  }
+}
+
+function isWitchToonsUrl(url: string) {
+  try {
+    const hostname = new URL(url).hostname.toLowerCase();
+    return hostname.includes("witchtoons.net") || hostname.includes("witchtoons");
+  } catch {
+    return url.toLowerCase().includes("witchtoons");
+  }
+}
+
+function isDuskScansUrl(url: string) {
+  try {
+    const hostname = new URL(url).hostname.toLowerCase();
+    return hostname.includes("duskscans.com") || hostname.includes("duskscans");
+  } catch {
+    return url.toLowerCase().includes("duskscans");
   }
 }
 
