@@ -43,17 +43,27 @@ function getInitialUser(): User | null {
  * It creates a single `onAuthStateChange` listener instead of one per component.
  */
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<AuthState>(() => {
-    const initialUser = getInitialUser();
-    return {
-      session: null,
-      user: initialUser,
-      loading: initialUser ? false : true,
-    };
+  const [state, setState] = useState<AuthState>({
+    session: null,
+    user: null,
+    loading: true,
   });
 
   useEffect(() => {
     let mounted = true;
+
+    // Fast client-side restore from localStorage after mount (safe from SSR hydration mismatch)
+    try {
+      const raw = localStorage.getItem(VNR_CACHED_USER_KEY);
+      if (raw) {
+        const cachedUser = JSON.parse(raw);
+        setState((prev) => ({
+          ...prev,
+          user: cachedUser,
+          loading: false,
+        }));
+      }
+    } catch {}
 
     // Check if the account has been banned by an admin in the background.
     // If banned, it signs the user out and clears state.
@@ -173,38 +183,25 @@ export function useAuth() {
 
 export function useIsAdmin() {
   const { user, loading: authLoading } = useAuth();
-  const [isAdmin, setIsAdmin] = useState(() => {
-    if (typeof window !== "undefined") {
-      try {
-        return localStorage.getItem("vnr_is_admin") === "true";
-      } catch {}
-    }
-    return false;
-  });
-  const [isMod, setIsMod] = useState(() => {
-    if (typeof window !== "undefined") {
-      try {
-        return localStorage.getItem("vnr_is_mod") === "true";
-      } catch {}
-    }
-    return false;
-  });
-  const [isUploader, setIsUploader] = useState(() => {
-    if (typeof window !== "undefined") {
-      try {
-        return localStorage.getItem("vnr_is_uploader") === "true";
-      } catch {}
-    }
-    return false;
-  });
-  const [loading, setLoading] = useState(() => {
-    if (typeof window !== "undefined") {
-      try {
-        return localStorage.getItem("vnr_is_admin") === null;
-      } catch {}
-    }
-    return true;
-  });
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [isMod, setIsMod] = useState(false);
+  const [isUploader, setIsUploader] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  // Restore cached roles on client mount without causing SSR hydration mismatch
+  useEffect(() => {
+    try {
+      const cachedAdmin = localStorage.getItem("vnr_is_admin") === "true";
+      const cachedMod = localStorage.getItem("vnr_is_mod") === "true";
+      const cachedUploader = localStorage.getItem("vnr_is_uploader") === "true";
+      if (cachedAdmin) setIsAdmin(true);
+      if (cachedMod) setIsMod(true);
+      if (cachedUploader) setIsUploader(true);
+      if (localStorage.getItem("vnr_is_admin") !== null) {
+        setLoading(false);
+      }
+    } catch {}
+  }, []);
 
   useEffect(() => {
     if (authLoading) return;

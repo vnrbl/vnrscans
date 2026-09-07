@@ -48,6 +48,11 @@ export function Navbar() {
   const [diceResult, setDiceResult] = useState<number | null>(null);
   const [diceSeries, setDiceSeries] = useState<DiceSeries[]>([]);
   const [navDiceFace, setNavDiceFace] = useState(6);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Escape key closes menu drawer
   useEffect(() => {
@@ -99,7 +104,7 @@ export function Navbar() {
   const { user } = useAuth();
   const { settings } = useReaderSettings();
   const { isAdmin, isMod, isUploader } = useIsAdmin();
-  const showPanel = isAdmin || isMod || isUploader;
+  const showPanel = mounted && (isAdmin || isMod || isUploader);
 
   let panelLabel = "Admin Panel";
   if (isAdmin) panelLabel = "Admin Panel";
@@ -281,7 +286,7 @@ export function Navbar() {
             })()}
 
             {/* Library Quick Access (Desktop) */}
-            {user && (
+            {mounted && user && (
               <Button
                 variant="ghost"
                 size="sm"
@@ -319,7 +324,7 @@ export function Navbar() {
             </Suspense>
 
             {/* User Profile Avatar & Dropdown Menu */}
-            {user ? (
+            {mounted && user ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="icon" className="rounded-full p-0 transition-all hover:bg-transparent hover:scale-105 focus-visible:ring-0 focus-visible:ring-offset-0">
@@ -346,20 +351,15 @@ export function Navbar() {
                           <div className="flex items-center gap-1">
                             Dao Heart Streak: {userStats.data.reading_streak} days
                           </div>
-                          <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-secondary">
+                          <div className="mt-1.5 h-1.5 w-full bg-white rounded-none overflow-hidden">
                             <div
-                              className="h-full bg-gradient-to-r from-amber-500 via-violet-600 to-purple-600"
-                              style={{ width: isAdmin ? "100%" : `${((userStats.data.experience_points % 100) / 100) * 100}%` }}
+                              className="h-full w-full bg-white rounded-none transition-all"
+                              style={{ width: "100%" }}
                             />
-                          </div>
-                          <div className="mt-1 text-xs">
-                            {isAdmin
-                              ? "Infinite Qi • Boundless Dao Ancestor"
-                              : `${userStats.data.experience_points % 100}/100 Qi to Realm Level ${userStats.data.user_level + 1}`}
                           </div>
                         </div>
                       </DropdownMenuLabel>
-                      <DropdownMenuSeparator />
+                      <DropdownMenuSeparator className="bg-white/10" />
                     </>
                   )}
                   <DropdownMenuItem onClick={() => navigate({ to: "/profile" })}>
@@ -370,22 +370,24 @@ export function Navbar() {
                   </DropdownMenuItem>
                   {showPanel && (
                     <>
-                      <DropdownMenuSeparator />
+                      <DropdownMenuSeparator className="bg-white/10" />
                       <DropdownMenuItem onClick={() => navigate({ to: "/admin" })} className="text-primary">
                         <ShieldCheck className="mr-2 h-4 w-4" /> {panelLabel}
                       </DropdownMenuItem>
                     </>
                   )}
-                  <DropdownMenuSeparator />
+                  <DropdownMenuSeparator className="bg-white/10" />
                   <DropdownMenuItem onClick={signOut}>
                     <LogOut className="mr-2 h-4 w-4" /> Sign out
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
-            ) : (
+            ) : mounted ? (
               <Button size="sm" onClick={() => navigate({ to: "/auth" })} className="hidden sm:inline-flex">
                 Sign In
               </Button>
+            ) : (
+              <div className="hidden sm:inline-block w-16 h-8" />
             )}
           </div>
         </div>
@@ -484,7 +486,7 @@ export function Navbar() {
               </Link>
             )}
 
-            {isAdmin && (
+            {mounted && isAdmin && (
               <Link
                 to="/security"
                 onClick={() => setMenuDrawerOpen(false)}
@@ -578,12 +580,12 @@ export function Navbar() {
             </Link>
 
             <Link
-              to={user ? "/profile" : "/auth"}
+              to={mounted && user ? "/profile" : "/auth"}
               className="flex flex-col items-center justify-center gap-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground hover:text-primary transition-colors py-1 flex-1"
               activeProps={{ className: "text-primary font-black" }}
             >
               <UserIcon className="h-5 w-5 stroke-[1.8]" />
-              <span>{user ? "Profile" : "Sign In"}</span>
+              <span>{mounted && user ? "Profile" : "Sign In"}</span>
             </Link>
           </>
         ) : (
@@ -607,12 +609,12 @@ export function Navbar() {
             </Link>
 
             <Link
-              to={user ? "/profile" : "/auth"}
+              to={mounted && user ? "/profile" : "/auth"}
               className="flex flex-col items-center justify-center gap-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground hover:text-primary transition-colors py-1 flex-1"
               activeProps={{ className: "text-primary font-black" }}
             >
               <UserIcon className="h-5 w-5 stroke-[1.8]" />
-              <span>{user ? "Profile" : "Sign In"}</span>
+              <span>{mounted && user ? "Profile" : "Sign In"}</span>
             </Link>
           </>
         )}

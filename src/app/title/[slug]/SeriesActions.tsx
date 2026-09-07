@@ -8,7 +8,7 @@ import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth, useIsAdmin } from "@/hooks/useAuth";
-import { Button, AnimatedButton } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { ScanCoverImporter } from "@/components/admin/ScanCoverImporter";
 import {
   Select,
@@ -530,25 +530,21 @@ export const SeriesActions = React.memo(function SeriesActions({
             href={`/title/${slug}/${readChapterSlug}`}
             className="block"
           >
-            <AnimatedButton className="h-11 w-full bg-primary text-base font-semibold hover:bg-primary/95 text-primary-foreground shadow-lg shadow-purple-500/10 rounded-xl">
-              <span className="flex items-center justify-center gap-2">
-                <BookOpen className="h-4 w-4" />
-                {readButtonText}
-              </span>
-            </AnimatedButton>
+            <Button className="h-11 w-full bg-primary text-sm sm:text-base font-semibold hover:bg-primary/95 text-primary-foreground shadow-md shadow-primary/10 px-3 truncate">
+              <BookOpen className="mr-2 h-4 w-4 shrink-0" />
+              <span className="truncate">{readButtonText}</span>
+            </Button>
           </Link>
         )}
 
         {user && !isFollowing.data && (
-          <AnimatedButton
-            className="h-11 w-full font-semibold shadow-md rounded-xl"
+          <Button
+            className="h-11 w-full bg-primary/90 font-semibold hover:bg-primary text-primary-foreground"
             onClick={() => toggleFollow.mutate()}
           >
-            <span className="flex items-center justify-center gap-2">
-              <UserPlus className="h-4 w-4" />
-              Follow
-            </span>
-          </AnimatedButton>
+            <UserPlus className="mr-2 h-4 w-4" />
+            Follow
+          </Button>
         )}
 
         {user && isFollowing.data && (

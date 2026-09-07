@@ -335,11 +335,13 @@ export default function TitleDetailPageContent({
   const readChapterNumber = isContinue
     ? lastReadChapter.chapter_number
     : firstChapter?.chapter_number;
-  const readButtonLabel = isContinue ? "Resume" : "Start reading";
+  const readButtonLabel = isContinue ? "Resume" : "Start";
   const readButtonText =
     readChapterNumber != null
       ? `${readButtonLabel} Ch. ${readChapterNumber}`
-      : readButtonLabel;
+      : isContinue
+        ? "Resume"
+        : "Start Reading";
 
   return (
     <div className="min-h-screen bg-background relative">

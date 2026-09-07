@@ -1764,7 +1764,7 @@ export default function ProfilePage() {
               {/* Bio */}
               {bio && (
                 <p 
-                  className="mt-3 max-w-xl text-sm leading-relaxed text-muted-foreground border border-border/30 bg-card/25 backdrop-blur-md rounded-xl p-3.5"
+                  className="mt-3 max-w-xl text-sm leading-relaxed text-neutral-300 border border-white/10 liquid-glass rounded-xl p-3.5"
                 >
                   {bio}
                 </p>
@@ -1777,7 +1777,7 @@ export default function ProfilePage() {
       {/* ─── Level bar ─── */}
       <div className="container mx-auto max-w-5xl px-4 sm:px-6 md:px-12 lg:px-16 mt-6">
         <div
-          className="rounded-xl border border-border/30 bg-card/25 backdrop-blur-md p-4"
+          className="rounded-xl border border-white/10 liquid-glass p-4"
         >
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2">
@@ -1799,7 +1799,7 @@ export default function ProfilePage() {
               </span>
             )}
           </div>
-          <div className="relative h-2 w-full overflow-hidden rounded-full bg-secondary/60">
+          <div className="relative h-2 w-full overflow-hidden rounded-full bg-black/60 border border-white/5">
             <div
               className="h-full rounded-full transition-all duration-1000 ease-out"
               style={{

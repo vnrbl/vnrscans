@@ -434,7 +434,7 @@ function SettingsContent() {
                     <span>{isAdmin ? "Dao Qi" : "Level Progress"}</span>
                     <span>{isAdmin ? "Maxed Out" : `${xpProgress.toFixed(0)}%`}</span>
                   </div>
-                  <div className="h-1.5 w-full rounded-full bg-neutral-900/80 border border-white/5 overflow-hidden">
+                  <div className="h-1.5 w-full rounded-full bg-black/60 border border-white/5 overflow-hidden">
                     <div
                       className="h-full rounded-full transition-all duration-700 ease-out"
                       style={{
@@ -500,7 +500,7 @@ function SettingsContent() {
             </nav>
 
             {/* Device Sync Info Box */}
-            <div className="rounded-xl border border-border/40 bg-neutral-950/40 p-3.5 text-xs text-muted-foreground space-y-2">
+            <div className="rounded-xl border border-white/10 bg-black/50 p-3.5 text-xs text-muted-foreground space-y-2">
               <div className="flex items-center gap-2 text-foreground font-medium text-2xs uppercase tracking-wider font-mono">
                 <Info className="h-3.5 w-3.5 text-purple-400" />
                 Persistent Storage
@@ -547,8 +547,8 @@ function SettingsContent() {
                           className={cn(
                             "flex flex-col text-left p-3.5 rounded-xl border transition-all text-xs relative",
                             settings.readingMode === "webtoon"
-                              ? "bg-purple-950/20 border-purple-500/50 text-white shadow-sm ring-1 ring-purple-500/30"
-                              : "bg-neutral-900/50 border-border/40 text-neutral-300 hover:border-neutral-700 hover:bg-neutral-800/40"
+                              ? "bg-purple-950/30 border-purple-500/50 text-white shadow-sm ring-1 ring-purple-500/30"
+                              : "bg-black/50 border-white/10 text-neutral-300 hover:border-white/20 hover:bg-black/70"
                           )}
                         >
                           <div className="flex items-center justify-between mb-1.5">
@@ -574,8 +574,8 @@ function SettingsContent() {
                           className={cn(
                             "flex flex-col text-left p-3.5 rounded-xl border transition-all text-xs relative",
                             settings.readingMode === "page"
-                              ? "bg-purple-950/20 border-purple-500/50 text-white shadow-sm ring-1 ring-purple-500/30"
-                              : "bg-neutral-900/50 border-border/40 text-neutral-300 hover:border-neutral-700 hover:bg-neutral-800/40"
+                              ? "bg-purple-950/30 border-purple-500/50 text-white shadow-sm ring-1 ring-purple-500/30"
+                              : "bg-black/50 border-white/10 text-neutral-300 hover:border-white/20 hover:bg-black/70"
                           )}
                         >
                           <div className="flex items-center justify-between mb-1.5">
@@ -635,8 +635,8 @@ function SettingsContent() {
                               className={cn(
                                 "p-3 rounded-lg border text-left transition-all text-xs flex flex-col justify-between",
                                 isSelected
-                                  ? "bg-purple-950/20 border-purple-500/50 text-white ring-1 ring-purple-500/30"
-                                  : "bg-neutral-900/40 border-border/40 text-neutral-300 hover:bg-neutral-800/40 hover:border-neutral-700"
+                                  ? "bg-purple-950/30 border-purple-500/50 text-white ring-1 ring-purple-500/30"
+                                  : "bg-black/50 border-white/10 text-neutral-300 hover:bg-black/70 hover:border-white/20"
                               )}
                             >
                               <div className="flex items-center justify-between mb-1">
@@ -708,8 +708,8 @@ function SettingsContent() {
                               className={cn(
                                 "p-3 rounded-xl border text-left transition-all text-xs flex flex-col gap-2 relative",
                                 isSelected
-                                  ? "bg-purple-950/20 border-purple-500/50 text-white ring-1 ring-purple-500/30"
-                                  : "bg-neutral-900/40 border-border/40 text-neutral-300 hover:bg-neutral-800/40 hover:border-neutral-700"
+                                  ? "bg-purple-950/30 border-purple-500/50 text-white ring-1 ring-purple-500/30"
+                                  : "bg-black/50 border-white/10 text-neutral-300 hover:bg-black/70 hover:border-white/20"
                               )}
                             >
                               <div className="flex items-center justify-between">
@@ -764,8 +764,8 @@ function SettingsContent() {
                               className={cn(
                                 "p-3 rounded-lg border text-left transition-all text-xs flex flex-col justify-between",
                                 isSelected
-                                  ? "bg-purple-950/20 border-purple-500/50 text-white ring-1 ring-purple-500/30"
-                                  : "bg-neutral-900/40 border-border/40 text-neutral-300 hover:bg-neutral-800/40 hover:border-neutral-700"
+                                  ? "bg-purple-950/30 border-purple-500/50 text-white ring-1 ring-purple-500/30"
+                                  : "bg-black/50 border-white/10 text-neutral-300 hover:bg-black/70 hover:border-white/20"
                               )}
                             >
                               <div className="flex items-center justify-between mb-1">
@@ -883,8 +883,8 @@ function SettingsContent() {
                               className={cn(
                                 "p-3.5 rounded-xl border text-left transition-all text-xs flex flex-col justify-between",
                                 isSelected
-                                  ? "bg-purple-950/20 border-purple-500/50 text-white ring-1 ring-purple-500/30"
-                                  : "bg-neutral-900/40 border-border/40 text-neutral-300 hover:bg-neutral-800/40 hover:border-neutral-700"
+                                  ? "bg-purple-950/30 border-purple-500/50 text-white ring-1 ring-purple-500/30"
+                                  : "bg-black/50 border-white/10 text-neutral-300 hover:bg-black/70 hover:border-white/20"
                               )}
                             >
                               <div className="flex items-center justify-between mb-2">
@@ -945,8 +945,8 @@ function SettingsContent() {
                               className={cn(
                                 "p-3.5 rounded-xl border text-left transition-all text-xs flex flex-col justify-between",
                                 isSelected
-                                  ? "bg-purple-950/20 border-purple-500/50 text-white ring-1 ring-purple-500/30"
-                                  : "bg-neutral-900/40 border-border/40 text-neutral-300 hover:bg-neutral-800/40 hover:border-neutral-700"
+                                  ? "bg-purple-950/30 border-purple-500/50 text-white ring-1 ring-purple-500/30"
+                                  : "bg-black/50 border-white/10 text-neutral-300 hover:bg-black/70 hover:border-white/20"
                               )}
                             >
                               <div className="flex items-center justify-between mb-2">
@@ -988,7 +988,7 @@ function SettingsContent() {
                   <CardContent className="space-y-6">
 
                     {/* Show Novels on Home Page Toggle */}
-                    <div className="p-4 rounded-xl border border-border/40 bg-neutral-950/30 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div className="p-4 rounded-xl border border-white/10 bg-black/50 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                       <div className="space-y-1">
                         <div className="flex items-center gap-2">
                           <Label htmlFor="show-novels" className="font-semibold text-white cursor-pointer text-sm">
@@ -1031,7 +1031,7 @@ function SettingsContent() {
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
                         <Link
                           href="/browse"
-                          className="p-3.5 rounded-xl border border-border/40 bg-neutral-900/40 hover:bg-neutral-800/50 hover:border-neutral-700 transition-all text-xs flex items-center justify-between group"
+                          className="p-3.5 rounded-xl border border-white/10 bg-black/50 hover:bg-black/70 hover:border-white/20 transition-all text-xs flex items-center justify-between group"
                         >
                           <div className="space-y-0.5">
                             <p className="font-semibold text-white group-hover:text-purple-300 transition-colors">
@@ -1044,7 +1044,7 @@ function SettingsContent() {
 
                         <Link
                           href="/novels"
-                          className="p-3.5 rounded-xl border border-border/40 bg-neutral-900/40 hover:bg-neutral-800/50 hover:border-neutral-700 transition-all text-xs flex items-center justify-between group"
+                          className="p-3.5 rounded-xl border border-white/10 bg-black/50 hover:bg-black/70 hover:border-white/20 transition-all text-xs flex items-center justify-between group"
                         >
                           <div className="space-y-0.5">
                             <p className="font-semibold text-white group-hover:text-purple-300 transition-colors">
@@ -1081,7 +1081,7 @@ function SettingsContent() {
 
                     {/* Storage Stats Row */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div className="p-4 rounded-xl border border-border/40 bg-neutral-950/40 space-y-1">
+                      <div className="p-4 rounded-xl border border-white/10 bg-black/50 space-y-1">
                         <span className="text-3xs font-mono uppercase tracking-wider text-muted-foreground">
                           Estimated LocalStorage Space
                         </span>
@@ -1093,7 +1093,7 @@ function SettingsContent() {
                         </p>
                       </div>
 
-                      <div className="p-4 rounded-xl border border-border/40 bg-neutral-950/40 space-y-1">
+                      <div className="p-4 rounded-xl border border-white/10 bg-black/50 space-y-1">
                         <span className="text-3xs font-mono uppercase tracking-wider text-muted-foreground">
                           Cloud Account Link
                         </span>
@@ -1113,7 +1113,7 @@ function SettingsContent() {
                       <Label className="text-sm font-semibold text-white">Cache & Maintenance Actions</Label>
 
                       <div className="space-y-2.5">
-                        <div className="p-3.5 rounded-xl border border-border/40 bg-neutral-900/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div className="p-3.5 rounded-xl border border-white/10 bg-black/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                           <div>
                             <p className="text-xs font-semibold text-white">Clear Reader Feed & Image Cache</p>
                             <p className="text-2xs text-muted-foreground">
@@ -1124,14 +1124,14 @@ function SettingsContent() {
                             variant="outline"
                             size="sm"
                             onClick={handleClearCache}
-                            className="text-xs border-border/60 hover:bg-neutral-800 shrink-0 gap-1.5"
+                            className="text-xs border-border/60 hover:bg-black/70 hover:border-white/20 shrink-0 gap-1.5"
                           >
                             <Trash2 className="h-3.5 w-3.5 text-neutral-400" />
                             Clear Cache
                           </Button>
                         </div>
 
-                        <div className="p-3.5 rounded-xl border border-border/40 bg-neutral-900/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div className="p-3.5 rounded-xl border border-white/10 bg-black/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                           <div>
                             <p className="text-xs font-semibold text-white">Export Settings JSON</p>
                             <p className="text-2xs text-muted-foreground">
@@ -1142,7 +1142,7 @@ function SettingsContent() {
                             variant="outline"
                             size="sm"
                             onClick={handleExportSettings}
-                            className="text-xs border-border/60 hover:bg-neutral-800 shrink-0 gap-1.5"
+                            className="text-xs border-border/60 hover:bg-black/70 hover:border-white/20 shrink-0 gap-1.5"
                           >
                             <Copy className="h-3.5 w-3.5 text-neutral-400" />
                             Copy to Clipboard
@@ -1179,7 +1179,7 @@ function SettingsContent() {
             ══════════════════════════════════════════════════════════ */}
             {activeTab === "admin" && isAdmin && (
               <div className="space-y-6 animate-in fade-in-50 duration-200">
-                <Card className="liquid-glass-card border-amber-500/30 bg-gradient-to-b from-neutral-950/70 via-neutral-900/50 to-amber-950/20 shadow-2xl">
+                <Card className="liquid-glass-card border-amber-500/30 shadow-2xl">
                   <CardHeader className="pb-4 border-b border-amber-500/20">
                     <div className="flex items-center justify-between">
                       <CardTitle className="text-lg font-bold flex items-center gap-2 text-amber-400">
@@ -1238,7 +1238,7 @@ function SettingsContent() {
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <Link
                           href="/admin/series"
-                          className="p-3.5 rounded-xl border border-amber-500/20 bg-neutral-900/50 hover:bg-amber-950/30 hover:border-amber-500/40 transition-all text-xs flex items-center justify-between group"
+                          className="p-3.5 rounded-xl border border-amber-500/20 bg-black/50 hover:bg-black/70 hover:border-amber-500/40 transition-all text-xs flex items-center justify-between group"
                         >
                           <div className="space-y-0.5">
                             <p className="font-semibold text-white group-hover:text-amber-300 transition-colors">
@@ -1251,7 +1251,7 @@ function SettingsContent() {
 
                         <Link
                           href="/admin"
-                          className="p-3.5 rounded-xl border border-amber-500/20 bg-neutral-900/50 hover:bg-amber-950/30 hover:border-amber-500/40 transition-all text-xs flex items-center justify-between group"
+                          className="p-3.5 rounded-xl border border-amber-500/20 bg-black/50 hover:bg-black/70 hover:border-amber-500/40 transition-all text-xs flex items-center justify-between group"
                         >
                           <div className="space-y-0.5">
                             <p className="font-semibold text-white group-hover:text-amber-300 transition-colors">

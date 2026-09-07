@@ -4,7 +4,10 @@ import NextLink from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import React from "react";
 
-export function Link({ to, params, search, hash, children, activeProps, activeOptions, className, ...props }: any) {
+export const Link = React.forwardRef<HTMLAnchorElement, any>(function Link(
+  { to, params, search, hash, children, activeProps, activeOptions, className, ...props }: any,
+  ref
+) {
   let href = to || "";
   if (params) {
     for (const [key, val] of Object.entries(params)) {
@@ -59,6 +62,7 @@ export function Link({ to, params, search, hash, children, activeProps, activeOp
 
   return (
     <NextLink
+      ref={ref}
       href={href}
       className={finalClassName}
       prefetch={props.prefetch ?? false}
@@ -69,7 +73,8 @@ export function Link({ to, params, search, hash, children, activeProps, activeOp
       {children}
     </NextLink>
   );
-}
+});
+Link.displayName = "Link";
 
 export function useNavigate() {
   const router = useRouter();
