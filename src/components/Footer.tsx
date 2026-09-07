@@ -29,14 +29,14 @@ export function Footer() {
     <footer className="border-t border-hairline bg-[#06060a] text-muted-foreground transition-colors">
       {/* Top half */}
       <div className="container mx-auto px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16 py-12">
-        <div className="grid gap-8 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 text-center sm:text-left">
+        <div className="grid gap-8 grid-cols-2 lg:grid-cols-4 text-center sm:text-left">
           {/* Logo & Description */}
-          <div className="col-span-1 sm:col-span-2 lg:col-span-1 flex flex-col items-center sm:items-start text-center sm:text-left space-y-4">
+          <div className="col-span-2 lg:col-span-1 flex flex-col items-center sm:items-start text-center sm:text-left space-y-4">
             <Link to="/home" className="flex items-center gap-2.5 transition-transform hover:scale-102 w-fit group">
               <div className="relative grid h-9 w-9 place-items-center rounded-[4px] border border-purple-500/40 bg-purple-950/20 font-bold text-white text-xs shadow-[0_0_12px_rgba(168,85,247,0.2)] group-hover:border-purple-400 group-hover:shadow-[0_0_16px_rgba(168,85,247,0.4)] transition-all">
                 VS
               </div>
-              <span className="text-lg font-bold text-white tracking-widest uppercase group-hover:text-purple-300 transition-colors">
+              <span className="text-lg font-bold text-white tracking-widest uppercase group-hover:text-purple-300 transition-colors whitespace-nowrap">
                 vnrscans
               </span>
             </Link>

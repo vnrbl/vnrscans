@@ -127,7 +127,7 @@ export default function Footer16({
           <div className="md:col-span-1 flex flex-col items-center sm:items-start text-center sm:text-left space-y-4">
             <Link to="/home" className="flex items-center gap-2.5 transition-transform hover:scale-105">
               <img src="/favicon.svg" alt="vnrscans logo" width={32} height={32} className="h-8 w-8 rounded-lg object-contain" />
-              <span className="text-base font-black tracking-wider text-white uppercase">
+              <span className="text-base font-black tracking-wider text-white uppercase whitespace-nowrap">
                 {brandName}
               </span>
             </Link>
@@ -156,7 +156,7 @@ export default function Footer16({
           </div>
 
           {/* Links Grid - Centralized on mobile */}
-          <div className="md:col-span-3 grid grid-cols-1 sm:grid-cols-3 gap-8 text-center sm:text-left">
+          <div className="md:col-span-3 grid grid-cols-2 sm:grid-cols-3 gap-6 sm:gap-8 text-center sm:text-left">
             {columns.map((col, idx) => (
               <div key={idx} className="space-y-3 flex flex-col items-center sm:items-start">
                 <h4 className="text-xs font-bold uppercase tracking-widest text-white">
@@ -182,7 +182,7 @@ export default function Footer16({
 
         {/* Bottom bar - Centralized on mobile */}
         <div className="mt-12 pt-6 border-t border-white/10 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-neutral-500 text-center sm:text-left">
-          <p>{copyright}</p>
+          <p className="whitespace-nowrap">{copyright}</p>
           <div className="flex flex-wrap items-center justify-center sm:justify-end gap-4">
             {legalLinks.map((item, i) => (
               <Link key={i} to={item.href} className="hover:text-neutral-300 transition-colors">

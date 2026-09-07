@@ -143,7 +143,7 @@ export default function Footer19({
           </div>
 
           {/* Nav columns (centralized on mobile) */}
-          <div className="lg:col-span-6 grid grid-cols-1 sm:grid-cols-3 gap-8 text-center sm:text-left">
+          <div className="lg:col-span-6 grid grid-cols-2 sm:grid-cols-3 gap-6 sm:gap-8 text-center sm:text-left">
             {navColumns.map((col, idx) => (
               <div key={idx} className="space-y-3 flex flex-col items-center sm:items-start">
                 <p className="text-xs font-mono font-bold tracking-widest text-purple-400 uppercase">
@@ -169,12 +169,12 @@ export default function Footer19({
 
         {/* Bottom bar with logo, copyright and socials */}
         <div className="pt-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-neutral-500 text-center sm:text-left">
-          <div className="flex items-center gap-2.5">
-            <img src="/favicon.svg" alt="vnr logo" width={24} height={24} className="h-6 w-6 rounded object-contain" />
-            <span className="font-black text-white text-sm tracking-wider uppercase">{brandName}</span>
+          <div className="flex items-center gap-2.5 shrink-0">
+            <img src="/favicon.svg" alt="vnr logo" width={24} height={24} className="h-6 w-6 rounded object-contain shrink-0" />
+            <span className="font-black text-white text-sm tracking-wider uppercase whitespace-nowrap">{brandName}</span>
           </div>
 
-          <p>{copyright}</p>
+          <p className="whitespace-nowrap">{copyright}</p>
 
           <div className="flex items-center gap-2">
             {socialLinks.map((item, i) => (

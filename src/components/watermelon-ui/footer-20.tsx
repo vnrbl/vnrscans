@@ -73,7 +73,7 @@ export default function Footer20({
           <div className="md:col-span-6 flex flex-col items-center sm:items-start text-center sm:text-left space-y-4">
             <Link to="/home" className="flex items-center gap-2.5">
               <img src="/favicon.svg" alt="vnr logo" width={32} height={32} className="h-8 w-8 rounded-lg object-contain" />
-              <span className="text-xl font-black text-white tracking-widest uppercase">{brandName}</span>
+              <span className="text-xl font-black text-white tracking-widest uppercase whitespace-nowrap">{brandName}</span>
             </Link>
             <p className="text-xs text-neutral-400 max-w-md leading-relaxed">
               {description}
@@ -99,31 +99,33 @@ export default function Footer20({
             </div>
           </div>
 
-          {/* Links columns - Centralized on mobile */}
-          <div className="md:col-span-3 flex flex-col items-center sm:items-start text-center sm:text-left space-y-3">
-            <h4 className="text-xs font-bold uppercase tracking-widest text-white">Directory</h4>
-            <ul className="space-y-2 text-xs flex flex-col items-center sm:items-start">
-              <li><Link to="/home" className="hover:text-white transition-colors">Home Page</Link></li>
-              <li><Link to="/browse" className="hover:text-white transition-colors">Browse Manga</Link></li>
-              <li><Link to="/rankings" className="hover:text-white transition-colors">Top Rankings</Link></li>
-              <li><Link to="/novels" className="hover:text-white transition-colors">Light Novels</Link></li>
-            </ul>
-          </div>
+          {/* Links columns - 2 grid in 1 row on mobile */}
+          <div className="md:col-span-6 grid grid-cols-2 gap-6 sm:gap-8">
+            <div className="flex flex-col items-center sm:items-start text-center sm:text-left space-y-3">
+              <h4 className="text-xs font-bold uppercase tracking-widest text-white">Directory</h4>
+              <ul className="space-y-2 text-xs flex flex-col items-center sm:items-start">
+                <li><Link to="/home" className="hover:text-white transition-colors">Home Page</Link></li>
+                <li><Link to="/browse" className="hover:text-white transition-colors">Browse Manga</Link></li>
+                <li><Link to="/rankings" className="hover:text-white transition-colors">Top Rankings</Link></li>
+                <li><Link to="/novels" className="hover:text-white transition-colors">Light Novels</Link></li>
+              </ul>
+            </div>
 
-          <div className="md:col-span-3 flex flex-col items-center sm:items-start text-center sm:text-left space-y-3">
-            <h4 className="text-xs font-bold uppercase tracking-widest text-white">Policies</h4>
-            <ul className="space-y-2 text-xs flex flex-col items-center sm:items-start">
-              <li><Link to="/dmca" className="hover:text-white transition-colors">DMCA Notice</Link></li>
-              <li><Link to="/terms" className="hover:text-white transition-colors">Terms of Service</Link></li>
-              <li><Link to="/privacy" className="hover:text-white transition-colors">Privacy Policy</Link></li>
-              <li><Link to="/security" className="hover:text-white transition-colors">Security Center</Link></li>
-            </ul>
+            <div className="flex flex-col items-center sm:items-start text-center sm:text-left space-y-3">
+              <h4 className="text-xs font-bold uppercase tracking-widest text-white">Policies</h4>
+              <ul className="space-y-2 text-xs flex flex-col items-center sm:items-start">
+                <li><Link to="/dmca" className="hover:text-white transition-colors">DMCA Notice</Link></li>
+                <li><Link to="/terms" className="hover:text-white transition-colors">Terms of Service</Link></li>
+                <li><Link to="/privacy" className="hover:text-white transition-colors">Privacy Policy</Link></li>
+                <li><Link to="/security" className="hover:text-white transition-colors">Security Center</Link></li>
+              </ul>
+            </div>
           </div>
         </div>
 
         {/* Bottom bar - Centralized on mobile */}
         <div className="border-t border-white/10 pt-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-neutral-500 text-center sm:text-left">
-          <p>© 2026 {brandName}. All rights reserved.</p>
+          <p className="whitespace-nowrap">© 2026 {brandName}. All rights reserved.</p>
           <div className="flex flex-wrap items-center justify-center sm:justify-end gap-4">
             <Link to="/dmca" className="hover:text-neutral-300">DMCA</Link>
             <Link to="/privacy" className="hover:text-neutral-300">Privacy</Link>

@@ -252,10 +252,10 @@ export function Footer6({
               </div>
             </motion.div>
 
-            {/* First Link Column */}
+            {/* First Link Column (Desktop / Tablet) */}
             <motion.div
               variants={techReveal}
-              className="relative col-span-1 border-t md:border-t-0 md:border-l border-white/10 px-5 py-8 sm:px-6 md:px-6 md:py-10 lg:col-span-2"
+              className="hidden md:block relative col-span-1 border-t md:border-t-0 md:border-l border-white/10 px-5 py-8 sm:px-6 md:px-6 md:py-10 lg:col-span-2"
             >
               {firstGroup && (
                 <div className="flex flex-col gap-4 items-center text-center sm:items-start sm:text-left">
@@ -280,12 +280,43 @@ export function Footer6({
               )}
             </motion.div>
 
-            <GridTick className="-top-2 -right-2" />
-            <GridTick className="-right-2 -bottom-2" />
+            <GridTick className="-top-2 -right-2 hidden md:flex" />
+            <GridTick className="-right-2 -bottom-2 hidden md:flex" />
           </div>
 
-          {/* Remaining Link Columns */}
-          <div className="relative px-5 py-8 sm:px-8 sm:py-10 lg:col-span-6">
+          {/* Mobile Link Groups: 2 grid columns in 1 row */}
+          <div className="block md:hidden relative px-5 py-8 border-b md:border-b-0 border-white/10">
+            <div className="grid grid-cols-2 gap-x-4 gap-y-7">
+              {groupsToUse.map((group) => (
+                <motion.div
+                  key={group.title}
+                  variants={techReveal}
+                  className="flex flex-col gap-3.5 items-center text-center"
+                >
+                  <div>
+                    <span className="text-purple-400 text-xs font-bold uppercase tracking-wider">
+                      //&nbsp;&nbsp;{group.title}
+                    </span>
+                  </div>
+
+                  <div className="flex flex-col gap-2 items-center">
+                    {group.links.map((link, index) => (
+                      <a
+                        key={index}
+                        href={link.href}
+                        className="text-neutral-400 hover:text-purple-300 block py-0.5 text-xs font-medium transition-colors"
+                      >
+                        {link.label}
+                      </a>
+                    ))}
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          </div>
+
+          {/* Remaining Link Columns (Desktop / Tablet) */}
+          <div className="hidden md:block relative px-5 py-8 sm:px-8 sm:py-10 lg:col-span-6">
             <div className="grid grid-cols-1 gap-7 sm:grid-cols-3 sm:gap-4">
               {remainingGroups.map((group) => (
                 <motion.div
@@ -330,7 +361,7 @@ export function Footer6({
             </div>
 
             {statusTag && (
-              <span className="text-purple-400 text-xs font-mono font-bold tracking-widest">
+              <span className="text-purple-400 text-xs font-mono font-bold tracking-widest whitespace-nowrap shrink-0">
                 [ {statusTag.toUpperCase()} ]
               </span>
             )}
@@ -342,17 +373,17 @@ export function Footer6({
           variants={techReveal}
           className="flex flex-col gap-6 px-5 py-6 sm:px-8 sm:py-8 border-t border-white/10 lg:flex-row lg:items-center lg:justify-between"
         >
-          <div className="flex flex-col gap-3 items-center text-center sm:flex-row sm:items-center sm:text-left">
-            <div className="flex items-center gap-2.5">
-              <img src="/favicon.svg" alt="vnr logo" width={24} height={24} className="h-6 w-6 rounded object-contain" />
-              <span className="text-white text-base font-black tracking-wider uppercase">
+          <div className="flex flex-col gap-3 items-center text-center sm:flex-row sm:items-center sm:text-left min-w-0">
+            <div className="flex items-center gap-2.5 shrink-0">
+              <img src="/favicon.svg" alt="vnr logo" width={24} height={24} className="h-6 w-6 rounded object-contain shrink-0" />
+              <span className="text-white text-base font-black tracking-wider uppercase whitespace-nowrap">
                 {brandName}
               </span>
             </div>
 
             {brandSubtitle && (
               <>
-                <div className="hidden h-4 w-px bg-white/20 sm:block" />
+                <div className="hidden h-4 w-px bg-white/20 sm:block shrink-0" />
                 <p className="text-neutral-400 text-xs max-w-sm">
                   {brandSubtitle}
                 </p>
@@ -360,8 +391,8 @@ export function Footer6({
             )}
           </div>
 
-          <div className="flex flex-col items-center text-center sm:flex-row sm:items-center sm:text-left gap-4 lg:justify-end">
-            <p className="text-neutral-500 text-xs">
+          <div className="flex flex-col items-center text-center sm:flex-row sm:items-center sm:text-left gap-4 lg:justify-end shrink-0">
+            <p className="text-neutral-500 text-xs whitespace-nowrap">
               {copyright}
             </p>
 
