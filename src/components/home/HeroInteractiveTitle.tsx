@@ -18,7 +18,7 @@ export function HeroInteractiveTitle() {
       // Dimensions optimized for tight margins so text fills the viewport
       const canvas = document.createElement("canvas");
       canvas.width = 1500;
-      canvas.height = 360;
+      canvas.height = 330;
       const ctx = canvas.getContext("2d");
       if (!ctx) return;
 
@@ -27,19 +27,19 @@ export function HeroInteractiveTitle() {
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
       try {
-        ctx.letterSpacing = "0.04em";
+        ctx.letterSpacing = "0.01em";
       } catch {}
 
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
 
       // Line 1: DISCOVER STORIES (Luminous crisp white)
-      ctx.font = '900 132px "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+      ctx.font = '900 134px "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
       ctx.fillStyle = "#ffffff";
-      ctx.fillText("DISCOVER STORIES", canvas.width / 2, 105);
+      ctx.fillText("DISCOVER STORIES", canvas.width / 2, 95);
 
       // Line 2: DRAWN BY IMAGINATION (Bright luminous silver into electric violet/purple)
-      ctx.font = '900 132px "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+      ctx.font = '900 134px "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
       const grad = ctx.createLinearGradient(120, 0, canvas.width - 120, 0);
       grad.addColorStop(0, "#ffffff");
       grad.addColorStop(0.25, "#f3e8ff");
@@ -47,7 +47,7 @@ export function HeroInteractiveTitle() {
       grad.addColorStop(0.8, "#d8b4fe");
       grad.addColorStop(1, "#c084fc");
       ctx.fillStyle = grad;
-      ctx.fillText("DRAWN BY IMAGINATION", canvas.width / 2, 255);
+      ctx.fillText("DRAWN BY IMAGINATION", canvas.width / 2, 235);
 
       setDataUrl(canvas.toDataURL("image/png"));
     };
@@ -66,17 +66,17 @@ export function HeroInteractiveTitle() {
       </h1>
 
       {dataUrl ? (
-        <div className="w-full h-[220px] sm:h-[300px] md:h-[400px] lg:h-[480px] xl:h-[520px] flex items-center justify-center">
+        <div className="w-full h-[200px] sm:h-[280px] md:h-[370px] lg:h-[440px] xl:h-[480px] flex items-center justify-center">
           <InteractiveParticles
             src={dataUrl}
             allowUpload={false}
             background="transparent"
             color="#ffffff"
-            size={2.2}
-            randomness={1.0}
-            depth={3.2}
-            touchRadius={0.18}
-            maxDimension={500}
+            size={2.0}
+            randomness={0.5}
+            depth={3.0}
+            touchRadius={0.16}
+            maxDimension={520}
             className="w-full h-full"
           />
         </div>

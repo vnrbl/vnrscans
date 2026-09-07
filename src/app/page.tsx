@@ -158,7 +158,7 @@ export default async function Home() {
 
           <HeroInteractiveTitle />
 
-          <p className="mx-auto mt-8 max-w-2xl text-sm leading-relaxed text-muted-foreground sm:text-base md:text-lg tracking-[0.02em] font-light">
+          <p className="mx-auto mt-2 sm:mt-3 max-w-2xl text-sm leading-relaxed text-zinc-300 sm:text-base md:text-lg tracking-normal font-normal antialiased">
             Follow your favorite manhwa, track new releases, level up your reader rank, and explore creator-first web novels in a premium reading environment.
           </p>
 
