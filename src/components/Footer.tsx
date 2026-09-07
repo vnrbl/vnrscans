@@ -1,8 +1,36 @@
 import { Link } from "@/lib/router-compat";
 import NextLink from "next/link";
 import { ShieldCheck, Mail, ExternalLink, Globe } from "lucide-react";
+import { useReaderSettings } from "@/contexts/ReaderSettingsContext";
+import dynamic from "next/dynamic";
+
+const Footer16 = dynamic(() => import("@/components/watermelon-ui/footer-16"), { ssr: false });
+const Footer19 = dynamic(() => import("@/components/watermelon-ui/footer-19"), { ssr: false });
+const Footer20 = dynamic(() => import("@/components/watermelon-ui/footer-20"), { ssr: false });
+const Footer6 = dynamic(() => import("@/components/watermelon-ui/footer-6"), { ssr: false });
 
 export function Footer() {
+  const { settings } = useReaderSettings();
+
+  if (settings.footerStyle === "footer-16") {
+    return <Footer16 />;
+  }
+  if (settings.footerStyle === "footer-19") {
+    return <Footer19 />;
+  }
+  if (settings.footerStyle === "footer-20") {
+    return <Footer20 />;
+  }
+  if (settings.footerStyle === "footer-6") {
+    return (
+      <Footer6
+        brandName="VNR SCANS"
+        headline="Stay in the loop with new chapter updates"
+        description="Experience the fastest scanlation reader on the web."
+      />
+    );
+  }
+
   return (
     <footer className="border-t border-hairline bg-[#06060a] text-muted-foreground transition-colors">
       {/* Top half */}

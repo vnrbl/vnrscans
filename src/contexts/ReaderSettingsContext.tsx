@@ -2,6 +2,9 @@
 
 import { createContext, useContext, useEffect, useState } from "react";
 
+export type NavbarStyle = "default" | "glass-dock" | "spotlight" | "awwwards";
+export type FooterStyle = "default" | "footer-16" | "footer-19" | "footer-20" | "footer-6";
+
 export interface ReaderSettings {
   readingDirection: "ltr" | "rtl" | "vertical";
   pageFit: "width" | "height" | "original";
@@ -11,6 +14,8 @@ export interface ReaderSettings {
   showNovelsOnHome: boolean;
   readingFilter: "normal" | "oled" | "warm" | "dim";
   enable30MinHold: boolean;
+  navbarStyle: NavbarStyle;
+  footerStyle: FooterStyle;
 }
 
 const defaultSettings: ReaderSettings = {
@@ -22,6 +27,8 @@ const defaultSettings: ReaderSettings = {
   showNovelsOnHome: false,
   readingFilter: "normal",
   enable30MinHold: true,
+  navbarStyle: "default",
+  footerStyle: "default",
 };
 
 interface ReaderSettingsContextType {

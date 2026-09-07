@@ -33,6 +33,8 @@ import {
   ArrowRight,
   Info,
   Crown,
+  Compass,
+  PanelBottom,
 } from "lucide-react";
 import { UserAvatarFrame } from "@/components/UserAvatarFrame";
 import { useReaderSettings } from "@/contexts/ReaderSettingsContext";
@@ -958,6 +960,170 @@ function SettingsContent() {
                               </p>
                               <Badge variant="outline" className="text-[10px] w-fit">
                                 {q.badge}
+                              </Badge>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    <Separator className="border-border/30" />
+
+                    {/* Navigation Bar Style Selector */}
+                    <div className="space-y-3">
+                      <div>
+                        <Label className="text-sm font-semibold text-white flex items-center gap-1.5">
+                          <Compass className="h-4 w-4 text-purple-400" />
+                          Navigation Bar Style
+                        </Label>
+                        <p className="text-xs text-muted-foreground">
+                          Choose your preferred top navigation layout and interaction mechanics
+                        </p>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {[
+                          {
+                            id: "default",
+                            title: "SpaceX Classic Glass",
+                            desc: "Translucent frosted iOS bar with central search console & fast GPU drawer",
+                            badge: "Default",
+                          },
+                          {
+                            id: "glass-dock",
+                            title: "Glass Dock",
+                            desc: "Floating translucent dock with animated morphing icons & tooltips (VengeanceUI)",
+                            badge: "Interactive",
+                          },
+                          {
+                            id: "spotlight",
+                            title: "Spotlight Navbar",
+                            desc: "Interactive cursor beam spotlight with responsive magnetic highlight glow",
+                            badge: "Modern",
+                          },
+                          {
+                            id: "awwwards",
+                            title: "Awwwards Nav",
+                            desc: "Award-winning expandable floating mega-menu with spring animations",
+                            badge: "Featured",
+                          },
+                        ].map((nav) => {
+                          const isSelected = (settings.navbarStyle || "default") === nav.id;
+                          return (
+                            <button
+                              key={nav.id}
+                              type="button"
+                              onClick={() => {
+                                updateSettings({ navbarStyle: nav.id as any });
+                                toast.success(`Navbar style updated to: ${nav.title}`);
+                              }}
+                              className={cn(
+                                "p-3.5 rounded-xl border text-left transition-all text-xs flex flex-col justify-between",
+                                isSelected
+                                  ? "bg-purple-950/30 border-purple-500/50 text-white ring-1 ring-purple-500/30 shadow-sm"
+                                  : "bg-black/50 border-white/10 text-neutral-300 hover:bg-black/70 hover:border-white/20"
+                              )}
+                            >
+                              <div className="flex items-center justify-between mb-2">
+                                <span className="font-semibold text-white">{nav.title}</span>
+                                {isSelected && <Check className="h-3.5 w-3.5 text-purple-400" />}
+                              </div>
+                              <p className="text-2xs text-muted-foreground leading-normal mb-2.5">
+                                {nav.desc}
+                              </p>
+                              <Badge
+                                variant="outline"
+                                className={cn(
+                                  "text-[10px] w-fit",
+                                  isSelected ? "border-purple-500/40 text-purple-300 bg-purple-950/30" : ""
+                                )}
+                              >
+                                {nav.badge}
+                              </Badge>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    <Separator className="border-border/30" />
+
+                    {/* Footer Style Selector */}
+                    <div className="space-y-3">
+                      <div>
+                        <Label className="text-sm font-semibold text-white flex items-center gap-1.5">
+                          <PanelBottom className="h-4 w-4 text-purple-400" />
+                          Footer Design Architecture
+                        </Label>
+                        <p className="text-xs text-muted-foreground">
+                          Select the layout and aesthetic of the bottom footer across all pages
+                        </p>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                        {[
+                          {
+                            id: "default",
+                            title: "Default VNR Footer",
+                            desc: "Classic compact scanlation footer with community & DMCA links",
+                            badge: "Classic",
+                          },
+                          {
+                            id: "footer-16",
+                            title: "Watermelon Minimal Grid",
+                            desc: "Card-based grid with newsletter signup and category columns",
+                            badge: "Card Grid",
+                          },
+                          {
+                            id: "footer-19",
+                            title: "Watermelon Sleek Links",
+                            desc: "Clean multi-column layout with social badges and quick navigation",
+                            badge: "Multi-Col",
+                          },
+                          {
+                            id: "footer-20",
+                            title: "Watermelon Watermark",
+                            desc: "Bold giant typography watermark with minimalist branding",
+                            badge: "Watermark",
+                          },
+                          {
+                            id: "footer-6",
+                            title: "Watermelon Tech Grid",
+                            desc: "Interactive tick grid background with live system status badge",
+                            badge: "Enterprise",
+                          },
+                        ].map((foot) => {
+                          const isSelected = (settings.footerStyle || "default") === foot.id;
+                          return (
+                            <button
+                              key={foot.id}
+                              type="button"
+                              onClick={() => {
+                                updateSettings({ footerStyle: foot.id as any });
+                                toast.success(`Footer style updated to: ${foot.title}`);
+                              }}
+                              className={cn(
+                                "p-3.5 rounded-xl border text-left transition-all text-xs flex flex-col justify-between",
+                                isSelected
+                                  ? "bg-purple-950/30 border-purple-500/50 text-white ring-1 ring-purple-500/30 shadow-sm"
+                                  : "bg-black/50 border-white/10 text-neutral-300 hover:bg-black/70 hover:border-white/20"
+                              )}
+                            >
+                              <div className="flex items-center justify-between mb-2">
+                                <span className="font-semibold text-white">{foot.title}</span>
+                                {isSelected && <Check className="h-3.5 w-3.5 text-purple-400" />}
+                              </div>
+                              <p className="text-2xs text-muted-foreground leading-normal mb-2.5">
+                                {foot.desc}
+                              </p>
+                              <Badge
+                                variant="outline"
+                                className={cn(
+                                  "text-[10px] w-fit",
+                                  isSelected ? "border-purple-500/40 text-purple-300 bg-purple-950/30" : ""
+                                )}
+                              >
+                                {foot.badge}
                               </Badge>
                             </button>
                           );

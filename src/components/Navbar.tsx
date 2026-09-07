@@ -25,6 +25,10 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
+import { SpotlightNavbar } from "@/components/ui/spotlight-navbar";
+import { GlassDock } from "@/components/ui/glass-dock";
+import { AwwwardsNav } from "@/components/ui/awwwards-nav";
 const NotificationBell = lazy(() => import("@/components/notifications/NotificationBell").then(m => ({ default: m.NotificationBell })));
 
 
@@ -120,6 +124,62 @@ export function Navbar() {
     { to: "/leaderboard", label: "Leaderboard", icon: Crown },
     { to: "/recommendations", label: "For You", icon: Sparkles },
     { to: "/novels", label: "Novels", icon: BookOpen },
+  ];
+
+  const spotlightItems = [
+    { label: "Home", href: "/home" },
+    { label: "Browse", href: "/browse" },
+    { label: "Rankings", href: "/rankings" },
+    { label: "Novels", href: "/novels" },
+    { label: "Leaderboard", href: "/leaderboard" },
+  ];
+
+  const dockItems = [
+    { title: "Home", icon: Home, onClick: () => navigate({ to: "/home" }) },
+    { title: "Browse", icon: BookOpen, onClick: () => navigate({ to: "/browse" }) },
+    { title: "Rankings", icon: Trophy, onClick: () => navigate({ to: "/rankings" }) },
+    { title: "Random", icon: Dice5, onClick: () => handleRandom() },
+    { title: "Search", icon: Search, onClick: () => setSearchOpen(true) },
+    { title: "Library", icon: Library, onClick: () => navigate({ to: "/library" }) },
+    { title: "Settings", icon: SettingsIcon, onClick: () => navigate({ to: "/settings" }) },
+  ];
+
+  const awwwardsItems = [
+    { label: "Home", href: "/home" },
+    { label: "Browse", href: "/browse" },
+    { label: "Rankings", href: "/rankings" },
+    { label: "Novels", href: "/novels" },
+  ];
+
+  const awwwardsColumns = [
+    {
+      title: "Explore",
+      links: [
+        { label: "Home", href: "/home" },
+        { label: "Browse Catalog", href: "/browse" },
+        { label: "Rankings", href: "/rankings" },
+        { label: "Leaderboard", href: "/leaderboard" },
+        { label: "Light Novels", href: "/novels" },
+      ],
+    },
+    {
+      title: "Categories",
+      links: [
+        { label: "Manga", href: "/browse?type=manga" },
+        { label: "Manhwa", href: "/browse?type=manhwa" },
+        { label: "Manhua", href: "/browse?type=manhua" },
+        { label: "Novels", href: "/browse?type=novel" },
+      ],
+    },
+    {
+      title: "Account",
+      links: [
+        { label: "My Library", href: "/library" },
+        { label: "Profile", href: "/profile" },
+        { label: "Settings", href: "/settings" },
+        ...(showPanel ? [{ label: panelLabel, href: "/admin" }] : []),
+      ],
+    },
   ];
 
 
@@ -238,28 +298,49 @@ export function Navbar() {
             )}
           </div>
 
-          {/* Centralized Search Bar (PC / Desktop only) */}
-          <div className="hidden xl:flex items-center justify-center absolute left-1/2 -translate-x-1/2 z-10 pointer-events-auto">
-            <button
-              onClick={() => setSearchOpen(true)}
-              title="Search (Ctrl+K)"
-              className="flex items-center gap-2.5 w-[280px] xl:w-[320px] h-9 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 hover:border-white/30 px-3 text-xs text-neutral-400 hover:text-white transition-all focus:outline-none shadow-sm cursor-pointer"
-            >
-              <Search className="h-3.5 w-3.5 shrink-0 text-neutral-400 stroke-[1.8]" />
-              <span className="flex-1 truncate text-left font-sans font-normal tracking-normal text-neutral-400">
-                Search titles, authors...
-              </span>
-              <kbd className="inline-flex items-center rounded border border-border/60 bg-neutral-900/80 px-1.5 py-0.5 text-[9px] font-mono font-bold text-neutral-400">
-                Ctrl K
-              </kbd>
-            </button>
-          </div>
+          {/* Centralized Navigation / Search Bar */}
+          {mounted && settings.navbarStyle === "spotlight" ? (
+            <div className="hidden lg:flex items-center justify-center absolute left-1/2 -translate-x-1/2 z-10 pointer-events-auto">
+              <SpotlightNavbar
+                items={spotlightItems}
+                onItemClick={(item) => navigate({ to: item.href })}
+              />
+            </div>
+          ) : mounted && settings.navbarStyle === "glass-dock" ? (
+            <div className="hidden lg:flex items-center justify-center absolute left-1/2 -translate-x-1/2 z-10 pointer-events-auto">
+              <GlassDock
+                items={dockItems}
+                tooltipPlacement="bottom"
+                dockClassName="py-1 px-3 rounded-xl border border-white/10 bg-black/60 shadow-lg backdrop-blur-md"
+              />
+            </div>
+          ) : (
+            /* Default SpaceX Centralized Search Bar */
+            <div className="hidden xl:flex items-center justify-center absolute left-1/2 -translate-x-1/2 z-10 pointer-events-auto">
+              <button
+                onClick={() => setSearchOpen(true)}
+                title="Search (Ctrl+K)"
+                className="flex items-center gap-2.5 w-[280px] xl:w-[320px] h-9 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 hover:border-white/30 px-3 text-xs text-neutral-400 hover:text-white transition-all focus:outline-none shadow-sm cursor-pointer"
+              >
+                <Search className="h-3.5 w-3.5 shrink-0 text-neutral-400 stroke-[1.8]" />
+                <span className="flex-1 truncate text-left font-sans font-normal tracking-normal text-neutral-400">
+                  Search titles, authors...
+                </span>
+                <kbd className="inline-flex items-center rounded border border-border/60 bg-neutral-900/80 px-1.5 py-0.5 text-[9px] font-mono font-bold text-neutral-400">
+                  Ctrl K
+                </kbd>
+              </button>
+            </div>
+          )}
 
           {/* Right Actions */}
           <div className="flex items-center gap-1.5 sm:gap-2">
-            {/* Search Button (Icon only for below PC size devices: mobile, tablets, iPads) */}
+            {/* Search Button (Icon for mobile/tablets or when center is occupied by dock/spotlight) */}
             <button
-              className="flex xl:hidden items-center justify-center h-9 w-9 rounded-lg text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors cursor-pointer active:scale-95"
+              className={cn(
+                "items-center justify-center h-9 w-9 rounded-lg text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors cursor-pointer active:scale-95",
+                !settings.navbarStyle || settings.navbarStyle === "default" ? "flex xl:hidden" : "flex"
+              )}
               onClick={() => setSearchOpen(true)}
               aria-label="Search"
               title="Search"
@@ -619,6 +700,15 @@ export function Navbar() {
           </>
         )}
       </nav>
+
+      {/* Floating Awwwards Nav (Desktop, when selected) */}
+      {mounted && settings.navbarStyle === "awwwards" && (
+        <AwwwardsNav
+          items={awwwardsItems}
+          columns={awwwardsColumns}
+          className="hidden sm:block"
+        />
+      )}
     </>
   );
 }

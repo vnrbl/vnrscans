@@ -18,12 +18,25 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { formatAppDate } from "@/lib/date";
+import { cn } from "@/lib/utils";
 
+export function parseAnnouncementDesign(bannerColor?: string | null, type?: string | null): { design: string; color: string } {
+  if (!bannerColor) return { design: "default", color: "#8B5CF6" };
+  if (bannerColor.startsWith("announcement-")) {
+    const parts = bannerColor.split("|");
+    return { design: parts[0], color: parts[1] || "#8B5CF6" };
+  }
+  if (type?.startsWith("announcement-")) {
+    return { design: type, color: bannerColor };
+  }
+  return { design: "default", color: bannerColor };
+}
 
 type AnnouncementForm = {
   title: string;
   content: string;
   type: string;
+  design: string;
   priority: string;
   show_banner: boolean;
   banner_color: string;
@@ -38,6 +51,7 @@ const emptyForm: AnnouncementForm = {
   title: "",
   content: "",
   type: "info",
+  design: "default",
   priority: "0",
   show_banner: true,
   banner_color: "#8B5CF6",
@@ -70,13 +84,14 @@ export default function AdminAnnouncements() {
   const save = useMutation({
     mutationFn: async () => {
       const { data: auth } = await supabase.auth.getUser();
+      const finalBannerColor = form.design === "default" ? form.banner_color : `${form.design}|${form.banner_color}`;
       const payload = {
         title: form.title,
         content: form.content,
         type: form.type,
         priority: parseInt(form.priority, 10),
         show_banner: form.show_banner,
-        banner_color: form.banner_color,
+        banner_color: finalBannerColor,
         icon: form.icon || null,
         target_audience: form.target_audience,
         starts_at: form.starts_at || new Date().toISOString(),
@@ -157,14 +172,16 @@ export default function AdminAnnouncements() {
   });
 
   const openEdit = (item: Record<string, unknown>) => {
+    const parsed = parseAnnouncementDesign(item.banner_color as string | null, item.type as string | null);
     setEditing(item);
     setForm({
       title: String(item.title ?? ""),
       content: String(item.content ?? ""),
       type: String(item.type ?? "info"),
+      design: parsed.design,
       priority: String(item.priority ?? 0),
       show_banner: Boolean(item.show_banner),
-      banner_color: String(item.banner_color ?? "#8B5CF6"),
+      banner_color: parsed.color,
       icon: String(item.icon ?? ""),
       target_audience: String(item.target_audience ?? "all"),
       starts_at: item.starts_at ? new Date(String(item.starts_at)).toISOString().slice(0, 16) : "",
@@ -225,6 +242,11 @@ export default function AdminAnnouncements() {
                   {item.icon && <span>{item.icon}</span>}
                   <h3 className="font-semibold">{item.title}</h3>
                   <Badge variant={typeColors[item.type as string] ?? "outline"}>{item.type}</Badge>
+                  {parseAnnouncementDesign(item.banner_color as string, item.type as string).design !== "default" && (
+                    <Badge variant="secondary" className="bg-purple-950/50 text-purple-300 border-purple-500/30">
+                      {parseAnnouncementDesign(item.banner_color as string, item.type as string).design}
+                    </Badge>
+                  )}
                   {!item.is_active && <Badge variant="outline">Inactive</Badge>}
                   <Badge variant="secondary">Priority {item.priority}</Badge>
                   <Badge variant="outline">{item.target_audience}</Badge>
@@ -336,8 +358,59 @@ function AnnouncementFormFields({
           <Input value={form.icon} onChange={(e) => setForm({ ...form, icon: e.target.value })} placeholder="📢" />
         </div>
       </div>
+      {/* Design Style Selector */}
+      <div className="space-y-2">
+        <Label>Banner Design Style</Label>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+          {[
+            {
+              id: "default",
+              label: "Default Gradient",
+              desc: "Classic VNR horizontal banner with icon & dismiss button",
+            },
+            {
+              id: "announcement-4",
+              label: "Announcement 4",
+              desc: "Watermelon gradient pill with glowing ambient light & badge",
+            },
+            {
+              id: "announcement-2",
+              label: "Announcement 2",
+              desc: "Watermelon frosted bar with sparkles & high contrast button",
+            },
+            {
+              id: "announcement-5",
+              label: "Announcement 5",
+              desc: "Watermelon sleek backdrop blur with arrow action",
+            },
+            {
+              id: "announcement-9",
+              label: "Announcement 9",
+              desc: "Watermelon card banner with notification bell icon",
+            },
+          ].map((d) => (
+            <button
+              key={d.id}
+              type="button"
+              onClick={() => setForm({ ...form, design: d.id })}
+              className={cn(
+                "p-3 rounded-lg border text-left transition-all text-xs flex flex-col justify-between cursor-pointer",
+                form.design === d.id
+                  ? "bg-purple-950/40 border-purple-500 text-white ring-1 ring-purple-500/40"
+                  : "bg-black/40 border-white/10 text-neutral-300 hover:bg-black/60 hover:border-white/20"
+              )}
+            >
+              <div className="flex items-center justify-between mb-1">
+                <span className="font-semibold text-white">{d.label}</span>
+                {form.design === d.id && <span className="text-purple-400 font-bold">✓</span>}
+              </div>
+              <span className="text-[11px] text-muted-foreground leading-snug">{d.desc}</span>
+            </button>
+          ))}
+        </div>
+      </div>
       <div>
-        <Label>Banner color</Label>
+        <Label>Banner color / Accent</Label>
         <Input type="color" value={form.banner_color} onChange={(e) => setForm({ ...form, banner_color: e.target.value })} />
       </div>
       <div className="grid gap-3 sm:grid-cols-2">

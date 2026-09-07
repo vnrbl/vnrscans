@@ -4,6 +4,12 @@ import { X, Crown } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
+import dynamic from "next/dynamic";
+
+const Announcement4 = dynamic(() => import("@/components/watermelon-ui/announcement-4"), { ssr: false });
+const Announcement2 = dynamic(() => import("@/components/watermelon-ui/announcement-2"), { ssr: false });
+const Announcement5 = dynamic(() => import("@/components/watermelon-ui/announcement-5"), { ssr: false });
+const Announcement9 = dynamic(() => import("@/components/watermelon-ui/announcement-9"), { ssr: false });
 
 type Announcement = {
   id: string;
@@ -16,6 +22,16 @@ type Announcement = {
   icon: string | null;
   target_audience: string;
 };
+
+function parseDesign(bannerColor?: string | null, type?: string | null): string {
+  if (bannerColor?.startsWith("announcement-")) {
+    return bannerColor.split("|")[0];
+  }
+  if (type?.startsWith("announcement-")) {
+    return type;
+  }
+  return "default";
+}
 
 export function AnnouncementBanner() {
   const { user } = useAuth();
@@ -99,6 +115,52 @@ export function AnnouncementBanner() {
   const top = visible[0];
 
   if (!top) return null;
+
+  const design = parseDesign(top.banner_color, top.type);
+
+  if (design === "announcement-4") {
+    return (
+      <Announcement4
+        title={top.title}
+        content={top.content}
+        buttonText="View Details"
+        onDismiss={() => dismiss.mutate(top.id)}
+      />
+    );
+  }
+
+  if (design === "announcement-2") {
+    return (
+      <Announcement2
+        title={top.title}
+        content={top.content}
+        buttonText="View Details"
+        onDismiss={() => dismiss.mutate(top.id)}
+      />
+    );
+  }
+
+  if (design === "announcement-5") {
+    return (
+      <Announcement5
+        title={top.title}
+        content={top.content}
+        buttonText="View Details"
+        onDismiss={() => dismiss.mutate(top.id)}
+      />
+    );
+  }
+
+  if (design === "announcement-9") {
+    return (
+      <Announcement9
+        title={top.title}
+        content={top.content}
+        buttonText="View Details"
+        onDismiss={() => dismiss.mutate(top.id)}
+      />
+    );
+  }
 
   return (
     <div className="relative overflow-hidden border-b border-border/50 bg-gradient-to-r from-gray-900 via-purple-900/20 to-gray-900" style={{ minHeight: 64 }}>
