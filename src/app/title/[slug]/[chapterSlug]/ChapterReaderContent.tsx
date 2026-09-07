@@ -594,22 +594,8 @@ export default function Reader({
       }
     }
 
-    let ticking = false;
-    const throttledCheck = () => {
-      if (!ticking) {
-        window.requestAnimationFrame(() => {
-          checkCompletion();
-          ticking = false;
-        });
-        ticking = true;
-      }
-    };
-
-    window.addEventListener("scroll", throttledCheck, { passive: true });
-
     return () => {
       if (observer) observer.disconnect();
-      window.removeEventListener("scroll", throttledCheck);
     };
   }, [user, chapterQ.data, awardXp]);
 
@@ -1712,6 +1698,28 @@ function ScheduledChapterUnlockView({
   );
 }
 
+// Shared high-performance virtual memory manager for 50-300+ image chapters
+let sharedReaderPageObserver: IntersectionObserver | null = null;
+const readerPageCallbacks = new WeakMap<Element, (inRange: boolean) => void>();
+
+function getSharedReaderPageObserver(): IntersectionObserver | null {
+  if (typeof window === "undefined" || !("IntersectionObserver" in window)) return null;
+  if (!sharedReaderPageObserver) {
+    sharedReaderPageObserver = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          const cb = readerPageCallbacks.get(entry.target);
+          if (cb) cb(entry.isIntersecting);
+        }
+      },
+      // 2500px top/bottom buffer (~3-4 screens) ensures zero blank space during rapid scrolling
+      // while allowing distant offscreen bitmaps (>2500px away) to release decoded memory
+      { rootMargin: "2500px 0px 2500px 0px" }
+    );
+  }
+  return sharedReaderPageObserver;
+}
+
 interface ChapterPageItemProps {
   page: {
     id: string;
@@ -1735,6 +1743,35 @@ const ChapterPageItem = memo(function ChapterPageItem({
   const [hasError, setHasError] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
   const [imgSrc, setImgSrc] = useState(page.image_url);
+  const [isInRange, setIsInRange] = useState(isPriority);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (isPriority) {
+      setIsInRange(true);
+      return;
+    }
+
+    const el = containerRef.current;
+    if (!el) return;
+
+    const observer = getSharedReaderPageObserver();
+    if (!observer) {
+      setIsInRange(true);
+      return;
+    }
+
+    readerPageCallbacks.set(el, (inRange) => {
+      setIsInRange(inRange);
+    });
+
+    observer.observe(el);
+
+    return () => {
+      observer.unobserve(el);
+      readerPageCallbacks.delete(el);
+    };
+  }, [isPriority]);
 
   const handleRetry = useCallback(() => {
     setHasError(false);
@@ -1775,6 +1812,7 @@ const ChapterPageItem = memo(function ChapterPageItem({
 
   return (
     <div
+      ref={containerRef}
       id={`chapter-page-${index}`}
       data-page-index={index}
       className={`relative scroll-mt-14 reader-page-container w-full max-w-full overflow-hidden transition-[min-height] duration-200 ${
@@ -1785,7 +1823,9 @@ const ChapterPageItem = memo(function ChapterPageItem({
         containIntrinsicSize: "auto 800px",
       }}
     >
-      {hasError ? (
+      {!isInRange ? (
+        <div className="w-full min-h-[420px] sm:min-h-[600px] bg-secondary/20" />
+      ) : hasError ? (
         <div className="mx-auto flex aspect-[2/3] w-full flex-col items-center justify-center rounded-lg border-2 border-dashed border-border bg-secondary/50 text-center">
           <div className="rounded-full bg-destructive/20 p-4 text-destructive">
             <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">

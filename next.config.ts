@@ -130,6 +130,8 @@ const nextConfig: NextConfig = {
       "sonner",
       "cmdk",
       "zod",
+      "@phosphor-icons/react",
+      "framer-motion",
     ],
   },
   async rewrites() {

@@ -869,13 +869,11 @@ html.reader-filter-dim .reader-page-container img {
    ========================================================================== */
 html {
   -webkit-overflow-scrolling: touch;
-  scroll-behavior: smooth;
+  scroll-behavior: auto;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  html {
-    scroll-behavior: auto;
-  }
+.smooth-scroll {
+  scroll-behavior: smooth;
 }
 
 /* Fast GPU compositing & offscreen layout isolation for Reader */

@@ -2,8 +2,7 @@ import type { Metadata } from "next";
 import BrowsePage, { type BrowseInitialData } from "./BrowseClient";
 import { supabase } from "@/integrations/supabase/client";
 
-export const dynamic = "force-dynamic";
-export const revalidate = 0; // Always sync directly with DB without stale cache
+export const revalidate = 60; // Edge cached for 60s — instant 30ms delivery with background revalidation
 
 export const metadata: Metadata = {
   title: "Browse Manga, Manhwa, Manhua & Novels - vnrscans",

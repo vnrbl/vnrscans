@@ -65,7 +65,7 @@ export const Link = React.forwardRef<HTMLAnchorElement, any>(function Link(
       ref={ref}
       href={href}
       className={finalClassName}
-      prefetch={props.prefetch ?? false}
+      prefetch={props.prefetch ?? (typeof href === "string" && href.startsWith("/"))}
       onMouseEnter={handleMouseEnter}
       onTouchStart={handleTouchStart}
       {...mergedProps}

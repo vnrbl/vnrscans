@@ -59,11 +59,15 @@ export function NavbarSearch({ open, onOpenChange }: NavbarSearchProps) {
 
   // In-memory search cache for instant sub-millisecond response on backspace/repeat
   const searchCacheRef = useRef<Map<string, { series: any[]; users: any[]; groups: string[] }>>(new Map());
+  const abortControllerRef = useRef<AbortController | null>(null);
 
-  // Debounced search with in-memory caching
+  // Debounced search with in-memory caching and abort cancellation
   useEffect(() => {
     const rawQ = searchQuery.trim();
     if (!rawQ || rawQ.length < 2) {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
       setSeriesResults([]);
       setUserResults([]);
       setGroupResults([]);
@@ -77,12 +81,21 @@ export function NavbarSearch({ open, onOpenChange }: NavbarSearchProps) {
     // Instant Cache Hit (0ms latency)
     const cached = searchCacheRef.current.get(cacheKey);
     if (cached) {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
       setSeriesResults(cached.series);
       setUserResults(cached.users);
       setGroupResults(cached.groups);
       setSearching(false);
       return;
     }
+
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
 
     const timer = setTimeout(async () => {
       const q = prepared.primaryTerm;
@@ -94,8 +107,10 @@ export function NavbarSearch({ open, onOpenChange }: NavbarSearchProps) {
               .from("profiles")
               .select("username,avatar_url,user_level,reading_streak")
               .ilike("username", `%${q}%`)
+              .abortSignal(controller.signal)
               .limit(8);
 
+            if (controller.signal.aborted) return;
             if (error) throw error;
             const users = usersData || [];
             setUserResults(users);
@@ -106,8 +121,10 @@ export function NavbarSearch({ open, onOpenChange }: NavbarSearchProps) {
               .select("scanlation_group")
               .ilike("scanlation_group", `%${q}%`)
               .not("scanlation_group", "is", null)
+              .abortSignal(controller.signal)
               .limit(10);
 
+            if (controller.signal.aborted) return;
             if (error) throw error;
             const uniqueGroups = groupsData
               ? (Array.from(
@@ -123,28 +140,37 @@ export function NavbarSearch({ open, onOpenChange }: NavbarSearchProps) {
               .from("series")
               .select("id,slug,title,alternative_titles,description,cover_url,type,rating_average,view_count,is_trending")
               .eq("is_hidden", false)
-              .or(seriesFilter);
+              .or(seriesFilter)
+              .abortSignal(controller.signal);
 
             if (selectedCategory !== "all") {
               queryBuilder = queryBuilder.eq("type", selectedCategory);
             }
 
             const { data: seriesData, error } = await queryBuilder.limit(24);
+            if (controller.signal.aborted) return;
             if (error) throw error;
 
             const ranked = seriesData ? rankSeriesResults(seriesData, prepared).slice(0, 16) : [];
             setSeriesResults(ranked);
             searchCacheRef.current.set(cacheKey, { series: ranked, users: [], groups: [] });
           }
-        } catch (err) {
-          console.error("Search error:", err);
+        } catch (err: any) {
+          if (err?.name !== "AbortError" && !controller.signal.aborted) {
+            console.error("Search error:", err);
+          }
         } finally {
-          setSearching(false);
+          if (!controller.signal.aborted) {
+            setSearching(false);
+          }
         }
       }
-    }, 120);
+    }, 150);
 
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
   }, [searchQuery, selectedCategory]);
 
   const handleClose = () => {
