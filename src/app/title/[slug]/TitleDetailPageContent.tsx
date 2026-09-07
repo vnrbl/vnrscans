@@ -47,6 +47,7 @@ import {
 import { useDragScroll, DRAG_SCROLL_CONTAINER_CLASS } from "@/hooks/useDragScroll";
 import { TITLE_CARD_WIDTH, TITLE_COVER_CLASS } from "@/components/titleCardStyles";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { ReleaseScheduleCard } from "@/components/ReleaseScheduleCard";
 import { formatAppDate } from "@/lib/date";
 
@@ -120,6 +121,7 @@ export default function TitleDetailPageContent({
   initialSeriesData?: any;
   initialChaptersData?: any[];
 }) {
+  const router = useRouter();
   const { user } = useAuth();
   const [showRealms, setShowRealms] = React.useState(false);
   const [realmsTab, setRealmsTab] = React.useState("standard");
@@ -380,6 +382,24 @@ export default function TitleDetailPageContent({
       </div>
 
       <div className="container mx-auto px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16 py-6 lg:py-8 relative z-10">
+        {/* Back navigation */}
+        <div className="mb-4">
+          <button
+            type="button"
+            onClick={() => {
+              if (typeof window !== "undefined" && window.history.length > 1) {
+                router.back();
+              } else {
+                router.push("/browse");
+              }
+            }}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[4px] text-xs font-semibold text-neutral-300 hover:text-white bg-neutral-900/70 hover:bg-neutral-800/90 border border-neutral-800 hover:border-purple-500/50 transition-all cursor-pointer shadow-sm group"
+          >
+            <ChevronLeft className="h-4 w-4 transition-transform group-hover:-translate-x-0.5 text-neutral-400 group-hover:text-purple-400" />
+            <span>Back to catalog</span>
+          </button>
+        </div>
+
         <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:gap-8 lg:gap-10">
           {/* Left sidebar — cover & actions (memoized) */}
           <SeriesActions

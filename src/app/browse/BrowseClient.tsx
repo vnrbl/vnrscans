@@ -146,9 +146,23 @@ function BrowsePageContent({ initialData }: { initialData?: BrowseInitialData })
 
   // Pagination and Infinite Scroll states
   const pageSize = useGridPageSize();
-  const [currentPage, setCurrentPage] = useState<number>(Number.isNaN(urlPage) || urlPage < 1 ? 1 : urlPage);
+  const [currentPage, setCurrentPage] = useState<number>(() => {
+    if (typeof window !== "undefined") {
+      const pageParam = parseInt(new URLSearchParams(window.location.search).get("page") || "", 10);
+      if (!Number.isNaN(pageParam) && pageParam >= 1) return pageParam;
+      const savedPage = parseInt(sessionStorage.getItem("vnr_browse_page") || "", 10);
+      if (!Number.isNaN(savedPage) && savedPage >= 1) return savedPage;
+    }
+    return Number.isNaN(urlPage) || urlPage < 1 ? 1 : urlPage;
+  });
   const [browseMode, setBrowseMode] = useState<"paged" | "infinite">("paged");
-  const [infiniteCount, setInfiniteCount] = useState<number>(DEFAULT_PAGE_SIZE);
+  const [infiniteCount, setInfiniteCount] = useState<number>(() => {
+    if (typeof window !== "undefined") {
+      const savedCount = parseInt(sessionStorage.getItem("vnr_browse_infinite_count") || "", 10);
+      if (!Number.isNaN(savedCount) && savedCount > DEFAULT_PAGE_SIZE) return savedCount;
+    }
+    return DEFAULT_PAGE_SIZE;
+  });
   const [isLoadingMore, setIsLoadingMore] = useState<boolean>(false);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
 
@@ -164,29 +178,86 @@ function BrowsePageContent({ initialData }: { initialData?: BrowseInitialData })
     }
   }, []);
 
-  // Sync currentPage from url when user navigates using back/forward
+  const isInitialMountRef = useRef(true);
   useEffect(() => {
-    const pageParam = parseInt(searchParams.get("page") || "1", 10);
-    const validPage = Number.isNaN(pageParam) || pageParam < 1 ? 1 : pageParam;
-    setCurrentPage((prev) => (prev !== validPage ? validPage : prev));
-  }, [searchParams]);
+    isInitialMountRef.current = false;
+  }, []);
 
-  // Reset pagination when search query, pageSize, or any filter changes
-  useEffect(() => {
+  const resetPageToFirst = () => {
     setCurrentPage(1);
     setInfiniteCount(pageSize);
-  }, [
-    debouncedSearchQuery,
-    groupFilter,
-    typeFilters,
-    statusFilter,
-    contentRating,
-    genreFilters,
-    tagFilters,
-    sortBy,
-    duration,
-    pageSize,
-  ]);
+    try {
+      sessionStorage.setItem("vnr_browse_page", "1");
+      sessionStorage.removeItem("vnr_browse_scroll_pos");
+      sessionStorage.removeItem("vnr_browse_infinite_count");
+    } catch {}
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("page");
+    const qs = params.toString();
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+  };
+
+  // Sync currentPage from url when user navigates using back/forward or restore saved page
+  useEffect(() => {
+    const pageParam = parseInt(searchParams.get("page") || "", 10);
+    if (!Number.isNaN(pageParam) && pageParam >= 1) {
+      setCurrentPage((prev) => (prev !== pageParam ? pageParam : prev));
+      try {
+        sessionStorage.setItem("vnr_browse_page", String(pageParam));
+      } catch {}
+    } else if (currentPage > 1) {
+      // If URL does not have page param but currentPage was restored from sessionStorage, sync it to URL
+      const params = new URLSearchParams(searchParams.toString());
+      params.set("page", String(currentPage));
+      router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+    }
+  }, [searchParams, currentPage, pathname, router]);
+
+  // Track scroll position and active page so returning from a series restores the exact scroll area
+  useEffect(() => {
+    if (typeof window !== "undefined" && "scrollRestoration" in window.history) {
+      window.history.scrollRestoration = "manual";
+    }
+
+    let scrollTimer: NodeJS.Timeout | null = null;
+    const handleScroll = () => {
+      if (scrollTimer) clearTimeout(scrollTimer);
+      scrollTimer = setTimeout(() => {
+        try {
+          if (window.scrollY > 0) {
+            sessionStorage.setItem("vnr_browse_scroll_pos", String(Math.round(window.scrollY)));
+            sessionStorage.setItem("vnr_browse_page", String(currentPage));
+            if (browseMode === "infinite") {
+              sessionStorage.setItem("vnr_browse_infinite_count", String(infiniteCount));
+            }
+          }
+        } catch {}
+      }, 80);
+    };
+
+    const handleClickLink = (e: MouseEvent) => {
+      const target = (e.target as HTMLElement)?.closest?.("a");
+      const href = target?.getAttribute("href");
+      if (target && href && (href.includes("/title/") || href.startsWith("/title"))) {
+        try {
+          sessionStorage.setItem("vnr_browse_scroll_pos", String(Math.round(window.scrollY)));
+          sessionStorage.setItem("vnr_browse_page", String(currentPage));
+          if (browseMode === "infinite") {
+            sessionStorage.setItem("vnr_browse_infinite_count", String(infiniteCount));
+          }
+        } catch {}
+      }
+    };
+
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    document.addEventListener("click", handleClickLink, { capture: true, passive: true });
+
+    return () => {
+      if (scrollTimer) clearTimeout(scrollTimer);
+      window.removeEventListener("scroll", handleScroll);
+      document.removeEventListener("click", handleClickLink, { capture: true });
+    };
+  }, [currentPage, browseMode, infiniteCount]);
 
   useEffect(() => {
     if (urlType) {
@@ -291,6 +362,7 @@ function BrowsePageContent({ initialData }: { initialData?: BrowseInitialData })
         ? prev.filter(t => t !== type)
         : [...prev, type]
     );
+    resetPageToFirst();
   };
 
   // Toggle genre filter
@@ -302,10 +374,11 @@ function BrowsePageContent({ initialData }: { initialData?: BrowseInitialData })
         const params = new URLSearchParams(searchParams.toString());
         params.delete("genre");
         const qs = params.toString();
-        router.replace(qs ? `${pathname}?${qs}` : pathname);
+        router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
       }
       return next;
     });
+    resetPageToFirst();
   };
 
   // Toggle tag filter
@@ -317,10 +390,11 @@ function BrowsePageContent({ initialData }: { initialData?: BrowseInitialData })
         const params = new URLSearchParams(searchParams.toString());
         params.delete("tag");
         const qs = params.toString();
-        router.replace(qs ? `${pathname}?${qs}` : pathname);
+        router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
       }
       return next;
     });
+    resetPageToFirst();
   };
 
   // Clear all filters
@@ -339,7 +413,30 @@ function BrowsePageContent({ initialData }: { initialData?: BrowseInitialData })
     params.delete("genre");
     params.delete("tag");
     params.delete("type");
-    router.replace(`${pathname}?${params.toString()}`);
+    params.delete("page");
+    const qs = params.toString();
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+    resetPageToFirst();
+  };
+
+  const handleStatusChange = (val: string) => {
+    setStatusFilter(val);
+    resetPageToFirst();
+  };
+
+  const handleRatingChange = (val: string) => {
+    setContentRating(val);
+    resetPageToFirst();
+  };
+
+  const handleDurationChange = (val: string) => {
+    setDuration(val);
+    resetPageToFirst();
+  };
+
+  const handleSortChange = (val: string) => {
+    setSortBy(val);
+    resetPageToFirst();
   };
 
   const hasActiveFilters = typeFilters.length > 0 || genreFilters.length > 0 || tagFilters.length > 0 || 
@@ -546,7 +643,7 @@ function BrowsePageContent({ initialData }: { initialData?: BrowseInitialData })
 
   const totalItems = allManhwa.data?.length || 0;
   const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
-  const activePage = Math.min(Math.max(1, currentPage), totalPages);
+  const activePage = totalItems > 0 ? Math.min(Math.max(1, currentPage), totalPages) : currentPage;
 
   // Paginated or infinite slice
   const paginatedItems = useMemo(() => {
@@ -585,6 +682,47 @@ function BrowsePageContent({ initialData }: { initialData?: BrowseInitialData })
     return () => observer.disconnect();
   }, [browseMode, infiniteCount, totalItems, isLoadingMore, pageSize]);
 
+  // Restore scroll position after series items render on page return
+  const scrollRestoredRef = useRef(false);
+
+  useEffect(() => {
+    if (scrollRestoredRef.current) return;
+    if (allManhwa.isLoading || !paginatedItems || paginatedItems.length === 0) return;
+
+    try {
+      const savedScroll = sessionStorage.getItem("vnr_browse_scroll_pos");
+      if (savedScroll) {
+        const targetY = parseInt(savedScroll, 10);
+        if (!Number.isNaN(targetY) && targetY > 0) {
+          let attempts = 0;
+          let cancelled = false;
+          const maxAttempts = 35;
+
+          const performRestore = () => {
+            if (cancelled) return;
+            attempts++;
+
+            window.scrollTo({ top: targetY, behavior: "instant" as ScrollBehavior });
+
+            if (Math.abs(window.scrollY - targetY) < 30 || attempts >= maxAttempts) {
+              scrollRestoredRef.current = true;
+              return;
+            }
+
+            setTimeout(performRestore, 50);
+          };
+
+          const t = setTimeout(performRestore, 40);
+          return () => {
+            cancelled = true;
+            clearTimeout(t);
+          };
+        }
+      }
+    } catch {}
+    scrollRestoredRef.current = true;
+  }, [paginatedItems, allManhwa.isLoading]);
+
   return (
     <div className="min-h-screen bg-background">
       <div className="container mx-auto px-4 py-6 sm:px-6 md:px-8 lg:px-12 xl:px-16">
@@ -607,7 +745,21 @@ function BrowsePageContent({ initialData }: { initialData?: BrowseInitialData })
               type="text"
               placeholder="Search manga by title, author or genre..."
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e) => {
+                const val = e.target.value;
+                setSearchQuery(val);
+                if (currentPage !== 1) {
+                  setCurrentPage(1);
+                  try {
+                    sessionStorage.setItem("vnr_browse_page", "1");
+                    sessionStorage.removeItem("vnr_browse_scroll_pos");
+                  } catch {}
+                  const params = new URLSearchParams(searchParams.toString());
+                  params.delete("page");
+                  const qs = params.toString();
+                  router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+                }
+              }}
               className="h-12 pl-11 pr-4 rounded-[4px] bg-surface-1/90 border border-hairline focus:border-purple-500 focus:ring-1 focus:ring-purple-500/30 text-white placeholder:text-neutral-500 text-sm transition-all"
             />
           </div>
@@ -746,7 +898,7 @@ function BrowsePageContent({ initialData }: { initialData?: BrowseInitialData })
           </Popover>
 
           {/* Status Filter */}
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <Select value={statusFilter} onValueChange={handleStatusChange}>
             <SelectTrigger className="h-9 w-full sm:w-[140px]">
               <SelectValue placeholder="Status" />
             </SelectTrigger>
@@ -759,7 +911,7 @@ function BrowsePageContent({ initialData }: { initialData?: BrowseInitialData })
           </Select>
 
           {/* Content Rating Filter */}
-          <Select value={contentRating} onValueChange={setContentRating}>
+          <Select value={contentRating} onValueChange={handleRatingChange}>
             <SelectTrigger className="h-9 w-full sm:w-[140px]">
               <SelectValue placeholder="Rating" />
             </SelectTrigger>
@@ -773,7 +925,7 @@ function BrowsePageContent({ initialData }: { initialData?: BrowseInitialData })
           </Select>
 
           {/* Duration Filter */}
-          <Select value={duration} onValueChange={setDuration}>
+          <Select value={duration} onValueChange={handleDurationChange}>
             <SelectTrigger className="h-9 w-full sm:w-[140px]">
               <SelectValue placeholder="Duration" />
             </SelectTrigger>
@@ -785,7 +937,7 @@ function BrowsePageContent({ initialData }: { initialData?: BrowseInitialData })
             </SelectContent>
           </Select>
 
-          <Select value={sortBy} onValueChange={setSortBy}>
+          <Select value={sortBy} onValueChange={handleSortChange}>
             <SelectTrigger className="h-9 w-full sm:w-[140px]">
               <SelectValue placeholder="Sort By" />
             </SelectTrigger>
@@ -805,9 +957,11 @@ function BrowsePageContent({ initialData }: { initialData?: BrowseInitialData })
                 className="h-3.5 w-3.5 cursor-pointer hover:text-foreground" 
                 onClick={() => {
                   setGroupFilter("");
+                  resetPageToFirst();
                   const params = new URLSearchParams(searchParams.toString());
                   params.delete("group");
-                  router.replace(`${pathname}?${params.toString()}`);
+                  const qs = params.toString();
+                  router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
                 }}
               />
             </Badge>
@@ -982,9 +1136,13 @@ function BrowsePageContent({ initialData }: { initialData?: BrowseInitialData })
               pageSize={pageSize}
               onPageChange={(p) => {
                 setCurrentPage(p);
+                try {
+                  sessionStorage.setItem("vnr_browse_page", String(p));
+                  sessionStorage.setItem("vnr_browse_scroll_pos", "0");
+                } catch {}
                 const params = new URLSearchParams(searchParams.toString());
                 params.set("page", String(p));
-                router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+                router.push(`${pathname}?${params.toString()}`, { scroll: false });
                 window.scrollTo({ top: 0, behavior: "smooth" });
               }}
               itemLabel="manga"

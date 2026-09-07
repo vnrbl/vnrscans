@@ -308,7 +308,7 @@ export const SeriesActions = React.memo(function SeriesActions({
       await supabase.from("user_library").insert({
         user_id: user.id,
         series_id: seriesId,
-        reading_status: "reading",
+        reading_status: "plan_to_read",
       });
       return { wasFollowing: false };
     },
@@ -548,19 +548,19 @@ export const SeriesActions = React.memo(function SeriesActions({
 
         {user && isFollowing.data && (
           <Select
-            value={libraryStatus.data ?? "reading"}
+            value={libraryStatus.data ?? "plan_to_read"}
             onValueChange={(v) => setStatus.mutate(v as any)}
           >
             <SelectTrigger className="h-11 w-full border-primary/40 bg-primary/10 font-semibold text-primary">
               <div className="flex items-center gap-2">
                 <Bookmark className="h-4 w-4" />
-                <SelectValue placeholder="Reading" />
+                <SelectValue placeholder="Plan to Read" />
               </div>
             </SelectTrigger>
             <SelectContent>
+              <SelectItem value="plan_to_read">Plan to Read</SelectItem>
               <SelectItem value="reading">Reading</SelectItem>
               <SelectItem value="completed">Completed</SelectItem>
-              <SelectItem value="plan_to_read">Plan to Read</SelectItem>
               <SelectItem value="dropped">Dropped</SelectItem>
             </SelectContent>
           </Select>
