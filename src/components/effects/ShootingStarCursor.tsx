@@ -21,13 +21,15 @@ interface StarParticle {
 }
 
 const CELESTIAL_COLORS = [
-  { color: "#ffffff", glow: "rgba(255, 255, 255, 0.8)" },
-  { color: "#fffbeb", glow: "rgba(254, 240, 138, 0.7)" },
-  { color: "#fef08a", glow: "rgba(253, 224, 71, 0.8)" },
-  { color: "#fde047", glow: "rgba(250, 204, 21, 0.7)" },
-  { color: "#fbbf24", glow: "rgba(245, 158, 11, 0.6)" },
-  { color: "#f59e0b", glow: "rgba(217, 119, 6, 0.6)" },
-  { color: "#e0e7ff", glow: "rgba(165, 180, 252, 0.5)" }, // subtle cosmic blue-white accent
+  { color: "#ffffff", glow: "rgba(255, 255, 255, 0.95)" },  // Pure white star core
+  { color: "#f5f3ff", glow: "rgba(237, 233, 254, 0.9)" },   // Ethereal soft lavender
+  { color: "#e9d5ff", glow: "rgba(216, 180, 254, 0.85)" },  // Luminous violet
+  { color: "#d8b4fe", glow: "rgba(192, 132, 252, 0.85)" },  // Bright lavender-purple sparkle
+  { color: "#c084fc", glow: "rgba(168, 85, 247, 0.85)" },  // Radiant purple
+  { color: "#a855f7", glow: "rgba(147, 51, 234, 0.8)" },   // Vivid brand purple
+  { color: "#8b5cf6", glow: "rgba(139, 92, 246, 0.8)" },   // Signature VNR Scans violet
+  { color: "#7c3aed", glow: "rgba(124, 58, 237, 0.75)" },  // Deep cosmic violet
+  { color: "#818cf8", glow: "rgba(99, 102, 241, 0.7)" },   // Subtle indigo nebula accent
 ];
 
 export function ShootingStarCursor() {
