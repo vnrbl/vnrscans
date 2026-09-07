@@ -37,6 +37,11 @@ const PwaInstallPrompt = dynamic(
   { ssr: false }
 );
 
+const ShootingStarCursor = dynamic(
+  () => import("@/components/effects/ShootingStarCursor").then((m) => m.ShootingStarCursor),
+  { ssr: false }
+);
+
 export function Providers({ children }: { children: ReactNode }) {
   const [queryClient] = useState(
     () =>
@@ -117,6 +122,7 @@ function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="flex min-h-screen flex-col" suppressHydrationWarning>
+      <ShootingStarCursor />
       <NavigationProgress />
       <AnnouncementBanner />
       <Navbar />

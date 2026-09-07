@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getOrFetchSeriesCharacters } from "@/lib/character-fetcher";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchSeriesBySlug } from "@/lib/series-slug";
 
 export const dynamic = "force-dynamic";
 
@@ -20,21 +21,18 @@ export async function GET(
 
     // If title not provided in query, fetch from series table
     if (!title) {
-      const { data: series } = await supabase
-        .from("series")
-        .select("title")
-        .eq("slug", slug)
-        .maybeSingle();
+      const series = await fetchSeriesBySlug(slug, "title");
       title = series?.title || slug.replace(/-/g, " ");
     }
 
-    const characters = await getOrFetchSeriesCharacters(title, slug, force);
+    const effectiveTitle: string = title || slug.replace(/-/g, " ");
+    const characters = await getOrFetchSeriesCharacters(effectiveTitle, slug, force);
 
     return NextResponse.json({
       characters,
       total: characters.length,
       seriesSlug: slug,
-      seriesTitle: title,
+      seriesTitle: effectiveTitle,
     });
   } catch (err: any) {
     console.error("[api/series/characters] Error:", err);

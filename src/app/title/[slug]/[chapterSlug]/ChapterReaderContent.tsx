@@ -77,6 +77,7 @@ import { CommentAttachmentGrid } from "@/components/comments/CommentAttachmentGr
 import { sanitizeHtml } from "@/lib/html-sanitizer";
 import { resolveChapterImageUrl } from "@/lib/chapter-utils";
 import NovelSettingsPanel from "@/components/NovelSettingsPanel";
+import { fetchSeriesBySlug } from "@/lib/series-slug";
 
 const isVideoUrl = (url: string) => {
   if (!url) return false;
@@ -204,29 +205,8 @@ export default function Reader({
   const chapterQ = useQuery({
     queryKey: ["chapter", titleSlug, chapterSlug],
     queryFn: async () => {
-      // 1. Resolve series by slug (with hyphen/punctuation-insensitive fallback)
-      let { data: seriesData } = await supabase
-        .from("series")
-        .select("id, slug, title, type")
-        .eq("slug", titleSlug)
-        .maybeSingle();
-
-      if (!seriesData) {
-        const normalized = titleSlug.replace(/[^a-z0-9]/g, "").toLowerCase();
-        const { data: candidates } = await supabase
-          .from("series")
-          .select("id, slug, title, type")
-          .limit(100);
-
-        if (candidates) {
-          seriesData =
-            candidates.find(
-              (s) =>
-                s.slug === titleSlug ||
-                s.slug.replace(/[^a-z0-9]/g, "").toLowerCase() === normalized
-            ) ?? null;
-        }
-      }
+      // 1. Resolve series by slug (with encoding/hyphen/punctuation-insensitive fallback)
+      const seriesData = await fetchSeriesBySlug(titleSlug, "id, slug, title, type");
 
       let data: any = null;
 

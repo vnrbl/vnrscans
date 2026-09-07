@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import ChapterReaderContent from "./ChapterReaderContent";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchSeriesBySlug } from "@/lib/series-slug";
 
 export const revalidate = 120; // Edge cached for 2 minutes — fast instant loading
 
@@ -12,29 +13,8 @@ type PageProps = {
 
 // Server-side helper to fetch series + chapter + pages in one deduplicated request
 const getChapterFullData = cache(async (seriesSlug: string, chapterSlug: string) => {
-  // 1. Resolve series by slug (with hyphen/punctuation-insensitive fallback)
-  let { data: series } = await supabase
-    .from("series")
-    .select("id, slug, title, cover_url, type, description")
-    .eq("slug", seriesSlug)
-    .maybeSingle();
-
-  if (!series) {
-    const normalized = seriesSlug.replace(/[^a-z0-9]/g, "").toLowerCase();
-    const { data: candidates } = await supabase
-      .from("series")
-      .select("id, slug, title, cover_url, type, description")
-      .limit(100);
-
-    if (candidates) {
-      series =
-        candidates.find(
-          (s) =>
-            s.slug === seriesSlug ||
-            s.slug.replace(/[^a-z0-9]/g, "").toLowerCase() === normalized
-        ) ?? null;
-    }
-  }
+  // 1. Resolve series by slug (with encoding/hyphen/punctuation-insensitive fallback)
+  const series = await fetchSeriesBySlug(seriesSlug, "id, slug, title, cover_url, type, description");
 
   let chapter: any = null;
 

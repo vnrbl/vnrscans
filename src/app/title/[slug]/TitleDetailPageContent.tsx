@@ -50,6 +50,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ReleaseScheduleCard } from "@/components/ReleaseScheduleCard";
 import { formatAppDate } from "@/lib/date";
+import { fetchSeriesBySlug } from "@/lib/series-slug";
 
 function SideWidgets({
   seriesId,
@@ -129,12 +130,7 @@ export default function TitleDetailPageContent({
   const seriesQ = useQuery({
     queryKey: ["series", "detail", slug],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("series")
-        .select("*,series_genres(genre:genres(id,name,slug)),series_tags(tag:tags(id,name,slug,color,icon))")
-        .eq("slug", slug)
-        .maybeSingle();
-      if (error) throw error;
+      const data = await fetchSeriesBySlug(slug);
       if (!data) throw new Error("Series not found");
       return data;
     },

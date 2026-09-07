@@ -5,6 +5,8 @@ import { notFound } from "next/navigation";
 import TitleDetailPageContent from "./TitleDetailPageContent";
 import { supabase } from "@/integrations/supabase/client";
 
+import { fetchSeriesBySlug } from "@/lib/series-slug";
+
 export const revalidate = 60; // ISR edge caching for 60s
 
 type PageProps = {
@@ -17,12 +19,7 @@ type PageProps = {
 /* ------------------------------------------------------------------ */
 
 const getSeriesData = cache(async (slug: string) => {
-  const { data } = await supabase
-    .from("series")
-    .select("*,series_genres(genre:genres(id,name,slug)),series_tags(tag:tags(id,name,slug,color,icon))")
-    .eq("slug", slug)
-    .maybeSingle();
-  return data;
+  return await fetchSeriesBySlug(slug);
 });
 
 const getChaptersData = cache(async (seriesId: string) => {
