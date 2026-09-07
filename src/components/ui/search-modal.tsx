@@ -291,6 +291,11 @@ export function SearchModal({
     <div
       role={modal ? "dialog" : undefined}
       aria-modal={modal ? true : undefined}
+      style={{
+        backgroundColor: "rgba(6, 6, 8, 0.72)",
+        WebkitBackdropFilter: "blur(24px) saturate(190%) contrast(95%)",
+        backdropFilter: "blur(24px) saturate(190%) contrast(95%)",
+      }}
       className={cn(
         "mx-auto w-full max-w-xl overflow-hidden rounded-2xl search-console-ios-glass text-white",
         className,
@@ -558,23 +563,27 @@ export function SearchModal({
 
   if (!modal) return panel;
 
+  if (!actualOpen) return null;
+
   return (
     <div
-      onClick={() => setOpen(false)}
       aria-hidden={!actualOpen}
       className={cn(
-        "fixed inset-0 z-50 flex items-start justify-center p-3 sm:p-4 pt-[8vh] sm:pt-[12vh] transition-opacity duration-200",
-        actualOpen ? "opacity-100 pointer-events-auto" : "pointer-events-none opacity-0",
+        "fixed inset-0 z-50 flex items-start justify-center p-3 sm:p-4 pt-[8vh] sm:pt-[12vh]",
         overlayClassName,
       )}
     >
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" />
+      {/* Click-away backdrop */}
+      <div
+        onClick={() => setOpen(false)}
+        className="fixed inset-0 bg-black/35"
+        aria-hidden="true"
+      />
+
+      {/* Floating Modal Panel */}
       <div
         onClick={(e) => e.stopPropagation()}
-        className={cn(
-          "relative z-10 w-full max-w-xl transition-all duration-200 ease-out",
-          actualOpen ? "translate-y-0 scale-100 opacity-100" : "-translate-y-2 scale-[0.98] opacity-0",
-        )}
+        className="relative z-10 w-full max-w-xl"
       >
         {panel}
       </div>
