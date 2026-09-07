@@ -221,18 +221,18 @@ export function Navbar() {
             )}
           </div>
 
-          {/* Centralized Search Bar (desktop) */}
-          <div className="hidden sm:flex items-center justify-center absolute left-1/2 -translate-x-1/2 z-10 pointer-events-auto">
+          {/* Centralized Search Bar (PC / Desktop only) */}
+          <div className="hidden xl:flex items-center justify-center absolute left-1/2 -translate-x-1/2 z-10 pointer-events-auto">
             <button
               onClick={() => setSearchOpen(true)}
               title="Search (Ctrl+K)"
-              className="flex items-center gap-2.5 w-[200px] md:w-[260px] lg:w-[320px] h-9 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 hover:border-white/30 px-3 text-xs text-neutral-400 hover:text-white transition-all focus:outline-none shadow-sm cursor-pointer"
+              className="flex items-center gap-2.5 w-[280px] xl:w-[320px] h-9 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 hover:border-white/30 px-3 text-xs text-neutral-400 hover:text-white transition-all focus:outline-none shadow-sm cursor-pointer"
             >
               <Search className="h-3.5 w-3.5 shrink-0 text-neutral-400 stroke-[1.8]" />
               <span className="flex-1 truncate text-left font-sans font-normal tracking-normal text-neutral-400">
                 Search titles, authors...
               </span>
-              <kbd className="hidden lg:inline-flex items-center rounded border border-border/60 bg-neutral-900/80 px-1.5 py-0.5 text-[9px] font-mono font-bold text-neutral-400">
+              <kbd className="inline-flex items-center rounded border border-border/60 bg-neutral-900/80 px-1.5 py-0.5 text-[9px] font-mono font-bold text-neutral-400">
                 Ctrl K
               </kbd>
             </button>
@@ -240,6 +240,16 @@ export function Navbar() {
 
           {/* Right Actions */}
           <div className="flex items-center gap-1.5 sm:gap-2">
+            {/* Search Button (Icon only for below PC size devices: mobile, tablets, iPads) */}
+            <button
+              className="flex xl:hidden items-center justify-center h-9 w-9 rounded-lg text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors cursor-pointer active:scale-95"
+              onClick={() => setSearchOpen(true)}
+              aria-label="Search"
+              title="Search"
+            >
+              <Search className="h-5 w-5" />
+            </button>
+
             {/* Random Button (desktop) */}
             {(() => {
               const DiceIcon = [Dice1, Dice2, Dice3, Dice4, Dice5, Dice6][navDiceFace - 1];
@@ -275,15 +285,6 @@ export function Navbar() {
                 </span>
               </Button>
             )}
-
-            {/* Mobile Search Button (Top Header) */}
-            <button
-              className="flex sm:hidden items-center justify-center h-9 w-9 rounded-lg text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors"
-              onClick={() => setSearchOpen(true)}
-              aria-label="Search"
-            >
-              <Search className="h-5 w-5" />
-            </button>
 
             {/* Mobile Random Roll Icon */}
             {(() => {

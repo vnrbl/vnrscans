@@ -1174,11 +1174,11 @@ export default function Reader({
 
       {/* Bottom Nav - Fixed at bottom (Mobile only) */}
       <nav
-        className={`fixed bottom-0 left-0 right-0 z-30 border-t border-border/50 bg-background/90 backdrop-blur md:hidden transition-transform duration-300 pb-[env(safe-area-inset-bottom,0px)] ${
+        className={`fixed bottom-0 left-0 right-0 z-30 border-t border-border/50 bg-background/95 backdrop-blur-md md:hidden transition-transform duration-300 pb-[max(0.5rem,env(safe-area-inset-bottom,0px))] shadow-xl ${
           controlsVisible ? "translate-y-0" : "translate-y-full"
         }`}
       >
-        <div className="container mx-auto flex items-center justify-between gap-2 px-4 py-2.5">
+        <div className="w-full max-w-lg mx-auto flex items-center justify-between gap-1 min-[360px]:gap-1.5 min-[400px]:gap-2 px-2 min-[360px]:px-3 min-[400px]:px-4 py-2">
           <Button
             variant="outline"
             size="sm"
@@ -1190,38 +1190,59 @@ export default function Reader({
                 params: { titleSlug: seriesSlug, chapterSlug: prev.slug },
               })
             }
+            className="shrink-0 h-8 min-[380px]:h-8.5 px-2 min-[360px]:px-2.5 min-[400px]:px-3 text-xs font-medium"
           >
-            <ChevronLeft className="mr-1 h-4 w-4" />
-            Prev
+            <ChevronLeft className="h-3.5 w-3.5 min-[380px]:h-4 min-[380px]:w-4 min-[360px]:mr-1" />
+            <span className="hidden min-[340px]:inline">Prev</span>
           </Button>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-0.5 min-[360px]:gap-1 min-[400px]:gap-1.5">
             <Link to="/home">
-              <Button variant="ghost" size="sm" title="Home">
-                <Home className="h-4 w-4" />
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 w-8 min-[380px]:h-8.5 min-[380px]:w-8.5 p-0 rounded-lg"
+                title="Home"
+              >
+                <Home className="h-3.5 w-3.5 min-[380px]:h-4 min-[380px]:w-4" />
               </Button>
             </Link>
             <Link to="/title/$slug" params={{ slug: seriesSlug }}>
-              <Button variant="ghost" size="sm" title="Back to title">
-                <BookOpen className="h-4 w-4" />
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 w-8 min-[380px]:h-8.5 min-[380px]:w-8.5 p-0 rounded-lg"
+                title="Back to title"
+              >
+                <BookOpen className="h-3.5 w-3.5 min-[380px]:h-4 min-[380px]:w-4" />
               </Button>
             </Link>
             {/* Auto-scroll Button - Mobile only */}
             <Button
               variant={isAutoScrolling ? "default" : "ghost"}
               size="sm"
+              className="h-8 w-8 min-[380px]:h-8.5 min-[380px]:w-8.5 p-0 rounded-lg"
               onClick={toggleAutoScroll}
               title={isAutoScrolling ? "Stop Auto-scroll" : "Start Auto-scroll"}
             >
-              {isAutoScrolling ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+              {isAutoScrolling ? (
+                <Pause className="h-3.5 w-3.5 min-[380px]:h-4 min-[380px]:w-4 text-violet-400" />
+              ) : (
+                <Play className="h-3.5 w-3.5 min-[380px]:h-4 min-[380px]:w-4" />
+              )}
             </Button>
             {/* Fullscreen Button - Mobile */}
             <Button
               variant="ghost"
               size="sm"
+              className="h-8 w-8 min-[380px]:h-8.5 min-[380px]:w-8.5 p-0 rounded-lg"
               onClick={toggleFullscreen}
               title={isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
             >
-              {isFullscreen ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
+              {isFullscreen ? (
+                <Minimize className="h-3.5 w-3.5 min-[380px]:h-4 min-[380px]:w-4" />
+              ) : (
+                <Maximize className="h-3.5 w-3.5 min-[380px]:h-4 min-[380px]:w-4" />
+              )}
             </Button>
             {/* Report Button - Mobile only */}
             <ReportButton
@@ -1240,9 +1261,10 @@ export default function Reader({
                 params: { titleSlug: seriesSlug, chapterSlug: next.slug },
               })
             }
+            className="shrink-0 h-8 min-[380px]:h-8.5 px-2 min-[360px]:px-2.5 min-[400px]:px-3 text-xs font-medium"
           >
-            Next
-            <ChevronRight className="ml-1 h-4 w-4" />
+            <span className="hidden min-[340px]:inline">Next</span>
+            <ChevronRight className="h-3.5 w-3.5 min-[380px]:h-4 min-[380px]:w-4 min-[360px]:ml-1" />
           </Button>
         </div>
       </nav>
@@ -1349,18 +1371,18 @@ function ReaderTopBar({
 
   return (
     <header className="sticky top-0 z-30 w-full border-b border-border/50 bg-background/95 backdrop-blur-md">
-      <div className="w-full max-w-7xl mx-auto flex items-center justify-between gap-1.5 sm:gap-2 px-2.5 sm:px-6 py-2 sm:py-2.5">
+      <div className="w-full max-w-7xl mx-auto flex items-center justify-between gap-1 min-[360px]:gap-1.5 sm:gap-2 px-2 min-[360px]:px-3 sm:px-6 py-1.5 min-[360px]:py-2 sm:py-2.5">
         <Link
           to="/title/$slug"
           params={{ slug: seriesSlug }}
-          className="flex min-w-0 items-center gap-2 text-sm hover:opacity-85 transition-opacity shrink-0"
+          className="flex min-w-0 items-center gap-1.5 sm:gap-2 text-sm hover:opacity-85 transition-opacity flex-1 sm:flex-initial max-w-[125px] min-[360px]:max-w-[155px] min-[420px]:max-w-[200px] sm:max-w-xs md:max-w-md shrink-0"
         >
           <ArrowLeft className="h-4 w-4 shrink-0 text-muted-foreground" />
           <div className="min-w-0">
-            <div className="truncate font-semibold text-xs sm:text-sm text-foreground max-w-[105px] min-[360px]:max-w-[140px] sm:max-w-xs">
+            <div className="truncate font-semibold text-xs sm:text-sm text-foreground">
               {seriesTitle}
             </div>
-            <div className="truncate text-[11px] text-muted-foreground">{title}</div>
+            <div className="truncate text-[10px] min-[360px]:text-[11px] text-muted-foreground">{title}</div>
             {/* Screen-reader-only h1 tag for absolute SEO compliance and hierarchy */}
             <h1 className="sr-only">
               Read {seriesTitle} {title.includes("Ch. ") ? `Chapter ${title.replace("Ch. ", "")}` : title} Online Free
@@ -1373,7 +1395,7 @@ function ReaderTopBar({
             type="button"
             onClick={() => window.dispatchEvent(new Event("open-global-search"))}
             title="Search (Ctrl+K)"
-            className="h-8 sm:h-9 w-8 sm:w-9 grid place-items-center rounded-lg border border-border/50 bg-background/50 hover:bg-secondary/60 text-muted-foreground hover:text-foreground transition-colors cursor-pointer shrink-0"
+            className="h-8 w-8 sm:h-9 sm:w-9 grid place-items-center rounded-lg border border-border/50 bg-background/50 hover:bg-secondary/60 text-muted-foreground hover:text-foreground transition-colors cursor-pointer shrink-0"
           >
             <Search className="h-3.5 w-3.5" />
           </button>
@@ -1384,10 +1406,10 @@ function ReaderTopBar({
               type="button"
               onClick={onCycleFilter}
               title={`Eye Comfort Filter: ${currentFilter?.toUpperCase()}`}
-              className="flex items-center gap-1 text-xs h-8 sm:h-9 px-2 sm:px-2.5 rounded-lg border border-border/50 bg-background/50 hover:bg-secondary/60 text-muted-foreground hover:text-foreground transition-colors cursor-pointer shrink-0"
+              className="flex items-center justify-center gap-1 text-xs h-8 sm:h-9 px-2 sm:px-2.5 rounded-lg border border-border/50 bg-background/50 hover:bg-secondary/60 text-muted-foreground hover:text-foreground transition-colors cursor-pointer shrink-0"
             >
               <SunMoon className="h-3.5 w-3.5 text-amber-400 shrink-0" />
-              <span className="hidden min-[500px]:inline capitalize text-[11px] font-medium">{currentFilter}</span>
+              <span className="hidden min-[520px]:inline capitalize text-[11px] font-medium">{currentFilter}</span>
             </button>
           )}
 
@@ -1398,7 +1420,7 @@ function ReaderTopBar({
               onClick={onDownload}
               disabled={isDownloading || isDownloaded}
               title={isDownloaded ? "Saved Offline" : "Save Chapter Offline"}
-              className={`flex items-center gap-1 text-xs h-8 sm:h-9 px-2 sm:px-2.5 rounded-lg border transition-colors cursor-pointer shrink-0 ${
+              className={`flex items-center justify-center gap-1 text-xs h-8 sm:h-9 px-2 sm:px-2.5 rounded-lg border transition-colors cursor-pointer shrink-0 ${
                 isDownloaded
                   ? "border-emerald-500/50 bg-emerald-950/30 text-emerald-400"
                   : "border-border/50 bg-background/50 hover:bg-secondary/60 text-muted-foreground hover:text-foreground"
@@ -1412,12 +1434,12 @@ function ReaderTopBar({
               ) : isDownloaded ? (
                 <>
                   <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
-                  <span className="hidden min-[560px]:inline text-[11px] font-medium">Offline</span>
+                  <span className="hidden min-[580px]:inline text-[11px] font-medium">Offline</span>
                 </>
               ) : (
                 <>
                   <Download className="h-3.5 w-3.5 shrink-0" />
-                  <span className="hidden min-[560px]:inline text-[11px] font-medium">Save</span>
+                  <span className="hidden min-[580px]:inline text-[11px] font-medium">Save</span>
                 </>
               )}
             </button>
@@ -1433,7 +1455,7 @@ function ReaderTopBar({
                 })
               }
             >
-              <SelectTrigger className="w-[85px] sm:w-[130px] text-xs h-8 sm:h-9">
+              <SelectTrigger className="w-[75px] min-[360px]:w-[85px] sm:w-[130px] text-xs h-8 sm:h-9 px-1.5 sm:px-2 shrink-0">
                 <SelectValue placeholder="Group" />
               </SelectTrigger>
               <SelectContent>
@@ -1458,14 +1480,15 @@ function ReaderTopBar({
                 })
               }
             >
-              <SelectTrigger className="w-[110px] min-[360px]:w-[125px] sm:w-[165px] text-xs h-8 sm:h-9 px-2 sm:px-2.5">
-                <List className="mr-1.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+              <SelectTrigger className="w-[86px] min-[360px]:w-[96px] min-[400px]:w-[110px] sm:w-[150px] md:w-[170px] text-xs h-8 sm:h-9 px-1.5 min-[360px]:px-2 sm:px-2.5 shrink-0">
+                <List className="mr-1 h-3.5 w-3.5 shrink-0 text-muted-foreground hidden min-[360px]:inline-block" />
                 <SelectValue placeholder="Chapter" />
               </SelectTrigger>
               <SelectContent className="max-h-72">
                 {allChapters.map((ch) => (
                   <SelectItem key={ch.id} value={ch.slug} className="text-xs">
-                    Chapter {ch.chapter_number}
+                    <span className="sm:hidden">Ch. {ch.chapter_number}</span>
+                    <span className="hidden sm:inline">Chapter {ch.chapter_number}</span>
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -2209,8 +2232,8 @@ function ImageView({
     <>
       {/* Floating Continue Where You Left Off Prompt (Matching site purple theme & user screenshot) */}
       {continuePrompt && (
-        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 animate-in fade-in slide-in-from-bottom-5 duration-300 pointer-events-auto select-none">
-          <div className="flex items-center gap-2 pl-4 pr-2.5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white shadow-2xl shadow-purple-950/80 border border-purple-400/40 backdrop-blur-md transition-all">
+        <div className="fixed bottom-14 min-[400px]:bottom-16 md:bottom-8 left-1/2 -translate-x-1/2 z-50 animate-in fade-in slide-in-from-bottom-5 duration-300 pointer-events-auto select-none max-w-[calc(100vw-1.5rem)]">
+          <div className="flex items-center gap-1.5 sm:gap-2 px-3 sm:pl-4 sm:pr-2.5 py-2 sm:py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white shadow-2xl shadow-purple-950/80 border border-purple-400/40 backdrop-blur-md transition-all">
             <button
               type="button"
               onClick={() => {
@@ -2221,12 +2244,12 @@ function ImageView({
                   true
                 );
               }}
-              className="flex items-center gap-2 text-xs sm:text-sm font-semibold text-white hover:text-purple-100 transition-colors cursor-pointer"
+              className="flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm font-semibold text-white hover:text-purple-100 transition-colors cursor-pointer truncate"
             >
-              <ArrowDown className="h-4 w-4 stroke-[2.5] shrink-0 animate-bounce" />
-              <span>Continue where you left off</span>
+              <ArrowDown className="h-3.5 w-3.5 sm:h-4 sm:w-4 stroke-[2.5] shrink-0 animate-bounce" />
+              <span className="truncate">Continue where you left off</span>
               {continuePrompt.percent > 0 && (
-                <span className="text-3xs bg-black/25 px-1.5 py-0.5 rounded font-mono font-bold">
+                <span className="text-3xs bg-black/25 px-1.5 py-0.5 rounded font-mono font-bold shrink-0">
                   {continuePrompt.percent}%
                 </span>
               )}
@@ -2237,7 +2260,7 @@ function ImageView({
                 e.stopPropagation();
                 setContinuePrompt(null);
               }}
-              className="ml-1 p-1 rounded-lg hover:bg-white/20 text-white/80 hover:text-white transition-colors cursor-pointer"
+              className="ml-0.5 sm:ml-1 p-1 rounded-lg hover:bg-white/20 text-white/80 hover:text-white transition-colors cursor-pointer shrink-0"
               title="Dismiss"
               aria-label="Dismiss continue prompt"
             >
@@ -2555,19 +2578,19 @@ function NovelView({
     <div className={`relative min-h-screen ${themeStyles.bg} ${themeStyles.text} transition-colors duration-300`}>
       {/* Floating Continue Where You Left Off Prompt for Novels */}
       {continuePrompt && (
-        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 animate-in fade-in slide-in-from-bottom-5 duration-300 pointer-events-auto select-none">
-          <div className="flex items-center gap-2 pl-4 pr-2.5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white shadow-2xl shadow-purple-950/80 border border-purple-400/40 backdrop-blur-md transition-all">
+        <div className="fixed bottom-14 min-[400px]:bottom-16 md:bottom-8 left-1/2 -translate-x-1/2 z-50 animate-in fade-in slide-in-from-bottom-5 duration-300 pointer-events-auto select-none max-w-[calc(100vw-1.5rem)]">
+          <div className="flex items-center gap-1.5 sm:gap-2 px-3 sm:pl-4 sm:pr-2.5 py-2 sm:py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white shadow-2xl shadow-purple-950/80 border border-purple-400/40 backdrop-blur-md transition-all">
             <button
               type="button"
               onClick={() => {
                 performNovelScrollToTarget(continuePrompt.scrollRatio, continuePrompt.scrollTop, true);
               }}
-              className="flex items-center gap-2 text-xs sm:text-sm font-semibold text-white hover:text-purple-100 transition-colors cursor-pointer"
+              className="flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm font-semibold text-white hover:text-purple-100 transition-colors cursor-pointer truncate"
             >
-              <ArrowDown className="h-4 w-4 stroke-[2.5] shrink-0 animate-bounce" />
-              <span>Continue where you left off</span>
+              <ArrowDown className="h-3.5 w-3.5 sm:h-4 sm:w-4 stroke-[2.5] shrink-0 animate-bounce" />
+              <span className="truncate">Continue where you left off</span>
               {continuePrompt.percent > 0 && (
-                <span className="text-3xs bg-black/25 px-1.5 py-0.5 rounded font-mono font-bold">
+                <span className="text-3xs bg-black/25 px-1.5 py-0.5 rounded font-mono font-bold shrink-0">
                   {continuePrompt.percent}%
                 </span>
               )}
@@ -2578,7 +2601,7 @@ function NovelView({
                 e.stopPropagation();
                 setContinuePrompt(null);
               }}
-              className="ml-1 p-1 rounded-lg hover:bg-white/20 text-white/80 hover:text-white transition-colors cursor-pointer"
+              className="ml-0.5 sm:ml-1 p-1 rounded-lg hover:bg-white/20 text-white/80 hover:text-white transition-colors cursor-pointer shrink-0"
               title="Dismiss"
               aria-label="Dismiss continue prompt"
             >
@@ -2719,36 +2742,50 @@ function ChapterNavigation({
   seriesSlug?: string;
 }) {
   return (
-    <div className="my-8 flex items-center justify-between gap-3">
+    <div className="my-6 sm:my-8 flex items-center justify-between gap-2 sm:gap-3">
       {/* Previous Chapter Button */}
-      <Button variant="outline" size="lg" disabled={!hasPrev} onClick={onPrev} className="flex-1">
-        <ChevronLeft className="mr-2 h-5 w-5" />
-        <span className="hidden sm:inline">Previous</span>
-        <span className="sm:hidden">Prev</span>
+      <Button
+        variant="outline"
+        size="lg"
+        disabled={!hasPrev}
+        onClick={onPrev}
+        className="flex-1 h-10 sm:h-11 px-2.5 sm:px-4 text-xs sm:text-sm font-semibold"
+      >
+        <ChevronLeft className="mr-1 sm:mr-2 h-4 w-4 sm:h-5 sm:w-5 shrink-0" />
+        <span className="hidden sm:inline">Previous Chapter</span>
+        <span className="sm:hidden">Prev Chapter</span>
       </Button>
 
       {/* Series Info Button (Middle) */}
       {seriesSlug && (
         <Link to="/title/$slug" params={{ slug: seriesSlug }}>
-          <Button variant="secondary" size="lg" className="px-6" title="Series Info">
-            <BookOpen className="h-5 w-5" />
+          <Button
+            variant="secondary"
+            size="lg"
+            className="h-10 sm:h-11 px-3 sm:px-5 shrink-0"
+            title="Series Info"
+          >
+            <BookOpen className="h-4 w-4 sm:h-5 sm:w-5" />
           </Button>
         </Link>
       )}
 
       {/* Next Chapter or Home Button */}
       {hasNext ? (
-        <Button size="lg" onClick={onNext} className="flex-1">
-          <span className="hidden sm:inline">Next</span>
-          <span className="sm:hidden">Next</span>
-          <ChevronRight className="ml-2 h-5 w-5" />
+        <Button
+          size="lg"
+          onClick={onNext}
+          className="flex-1 h-10 sm:h-11 px-2.5 sm:px-4 text-xs sm:text-sm font-semibold"
+        >
+          <span className="hidden sm:inline">Next Chapter</span>
+          <span className="sm:hidden">Next Chapter</span>
+          <ChevronRight className="ml-1 sm:ml-2 h-4 w-4 sm:h-5 sm:w-5 shrink-0" />
         </Button>
       ) : (
         <Link to="/home" className="flex-1">
-          <Button size="lg" className="w-full">
-            <Home className="mr-2 h-5 w-5" />
-            <span className="hidden sm:inline">Home</span>
-            <span className="sm:hidden">Home</span>
+          <Button size="lg" className="w-full h-10 sm:h-11 px-2.5 sm:px-4 text-xs sm:text-sm font-semibold">
+            <Home className="mr-1 sm:mr-2 h-4 w-4 sm:h-5 sm:w-5 shrink-0" />
+            <span>Home</span>
           </Button>
         </Link>
       )}
@@ -2869,35 +2906,35 @@ function FloatingControls({
   return (
     <>
       {/* Floating Vertical Sidebar */}
-      <div className="fixed right-4 top-1/2 -translate-y-1/2 z-50 hidden md:flex flex-col gap-2 bg-card backdrop-blur-lg rounded-full p-2 border border-border/50 shadow-lg">
+      <div className="fixed right-2 min-[1280px]:right-4 min-[1536px]:right-6 top-1/2 -translate-y-1/2 z-50 hidden md:flex flex-col gap-1.5 lg:gap-2 bg-card/90 backdrop-blur-lg rounded-full p-1.5 lg:p-2 border border-border/50 shadow-xl">
         {/* Previous Chapter */}
         <button
           onClick={onPrev}
           disabled={!hasPrev}
-          className="p-3 rounded-full hover:bg-primary/20 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+          className="p-2 lg:p-2.5 xl:p-3 rounded-full hover:bg-primary/20 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
           title="Previous Chapter"
         >
-          <ChevronLeft className="h-5 w-5" />
+          <ChevronLeft className="h-4 w-4 lg:h-5 lg:w-5" />
         </button>
 
         {/* Auto Scroll Toggle */}
         <button
           onClick={toggleAutoScroll}
-          className={`p-3 rounded-full transition-colors ${
+          className={`p-2 lg:p-2.5 xl:p-3 rounded-full transition-colors ${
             autoScrollEnabled
-              ? "bg-violet-600 text-white hover:bg-violet-700"
+              ? "bg-violet-600 text-white hover:bg-violet-700 shadow-md shadow-violet-900/40"
               : "hover:bg-primary/20"
           }`}
           title={autoScrollEnabled ? "Pause Auto Scroll" : "Start Auto Scroll"}
         >
-          {autoScrollEnabled ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
+          {autoScrollEnabled ? <Pause className="h-4 w-4 lg:h-5 lg:w-5" /> : <Play className="h-4 w-4 lg:h-5 lg:w-5" />}
         </button>
 
         {/* Speed Control Button */}
         {autoScrollEnabled && (
           <button
             onClick={() => setShowSpeedControl(!showSpeedControl)}
-            className="p-3 rounded-full hover:bg-primary/20 transition-colors text-xs font-bold"
+            className="p-2 lg:p-2.5 xl:p-3 rounded-full hover:bg-primary/20 transition-colors text-xs font-bold"
             title="Adjust Speed"
           >
             {scrollSpeed}x
@@ -2907,67 +2944,67 @@ function FloatingControls({
         {/* Chapter List */}
         <button
           onClick={() => setShowChapters(!showChapters)}
-          className="p-3 rounded-full hover:bg-primary/20 transition-colors"
+          className="p-2 lg:p-2.5 xl:p-3 rounded-full hover:bg-primary/20 transition-colors"
           title="Chapters"
         >
-          <List className="h-5 w-5" />
+          <List className="h-4 w-4 lg:h-5 lg:w-5" />
         </button>
 
         {/* Home */}
         <Link
           to="/home"
-          className="p-3 rounded-full hover:bg-primary/20 transition-colors"
+          className="p-2 lg:p-2.5 xl:p-3 rounded-full hover:bg-primary/20 transition-colors"
           title="Home"
         >
-          <Home className="h-5 w-5" />
+          <Home className="h-4 w-4 lg:h-5 lg:w-5" />
         </Link>
 
         {/* Back to series */}
         <Link
           to="/title/$slug"
           params={{ slug: seriesSlug }}
-          className="p-3 rounded-full hover:bg-primary/20 transition-colors"
+          className="p-2 lg:p-2.5 xl:p-3 rounded-full hover:bg-primary/20 transition-colors"
           title="Back to title"
         >
-          <BookOpen className="h-5 w-5" />
+          <BookOpen className="h-4 w-4 lg:h-5 lg:w-5" />
         </Link>
 
         {/* Fullscreen Toggle */}
         <button
           onClick={toggleFullscreen}
-          className="p-3 rounded-full hover:bg-primary/20 transition-colors"
+          className="p-2 lg:p-2.5 xl:p-3 rounded-full hover:bg-primary/20 transition-colors"
           title={isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
         >
-          {isFullscreen ? <Minimize className="h-5 w-5" /> : <Maximize className="h-5 w-5" />}
+          {isFullscreen ? <Minimize className="h-4 w-4 lg:h-5 lg:w-5" /> : <Maximize className="h-4 w-4 lg:h-5 lg:w-5" />}
         </button>
 
         {/* Report */}
         <button
           onClick={() => setShowReport(!showReport)}
-          className="p-3 rounded-full hover:bg-primary/20 transition-colors"
+          className="p-2 lg:p-2.5 xl:p-3 rounded-full hover:bg-primary/20 transition-colors"
           title="Report"
         >
-          <Flag className="h-5 w-5" />
+          <Flag className="h-4 w-4 lg:h-5 lg:w-5" />
         </button>
 
         {/* Next Chapter */}
         <button
           onClick={onNext}
           disabled={!hasNext}
-          className="p-3 rounded-full hover:bg-primary/20 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+          className="p-2 lg:p-2.5 xl:p-3 rounded-full hover:bg-primary/20 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
           title="Next Chapter"
         >
-          <ChevronRight className="h-5 w-5" />
+          <ChevronRight className="h-4 w-4 lg:h-5 lg:w-5" />
         </button>
       </div>
 
       {/* Speed Control Panel */}
       {showSpeedControl && autoScrollEnabled && (
-        <div className="fixed right-20 top-1/2 -translate-y-1/2 z-40 w-56 bg-card backdrop-blur-lg rounded-lg border border-border/50 shadow-xl p-4">
+        <div className="fixed right-14 lg:right-20 top-1/2 -translate-y-1/2 z-40 w-52 sm:w-56 max-w-[calc(100vw-4.5rem)] bg-card/95 backdrop-blur-lg rounded-xl border border-border/50 shadow-2xl p-3.5 sm:p-4 animate-in fade-in zoom-in-95 duration-200">
           <div className="mb-3">
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm font-semibold">Scroll Speed</span>
-              <button onClick={() => setShowSpeedControl(false)} className="hover:text-primary">
+              <button onClick={() => setShowSpeedControl(false)} className="hover:text-primary p-1 rounded-full hover:bg-primary/10" aria-label="Close speed control">
                 <ArrowLeft className="h-4 w-4" />
               </button>
             </div>
@@ -3018,17 +3055,18 @@ function FloatingControls({
 
       {/* Chapters Panel */}
       {showChapters && (
-        <div className="fixed right-20 top-1/2 -translate-y-1/2 z-40 w-80 max-h-[500px] overflow-hidden bg-card backdrop-blur-lg rounded-xl border border-border/50 shadow-2xl">
-          <div className="sticky top-0 bg-card/95 backdrop-blur-md p-4 border-b border-border/50 flex items-center justify-between">
-            <span className="text-base font-bold">Chapters</span>
+        <div className="fixed right-14 lg:right-20 top-1/2 -translate-y-1/2 z-40 w-72 sm:w-80 max-w-[calc(100vw-4.5rem)] max-h-[70vh] sm:max-h-[500px] overflow-hidden bg-card/95 backdrop-blur-lg rounded-xl border border-border/50 shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+          <div className="sticky top-0 bg-card/95 backdrop-blur-md p-3.5 sm:p-4 border-b border-border/50 flex items-center justify-between">
+            <span className="text-sm sm:text-base font-bold">Chapters</span>
             <button
               onClick={() => setShowChapters(false)}
               className="hover:text-primary transition-colors p-1 rounded-full hover:bg-primary/10"
+              aria-label="Close chapter list"
             >
-              <ArrowLeft className="h-5 w-5" />
+              <ArrowLeft className="h-4.5 w-4.5 sm:h-5 sm:w-5" />
             </button>
           </div>
-          <div className="overflow-y-auto max-h-[420px] p-3 space-y-1.5 scrollbar-thin">
+          <div className="overflow-y-auto max-h-[calc(70vh-4rem)] sm:max-h-[420px] p-2.5 sm:p-3 space-y-1.5 scrollbar-thin">
             {allChapters.map((ch) => (
               <button
                 key={ch.id}
@@ -3039,7 +3077,7 @@ function FloatingControls({
                   });
                   setShowChapters(false);
                 }}
-                className={`w-full text-left px-4 py-2.5 rounded-lg text-sm hover:bg-primary/20 transition-all ${
+                className={`w-full text-left px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg text-xs sm:text-sm hover:bg-primary/20 transition-all ${
                   ch.slug === currentChapterSlug
                     ? "bg-violet-600 text-white font-semibold shadow-md"
                     : "hover:shadow-sm"
@@ -3104,10 +3142,10 @@ function FloatingReportPanel({
   });
 
   return (
-    <div className="fixed right-20 top-1/2 -translate-y-1/2 z-40 w-72 bg-card backdrop-blur-lg rounded-lg border border-border/50 shadow-xl">
-      <div className="sticky top-0 bg-card backdrop-blur p-3 border-b border-border/50 flex items-center justify-between">
+    <div className="fixed right-14 lg:right-20 top-1/2 -translate-y-1/2 z-40 w-72 max-w-[calc(100vw-4.5rem)] bg-card/95 backdrop-blur-lg rounded-xl border border-border/50 shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+      <div className="sticky top-0 bg-card/95 backdrop-blur p-3 border-b border-border/50 flex items-center justify-between">
         <span className="text-sm font-semibold">Report Issue</span>
-        <button onClick={onClose} className="hover:text-primary">
+        <button onClick={onClose} className="hover:text-primary p-1 rounded-full hover:bg-primary/10" aria-label="Close report panel">
           <ArrowLeft className="h-4 w-4" />
         </button>
       </div>
@@ -3185,8 +3223,13 @@ function ReportButton({
   return (
     <Sheet>
       <SheetTrigger asChild>
-        <Button variant="ghost" size="sm">
-          <Flag className="h-4 w-4" />
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-8 w-8 min-[380px]:h-8.5 min-[380px]:w-8.5 p-0 rounded-lg"
+          title="Report issue"
+        >
+          <Flag className="h-3.5 w-3.5 min-[380px]:h-4 min-[380px]:w-4" />
         </Button>
       </SheetTrigger>
       <SheetContent side="bottom" className="h-[400px]">
