@@ -25,6 +25,7 @@ import { HomeStats } from "./HomeStats";
 import { FlipFadeText } from "@/components/ui/flip-fade-text";
 import { LiquidMetalButton } from "@/components/ui/liquid-metal";
 import { AnimatedButton } from "@/components/ui/animated-button";
+import { PixelatedImageTrail } from "@/components/ui/pixelated-image-trail";
 
 export const revalidate = 120; // ISR cache for 2 minutes — instant edge HTML response
 
@@ -89,6 +90,25 @@ async function getShowcaseSeries(): Promise<ShowcaseSeries[]> {
   }
 }
 
+async function getTrailCovers(): Promise<string[]> {
+  try {
+    const { data, error } = await supabase
+      .from("series")
+      .select("cover_url")
+      .eq("is_hidden", false)
+      .not("cover_url", "is", null)
+      .order("view_count", { ascending: false })
+      .limit(20);
+
+    if (error || !data || data.length === 0) return [];
+    return data
+      .map((s) => s.cover_url)
+      .filter((url): url is string => Boolean(url && url.startsWith("http")));
+  } catch {
+    return [];
+  }
+}
+
 async function getStats() {
   try {
     const [seriesRes, chapterRes, userRes] = await Promise.all([
@@ -107,7 +127,11 @@ async function getStats() {
 }
 
 export default async function Home() {
-  const [series, stats] = await Promise.all([getShowcaseSeries(), getStats()]);
+  const [series, stats, trailCovers] = await Promise.all([
+    getShowcaseSeries(),
+    getStats(),
+    getTrailCovers(),
+  ]);
 
   // WebSite + Organization structured data for richer search presence
   const websiteLd = {
@@ -149,7 +173,17 @@ export default async function Home() {
           className="absolute -top-40 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-purple-600/10 rounded-full blur-[120px] pointer-events-none -z-10"
         />
 
-        <div className="container mx-auto px-4 text-center sm:px-6 md:px-8 lg:px-12 xl:px-16">
+        {/* Pixelated Manhwa Covers Cursor Trail */}
+        <PixelatedImageTrail
+          images={trailCovers}
+          className="z-0 opacity-80"
+          slices={5}
+          imageSize={165}
+          aspectRatio={1.42}
+          spawnThreshold={34}
+        />
+
+        <div className="container mx-auto px-4 text-center sm:px-6 md:px-8 lg:px-12 xl:px-16 relative z-10">
           <div className="inline-flex items-center gap-2 mb-6 px-3 py-1 rounded-full border border-purple-500/30 bg-purple-950/20 text-purple-300 text-3xs font-mono font-bold tracking-[0.12em] uppercase backdrop-blur-md">
             <span className="h-1.5 w-1.5 rounded-full bg-purple-400 animate-pulse" />
             Next-Gen Reading Platform
