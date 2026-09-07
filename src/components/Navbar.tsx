@@ -311,7 +311,7 @@ export function Navbar() {
               <GlassDock
                 items={dockItems}
                 tooltipPlacement="bottom"
-                dockClassName="py-1 px-3 rounded-xl border border-white/10 bg-black/60 shadow-lg backdrop-blur-md"
+                dockClassName="py-1 px-3 rounded-xl bg-white/[0.04] backdrop-blur-md"
               />
             </div>
           ) : (

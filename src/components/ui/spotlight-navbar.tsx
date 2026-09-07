@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
 import { animate } from "framer-motion";
 import { cn } from "@/lib/utils";
 
@@ -29,11 +30,24 @@ export function SpotlightNavbar({
   defaultActiveIndex = 0,
 }: SpotlightNavbarProps) {
   const navRef = useRef<HTMLDivElement>(null);
-  const [activeIndex, setActiveIndex] = useState(defaultActiveIndex);
+  const pathname = usePathname();
+  
+  const matchedIndex = items.findIndex((item) => {
+    if (item.href === "/home") return pathname === "/home" || pathname === "/";
+    return pathname.startsWith(item.href);
+  });
+
+  const [activeIndex, setActiveIndex] = useState(matchedIndex !== -1 ? matchedIndex : defaultActiveIndex);
   const [hoverX, setHoverX] = useState<number | null>(null);
 
   const spotlightX = useRef(0);
   const ambienceX = useRef(0);
+
+  useEffect(() => {
+    if (matchedIndex !== -1) {
+      setActiveIndex(matchedIndex);
+    }
+  }, [matchedIndex]);
 
   useEffect(() => {
     if (!navRef.current) return;
@@ -110,14 +124,11 @@ export function SpotlightNavbar({
         ref={navRef}
         style={
           {
-            "--spotlight-color": "rgba(192, 132, 252, 0.25)",
+            "--spotlight-color": "rgba(192, 132, 252, 0.2)",
             "--ambience-color": "rgba(168, 85, 247, 1)",
           } as React.CSSProperties
         }
-        className={cn(
-          "relative h-10 rounded-full transition-all duration-300 overflow-hidden",
-          "bg-black/60 backdrop-blur-2xl border border-white/15 shadow-[0_4px_25px_rgba(0,0,0,0.6)]"
-        )}
+        className="relative h-10 transition-all duration-300 overflow-hidden bg-transparent"
       >
         <ul className="relative flex items-center h-full px-2 gap-1 z-10">
           {items.map((item, idx) => (
@@ -130,9 +141,9 @@ export function SpotlightNavbar({
                   handleItemClick(item, idx);
                 }}
                 className={cn(
-                  "px-3.5 py-1.5 text-xs font-semibold tracking-wide transition-colors duration-200 rounded-full",
+                  "px-3.5 py-1.5 text-xs font-semibold tracking-wide transition-colors duration-200 rounded-lg",
                   activeIndex === idx
-                    ? "text-white"
+                    ? "text-white font-bold"
                     : "text-neutral-400 hover:text-white"
                 )}
               >
@@ -144,7 +155,7 @@ export function SpotlightNavbar({
 
         {/* 1. Moving Spotlight Beam */}
         <div
-          className="pointer-events-none absolute bottom-0 left-0 w-full h-full z-[1] transition-opacity duration-300"
+          className="pointer-events-none absolute bottom-0 left-0 w-full h-full z-[1] transition-opacity duration-300 rounded-lg"
           style={{
             opacity: hoverX !== null ? 1 : 0,
             background: `radial-gradient(120px circle at var(--spotlight-x, 50%) 100%, var(--spotlight-color) 0%, transparent 60%)`,
@@ -153,8 +164,9 @@ export function SpotlightNavbar({
 
         {/* 2. Active Ambience Underline */}
         <div
-          className="pointer-events-none absolute bottom-0 left-0 w-full h-[2px] z-[2]"
+          className="pointer-events-none absolute bottom-0 left-0 w-full h-[2px] z-[2] transition-opacity duration-300"
           style={{
+            opacity: activeIndex >= 0 ? 1 : 0,
             background: `radial-gradient(70px circle at var(--ambience-x, 50%) 0%, var(--ambience-color) 0%, transparent 100%)`,
           }}
         />
