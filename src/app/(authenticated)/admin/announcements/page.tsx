@@ -20,7 +20,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { formatAppDate } from "@/lib/date";
 import { cn } from "@/lib/utils";
 
-export function parseAnnouncementDesign(bannerColor?: string | null, type?: string | null): { design: string; color: string } {
+function parseAnnouncementDesign(bannerColor?: string | null, type?: string | null): { design: string; color: string } {
   if (!bannerColor) return { design: "default", color: "#8B5CF6" };
   if (bannerColor.startsWith("announcement-")) {
     const parts = bannerColor.split("|");
