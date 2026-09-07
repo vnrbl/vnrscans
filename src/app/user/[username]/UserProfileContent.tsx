@@ -38,6 +38,7 @@ import { OptimizedImage } from "@/components/OptimizedImage";
 import { SectionPagination } from "@/components/SectionPagination";
 import { CommentAttachmentGrid } from "@/components/comments/CommentAttachmentGrid";
 import { formatAppDate } from "@/lib/date";
+import { PageKineticLoader } from "@/components/ui/kinetic-text-loader";
 import {
   $getPublicUserRoles,
   $getPublicEquippedBadge,
@@ -886,10 +887,7 @@ export default function UserProfileContent({ username }: { username: string }) {
   if (!mounted || profile.isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center space-y-3">
-          <div className="h-10 w-10 animate-spin rounded-full border-4 border-primary border-t-transparent mx-auto" />
-          <p className="text-sm text-muted-foreground">Loading profile...</p>
-        </div>
+        <PageKineticLoader text="Loading" />
       </div>
     );
   }

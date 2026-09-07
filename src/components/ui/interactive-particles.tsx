@@ -122,9 +122,6 @@ void main() {
 
   vec4 colA = texture2D(uTexture, puv);
   float grey = colA.r * 0.21 + colA.g * 0.71 + colA.b * 0.07;
-  float maxC = max(colA.r, max(colA.g, colA.b));
-  float minC = min(colA.r, min(colA.g, colA.b));
-  float chroma = maxC - minC;
 
   // Soft, feathered dot instead of a hard-edged circle.
   float radius = 0.5;
@@ -132,9 +129,10 @@ void main() {
   float dist = radius - distance(uv, vec2(0.5));
   float t = smoothstep(0.0, border, dist);
 
-  // If the sampled pixel has vibrant color, use colA.rgb, otherwise tint greyscale by uColor
-  vec3 rgb = mix(vec3(grey) * uColor, colA.rgb, smoothstep(0.04, 0.15, chroma));
-  float alpha = t * (0.35 + 0.65 * max(grey, maxC));
+  // Tint the greyscale value and let dimmer particles fade so tonal images
+  // read as an airy field rather than a solid mass.
+  vec3 rgb = vec3(grey) * uColor;
+  float alpha = t * (0.35 + 0.65 * grey);
 
   gl_FragColor = vec4(rgb, alpha);
 }
@@ -331,7 +329,6 @@ export function InteractiveParticles({
       if (hits.length > 0 && hits[0].uv) touch.addTouch(hits[0].uv.x, hits[0].uv.y);
     };
     canvas.addEventListener("pointermove", onPointerMove);
-    canvas.addEventListener("pointerdown", onPointerMove);
 
     // ── build particles from the image ───────────────────────────────────────
     const loader = new THREE.TextureLoader();
@@ -366,11 +363,7 @@ export function InteractiveParticles({
 
       let numVisible = 0;
       for (let i = 0; i < numPoints; i++) {
-        const r = colors[i * 4];
-        const g = colors[i * 4 + 1];
-        const b = colors[i * 4 + 2];
-        const a = colors[i * 4 + 3];
-        if (Math.max(r, g, b) > threshold && a > 20) numVisible++;
+        if (colors[i * 4] > threshold) numVisible++;
       }
 
       uniforms = {
@@ -414,11 +407,7 @@ export function InteractiveParticles({
       const offsets = new Float32Array(numVisible * 3);
       const angles = new Float32Array(numVisible);
       for (let i = 0, j = 0; i < numPoints; i++) {
-        const r = colors[i * 4];
-        const g = colors[i * 4 + 1];
-        const b = colors[i * 4 + 2];
-        const a = colors[i * 4 + 3];
-        if (Math.max(r, g, b) <= threshold || a <= 20) continue;
+        if (colors[i * 4] <= threshold) continue;
         offsets[j * 3 + 0] = i % imgWidth;
         offsets[j * 3 + 1] = Math.floor(i / imgWidth);
         indices[j] = i;
@@ -451,11 +440,8 @@ export function InteractiveParticles({
     });
 
     const applyScale = () => {
-      if (!object3D || !hitArea || !imgHeight || !imgWidth) return;
-      const fovWidth = fovHeight * camera.aspect;
-      const scaleH = fovHeight / imgHeight;
-      const scaleW = fovWidth / imgWidth;
-      const scale = Math.min(scaleH, scaleW) * 1.02;
+      if (!object3D || !hitArea || !imgHeight) return;
+      const scale = fovHeight / imgHeight;
       object3D.scale.set(scale, scale, 1);
       hitArea.scale.set(scale, scale, 1);
     };
@@ -513,7 +499,6 @@ export function InteractiveParticles({
       visibilityObserver.disconnect();
       document.removeEventListener("visibilitychange", onVisibilityChange);
       canvas.removeEventListener("pointermove", onPointerMove);
-      canvas.removeEventListener("pointerdown", onPointerMove);
       window.removeEventListener("resize", applySize);
       resizeObserver.disconnect();
       if (uniforms) gsap.killTweensOf([uniforms.uSize, uniforms.uRandom, uniforms.uDepth]);

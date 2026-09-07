@@ -19,13 +19,10 @@ import nextDynamic from "next/dynamic";
 const LandingFaq = nextDynamic(() => import("./LandingFaq").then((m) => m.LandingFaq), {
   ssr: true,
 });
-const HeroInteractiveTitle = nextDynamic(
-  () => import("@/components/home/HeroInteractiveTitle").then((m) => m.HeroInteractiveTitle),
-  { ssr: true }
-);
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { HomeStats } from "./HomeStats";
+import { FlipFadeText } from "@/components/ui/flip-fade-text";
 
 export const revalidate = 120; // ISR cache for 2 minutes — instant edge HTML response
 
@@ -156,9 +153,20 @@ export default async function Home() {
             Next-Gen Reading Platform
           </div>
 
-          <HeroInteractiveTitle />
+          <h1 className="mx-auto max-w-5xl text-4xl font-bold leading-[0.95] tracking-[0.06em] sm:text-6xl md:text-7xl lg:text-8xl min-h-[2.15em] flex items-center justify-center">
+            <span className="sr-only">DISCOVER STORIES DRAWN BY IMAGINATION</span>
+            <FlipFadeText
+              words={[
+                { text: "DISCOVER\nSTORIES", className: "text-white" },
+                { text: "DRAWN BY\nIMAGINATION", className: "text-zinc-200" }
+              ]}
+              interval={3200}
+              className="my-0 py-0 w-full min-h-[2.15em] flex items-center justify-center"
+              textClassName="text-4xl font-bold leading-[0.95] tracking-[0.06em] sm:text-6xl md:text-7xl lg:text-8xl"
+            />
+          </h1>
 
-          <p className="mx-auto mt-2 sm:mt-3 max-w-2xl text-sm leading-relaxed text-zinc-300 sm:text-base md:text-lg tracking-normal font-normal antialiased">
+          <p className="mx-auto mt-8 max-w-2xl text-sm leading-relaxed text-muted-foreground sm:text-base md:text-lg tracking-[0.02em] font-light">
             Follow your favorite manhwa, track new releases, level up your reader rank, and explore creator-first web novels in a premium reading environment.
           </p>
 

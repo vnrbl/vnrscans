@@ -28,6 +28,7 @@ import {
 import { Command, CommandGroup, CommandItem } from "@/components/ui/command";
 import { buildSeriesSearchOrFilter, prepareSearchInput, rankSeriesResults } from "@/lib/search-utils";
 import { AddNewSeriesDialog } from "@/components/admin/AddNewSeriesDialog";
+import { PageKineticLoader } from "@/components/ui/kinetic-text-loader";
 
 export type BrowseGenre = { id: string; name: string; slug: string };
 export type BrowseTag = { id: string; name: string; slug: string; color: string | null; icon: string | null };
@@ -1298,7 +1299,7 @@ function SeriesList({ items, loading, rankOffset = 0 }: { items?: any[]; loading
 
 export default function BrowsePage({ initialData }: { initialData?: BrowseInitialData }) {
   return (
-    <Suspense fallback={<div className="container mx-auto px-4 py-8 text-center text-muted-foreground">Loading browse page...</div>}>
+    <Suspense fallback={<PageKineticLoader />}>
       <BrowsePageContent initialData={initialData} />
     </Suspense>
   );

@@ -6,6 +6,7 @@ import { Star, BookOpen, Trophy, Users, Heart, ChevronDown, ChevronUp, Tag } fro
 import { Badge } from "@/components/ui/badge";
 import { LiveSeriesEditor } from "@/components/admin/LiveSeriesEditor";
 import { FormattedText } from "@/components/FormattedText";
+import { SeriesFollowersStack } from "@/components/series/SeriesFollowersStack";
 
 import { useAuth } from "@/hooks/useAuth";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -272,6 +273,17 @@ export const SeriesHeader = React.memo(function SeriesHeader({
           <span className="font-mono font-bold text-white">{Number(s.view_count || 0).toLocaleString()}</span>
           <span className="text-[11px] text-neutral-500 ml-1">views</span>
         </span>
+      </div>
+
+      {/* Series followed by ElasticStack */}
+      <div className="mt-3 flex items-center justify-center sm:justify-start">
+        <SeriesFollowersStack
+          seriesId={s.id}
+          seriesTitle={s.title}
+          slug={slug}
+          followersCount={followersCount}
+          itemSize={32}
+        />
       </div>
 
       {s.description && (

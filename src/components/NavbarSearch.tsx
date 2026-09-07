@@ -1,28 +1,47 @@
-import { useState, useEffect, useRef } from "react";
-import { Search, BookOpen, User as UserIcon, Users, Loader2, X } from "lucide-react";
+"use client";
+
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { useNavigate, Link } from "@/lib/router-compat";
-import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { useNavigate } from "@/lib/router-compat";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
+import { toast } from "sonner";
+import {
+  BookOpen,
+  Books,
+  Buildings,
+  Compass,
+  DiceFive,
+  FileArrowDown,
+  Flame,
+  Globe,
+  ListPlus,
+  ShareFat,
+  Sparkle,
+  Trophy,
+  Users,
+} from "@phosphor-icons/react";
+import {
+  SearchModal,
+  SearchTag,
+  SearchResult,
+  QuickAction,
+  SearchFile,
+} from "@/components/ui/search-modal";
 import {
   buildSeriesSearchOrFilter,
-  getSearchDisplayTerm,
   prepareSearchInput,
   rankSeriesResults,
 } from "@/lib/search-utils";
 
-type SearchTab = "comics" | "users" | "groups";
+type FilterCategory = "all" | "manga" | "manhwa" | "manhua" | "novel" | "users" | "groups";
 
 const seriesTypeLabels: Record<string, string> = {
   manga: "Manga",
   manhwa: "Manhwa",
   manhua: "Manhua",
-  novel: "Novels",
+  novel: "Novel",
 };
-
-const readingTypeOrder = ["manga", "manhwa", "manhua", "novel"];
 
 interface NavbarSearchProps {
   open: boolean;
@@ -31,22 +50,26 @@ interface NavbarSearchProps {
 
 export function NavbarSearch({ open, onOpenChange }: NavbarSearchProps) {
   const router = useRouter();
+  const navigate = useNavigate();
+
   const [searchQuery, setSearchQuery] = useState("");
-  const [activeSearchTab, setActiveSearchTab] = useState<SearchTab>("comics");
+  const [selectedCategory, setSelectedCategory] = useState<FilterCategory>("all");
   const [searching, setSearching] = useState(false);
   const [seriesResults, setSeriesResults] = useState<any[]>([]);
   const [userResults, setUserResults] = useState<any[]>([]);
   const [groupResults, setGroupResults] = useState<string[]>([]);
-  const navigate = useNavigate();
 
   // Instant route prefetching when search dialog is opened
   useEffect(() => {
     if (open) {
       router.prefetch("/browse");
+      router.prefetch("/library");
+      router.prefetch("/rankings");
       router.prefetch("/request-series");
     }
   }, [open, router]);
 
+  // Fetch trending/hot series from VNR SCANS
   const hotSeries = useQuery({
     queryKey: ["navbar-hot-series"],
     queryFn: async () => {
@@ -56,7 +79,7 @@ export function NavbarSearch({ open, onOpenChange }: NavbarSearchProps) {
         .eq("is_hidden", false)
         .order("is_trending", { ascending: false })
         .order("view_count", { ascending: false })
-        .limit(24);
+        .limit(20);
       if (error) throw error;
       return data ?? [];
     },
@@ -64,10 +87,26 @@ export function NavbarSearch({ open, onOpenChange }: NavbarSearchProps) {
     staleTime: 10 * 60 * 1000,
   });
 
+  // Fetch recent chapter releases from VNR SCANS
+  const recentReleases = useQuery({
+    queryKey: ["navbar-recent-releases"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("chapters")
+        .select("id,chapter_number,title,created_at,series:series_id(title,slug)")
+        .order("created_at", { ascending: false })
+        .limit(4);
+      if (error) return [];
+      return data ?? [];
+    },
+    enabled: open,
+    staleTime: 5 * 60 * 1000,
+  });
+
   // In-memory search cache for instant sub-millisecond response on backspace/repeat
   const searchCacheRef = useRef<Map<string, { series: any[]; users: any[]; groups: string[] }>>(new Map());
 
-  // Ultra-fast search with in-memory caching and 120ms debounce
+  // Debounced search with in-memory caching
   useEffect(() => {
     const rawQ = searchQuery.trim();
     if (!rawQ || rawQ.length < 2) {
@@ -79,9 +118,9 @@ export function NavbarSearch({ open, onOpenChange }: NavbarSearchProps) {
     }
 
     const prepared = prepareSearchInput(rawQ);
-    const cacheKey = `${activeSearchTab}:${prepared.normalized}`;
+    const cacheKey = `${selectedCategory}:${prepared.normalized}`;
 
-    // 1. Instant Cache Hit (0ms latency!)
+    // 1. Instant Cache Hit (0ms latency)
     const cached = searchCacheRef.current.get(cacheKey);
     if (cached) {
       setSeriesResults(cached.series);
@@ -96,42 +135,18 @@ export function NavbarSearch({ open, onOpenChange }: NavbarSearchProps) {
       if (q.length >= 2) {
         setSearching(true);
         try {
-          if (activeSearchTab === "comics") {
-            const seriesFilter = buildSeriesSearchOrFilter(prepared.terms);
-            // Lean select including description and alternative_titles for smart multi-field matching
-            const { data: seriesData, error } = await supabase
-              .from("series")
-              .select("id,slug,title,alternative_titles,description,cover_url,type")
-              .eq("is_hidden", false)
-              .or(seriesFilter)
-              .limit(30);
-
-            if (error) throw error;
-            const ranked = seriesData ? rankSeriesResults(seriesData, prepared).slice(0, 24) : [];
-            setSeriesResults(ranked);
-
-            searchCacheRef.current.set(cacheKey, {
-              series: ranked,
-              users: userResults,
-              groups: groupResults,
-            });
-          } else if (activeSearchTab === "users") {
+          if (selectedCategory === "users") {
             const { data: usersData, error } = await supabase
               .from("profiles")
-              .select("username,avatar_url")
+              .select("username,avatar_url,user_level,reading_streak")
               .ilike("username", `%${q}%`)
               .limit(8);
 
             if (error) throw error;
             const users = usersData || [];
             setUserResults(users);
-
-            searchCacheRef.current.set(cacheKey, {
-              series: seriesResults,
-              users,
-              groups: groupResults,
-            });
-          } else if (activeSearchTab === "groups") {
+            searchCacheRef.current.set(cacheKey, { series: [], users, groups: [] });
+          } else if (selectedCategory === "groups") {
             const { data: groupsData, error } = await supabase
               .from("series_import_sources")
               .select("scanlation_group")
@@ -146,12 +161,26 @@ export function NavbarSearch({ open, onOpenChange }: NavbarSearchProps) {
                 ) as string[]).slice(0, 10)
               : [];
             setGroupResults(uniqueGroups);
+            searchCacheRef.current.set(cacheKey, { series: [], users: [], groups: uniqueGroups });
+          } else {
+            // Search Series
+            const seriesFilter = buildSeriesSearchOrFilter(prepared.terms);
+            let queryBuilder = supabase
+              .from("series")
+              .select("id,slug,title,alternative_titles,description,cover_url,type,rating_average,view_count,is_trending")
+              .eq("is_hidden", false)
+              .or(seriesFilter);
 
-            searchCacheRef.current.set(cacheKey, {
-              series: seriesResults,
-              users: userResults,
-              groups: uniqueGroups,
-            });
+            if (selectedCategory !== "all") {
+              queryBuilder = queryBuilder.eq("type", selectedCategory);
+            }
+
+            const { data: seriesData, error } = await queryBuilder.limit(24);
+            if (error) throw error;
+
+            const ranked = seriesData ? rankSeriesResults(seriesData, prepared).slice(0, 16) : [];
+            setSeriesResults(ranked);
+            searchCacheRef.current.set(cacheKey, { series: ranked, users: [], groups: [] });
           }
         } catch (err) {
           console.error("Search error:", err);
@@ -162,416 +191,287 @@ export function NavbarSearch({ open, onOpenChange }: NavbarSearchProps) {
     }, 120);
 
     return () => clearTimeout(timer);
-  }, [searchQuery, activeSearchTab]);
+  }, [searchQuery, selectedCategory]);
 
-  const handleSearchSelect = (slug: string) => {
+  const handleClose = () => {
     onOpenChange(false);
     setSearchQuery("");
-    setSeriesResults([]);
-    setUserResults([]);
-    setGroupResults([]);
+  };
+
+  const handleNavigateSeries = (slug: string) => {
+    handleClose();
     navigate({ to: "/title/$slug", params: { slug } });
   };
 
-  const handleUserSelect = (username: string) => {
-    onOpenChange(false);
-    setSearchQuery("");
-    setSeriesResults([]);
-    setUserResults([]);
-    setGroupResults([]);
+  const handleNavigateUser = (username: string) => {
+    handleClose();
     navigate({ to: "/user/$username", params: { username } });
   };
 
-  const handleGroupSelect = (groupName: string) => {
-    onOpenChange(false);
-    setSearchQuery("");
-    setSeriesResults([]);
-    setUserResults([]);
-    setGroupResults([]);
+  const handleNavigateGroup = (groupName: string) => {
+    handleClose();
     navigate({ to: "/browse", search: { group: groupName } });
   };
 
+  const handleRandomSeries = () => {
+    const pool = hotSeries.data ?? [];
+    if (pool.length > 0) {
+      const pick = pool[Math.floor(Math.random() * pool.length)];
+      handleNavigateSeries(pick.slug);
+      toast.success(`Rolling into: ${pick.title}`);
+    } else {
+      handleClose();
+      navigate({ to: "/browse" });
+    }
+  };
+
+  // Build Filter Tags ("I'm looking for...")
+  const tags: SearchTag[] = useMemo(() => [
+    {
+      id: "all",
+      label: "All",
+      icon: <Sparkle className="h-3.5 w-3.5" />,
+      active: selectedCategory === "all",
+    },
+    {
+      id: "manhwa",
+      label: "Manhwa",
+      icon: <Flame className="h-3.5 w-3.5" />,
+      active: selectedCategory === "manhwa",
+    },
+    {
+      id: "manga",
+      label: "Manga",
+      icon: <BookOpen className="h-3.5 w-3.5" />,
+      active: selectedCategory === "manga",
+    },
+    {
+      id: "manhua",
+      label: "Manhua",
+      icon: <Compass className="h-3.5 w-3.5" />,
+      active: selectedCategory === "manhua",
+    },
+    {
+      id: "novel",
+      label: "Novels",
+      icon: <Books className="h-3.5 w-3.5" />,
+      active: selectedCategory === "novel",
+    },
+    {
+      id: "users",
+      label: "Users",
+      icon: <Users className="h-3.5 w-3.5" />,
+      active: selectedCategory === "users",
+    },
+    {
+      id: "groups",
+      label: "Groups",
+      icon: <Buildings className="h-3.5 w-3.5" />,
+      active: selectedCategory === "groups",
+    },
+  ], [selectedCategory]);
+
+  const handleTagClick = (tag: SearchTag) => {
+    const tagId = (tag.id || tag.label.toLowerCase()) as FilterCategory;
+    setSelectedCategory((prev) => (prev === tagId ? "all" : tagId));
+  };
+
+  // Format website series/users results
+  const results: SearchResult[] = useMemo(() => {
+    const isQuerying = searchQuery.trim().length >= 2;
+
+    if (selectedCategory === "users") {
+      return userResults.map((u) => ({
+        name: u.username,
+        meta: `Reader • Lv. ${u.user_level || 1} • Streak: ${u.reading_streak || 0}d`,
+        avatar: u.avatar_url,
+        avatarShape: "circle",
+        href: `/user/${u.username}`,
+        actions: [
+          {
+            icon: <Users className="h-4 w-4" />,
+            label: "View Profile",
+            onClick: () => handleNavigateUser(u.username),
+          },
+        ],
+      }));
+    }
+
+    if (selectedCategory === "groups") {
+      return groupResults.map((g) => ({
+        name: g,
+        meta: "Scanlation Group • Series Provider",
+        avatarShape: "rounded",
+        href: `/browse?group=${encodeURIComponent(g)}`,
+        actions: [
+          {
+            icon: <Compass className="h-4 w-4" />,
+            label: "Browse Series",
+            onClick: () => handleNavigateGroup(g),
+          },
+        ],
+      }));
+    }
+
+    const itemsToDisplay = isQuerying
+      ? seriesResults
+      : (hotSeries.data ?? []).filter((s) => selectedCategory === "all" || s.type === selectedCategory);
+
+    return itemsToDisplay.map((series) => {
+      const views = series.view_count
+        ? series.view_count >= 1000
+          ? `${(series.view_count / 1000).toFixed(0)}k views`
+          : `${series.view_count} views`
+        : "Trending";
+      const rating = series.rating_average ? `★ ${Number(series.rating_average).toFixed(1)}` : "★ 4.8";
+      const typeLabel = seriesTypeLabels[series.type] || series.type || "Manga";
+
+      return {
+        name: series.title,
+        meta: `${typeLabel} • ${rating} • ${views}`,
+        avatar: series.cover_url,
+        avatarShape: "rounded",
+        badge: series.is_trending ? "HOT" : undefined,
+        href: `/title/${series.slug}`,
+        actions: [
+          {
+            icon: <BookOpen className="h-4 w-4" />,
+            label: "Read Series",
+            onClick: () => handleNavigateSeries(series.slug),
+          },
+          {
+            icon: <ShareFat className="h-4 w-4" />,
+            label: "Share",
+            onClick: () => {
+              if (typeof window !== "undefined") {
+                const url = `${window.location.origin}/title/${series.slug}`;
+                navigator.clipboard.writeText(url);
+                toast.success("Series link copied to clipboard!");
+              }
+            },
+          },
+        ],
+      };
+    });
+  }, [searchQuery, selectedCategory, userResults, groupResults, seriesResults, hotSeries.data]);
+
+  // Real Quick Actions for VNR SCANS
+  const quickActions: QuickAction[] = useMemo(() => [
+    {
+      label: "Browse All Comics",
+      shortcut: "B",
+      icon: <Compass className="h-3.5 w-3.5" />,
+      onClick: () => {
+        handleClose();
+        navigate({ to: "/browse" });
+      },
+    },
+    {
+      label: "My Library & Bookmarks",
+      shortcut: "L",
+      icon: <BookOpen className="h-3.5 w-3.5" />,
+      onClick: () => {
+        handleClose();
+        navigate({ to: "/library" });
+      },
+    },
+    {
+      label: "Roll Random Series",
+      shortcut: "R",
+      icon: <DiceFive className="h-3.5 w-3.5" />,
+      onClick: handleRandomSeries,
+    },
+    {
+      label: "Top Rankings",
+      shortcut: "T",
+      icon: <Trophy className="h-3.5 w-3.5" />,
+      onClick: () => {
+        handleClose();
+        navigate({ to: "/rankings" });
+      },
+    },
+    {
+      label: "Novels Hub",
+      shortcut: "N",
+      icon: <Books className="h-3.5 w-3.5" />,
+      onClick: () => {
+        handleClose();
+        navigate({ to: "/novels" });
+      },
+    },
+    {
+      label: "Request Series",
+      shortcut: "S",
+      icon: <Globe className="h-3.5 w-3.5" />,
+      onClick: () => {
+        handleClose();
+        navigate({ to: "/request-series" });
+      },
+    },
+  ], [navigate, hotSeries.data]);
+
+  // Real Recent Releases for the "Files / Releases" section
+  const files: SearchFile[] = useMemo(() => {
+    return (recentReleases.data ?? []).map((ch: any) => {
+      const seriesTitle = ch.series?.title || ch.title || "Latest Chapter";
+      const chapterExt = ch.chapter_number ? `Ch. ${ch.chapter_number}` : "";
+
+      return {
+        name: seriesTitle,
+        ext: chapterExt,
+        icon: <FileArrowDown className="h-3.5 w-3.5" />,
+        verified: true, // Verified official scans
+        onClick: () => {
+          if (ch.series?.slug) {
+            handleClose();
+            navigate({ to: `/title/${ch.series.slug}` });
+          }
+        },
+        onShare: () => {
+          if (typeof window !== "undefined" && ch.series?.slug) {
+            const url = `${window.location.origin}/title/${ch.series.slug}`;
+            navigator.clipboard.writeText(url);
+            toast.success("Copied chapter link to clipboard!");
+          }
+        },
+      };
+    });
+  }, [recentReleases.data, navigate]);
+
+  const handleSubmitQuery = (q: string) => {
+    const trimmed = q.trim();
+    if (!trimmed) return;
+    handleClose();
+    navigate({ to: "/browse", search: { search: trimmed } });
+  };
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="top-[12vh] max-h-[78vh] w-[calc(100vw-1.5rem)] max-w-[620px] translate-y-0 overflow-hidden rounded border-neutral-800 bg-neutral-950 p-0 shadow-2xl sm:top-[14vh] [&>button]:hidden">
-        <div className="border-b border-neutral-900 p-3">
-          <div className="flex items-center gap-3">
-            <div className="flex min-w-0 flex-1 items-center gap-2 rounded border border-neutral-800 bg-neutral-950 px-3 focus-within:border-neutral-500 transition-colors">
-              <Search className="h-4 w-4 flex-shrink-0 text-muted-foreground stroke-[1.5]" />
-              <input
-                value={searchQuery}
-                onChange={(event) => setSearchQuery(event.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    const q = searchQuery.trim();
-                    if (!q) return;
-                    onOpenChange(false);
-                    setSearchQuery("");
-                    navigate({ to: "/browse", search: { search: q } });
-                  }
-                }}
-                autoFocus
-                placeholder="Search manga by title, author or synopsis (Press Enter to Browse)..."
-                className="h-10 min-w-0 flex-1 bg-transparent font-sans text-sm font-normal tracking-normal text-white outline-none placeholder:text-neutral-500 placeholder:opacity-100"
-              />
-              {searching && <Loader2 className="h-4 w-4 animate-spin text-neutral-400" />}
-            </div>
-            <kbd className="hidden rounded border border-border bg-[#2b2b31] px-2 py-1 text-[10px] font-semibold text-muted-foreground sm:inline-flex">
-              ESC
-            </kbd>
-            <button
-              type="button"
-              onClick={() => onOpenChange(false)}
-              className="grid h-8 w-8 place-items-center rounded border border-neutral-800 text-neutral-400 transition hover:bg-neutral-900 hover:text-white"
-              aria-label="Close search"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          </div>
-        </div>
-
-        <div className="border-b border-neutral-900 p-3">
-          <div className="grid h-9 grid-cols-3 gap-2 rounded border border-neutral-800 bg-neutral-950 p-1">
-            <SearchTabButton
-              active={activeSearchTab === "comics"}
-              icon={<BookOpen className="h-3.5 w-3.5" />}
-              label="Comics"
-              onClick={() => setActiveSearchTab("comics")}
-            />
-            <SearchTabButton
-              active={activeSearchTab === "users"}
-              icon={<UserIcon className="h-3.5 w-3.5" />}
-              label="Users"
-              onClick={() => setActiveSearchTab("users")}
-            />
-            <SearchTabButton
-              active={activeSearchTab === "groups"}
-              icon={<Users className="h-3.5 w-3.5" />}
-              label="Groups"
-              onClick={() => setActiveSearchTab("groups")}
-            />
-          </div>
-        </div>
-
-        <div className="max-h-[54vh] overflow-y-auto px-3 py-4">
-          {activeSearchTab === "comics" && (
-            <SeriesSearchPanel
-              query={searchQuery}
-              loading={searching || hotSeries.isLoading}
-              items={searchQuery.trim().length >= 2 ? seriesResults : hotSeries.data ?? []}
-              onSelect={handleSearchSelect}
-              onClose={() => {
-                onOpenChange(false);
-                setSearchQuery("");
-              }}
-            />
-          )}
-          {activeSearchTab === "users" && (
-            <UserSearchPanel
-              query={searchQuery}
-              loading={searching}
-              items={userResults}
-              onSelect={handleUserSelect}
-            />
-          )}
-          {activeSearchTab === "groups" && (
-            <GroupSearchPanel
-              query={searchQuery}
-              loading={searching}
-              items={groupResults}
-              onSelect={handleGroupSelect}
-            />
-          )}
-        </div>
-      </DialogContent>
-    </Dialog>
+    <SearchModal
+      modal={true}
+      open={open}
+      onOpenChange={onOpenChange}
+      placeholder="Search series by title, author, or press Enter to browse..."
+      tags={tags}
+      onTagClick={handleTagClick}
+      results={results}
+      resultsTitle={searchQuery.trim().length >= 2 ? "Search Results" : "Trending on VNR Scans"}
+      resultsCount={results.length}
+      quickActions={quickActions}
+      quickActionsTitle="Quick actions"
+      files={files}
+      filesTitle="Recent Chapter Releases"
+      defaultQuery={searchQuery}
+      loading={searching || hotSeries.isLoading}
+      onQueryChange={setSearchQuery}
+      onSubmitQuery={handleSubmitQuery}
+      onSelectResult={(res) => {
+        if (res.href) {
+          handleClose();
+          router.push(res.href);
+        }
+      }}
+    />
   );
 }
 
-function SearchTabButton({
-  active,
-  icon,
-  label,
-  onClick,
-}: {
-  active: boolean;
-  icon: React.ReactNode;
-  label: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`flex min-w-0 items-center justify-center gap-2 rounded px-2 text-[10px] font-bold uppercase tracking-wider transition cursor-pointer ${
-        active
-          ? "bg-white text-black"
-          : "text-neutral-400 hover:text-white"
-      }`}
-    >
-      {icon}
-      <span className="truncate">{label}</span>
-    </button>
-  );
-}
-
-function SeriesSearchPanel({
-  query,
-  loading,
-  items,
-  onSelect,
-  onClose,
-}: {
-  query: string;
-  loading: boolean;
-  items: any[];
-  onSelect: (slug: string) => void;
-  onClose?: () => void;
-}) {
-  const displayQuery = getSearchDisplayTerm(query);
-  const isSearching = query.trim().length >= 2;
-
-  const grouped = readingTypeOrder
-    .map((type) => ({
-      type,
-      items: items.filter((item) => item.type === type).slice(0, 12),
-    }))
-    .filter((group) => group.items.length > 0);
-
-  if (loading) return <SearchLoading />;
-
-  if (isSearching && items.length === 0) {
-    return (
-      <div className="rounded-xl border border-dashed border-neutral-800 bg-neutral-900/40 p-8 text-center animate-in fade-in duration-200">
-        <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-neutral-900 border border-neutral-800 text-neutral-400">
-          <BookOpen className="h-6 w-6 opacity-30" />
-        </div>
-        <h4 className="text-sm font-bold text-white">This series does not exist</h4>
-        <p className="mt-1 text-xs text-neutral-400 max-w-sm mx-auto leading-relaxed">
-          No series matching &ldquo;<span className="text-purple-300 font-semibold">{displayQuery}</span>&rdquo; was found in our library.
-        </p>
-        <div className="mt-5 flex items-center justify-center gap-2.5">
-          <Link
-            to="/request-series"
-            search={displayQuery ? { title: displayQuery } : undefined}
-            onClick={() => onClose?.()}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-purple-500/40 bg-purple-500/10 px-3.5 py-1.5 text-xs font-semibold text-purple-300 hover:bg-purple-500/20 hover:border-purple-500/60 transition cursor-pointer"
-          >
-            <span>Request This Series</span>
-          </Link>
-          <Link
-            to="/browse"
-            search={displayQuery ? { search: displayQuery } : undefined}
-            onClick={() => onClose?.()}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-neutral-800 bg-neutral-900 px-3.5 py-1.5 text-xs font-semibold text-neutral-300 hover:text-white hover:border-neutral-700 transition cursor-pointer"
-          >
-            <span>Browse All</span>
-          </Link>
-        </div>
-      </div>
-    );
-  }
-
-  if (!loading && items.length === 0) {
-    return <SearchEmpty message="No comics available yet." />;
-  }
-
-  return (
-    <div className="space-y-5">
-      {grouped.map((group) => (
-        <section key={group.type} className="space-y-2">
-          <div className="flex items-center gap-2">
-            {isSearching ? (
-              <Badge className="h-5 rounded bg-purple-600/30 border border-purple-500/40 px-1.5 text-[10px] font-bold uppercase text-purple-300 hover:bg-purple-600/30">
-                Matching
-              </Badge>
-            ) : (
-              <Badge className="h-5 rounded bg-zinc-600 px-1.5 text-[10px] font-bold uppercase text-white hover:bg-zinc-600">
-                Hot
-              </Badge>
-            )}
-            <h3 className="text-xs font-bold text-zinc-200">
-              {seriesTypeLabels[group.type] ?? group.type}
-            </h3>
-            {isSearching && (
-              <span className="text-[10px] text-muted-foreground font-mono">
-                ({group.items.length})
-              </span>
-            )}
-          </div>
-          <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
-            {group.items.map((series) => (
-              <button
-                key={series.id}
-                type="button"
-                onClick={() => onSelect(series.slug)}
-                title={series.title}
-                className="group relative min-w-0 text-left cursor-pointer"
-              >
-                <div className="relative aspect-[2/3] overflow-hidden rounded bg-neutral-950 ring-1 ring-neutral-800 transition duration-200 group-hover:ring-purple-500/70 group-hover:shadow-lg group-hover:shadow-purple-500/10">
-                  {series.cover_url ? (
-                    series.cover_url.toLowerCase().split("?")[0].endsWith(".mp4") ? (
-                      <video
-                        src={series.cover_url}
-                        loop
-                        muted
-                        autoPlay
-                        playsInline
-                        className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
-                      />
-                    ) : (
-                      <img
-                        src={series.cover_url}
-                        alt={series.title}
-                        width={200}
-                        height={300}
-                        className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
-                        loading="lazy"
-                        decoding="async"
-                        referrerPolicy="no-referrer"
-                      />
-                    )
-                  ) : (
-                    <div className="grid h-full w-full place-items-center text-muted-foreground">
-                      <BookOpen className="h-6 w-6" />
-                    </div>
-                  )}
-
-                  {/* Default bottom title banner */}
-                  <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/55 to-transparent p-1.5 transition-opacity group-hover:opacity-0 pointer-events-none">
-                    <p className="line-clamp-2 text-[10px] font-bold leading-tight text-white">
-                      {series.title}
-                    </p>
-                  </div>
-
-                  {/* Full Series Name Reveal On Hover */}
-                  <div className="absolute inset-0 z-20 flex flex-col justify-end bg-gradient-to-t from-black via-black/95 to-black/30 p-2 opacity-0 group-hover:opacity-100 transition-all duration-200 pointer-events-none">
-                    <p className="text-[11px] font-bold leading-tight text-white break-words drop-shadow-md">
-                      {series.title}
-                    </p>
-                    <div className="mt-1 flex items-center gap-1 text-[9px] text-purple-300 font-semibold uppercase">
-                      <span>{series.type}</span>
-                      {series.rating_average && Number(series.rating_average) > 0 && (
-                        <span>• ★{Number(series.rating_average).toFixed(1)}</span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </button>
-            ))}
-          </div>
-        </section>
-      ))}
-    </div>
-  );
-}
-
-function UserSearchPanel({
-  query,
-  loading,
-  items,
-  onSelect,
-}: {
-  query: string;
-  loading: boolean;
-  items: any[];
-  onSelect: (username: string) => void;
-}) {
-  if (query.trim().length < 2) {
-    return <SearchEmpty message="Type at least 2 characters to search users." />;
-  }
-  if (loading) return <SearchLoading />;
-  if (items.length === 0) {
-    return <SearchEmpty message={`No users found for "${query}".`} />;
-  }
-  return (
-    <div className="grid gap-2 sm:grid-cols-2">
-      {items.map((userMember) => (
-        <button
-          key={userMember.username}
-          type="button"
-          onClick={() => onSelect(userMember.username)}
-          className="flex items-center gap-3 rounded bg-neutral-900 border border-neutral-850 p-3 text-left transition hover:bg-neutral-800"
-        >
-          {userMember.avatar_url ? (
-            <img
-              src={userMember.avatar_url}
-              alt={userMember.username}
-              width={40}
-              height={40}
-              className="h-10 w-10 rounded-full object-cover"
-              loading="lazy"
-              decoding="async"
-            />
-          ) : (
-            <div className="grid h-10 w-10 place-items-center rounded border border-neutral-850 bg-neutral-950 text-xs font-mono font-bold text-neutral-300">
-              {userMember.username?.charAt(0)?.toUpperCase()}
-            </div>
-          )}
-          <div className="min-w-0">
-            <p className="truncate text-sm font-semibold text-foreground">{userMember.username}</p>
-            <p className="text-xs text-muted-foreground">View profile</p>
-          </div>
-        </button>
-      ))}
-    </div>
-  );
-}
-
-function GroupSearchPanel({
-  query,
-  loading,
-  items,
-  onSelect,
-}: {
-  query: string;
-  loading: boolean;
-  items: string[];
-  onSelect: (groupName: string) => void;
-}) {
-  if (query.trim().length < 2) {
-    return <SearchEmpty message="Type at least 2 characters to search groups." />;
-  }
-  if (loading) return <SearchLoading />;
-  if (items.length === 0) {
-    return <SearchEmpty message={`No groups found for "${query}".`} />;
-  }
-  return (
-    <div className="grid gap-2 sm:grid-cols-2">
-      {items.map((group) => (
-        <button
-          key={group}
-          type="button"
-          onClick={() => onSelect(group)}
-          className="flex items-center gap-3 rounded bg-neutral-900 border border-neutral-850 p-3 text-left transition hover:bg-neutral-800"
-        >
-          <div className="grid h-10 w-10 place-items-center rounded border border-neutral-850 bg-neutral-950 text-neutral-400">
-            <Users className="h-4 w-4 stroke-[1.5]" />
-          </div>
-          <div className="min-w-0">
-            <p className="truncate text-sm font-semibold text-foreground">{group}</p>
-            <p className="text-xs text-muted-foreground">Open group titles</p>
-          </div>
-        </button>
-      ))}
-    </div>
-  );
-}
-
-function SearchLoading() {
-  return (
-    <div className="flex items-center justify-center gap-2 py-12 text-xs font-bold uppercase tracking-wider text-neutral-500">
-      <Loader2 className="h-4 w-4 animate-spin text-neutral-400" />
-      Searching...
-    </div>
-  );
-}
-
-function SearchEmpty({ message }: { message: string }) {
-  return (
-    <div className="rounded-md border border-dashed border-border/70 bg-[#19191d] px-4 py-10 text-center text-sm text-muted-foreground">
-      {message}
-    </div>
-  );
-}
+export default NavbarSearch;

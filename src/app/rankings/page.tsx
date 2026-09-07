@@ -9,16 +9,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card } from "@/components/ui/card";
+import { PageKineticLoader } from "@/components/ui/kinetic-text-loader";
 
 export default function RankingsPage() {
   return (
-    <Suspense
-      fallback={
-        <div className="flex h-[50vh] items-center justify-center">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-        </div>
-      }
-    >
+    <Suspense fallback={<PageKineticLoader />}>
       <RankingsContent />
     </Suspense>
   );

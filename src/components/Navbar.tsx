@@ -61,6 +61,18 @@ export function Navbar() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [menuDrawerOpen]);
 
+  // Ctrl+K / ⌘K hotkey toggles search console
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key.toLowerCase() === "k" && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        setSearchOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
   // Cycle dice face icon in navbar button while rolling
   useEffect(() => {
     if (!isRolling) return;
