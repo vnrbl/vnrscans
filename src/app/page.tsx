@@ -19,6 +19,10 @@ import nextDynamic from "next/dynamic";
 const LandingFaq = nextDynamic(() => import("./LandingFaq").then((m) => m.LandingFaq), {
   ssr: true,
 });
+const HeroInteractiveTitle = nextDynamic(
+  () => import("@/components/home/HeroInteractiveTitle").then((m) => m.HeroInteractiveTitle),
+  { ssr: true }
+);
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { HomeStats } from "./HomeStats";
@@ -152,11 +156,7 @@ export default async function Home() {
             Next-Gen Reading Platform
           </div>
 
-          <h1 className="mx-auto max-w-5xl text-4xl font-bold leading-[0.95] tracking-[0.06em] text-white sm:text-6xl md:text-7xl lg:text-8xl">
-            DISCOVER STORIES
-            <br />
-            <span className="text-gradient">DRAWN BY IMAGINATION</span>
-          </h1>
+          <HeroInteractiveTitle />
 
           <p className="mx-auto mt-8 max-w-2xl text-sm leading-relaxed text-muted-foreground sm:text-base md:text-lg tracking-[0.02em] font-light">
             Follow your favorite manhwa, track new releases, level up your reader rank, and explore creator-first web novels in a premium reading environment.
