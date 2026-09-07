@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   BookOpen,
   Buildings,
@@ -292,9 +293,9 @@ export function SearchModal({
       role={modal ? "dialog" : undefined}
       aria-modal={modal ? true : undefined}
       style={{
-        backgroundColor: "rgba(6, 6, 8, 0.72)",
-        WebkitBackdropFilter: "blur(24px) saturate(190%) contrast(95%)",
-        backdropFilter: "blur(24px) saturate(190%) contrast(95%)",
+        backgroundColor: "rgba(10, 10, 14, 0.85)",
+        WebkitBackdropFilter: "blur(32px) saturate(180%) contrast(100%)",
+        backdropFilter: "blur(32px) saturate(180%) contrast(100%)",
       }}
       className={cn(
         "mx-auto w-full max-w-xl overflow-hidden rounded-2xl search-console-ios-glass text-white",
@@ -565,30 +566,32 @@ export function SearchModal({
 
   if (!actualOpen) return null;
 
-  return (
+  const content = (
     <div
       aria-hidden={!actualOpen}
       className={cn(
-        "fixed inset-0 z-50 flex items-start justify-center p-3 sm:p-4 pt-[8vh] sm:pt-[12vh]",
+        "fixed inset-0 z-[100] flex items-start justify-center p-3 sm:p-4 pt-[8vh] sm:pt-[12vh]",
         overlayClassName,
       )}
     >
-      {/* Click-away backdrop */}
+      {/* Click-away backdrop: dark tint & soft blur so background is barely seeable */}
       <div
         onClick={() => setOpen(false)}
-        className="fixed inset-0 bg-black/35"
+        className="fixed inset-0 bg-black/65 backdrop-blur-sm transition-opacity duration-200"
         aria-hidden="true"
       />
 
       {/* Floating Modal Panel */}
       <div
         onClick={(e) => e.stopPropagation()}
-        className="relative z-10 w-full max-w-xl"
+        className="relative z-10 w-full max-w-xl shadow-2xl animate-in fade-in-0 zoom-in-95 duration-150"
       >
         {panel}
       </div>
     </div>
   );
+
+  return typeof document !== "undefined" ? createPortal(content, document.body) : content;
 }
 
 export default SearchModal;

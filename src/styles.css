@@ -613,13 +613,13 @@
 
   /* Apple / iOS Translucent Frosted Glass Search Console / Modal */
   .search-console-ios-glass {
-    background-color: rgba(6, 6, 8, 0.72) !important;
-    -webkit-backdrop-filter: blur(24px) saturate(190%) contrast(95%) !important;
-    backdrop-filter: blur(24px) saturate(190%) contrast(95%) !important;
-    border: 1px solid rgba(255, 255, 255, 0.12) !important;
+    background-color: rgba(10, 10, 14, 0.85) !important;
+    -webkit-backdrop-filter: blur(32px) saturate(180%) contrast(100%) !important;
+    backdrop-filter: blur(32px) saturate(180%) contrast(100%) !important;
+    border: 1px solid rgba(255, 255, 255, 0.13) !important;
     box-shadow: 
-      0 20px 60px -10px rgba(0, 0, 0, 0.75), 
-      0 0 35px -5px rgba(168, 85, 247, 0.18),
+      0 25px 60px -10px rgba(0, 0, 0, 0.85), 
+      0 0 35px -5px rgba(168, 85, 247, 0.2),
       inset 0 1px 1.5px 0 rgba(255, 255, 255, 0.25) !important;
   }
 

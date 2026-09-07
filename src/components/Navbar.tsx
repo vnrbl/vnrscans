@@ -472,25 +472,6 @@ export function Navbar() {
             )}
           </div>
         </div>
-
-        {/* Search Dialog (lazy-loaded) */}
-        {searchOpen && (
-          <Suspense fallback={null}>
-            <NavbarSearch open={searchOpen} onOpenChange={setSearchOpen} />
-          </Suspense>
-        )}
-
-        {/* Dice Roll Overlay */}
-        <Suspense fallback={null}>
-          <DiceRollOverlay
-            open={diceOpen}
-            diceResult={diceResult}
-            series={diceSeries}
-            onClose={handleDiceClose}
-            onNavigate={handleDiceNavigate}
-            onRollAgain={() => { handleDiceClose(); setTimeout(handleRandom, 50); }}
-          />
-        </Suspense>
       </header>
 
       {/* ─── Fast GPU-accelerated YouTube-style Drawer ─────────────────── */}
@@ -709,6 +690,25 @@ export function Navbar() {
           className="hidden sm:block"
         />
       )}
+
+      {/* Search Dialog (lazy-loaded, rendered top-level outside header) */}
+      {searchOpen && (
+        <Suspense fallback={null}>
+          <NavbarSearch open={searchOpen} onOpenChange={setSearchOpen} />
+        </Suspense>
+      )}
+
+      {/* Dice Roll Overlay */}
+      <Suspense fallback={null}>
+        <DiceRollOverlay
+          open={diceOpen}
+          diceResult={diceResult}
+          series={diceSeries}
+          onClose={handleDiceClose}
+          onNavigate={handleDiceNavigate}
+          onRollAgain={() => { handleDiceClose(); setTimeout(handleRandom, 50); }}
+        />
+      </Suspense>
     </>
   );
 }
