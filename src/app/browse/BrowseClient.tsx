@@ -46,7 +46,33 @@ const CORE_GENRES_SET = new Set([
   "monsters", "magic", "cultivation", "webtoon", "manhwa", "manhua", "manga"
 ]);
 
-const PAGE_SIZE = 24;
+const DEFAULT_PAGE_SIZE = 28;
+
+function useGridPageSize() {
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
+
+  useEffect(() => {
+    const calc = () => {
+      const w = window.innerWidth;
+      // Desktop xl (>= 1280px) has 7 columns in SeriesGrid: 7 cols * 4 rows = 28 cards (completely filled!)
+      if (w >= 1280) setPageSize(28);
+      // Desktop lg (1024px - 1279px) has 6 columns: 6 cols * 4 rows = 24 cards
+      else if (w >= 1024) setPageSize(24);
+      // Tablet md (768px - 1023px) has 5 columns: 5 cols * 5 rows = 25 cards
+      else if (w >= 768) setPageSize(25);
+      // Mobile/tablet sm (640px - 767px) has 4 columns: 4 cols * 6 rows = 24 cards
+      else if (w >= 540) setPageSize(24);
+      // Mobile has 2 columns: 2 cols * 12 rows = 24 cards
+      else setPageSize(24);
+    };
+
+    calc();
+    window.addEventListener("resize", calc);
+    return () => window.removeEventListener("resize", calc);
+  }, []);
+
+  return pageSize;
+}
 
 function BrowsePageContent({ initialData }: { initialData?: BrowseInitialData }) {
   const qc = useQueryClient();
@@ -119,9 +145,10 @@ function BrowsePageContent({ initialData }: { initialData?: BrowseInitialData })
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
 
   // Pagination and Infinite Scroll states
+  const pageSize = useGridPageSize();
   const [currentPage, setCurrentPage] = useState<number>(Number.isNaN(urlPage) || urlPage < 1 ? 1 : urlPage);
   const [browseMode, setBrowseMode] = useState<"paged" | "infinite">("paged");
-  const [infiniteCount, setInfiniteCount] = useState<number>(PAGE_SIZE);
+  const [infiniteCount, setInfiniteCount] = useState<number>(DEFAULT_PAGE_SIZE);
   const [isLoadingMore, setIsLoadingMore] = useState<boolean>(false);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
 
@@ -144,10 +171,10 @@ function BrowsePageContent({ initialData }: { initialData?: BrowseInitialData })
     setCurrentPage((prev) => (prev !== validPage ? validPage : prev));
   }, [searchParams]);
 
-  // Reset pagination when search query or any filter changes
+  // Reset pagination when search query, pageSize, or any filter changes
   useEffect(() => {
     setCurrentPage(1);
-    setInfiniteCount(PAGE_SIZE);
+    setInfiniteCount(pageSize);
   }, [
     debouncedSearchQuery,
     groupFilter,
@@ -158,6 +185,7 @@ function BrowsePageContent({ initialData }: { initialData?: BrowseInitialData })
     tagFilters,
     sortBy,
     duration,
+    pageSize,
   ]);
 
   useEffect(() => {
@@ -517,7 +545,7 @@ function BrowsePageContent({ initialData }: { initialData?: BrowseInitialData })
   });
 
   const totalItems = allManhwa.data?.length || 0;
-  const totalPages = Math.max(1, Math.ceil(totalItems / PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
   const activePage = Math.min(Math.max(1, currentPage), totalPages);
 
   // Paginated or infinite slice
@@ -526,11 +554,11 @@ function BrowsePageContent({ initialData }: { initialData?: BrowseInitialData })
     if (browseMode === "infinite") {
       return allManhwa.data.slice(0, infiniteCount);
     }
-    const start = (activePage - 1) * PAGE_SIZE;
-    return allManhwa.data.slice(start, start + PAGE_SIZE);
-  }, [allManhwa.data, browseMode, activePage, infiniteCount]);
+    const start = (activePage - 1) * pageSize;
+    return allManhwa.data.slice(start, start + pageSize);
+  }, [allManhwa.data, browseMode, activePage, infiniteCount, pageSize]);
 
-  const rankOffset = browseMode === "paged" ? (activePage - 1) * PAGE_SIZE : 0;
+  const rankOffset = browseMode === "paged" ? (activePage - 1) * pageSize : 0;
 
   // Infinite scroll IntersectionObserver hook
   useEffect(() => {
@@ -545,7 +573,7 @@ function BrowsePageContent({ initialData }: { initialData?: BrowseInitialData })
         if (entries[0]?.isIntersecting && !isLoadingMore) {
           setIsLoadingMore(true);
           setTimeout(() => {
-            setInfiniteCount((prev) => Math.min(prev + PAGE_SIZE, totalItems));
+            setInfiniteCount((prev) => Math.min(prev + pageSize, totalItems));
             setIsLoadingMore(false);
           }, 150);
         }
@@ -555,7 +583,7 @@ function BrowsePageContent({ initialData }: { initialData?: BrowseInitialData })
 
     observer.observe(node);
     return () => observer.disconnect();
-  }, [browseMode, infiniteCount, totalItems, isLoadingMore]);
+  }, [browseMode, infiniteCount, totalItems, isLoadingMore, pageSize]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -951,7 +979,7 @@ function BrowsePageContent({ initialData }: { initialData?: BrowseInitialData })
             <SectionPagination
               currentPage={activePage}
               totalItems={totalItems}
-              pageSize={PAGE_SIZE}
+              pageSize={pageSize}
               onPageChange={(p) => {
                 setCurrentPage(p);
                 const params = new URLSearchParams(searchParams.toString());
@@ -973,7 +1001,7 @@ function BrowsePageContent({ initialData }: { initialData?: BrowseInitialData })
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => setInfiniteCount((prev) => Math.min(prev + PAGE_SIZE, totalItems))}
+                    onClick={() => setInfiniteCount((prev) => Math.min(prev + pageSize, totalItems))}
                     className="h-8 text-xs cursor-pointer border-purple-500/30 hover:border-purple-500/60 hover:bg-purple-950/30"
                   >
                     Load More Manga

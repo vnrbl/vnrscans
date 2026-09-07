@@ -16,7 +16,7 @@ export function SeriesGrid({
   if (loading) {
     return (
       <div className="grid grid-cols-2 gap-3 min-[540px]:grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 sm:gap-4">
-        {Array.from({ length: 14 }).map((_, i) => (
+        {Array.from({ length: 28 }).map((_, i) => (
           <SeriesCardSkeleton key={i} />
         ))}
       </div>
