@@ -1,14 +1,15 @@
 "use client";
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Search, LayoutGrid, List, Star, X, BookOpen, Check } from "lucide-react";
+import { Search, LayoutGrid, List, Star, X, BookOpen, Check, Layers, Infinity as InfinityIcon, Loader2, ArrowUp } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { SeriesGrid } from "@/components/SeriesGrid";
+import { SectionPagination } from "@/components/SectionPagination";
 import { OptimizedImage } from "@/components/OptimizedImage";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { useState, useEffect, Suspense, useMemo } from "react";
+import { useState, useEffect, Suspense, useMemo, useRef } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { useReaderSettings } from "@/contexts/ReaderSettingsContext";
@@ -44,6 +45,8 @@ const CORE_GENRES_SET = new Set([
   "sports", "supernatural", "thriller", "wuxia", "xianxia", "xuanhuan", "yaoi", "yuri",
   "monsters", "magic", "cultivation", "webtoon", "manhwa", "manhua", "manga"
 ]);
+
+const PAGE_SIZE = 24;
 
 function BrowsePageContent({ initialData }: { initialData?: BrowseInitialData }) {
   const qc = useQueryClient();
@@ -84,6 +87,7 @@ function BrowsePageContent({ initialData }: { initialData?: BrowseInitialData })
   const urlGenre = searchParams.get("genre") || "";
   const urlTag = searchParams.get("tag") || "";
   const urlType = searchParams.get("type") || "";
+  const urlPage = parseInt(searchParams.get("page") || "1", 10);
 
   const [searchQuery, setSearchQuery] = useState(urlSearch);
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState(urlSearch);
@@ -113,6 +117,48 @@ function BrowsePageContent({ initialData }: { initialData?: BrowseInitialData })
   const [sortBy, setSortBy] = useState("latest");
   const [duration, setDuration] = useState("all");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+
+  // Pagination and Infinite Scroll states
+  const [currentPage, setCurrentPage] = useState<number>(Number.isNaN(urlPage) || urlPage < 1 ? 1 : urlPage);
+  const [browseMode, setBrowseMode] = useState<"paged" | "infinite">("paged");
+  const [infiniteCount, setInfiniteCount] = useState<number>(PAGE_SIZE);
+  const [isLoadingMore, setIsLoadingMore] = useState<boolean>(false);
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+
+  // Initialize browseMode preference from localStorage on client mount
+  useEffect(() => {
+    try {
+      const savedMode = localStorage.getItem("vnr_browse_mode");
+      if (savedMode === "infinite" || savedMode === "paged") {
+        setBrowseMode(savedMode);
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  // Sync currentPage from url when user navigates using back/forward
+  useEffect(() => {
+    const pageParam = parseInt(searchParams.get("page") || "1", 10);
+    const validPage = Number.isNaN(pageParam) || pageParam < 1 ? 1 : pageParam;
+    setCurrentPage((prev) => (prev !== validPage ? validPage : prev));
+  }, [searchParams]);
+
+  // Reset pagination when search query or any filter changes
+  useEffect(() => {
+    setCurrentPage(1);
+    setInfiniteCount(PAGE_SIZE);
+  }, [
+    debouncedSearchQuery,
+    groupFilter,
+    typeFilters,
+    statusFilter,
+    contentRating,
+    genreFilters,
+    tagFilters,
+    sortBy,
+    duration,
+  ]);
 
   useEffect(() => {
     if (urlType) {
@@ -470,6 +516,47 @@ function BrowsePageContent({ initialData }: { initialData?: BrowseInitialData })
     gcTime: 1000 * 60 * 20,
   });
 
+  const totalItems = allManhwa.data?.length || 0;
+  const totalPages = Math.max(1, Math.ceil(totalItems / PAGE_SIZE));
+  const activePage = Math.min(Math.max(1, currentPage), totalPages);
+
+  // Paginated or infinite slice
+  const paginatedItems = useMemo(() => {
+    if (!allManhwa.data) return [];
+    if (browseMode === "infinite") {
+      return allManhwa.data.slice(0, infiniteCount);
+    }
+    const start = (activePage - 1) * PAGE_SIZE;
+    return allManhwa.data.slice(start, start + PAGE_SIZE);
+  }, [allManhwa.data, browseMode, activePage, infiniteCount]);
+
+  const rankOffset = browseMode === "paged" ? (activePage - 1) * PAGE_SIZE : 0;
+
+  // Infinite scroll IntersectionObserver hook
+  useEffect(() => {
+    if (browseMode !== "infinite") return;
+    if (infiniteCount >= totalItems) return;
+
+    const node = sentinelRef.current;
+    if (!node) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting && !isLoadingMore) {
+          setIsLoadingMore(true);
+          setTimeout(() => {
+            setInfiniteCount((prev) => Math.min(prev + PAGE_SIZE, totalItems));
+            setIsLoadingMore(false);
+          }, 150);
+        }
+      },
+      { rootMargin: "350px" }
+    );
+
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [browseMode, infiniteCount, totalItems, isLoadingMore]);
+
   return (
     <div className="min-h-screen bg-background">
       <div className="container mx-auto px-4 py-6 sm:px-6 md:px-8 lg:px-12 xl:px-16">
@@ -746,12 +833,21 @@ function BrowsePageContent({ initialData }: { initialData?: BrowseInitialData })
           )}
         </div>
 
-        {/* Results Count */}
-        <div className="mb-6 flex items-center justify-between">
+        {/* Results Count & View Controls */}
+        <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <p className="text-sm text-muted-foreground">
-              {allManhwa.data?.length || 0} manga found
-            </p>
+            <div className="flex items-center gap-2">
+              <p className="text-sm font-semibold text-white">
+                {totalItems} manga found
+              </p>
+              {totalItems > 0 && (
+                <span className="text-xs text-muted-foreground">
+                  {browseMode === "paged"
+                    ? `• Page ${activePage} of ${totalPages}`
+                    : `• Showing ${Math.min(infiniteCount, totalItems)} of ${totalItems}`}
+                </span>
+              )}
+            </div>
             {(typeFilters.length > 0 || genreFilters.length > 0 || tagFilters.length > 0) && (
               <p className="mt-1 text-xs text-muted-foreground">
                 {typeFilters.length > 0 && `${typeFilters.length} type${typeFilters.length > 1 ? 's' : ''}`}
@@ -762,39 +858,147 @@ function BrowsePageContent({ initialData }: { initialData?: BrowseInitialData })
               </p>
             )}
           </div>
-          <div className="flex items-center gap-2">
-            <Button 
-              variant={viewMode === "grid" ? "default" : "ghost"} 
-              size="icon" 
-              className="h-8 w-8"
-              onClick={() => setViewMode("grid")}
-            >
-              <LayoutGrid className="h-4 w-4" />
-            </Button>
-            <Button 
-              variant={viewMode === "list" ? "default" : "ghost"} 
-              size="icon" 
-              className="h-8 w-8"
-              onClick={() => setViewMode("list")}
-            >
-              <List className="h-4 w-4" />
-            </Button>
+
+          <div className="flex items-center gap-2.5 self-start sm:self-auto flex-wrap">
+            {/* Paged vs Infinite Scroll Switcher */}
+            <div className="flex items-center rounded-lg border border-border/40 bg-card/70 p-0.5 shadow-sm">
+              <button
+                type="button"
+                onClick={() => {
+                  setBrowseMode("paged");
+                  try {
+                    localStorage.setItem("vnr_browse_mode", "paged");
+                  } catch {
+                    // ignore
+                  }
+                }}
+                className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-semibold transition-all cursor-pointer ${
+                  browseMode === "paged"
+                    ? "bg-purple-600 text-white shadow-[0_0_12px_rgba(147,51,234,0.4)]"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+                title="Page navigation (same to history pages)"
+              >
+                <Layers className="h-3.5 w-3.5" />
+                <span>Pages</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setBrowseMode("infinite");
+                  try {
+                    localStorage.setItem("vnr_browse_mode", "infinite");
+                  } catch {
+                    // ignore
+                  }
+                }}
+                className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-semibold transition-all cursor-pointer ${
+                  browseMode === "infinite"
+                    ? "bg-purple-600 text-white shadow-[0_0_12px_rgba(147,51,234,0.4)]"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+                title="Continuous infinite scrolling"
+              >
+                <InfinityIcon className="h-3.5 w-3.5" />
+                <span>Infinite Scroll</span>
+              </button>
+            </div>
+
+            {/* Grid vs List View Toggle */}
+            <div className="flex items-center rounded-lg border border-border/40 bg-card/70 p-0.5 shadow-sm">
+              <Button 
+                variant={viewMode === "grid" ? "default" : "ghost"} 
+                size="icon" 
+                className="h-7 w-7 rounded-md cursor-pointer"
+                onClick={() => setViewMode("grid")}
+                title="Grid View"
+              >
+                <LayoutGrid className="h-3.5 w-3.5" />
+              </Button>
+              <Button 
+                variant={viewMode === "list" ? "default" : "ghost"} 
+                size="icon" 
+                className="h-7 w-7 rounded-md cursor-pointer"
+                onClick={() => setViewMode("list")}
+                title="List View"
+              >
+                <List className="h-3.5 w-3.5" />
+              </Button>
+            </div>
           </div>
         </div>
 
         {/* Manhwa Grid/List */}
         {viewMode === "grid" ? (
           <SeriesGrid 
-            items={allManhwa.data} 
+            items={paginatedItems} 
             loading={allManhwa.isLoading} 
             emptyMessage="No manga found. Try adjusting your filters or search query."
             showRank={sortBy === "popular" || sortBy === "rating"}
+            rankOffset={rankOffset}
           />
         ) : (
           <SeriesList 
-            items={allManhwa.data} 
+            items={paginatedItems} 
             loading={allManhwa.isLoading} 
+            rankOffset={rankOffset}
           />
+        )}
+
+        {/* Pagination Controls / Infinite Scroll Sentinel */}
+        {!allManhwa.isLoading && totalItems > 0 && (
+          browseMode === "paged" ? (
+            <SectionPagination
+              currentPage={activePage}
+              totalItems={totalItems}
+              pageSize={PAGE_SIZE}
+              onPageChange={(p) => {
+                setCurrentPage(p);
+                const params = new URLSearchParams(searchParams.toString());
+                params.set("page", String(p));
+                router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+                window.scrollTo({ top: 0, behavior: "smooth" });
+              }}
+              itemLabel="manga"
+              accentColor="#8B5CF6"
+            />
+          ) : (
+            <div className="mt-8 space-y-4">
+              {infiniteCount < totalItems ? (
+                <div ref={sentinelRef} className="py-8 flex flex-col items-center justify-center gap-3">
+                  <div className="flex items-center gap-2 text-xs font-medium text-purple-300">
+                    <Loader2 className="h-4 w-4 animate-spin text-purple-400" />
+                    <span>Loading more series ({Math.min(infiniteCount, totalItems)} of {totalItems})...</span>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setInfiniteCount((prev) => Math.min(prev + PAGE_SIZE, totalItems))}
+                    className="h-8 text-xs cursor-pointer border-purple-500/30 hover:border-purple-500/60 hover:bg-purple-950/30"
+                  >
+                    Load More Manga
+                  </Button>
+                </div>
+              ) : (
+                <div className="mt-12 flex flex-col sm:flex-row items-center justify-between gap-4 py-6 border-t border-border/30 text-xs text-muted-foreground">
+                  <div className="flex items-center gap-2">
+                    <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.6)]" />
+                    <span className="font-medium text-foreground">You've reached the end</span>
+                    <span>• All {totalItems} manga loaded</span>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+                    className="h-8 text-xs gap-1.5 hover:text-foreground cursor-pointer"
+                  >
+                    <ArrowUp className="h-3.5 w-3.5" />
+                    Back to top
+                  </Button>
+                </div>
+              )}
+            </div>
+          )
         )}
       </div>
     </div>
@@ -802,7 +1006,7 @@ function BrowsePageContent({ initialData }: { initialData?: BrowseInitialData })
 }
 
 // List View Component
-function SeriesList({ items, loading }: { items?: any[]; loading: boolean }) {
+function SeriesList({ items, loading, rankOffset = 0 }: { items?: any[]; loading: boolean; rankOffset?: number }) {
   if (loading) {
     return (
       <div className="space-y-3">
@@ -832,7 +1036,7 @@ function SeriesList({ items, loading }: { items?: any[]; loading: boolean }) {
           {/* Ranking Number */}
           <div className="flex shrink-0 items-start">
             <div className="flex h-8 w-8 items-center justify-center rounded-[4px] bg-purple-950/40 border border-purple-500/30 text-sm font-mono font-bold text-purple-300 shadow-sm">
-              #{index + 1}
+              #{rankOffset + index + 1}
             </div>
           </div>
 

@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { Link } from "@/lib/router-compat";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, BookOpen, Clock, Layers, ListFilter } from "lucide-react";
+import { ArrowLeft, BookOpen, Clock, Layers, ListFilter, Infinity as InfinityIcon, Loader2, ArrowUp } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -88,6 +88,10 @@ export default function HomeHistoryContent({
   const { user, loading: authLoading } = useAuth();
   const [currentPage, setCurrentPage] = useState(1);
   const [historyView, setHistoryView] = useState<"series" | "chapters">("series");
+  const [historyMode, setHistoryMode] = useState<"paged" | "infinite">("paged");
+  const [infiniteCount, setInfiniteCount] = useState(PAGE_SIZE);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
 
   const sectionKey = isHistorySection(section) ? section : null;
   const meta = sectionKey ? SECTION_META[sectionKey] : null;
@@ -98,6 +102,7 @@ export default function HomeHistoryContent({
 
   useEffect(() => {
     setCurrentPage(1);
+    setInfiniteCount(PAGE_SIZE);
   }, [sectionKey, periodKey, historyView]);
 
   // Realtime subscription: synchronize Latest Updates, Followed Chapters, and Reading History with live DB updates
@@ -193,7 +198,7 @@ export default function HomeHistoryContent({
 
   const needsLogin = meta.requiresAuth && !authLoading && !user;
 
-  // Pagination calculations
+  // Pagination & Infinite scroll calculations
   const totalItems =
     sectionKey === "reading-history"
       ? ((historyQuery.data as ChapterItem[]) ?? []).length
@@ -202,16 +207,47 @@ export default function HomeHistoryContent({
   const paginatedGroupedSeries = useMemo(() => {
     if (sectionKey !== "followed-chapters" && sectionKey !== "latest-updates") return [];
     const list = (historyQuery.data as GroupedSeries[]) ?? [];
+    if (historyMode === "infinite") {
+      return list.slice(0, infiniteCount);
+    }
     const start = (currentPage - 1) * PAGE_SIZE;
     return list.slice(start, start + PAGE_SIZE);
-  }, [historyQuery.data, sectionKey, currentPage]);
+  }, [historyQuery.data, sectionKey, currentPage, historyMode, infiniteCount]);
 
   const paginatedHistoryData = useMemo(() => {
     if (sectionKey !== "reading-history") return [];
     const list = (historyQuery.data as ChapterItem[]) ?? [];
+    if (historyMode === "infinite") {
+      return list.slice(0, infiniteCount);
+    }
     const start = (currentPage - 1) * PAGE_SIZE;
     return list.slice(start, start + PAGE_SIZE);
-  }, [historyQuery.data, sectionKey, currentPage]);
+  }, [historyQuery.data, sectionKey, currentPage, historyMode, infiniteCount]);
+
+  // Infinite scroll observer hook
+  useEffect(() => {
+    if (historyMode !== "infinite") return;
+    if (infiniteCount >= totalItems) return;
+
+    const node = sentinelRef.current;
+    if (!node) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting && !isLoadingMore) {
+          setIsLoadingMore(true);
+          setTimeout(() => {
+            setInfiniteCount((prev) => Math.min(prev + PAGE_SIZE, totalItems));
+            setIsLoadingMore(false);
+          }, 150);
+        }
+      },
+      { rootMargin: "350px" }
+    );
+
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [historyMode, infiniteCount, totalItems, isLoadingMore]);
 
   return (
     <main className="container mx-auto min-h-screen px-4 py-20 sm:px-6 md:px-8 lg:px-12 xl:px-16">
@@ -280,6 +316,36 @@ export default function HomeHistoryContent({
               </Button>
             ))}
           </div>
+
+          {/* Mode Switcher: Pages vs Infinite Scroll */}
+          <div className="flex items-center rounded-lg border border-border/40 bg-card p-0.5 shadow-sm">
+            <button
+              type="button"
+              onClick={() => setHistoryMode("paged")}
+              className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-semibold transition-all cursor-pointer ${
+                historyMode === "paged"
+                  ? "bg-purple-600 text-white shadow-sm font-semibold"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+              title="Page navigation"
+            >
+              <Layers className="h-3.5 w-3.5" />
+              <span>Pages</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setHistoryMode("infinite")}
+              className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-semibold transition-all cursor-pointer ${
+                historyMode === "infinite"
+                  ? "bg-purple-600 text-white shadow-sm font-semibold"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+              title="Continuous infinite scrolling"
+            >
+              <InfinityIcon className="h-3.5 w-3.5" />
+              <span>Infinite Scroll</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -315,22 +381,60 @@ export default function HomeHistoryContent({
             </div>
           )}
 
-          {/* Section Pagination (triggers whenever total items exceed 20) */}
-          <SectionPagination
-            currentPage={currentPage}
-            totalItems={totalItems}
-            pageSize={PAGE_SIZE}
-            onPageChange={(p) => {
-              setCurrentPage(p);
-              window.scrollTo({ top: 0, behavior: "smooth" });
-            }}
-            itemLabel={
-              sectionKey === "reading-history" && historyView === "chapters"
-                ? "chapters"
-                : "series"
-            }
-            accentColor={meta.accentColor}
-          />
+          {/* Section Pagination or Infinite Scroll Sentinel */}
+          {historyMode === "paged" ? (
+            <SectionPagination
+              currentPage={currentPage}
+              totalItems={totalItems}
+              pageSize={PAGE_SIZE}
+              onPageChange={(p) => {
+                setCurrentPage(p);
+                window.scrollTo({ top: 0, behavior: "smooth" });
+              }}
+              itemLabel={
+                sectionKey === "reading-history" && historyView === "chapters"
+                  ? "chapters"
+                  : "series"
+              }
+              accentColor={meta.accentColor}
+            />
+          ) : (
+            <div className="mt-8 space-y-4">
+              {infiniteCount < totalItems ? (
+                <div ref={sentinelRef} className="py-8 flex flex-col items-center justify-center gap-3">
+                  <div className="flex items-center gap-2 text-xs font-medium text-purple-300">
+                    <Loader2 className="h-4 w-4 animate-spin text-purple-400" />
+                    <span>Loading more ({Math.min(infiniteCount, totalItems)} of {totalItems})...</span>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setInfiniteCount((prev) => Math.min(prev + PAGE_SIZE, totalItems))}
+                    className="h-8 text-xs cursor-pointer border-purple-500/30 hover:border-purple-500/60"
+                  >
+                    Load More
+                  </Button>
+                </div>
+              ) : (
+                <div className="mt-12 flex flex-col sm:flex-row items-center justify-between gap-4 py-6 border-t border-border/30 text-xs text-muted-foreground">
+                  <div className="flex items-center gap-2">
+                    <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.6)]" />
+                    <span className="font-medium text-foreground">You've reached the end</span>
+                    <span>• All {totalItems} items loaded</span>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+                    className="h-8 text-xs gap-1.5 hover:text-foreground cursor-pointer"
+                  >
+                    <ArrowUp className="h-3.5 w-3.5" />
+                    Back to top
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
         </>
       ) : (
         <div className="rounded-lg border border-border/40 bg-card p-8 text-center text-muted-foreground">

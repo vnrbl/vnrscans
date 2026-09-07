@@ -5,11 +5,13 @@ export function SeriesGrid({
   loading,
   emptyMessage = "No series found.",
   showRank = false,
+  rankOffset = 0,
 }: {
   items: Array<Parameters<typeof SeriesCard>[0]["s"]> | undefined;
   loading?: boolean;
   emptyMessage?: string;
   showRank?: boolean;
+  rankOffset?: number;
 }) {
   if (loading) {
     return (
@@ -30,7 +32,7 @@ export function SeriesGrid({
   return (
     <div className="grid grid-cols-2 gap-3 min-[540px]:grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 sm:gap-4">
       {items.map((s, index) => (
-        <SeriesCard key={s.id} s={s} rank={showRank ? index + 1 : undefined} />
+        <SeriesCard key={s.id} s={s} rank={showRank ? rankOffset + index + 1 : undefined} />
       ))}
     </div>
   );
