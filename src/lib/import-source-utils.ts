@@ -19,19 +19,19 @@ const SOURCE_PRESETS: Array<{
     hostIncludes: "qimanhwa.com",
     sourceSite: "Qi Scans",
     scanlationGroup: "Qi Scans",
-    imageUrlExample: "https://media.qimanhwa.com/file/qiscans/upload/upload/series/example/chapter/page_001.webp",
+    imageUrlExample: "https://media.qimanga.com/file/qiscans/upload/series/example/chapter/page_001.webp",
   },
   {
     hostIncludes: "qiscans.org",
     sourceSite: "Qi Scans",
     scanlationGroup: "Qi Scans",
-    imageUrlExample: "https://media.qimanhwa.com/file/qiscans/upload/upload/series/example/chapter/page_001.webp",
+    imageUrlExample: "https://media.qimanga.com/file/qiscans/upload/series/example/chapter/page_001.webp",
   },
   {
     hostIncludes: "qimanga.com",
     sourceSite: "Qi Scans",
     scanlationGroup: "Qi Scans",
-    imageUrlExample: "https://media.qimanhwa.com/file/qiscans/upload/upload/series/example/chapter/page_001.webp",
+    imageUrlExample: "https://media.qimanga.com/file/qiscans/upload/series/example/chapter/page_001.webp",
   },
   {
     hostIncludes: "asura",
@@ -125,4 +125,9 @@ export function isKnownImportSource(url: string): boolean {
   } catch {
     return false;
   }
+}
+
+export function normalizeScanlationGroup(group: string | null | undefined): string {
+  if (!group) return "";
+  return group.toLowerCase().replace(/[^a-z0-9]/g, "");
 }

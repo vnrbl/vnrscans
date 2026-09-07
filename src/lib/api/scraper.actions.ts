@@ -9,7 +9,7 @@ import {
   isPremiumOrLockedChapter,
 } from "../chapter-scraper";
 import { buildChapterSlug } from "../chapter-utils";
-import { detectImportSource } from "../import-source-utils";
+import { detectImportSource, normalizeScanlationGroup } from "../import-source-utils";
 import {
   detectSourceScanTiming,
   advanceNextReleaseAfterDrop,
@@ -1070,8 +1070,10 @@ export async function $syncImportSource(args: {
     const status = failed > 0 && imported > 0 ? "partial" : failed > 0 ? "failed" : "success";
     const message =
       imported > 0
-        ? `Imported ${imported} new chapter${imported !== 1 ? "s" : ""}${seriesTitle ? ` for ${seriesTitle}` : ""}.`
-        : `No new chapters were imported${seriesTitle ? ` for ${seriesTitle}` : ""}.`;
+        ? `Imported ${imported} new chapter${imported !== 1 ? "s" : ""} (Found ${chaptersFound} on source, ${skipped} already in DB)${seriesTitle ? ` for ${seriesTitle}` : ""}.`
+        : chaptersFound > 0
+          ? `Checked source: all ${chaptersFound} chapters already in database${seriesTitle ? ` for ${seriesTitle}` : ""}.`
+          : `No chapters found on source${seriesTitle ? ` for ${seriesTitle}` : ""}.`;
 
     await admin.from("series_import_logs").insert({
       source_id: source.id,
@@ -1297,7 +1299,7 @@ export async function $syncAllSeriesImportSources(args: {
 }
 
 function chapterScanKey(chapterNumber: number, scanlationGroup: string | null) {
-  return `${chapterNumber}::${(scanlationGroup || "").trim().toLowerCase()}`;
+  return `${chapterNumber}::${normalizeScanlationGroup(scanlationGroup)}`;
 }
 
 function isPremiumChapter(chapter: { chapterNumber: number; title?: string; url: string }): boolean {
@@ -1320,6 +1322,9 @@ function filterImagesByExampleUrl(images: string[], exampleUrl: string) {
       (url) => isQimanhwaUrl(url) && isNumberedImageUrl(url) && isQimanhwaReaderPath(url),
     );
     if (numberedImages.length > 0) return numberedImages;
+    // Fallback: if already numbered from Qi domain, keep them even if directory structure evolves
+    const qiNumbered = images.filter((url) => isQimanhwaUrl(url) && isNumberedImageUrl(url));
+    if (qiNumbered.length > 0) return qiNumbered;
   }
 
   if (isKaynScansUrl(exampleUrl)) {
@@ -1386,9 +1391,14 @@ function getImageUrlTypePrefix(exampleUrl: string): string | null {
 function isQimanhwaUrl(url: string) {
   try {
     const hostname = new URL(url).hostname.toLowerCase();
-    return hostname.includes("qimanhwa.com") || hostname.includes("qiscans.org");
+    return (
+      hostname.includes("qimanhwa.com") ||
+      hostname.includes("qiscans.org") ||
+      hostname.includes("qimanga.com")
+    );
   } catch {
-    return url.toLowerCase().includes("qimanhwa.com") || url.toLowerCase().includes("qiscans");
+    const lower = url.toLowerCase();
+    return lower.includes("qimanhwa.com") || lower.includes("qiscans") || lower.includes("qimanga");
   }
 }
 
@@ -1434,7 +1444,14 @@ function isQimanhwaReaderPath(url: string) {
     lowercaseUrl.includes("/file/qiscans/upload/rezo/series/") ||
     lowercaseUrl.includes("/rezo/series/") ||
     lowercaseUrl.includes("/file/qiscans/upload/upload/series/") ||
-    lowercaseUrl.includes("/upload/upload/series/")
+    lowercaseUrl.includes("/upload/upload/series/") ||
+    lowercaseUrl.includes("/file/qiscans/upload/series/") ||
+    lowercaseUrl.includes("/file/qimanga/upload/series/") ||
+    lowercaseUrl.includes("/file/qiscans/upload/") ||
+    lowercaseUrl.includes("/file/qimanga/upload/") ||
+    lowercaseUrl.includes("/upload/series/") ||
+    lowercaseUrl.includes("/uploads/series/") ||
+    lowercaseUrl.includes("quantumscans")
   );
 }
 

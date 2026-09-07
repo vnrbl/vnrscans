@@ -31,7 +31,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { moveToRecycleBin } from "@/lib/recycle-bin";
 import { $extractChaptersFromUrl, $extractImagesFromUrl, $syncImportSource } from "@/lib/api/scraper.actions";
 import type { ChapterInfo } from "@/lib/chapter-scraper";
-import { detectImportSource } from "@/lib/import-source-utils";
+import { detectImportSource, normalizeScanlationGroup } from "@/lib/import-source-utils";
 import { Button } from "@/components/ui/button";
 import { formatAppDate } from "@/lib/date";
 import { Input } from "@/components/ui/input";
@@ -791,9 +791,9 @@ export default function ChapterManager({ seriesId, onBack }: { seriesId: string;
     if (error) throw error;
     if (!data || data.length === 0) return null;
 
-    const targetGroup = (scanlationGroup || "").trim().toLowerCase();
+    const targetGroup = normalizeScanlationGroup(scanlationGroup);
     const match = data.find(
-      (c: any) => (c.scanlation_group || "").trim().toLowerCase() === targetGroup,
+      (c: any) => normalizeScanlationGroup(c.scanlation_group) === targetGroup,
     );
     return match || null;
   };
@@ -1064,9 +1064,14 @@ export default function ChapterManager({ seriesId, onBack }: { seriesId: string;
   const isQimanhwaUrl = (url: string) => {
     try {
       const hostname = new URL(url).hostname.toLowerCase();
-      return hostname.includes("qimanhwa.com") || hostname.includes("qiscans.org");
+      return (
+        hostname.includes("qimanhwa.com") ||
+        hostname.includes("qiscans.org") ||
+        hostname.includes("qimanga.com")
+      );
     } catch {
-      return url.toLowerCase().includes("qimanhwa.com") || url.toLowerCase().includes("qiscans");
+      const lower = url.toLowerCase();
+      return lower.includes("qimanhwa.com") || lower.includes("qiscans") || lower.includes("qimanga");
     }
   };
 
@@ -1350,7 +1355,7 @@ export default function ChapterManager({ seriesId, onBack }: { seriesId: string;
         (detectedPreset?.scanlationGroup && detectedPreset.scanlationGroup !== "Custom Source"
           ? detectedPreset.scanlationGroup
           : null);
-      const targetGroupNorm = (scanlation_group || "").trim().toLowerCase();
+      const targetGroupNorm = normalizeScanlationGroup(scanlation_group);
       const uploadableList: ChapterInfo[] = [];
       let skippedExistingCount = 0;
 
@@ -1359,7 +1364,7 @@ export default function ChapterManager({ seriesId, onBack }: { seriesId: string;
         // Only skip if the chapter already exists FOR THE SAME SCANLATION GROUP
         const existingInLocal = (chapters.data ?? []).some((c) => {
           if (Number(c.chapter_number) !== num) return false;
-          const cGroupNorm = (c.scanlation_group || "").trim().toLowerCase();
+          const cGroupNorm = normalizeScanlationGroup(c.scanlation_group);
           return cGroupNorm === targetGroupNorm;
         });
         const existingChapter =

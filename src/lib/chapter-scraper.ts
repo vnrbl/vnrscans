@@ -41,6 +41,7 @@ export interface ChapterInfo {
   url: string;
   scanGroup?: string;
   time?: string;
+  isFree?: boolean;
 }
 
 export interface ExtractChapterImagesOptions {
@@ -100,11 +101,21 @@ export async function extractChaptersFromSeriesUrl(seriesUrl: string): Promise<C
 
             if (allChaptersRaw.length > 0) {
               const chapters: ChapterInfo[] = allChaptersRaw
-                .filter((c: any) => !c.is_locked && !c.locked && !c.is_premium && !c.price && !c.coins)
+                .filter(
+                  (c: any) =>
+                    c.isFree === true ||
+                    (!c.is_locked &&
+                      !c.locked &&
+                      !c.is_premium &&
+                      !c.requiresPurchase &&
+                      (!c.price || Number(c.price) === 0) &&
+                      (!c.coins || Number(c.coins) === 0)),
+                )
                 .map((c: any) => ({
                   chapterNumber: Number(c.number),
                   title: c.title || undefined,
                   url: `${urlObj.origin}/series/${slug}/${c.slug}`,
+                  isFree: true,
                 }))
                 .filter((c: ChapterInfo) => !isPremiumOrLockedChapter(c));
               return chapters;
@@ -1001,31 +1012,35 @@ function isChapterLink(url: string, text: string): boolean {
 }
 
 export const PREMIUM_KEYWORDS = [
-  "premium", "locked", "paid", "coin", "coins", "point", "points",
-  "vip", "paywall", "buy", "purchase", "unlock", "ticket", "tickets",
-  "early-access", "early access", "subscribers-only", "subscriber only",
-  "fastpass", "fast-pass", "kofi", "patreon", "subscribers", "gems", "gem",
-  "rental", "rent",
-  "🔒", "🔐", "💰", "💎", "🪙", "🏷️",
+  "premium", "locked", "paid", "coin", "coins",
+  "paywall", "early-access", "early access", "subscribers-only", "subscriber only",
+  "fastpass", "fast-pass", "kofi", "patreon",
+  "🔒", "🔐", "🪙",
 ];
 
-const PREMIUM_EMOJIS = ["🔒", "🔐", "💰", "💎", "🪙", "🏷️"];
+const PREMIUM_EMOJIS = ["🔒", "🔐", "🪙"];
 const STRICT_PREMIUM_PHRASES = [
   "early-access", "early access", "subscribers-only", "subscriber only",
   "fastpass", "fast-pass", "kofi", "patreon", "paywall",
   "locked chapter", "premium chapter", "coin chapter", "buy chapter",
   "unlock chapter", "paid chapter", "requires coins", "spend coins",
   "unlock with", "coins required", "this chapter is locked",
-  "please purchase it to read",
+  "please purchase it to read", "chapter locked", "locked-chapter",
+  "rental chapter", "rent chapter",
 ];
-const WORD_BOUND_PREMIUM_REGEX = /\b(premium|locked|paid|coins?|points?|vip|paywall|buy|purchase|unlock|tickets?|gems?|rental|rent)\b/i;
+const WORD_BOUND_PREMIUM_REGEX = /\b(premium|paywall)\b|\[(?:locked|paid|coins?)\]|\((?:locked|paid|coins?)\)/i;
 
 export function isPremiumOrLockedChapter(chapter: {
   chapterNumber?: number;
   title?: string;
   url: string;
   rawHtml?: string;
+  isFree?: boolean;
 }): boolean {
+  if (chapter.isFree === true) {
+    return false;
+  }
+
   const titleLower = (chapter.title || "").toLowerCase();
   const urlLower = (chapter.url || "").toLowerCase();
   const rawLower = (chapter.rawHtml || "").toLowerCase();
@@ -1063,13 +1078,13 @@ export function isPremiumOrLockedChapter(chapter: {
 
   // 5. Price / currency / lock patterns
   if (
-    /\b(?:\d+\s*(?:coins?|points?|gems?|diamonds?|tickets?)|(?:price|cost)\s*[:=]?\s*\d+)\b/i.test(titleLower)
+    /\b(?:\d+\s*(?:coins?|pts?|points?|gems?|diamonds?|tickets?)\s*(?:required|to unlock|only)?|(?:price|cost)\s*[:=]\s*\d+)\b/i.test(titleLower)
   ) {
     return true;
   }
   if (rawLower) {
     const cleanRaw = rawLower.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ");
-    if (/\b(?:\d+\s*(?:coins?|points?|gems?|diamonds?|tickets?)|(?:price|cost)\s*[:=]?\s*\d+)\b/i.test(cleanRaw)) {
+    if (/\b(?:\d+\s*(?:coins?|pts?|points?|gems?|diamonds?|tickets?)\s*(?:required|to unlock|only)?|(?:price|cost)\s*[:=]\s*\d+)\b/i.test(cleanRaw)) {
       return true;
     }
   }
