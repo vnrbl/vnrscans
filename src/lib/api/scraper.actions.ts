@@ -1297,7 +1297,7 @@ export async function $syncAllSeriesImportSources(args: {
 }
 
 function chapterScanKey(chapterNumber: number, scanlationGroup: string | null) {
-  return `${chapterNumber}::${scanlationGroup?.trim() || ""}`;
+  return `${chapterNumber}::${(scanlationGroup || "").trim().toLowerCase()}`;
 }
 
 function isPremiumChapter(chapter: { chapterNumber: number; title?: string; url: string }): boolean {

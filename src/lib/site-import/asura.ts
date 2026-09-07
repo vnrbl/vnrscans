@@ -27,18 +27,23 @@ type BrowsePayload = {
   initialSeries?: AsuraSeriesPayload[];
 };
 
+function isAsuraHostname(hostname: string): boolean {
+  const h = hostname.toLowerCase();
+  return ASURA_HOSTS.has(h) || h.includes("asura");
+}
+
 export function isSupportedAsuraCatalogUrl(value: string): boolean {
   try {
-    return ASURA_HOSTS.has(new URL(value).hostname.toLowerCase());
+    return isAsuraHostname(new URL(value).hostname);
   } catch {
-    return false;
+    return value.toLowerCase().includes("asura");
   }
 }
 
 export async function discoverAsuraCatalog(inputUrl: string): Promise<SiteCatalogDiscovery> {
   const parsed = new URL(inputUrl);
-  if (!ASURA_HOSTS.has(parsed.hostname.toLowerCase())) {
-    throw new Error("This first version supports asurascans.com catalog URLs only.");
+  if (!isAsuraHostname(parsed.hostname)) {
+    throw new Error("This version supports Asura catalog URLs only (e.g. asurascans.com).");
   }
 
   const origin = parsed.origin;

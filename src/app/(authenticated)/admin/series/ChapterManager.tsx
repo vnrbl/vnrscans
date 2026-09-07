@@ -1072,9 +1072,9 @@ export default function ChapterManager({ seriesId, onBack }: { seriesId: string;
 
   const isAsuraUrl = (url: string) => {
     try {
-      return new URL(url).hostname.toLowerCase().includes("asurascans.com");
+      return new URL(url).hostname.toLowerCase().includes("asura");
     } catch {
-      return url.toLowerCase().includes("asurascans.com");
+      return url.toLowerCase().includes("asura");
     }
   };
 

@@ -200,6 +200,20 @@ export async function extractChaptersFromSeriesUrl(seriesUrl: string): Promise<C
       }
     }
 
+    // Custom extraction for Asura Scans (fast Astro island props & chapter extraction)
+    if (isAsuraScansUrl(seriesUrl)) {
+      try {
+        console.log(`[Scraper] Using custom Asura Scans chapter extraction for: ${seriesUrl}`);
+        const asuraChapters = await extractAsuraChapters(seriesUrl);
+        if (asuraChapters.length > 0) {
+          console.log(`[Scraper] Successfully extracted ${asuraChapters.length} chapters for Asura Scans (${seriesUrl})`);
+          return asuraChapters;
+        }
+      } catch (asuraErr) {
+        console.warn('[Scraper] Custom Asura Scans chapter extraction failed, falling back to standard extraction:', asuraErr);
+      }
+    }
+
     let html = '';
     let usePuppeteerFallback = false;
 
@@ -995,6 +1009,17 @@ export const PREMIUM_KEYWORDS = [
   "🔒", "🔐", "💰", "💎", "🪙", "🏷️",
 ];
 
+const PREMIUM_EMOJIS = ["🔒", "🔐", "💰", "💎", "🪙", "🏷️"];
+const STRICT_PREMIUM_PHRASES = [
+  "early-access", "early access", "subscribers-only", "subscriber only",
+  "fastpass", "fast-pass", "kofi", "patreon", "paywall",
+  "locked chapter", "premium chapter", "coin chapter", "buy chapter",
+  "unlock chapter", "paid chapter", "requires coins", "spend coins",
+  "unlock with", "coins required", "this chapter is locked",
+  "please purchase it to read",
+];
+const WORD_BOUND_PREMIUM_REGEX = /\b(premium|locked|paid|coins?|points?|vip|paywall|buy|purchase|unlock|tickets?|gems?|rental|rent)\b/i;
+
 export function isPremiumOrLockedChapter(chapter: {
   chapterNumber?: number;
   title?: string;
@@ -1008,8 +1033,7 @@ export function isPremiumOrLockedChapter(chapter: {
   // If explicitly marked free / unlocked and has no lock emoji or coin attributes
   if (
     (titleLower.includes("free") || titleLower.includes("unlocked")) &&
-    !/[🔒🔐]/.test(titleLower) &&
-    !/[🔒🔐]/.test(rawLower) &&
+    !PREMIUM_EMOJIS.some((e) => titleLower.includes(e) || rawLower.includes(e)) &&
     !rawLower.includes("lockedchaptermodal") &&
     !rawLower.includes("data-coin") &&
     !rawLower.includes("coin")
@@ -1017,26 +1041,40 @@ export function isPremiumOrLockedChapter(chapter: {
     return false;
   }
 
-  // 1. Keyword checks
-  if (PREMIUM_KEYWORDS.some((kw) => titleLower.includes(kw) || urlLower.includes(kw) || rawLower.includes(kw))) {
+  // 1. Emoji checks
+  if (PREMIUM_EMOJIS.some((e) => titleLower.includes(e) || rawLower.includes(e))) {
     return true;
   }
 
-  // 2. Price / currency / lock patterns
-  if (
-    /\b(?:\d+\s*(?:coins?|points?|gems?|diamonds?|tickets?)|(?:price|cost)\s*[:=]?\s*\d+)\b/i.test(titleLower) ||
-    /\b(?:cost|price|buy|\d+\s*(?:coins?|points?|gems?|diamonds?|tickets?))\b/i.test(rawLower)
-  ) {
-    return true;
-  }
-  if (
-    /\b(?:locked|unlock\s*with|subscriber\s*only|paid\s*chapter|early\s*access|coins?\s*required)\b/i.test(titleLower) ||
-    /\b(?:locked|unlock\s*with|subscriber\s*only|paid\s*chapter|early\s*access|coins?\s*required|this\s+chapter\s+is\s+locked|please\s+purchase\s+it\s+to\s+read)\b/i.test(rawLower)
-  ) {
+  // 2. Strict phrase checks on title, URL, or raw HTML
+  if (STRICT_PREMIUM_PHRASES.some((kw) => titleLower.includes(kw) || urlLower.includes(kw) || rawLower.includes(kw))) {
     return true;
   }
 
-  // 3. HTML attribute and class patterns
+  // 3. Word-bounded checks on title
+  if (WORD_BOUND_PREMIUM_REGEX.test(titleLower)) {
+    return true;
+  }
+
+  // 4. URL path checks
+  if (/\/chapter-(?:lock|coin|paid|buy)\b/i.test(urlLower)) {
+    return true;
+  }
+
+  // 5. Price / currency / lock patterns
+  if (
+    /\b(?:\d+\s*(?:coins?|points?|gems?|diamonds?|tickets?)|(?:price|cost)\s*[:=]?\s*\d+)\b/i.test(titleLower)
+  ) {
+    return true;
+  }
+  if (rawLower) {
+    const cleanRaw = rawLower.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ");
+    if (/\b(?:\d+\s*(?:coins?|points?|gems?|diamonds?|tickets?)|(?:price|cost)\s*[:=]?\s*\d+)\b/i.test(cleanRaw)) {
+      return true;
+    }
+  }
+
+  // 6. HTML attribute and class patterns
   if (
     /class=["'][^"']*\b(locked|is-locked|lock-icon|chapter-locked|has-lock|paid-chapter|premium-chapter|has-thumb\s+lock|locked-tag|wp-manga-chapter-locked|modal-lock|badge-lock)\b[^"']/i.test(rawLower) ||
     /data-(?:locked|paid|premium)=["']true["']/i.test(rawLower) ||
@@ -1045,8 +1083,7 @@ export function isPremiumOrLockedChapter(chapter: {
     /lockedchaptermodal/i.test(rawLower) ||
     /fa-lock|icon-lock|lucide-lock|svg[^>]*lock/i.test(rawLower) ||
     /class=["'][^"']*text-gold[^"']*["'][\s\S]*?(?:svg|<i\b)[\s\S]*?\d+/i.test(rawLower) ||
-    /&quot;isLocked&quot;:\[0,true\]|&quot;isLockedByCoins&quot;:\[0,true\]|&quot;isAccessible&quot;:\[0,false\]/i.test(rawLower) ||
-    /\/chapter-(?:lock|coin|paid|buy)\b/i.test(urlLower)
+    /&quot;isLocked&quot;:\[0,true\]|&quot;isLockedByCoins&quot;:\[0,true\]|&quot;isAccessible&quot;:\[0,false\]/i.test(rawLower)
   ) {
     return true;
   }
@@ -1301,6 +1338,65 @@ export function extractChapterLinks(html: string, baseUrl: string): ChapterInfo[
       }
     } catch (kaynErr) {
       console.warn('[Scraper] Failed parsing Kayn Scans embedded text:', kaynErr);
+    }
+  }
+
+  // Support Asura Scans embedded Astro island data
+  if (isAsuraScansUrl(baseUrl) || html.includes('ChapterListReact')) {
+    try {
+      const islandMatch = html.match(
+        /<astro-island[^>]*component-url="[^"]*ChapterListReact[^"]*"[^>]*props="([^"]*)"/i,
+      );
+      if (islandMatch?.[1]) {
+        const decodedProps = JSON.parse(decodeHtmlEntities(islandMatch[1]));
+        const unwrapped = unwrapAstroValue(decodedProps) as any;
+        const rawChapters: any[] = Array.isArray(unwrapped.chapters) ? unwrapped.chapters : [];
+        let asuraOrigin = "https://asurascans.com";
+        let asuraSeriesSlug = "";
+        try {
+          const u = new URL(baseUrl);
+          asuraOrigin = u.origin;
+          const currentPathParts = u.pathname.split("/").filter(Boolean);
+          asuraSeriesSlug = currentPathParts[currentPathParts.length - 1] || "";
+        } catch {}
+        if (unwrapped.publicUrl) {
+          const pubParts = String(unwrapped.publicUrl).split("/").filter(Boolean);
+          if (pubParts.length > 0) {
+            asuraSeriesSlug = pubParts[pubParts.length - 1];
+          }
+        }
+        if (!asuraSeriesSlug && unwrapped.seriesSlug) {
+          asuraSeriesSlug = unwrapped.seriesSlug;
+        }
+        const nowMs = Date.now();
+
+        for (const item of rawChapters) {
+          const chapterNumber = parseFloat(item.number);
+          if (isNaN(chapterNumber)) continue;
+
+          const isPremium = Boolean(item.is_premium || item.locked);
+          let isEarlyAccess = false;
+          if (item.early_access_until) {
+            const eaTime = new Date(item.early_access_until).getTime();
+            if (!isNaN(eaTime) && eaTime > nowMs) {
+              isEarlyAccess = true;
+            }
+          }
+          if (isPremium || isEarlyAccess) continue;
+
+          const chapterUrl = `${asuraOrigin}/comics/${asuraSeriesSlug}/chapter/${chapterNumber}`;
+          if (!seenUrls.has(chapterUrl)) {
+            seenUrls.add(chapterUrl);
+            chapters.push({
+              chapterNumber,
+              title: item.title ? String(item.title).trim() : undefined,
+              url: chapterUrl,
+            });
+          }
+        }
+      }
+    } catch (asuraErr) {
+      console.warn('[Scraper] Failed parsing Asura embedded Astro data:', asuraErr);
     }
   }
 
@@ -4061,4 +4157,120 @@ async function extractVortexChapterImages(chapterUrl: string): Promise<string[]>
 
   return Array.from(new Set(filtered));
 }
+
+function decodeHtmlEntities(value: string): string {
+  return value
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;|&apos;/g, "'")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&#x([0-9a-f]+);/gi, (_, hex: string) =>
+      String.fromCodePoint(Number.parseInt(hex, 16)),
+    )
+    .replace(/&#(\d+);/g, (_, decimal: string) =>
+      String.fromCodePoint(Number.parseInt(decimal, 10)),
+    )
+    .replace(/&amp;/g, "&");
+}
+
+function unwrapAstroValue(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    if (value.length === 2 && (value[0] === 0 || value[0] === 1)) {
+      return unwrapAstroValue(value[1]);
+    }
+    return value.map(unwrapAstroValue);
+  }
+
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, nested]) => [key, unwrapAstroValue(nested)]),
+    );
+  }
+
+  return value;
+}
+
+async function extractAsuraChapters(seriesUrl: string): Promise<ChapterInfo[]> {
+  const urlObj = new URL(seriesUrl);
+  const response = await fetch(seriesUrl, {
+    headers: {
+      'User-Agent':
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+      'Accept-Language': 'en-US,en;q=0.9',
+    },
+    signal: AbortSignal.timeout(20_000),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch Asura series page: ${response.status} ${response.statusText}`);
+  }
+
+  const html = await response.text();
+  const chapters: ChapterInfo[] = [];
+  const seenNumbers = new Set<number>();
+
+  // 1. Primary: Extract from Astro Island ChapterListReact props
+  const islandMatch = html.match(
+    /<astro-island[^>]*component-url="[^"]*ChapterListReact[^"]*"[^>]*props="([^"]*)"/i,
+  );
+
+  if (islandMatch?.[1]) {
+    try {
+      const decodedProps = JSON.parse(decodeHtmlEntities(islandMatch[1]));
+      const unwrapped = unwrapAstroValue(decodedProps) as any;
+      const rawChapters: any[] = Array.isArray(unwrapped.chapters) ? unwrapped.chapters : [];
+
+      let seriesSlug = "";
+      if (unwrapped.publicUrl) {
+        const pubParts = String(unwrapped.publicUrl).split("/").filter(Boolean);
+        if (pubParts.length > 0) {
+          seriesSlug = pubParts[pubParts.length - 1];
+        }
+      }
+      if (!seriesSlug) {
+        const currentPathParts = urlObj.pathname.split("/").filter(Boolean);
+        seriesSlug = currentPathParts[currentPathParts.length - 1] || unwrapped.seriesSlug || "";
+      }
+
+      const nowMs = Date.now();
+
+      for (const item of rawChapters) {
+        const num = parseFloat(item.number);
+        if (isNaN(num)) continue;
+
+        const isPremium = Boolean(item.is_premium || item.locked);
+        let isEarlyAccess = false;
+        if (item.early_access_until) {
+          const eaTime = new Date(item.early_access_until).getTime();
+          if (!isNaN(eaTime) && eaTime > nowMs) {
+            isEarlyAccess = true;
+          }
+        }
+
+        if (isPremium || isEarlyAccess) continue;
+
+        if (seenNumbers.has(num)) continue;
+        seenNumbers.add(num);
+
+        const chapterUrl = `${urlObj.origin}/comics/${seriesSlug}/chapter/${num}`;
+        chapters.push({
+          chapterNumber: num,
+          title: item.title ? String(item.title).trim() : undefined,
+          url: chapterUrl,
+        });
+      }
+
+      if (chapters.length > 0) {
+        return chapters.sort((a, b) => a.chapterNumber - b.chapterNumber);
+      }
+    } catch (parseErr) {
+      console.warn('[Scraper] Failed parsing Asura Astro island props, falling back to HTML links:', parseErr);
+    }
+  }
+
+  // 2. Fallback: Parse HTML anchor links
+  return extractChapterLinks(html, seriesUrl);
+}
+
 

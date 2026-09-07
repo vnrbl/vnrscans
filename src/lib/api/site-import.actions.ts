@@ -901,7 +901,7 @@ function normalizeMatchKey(value: unknown): string {
 }
 
 function chapterScanKey(chapterNumber: number, scanlationGroup: string | null) {
-  return `${chapterNumber}::${scanlationGroup?.trim() || ""}`;
+  return `${chapterNumber}::${(scanlationGroup || "").trim().toLowerCase()}`;
 }
 
 function slugify(value: string): string {

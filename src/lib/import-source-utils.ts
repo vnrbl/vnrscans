@@ -34,7 +34,7 @@ const SOURCE_PRESETS: Array<{
     imageUrlExample: "https://media.qimanhwa.com/file/qiscans/upload/upload/series/example/chapter/page_001.webp",
   },
   {
-    hostIncludes: "asurascans.com",
+    hostIncludes: "asura",
     sourceSite: "Asura Scans",
     scanlationGroup: "Asura Scans",
     imageUrlExample: "https://cdn.asurascans.com/asura-images/chapters/example/page-001.webp",
