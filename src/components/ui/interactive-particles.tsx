@@ -455,7 +455,7 @@ export function InteractiveParticles({
       const fovWidth = fovHeight * camera.aspect;
       const scaleH = fovHeight / imgHeight;
       const scaleW = fovWidth / imgWidth;
-      const scale = Math.min(scaleH, scaleW) * 0.94;
+      const scale = Math.min(scaleH, scaleW) * 1.02;
       object3D.scale.set(scale, scale, 1);
       hitArea.scale.set(scale, scale, 1);
     };
