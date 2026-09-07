@@ -56,7 +56,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { renderCommentMarkdown, COMMENT_TEXT_COLORS } from "@/lib/bbcode";
 import { useAuth, useIsAdmin } from "@/hooks/useAuth";
-import { Button } from "@/components/ui/button";
+import { Button, AnimatedButton } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { LiveWebGifPicker } from "@/components/comments/LiveWebGifPicker";
 import { saveChapterReadingPosition, getChapterReadingPosition } from "@/lib/reading-position";
@@ -4767,9 +4767,8 @@ function ChapterComments({
                     <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setReplyTo(null)}>
                       Cancel
                     </Button>
-                    <Button
-                      size="sm"
-                      className="h-7 gap-2 px-3 text-xs cursor-pointer"
+                    <AnimatedButton
+                      className="h-7 gap-1.5 px-3 text-xs cursor-pointer rounded-lg font-semibold"
                       disabled={
                         createComment.isPending ||
                         replyUploadingAttachment ||
@@ -4788,7 +4787,7 @@ function ChapterComments({
                     >
                       <Send className="h-3.5 w-3.5" />
                       Reply
-                    </Button>
+                    </AnimatedButton>
                   </div>
                 </div>
               </div>
@@ -4997,8 +4996,8 @@ function ChapterComments({
               />
               Mark as spoiler
             </label>
-            <Button
-              className="h-8 gap-2 px-4 text-xs font-semibold shadow-md shadow-primary/10 hover:brightness-110 active:scale-[0.98] transition-all cursor-pointer"
+            <AnimatedButton
+              className="h-8 gap-2 px-4 text-xs font-semibold shadow-md shadow-primary/10 hover:brightness-110 active:scale-[0.98] transition-all cursor-pointer rounded-lg"
               disabled={
                 !user ||
                 createComment.isPending ||
@@ -5018,7 +5017,7 @@ function ChapterComments({
             >
               <Send className="h-3.5 w-3.5" />
               Post Comment
-            </Button>
+            </AnimatedButton>
           </div>
         </div>
 

@@ -23,6 +23,8 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { HomeStats } from "./HomeStats";
 import { FlipFadeText } from "@/components/ui/flip-fade-text";
+import { LiquidMetalButton } from "@/components/ui/liquid-metal";
+import { AnimatedButton } from "@/components/ui/animated-button";
 
 export const revalidate = 120; // ISR cache for 2 minutes — instant edge HTML response
 
@@ -172,14 +174,23 @@ export default async function Home() {
 
           <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
             <Link href="/home" className="w-full sm:w-auto">
-              <span className="btn-solid-pill w-full justify-center cursor-pointer shadow-lg hover:shadow-white/10 hover:scale-[1.02] transition-all">
-                Start Reading <ArrowRight className="ml-1 h-4 w-4" />
-              </span>
+              <LiquidMetalButton
+                size="md"
+                rightIcon={<ArrowRight className="h-4 w-4" />}
+                className="w-full sm:w-auto"
+                metalConfig={{
+                  colorBack: "#2e0854",
+                  colorTint: "#e9d5ff",
+                  speed: 0.6,
+                }}
+              >
+                Start Reading
+              </LiquidMetalButton>
             </Link>
             <Link href="/browse" className="w-full sm:w-auto">
-              <span className="btn-ghost-pill w-full justify-center cursor-pointer hover:border-purple-400 hover:text-purple-200 transition-all">
+              <AnimatedButton className="w-full sm:w-auto px-7 py-2.5 text-sm font-semibold rounded-full border border-purple-500/30 bg-neutral-950/80 hover:bg-neutral-900 text-neutral-200">
                 Explore Library
-              </span>
+              </AnimatedButton>
             </Link>
           </div>
 

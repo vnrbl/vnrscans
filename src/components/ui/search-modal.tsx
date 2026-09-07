@@ -291,9 +291,7 @@ export function SearchModal({
       role={modal ? "dialog" : undefined}
       aria-modal={modal ? true : undefined}
       className={cn(
-        "mx-auto w-full max-w-xl overflow-hidden rounded-2xl border backdrop-blur-2xl",
-        "border-black/[0.08] bg-white/95 text-neutral-900 shadow-2xl",
-        "dark:border-white/10 dark:bg-neutral-950/95 dark:text-white dark:shadow-[0_24px_64px_-16px_rgba(0,0,0,0.8)]",
+        "mx-auto w-full max-w-xl overflow-hidden rounded-2xl liquid-glass-window text-neutral-900 dark:text-white",
         className,
       )}
     >

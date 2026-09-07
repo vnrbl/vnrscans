@@ -8,7 +8,7 @@ import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth, useIsAdmin } from "@/hooks/useAuth";
-import { Button } from "@/components/ui/button";
+import { Button, AnimatedButton } from "@/components/ui/button";
 import { ScanCoverImporter } from "@/components/admin/ScanCoverImporter";
 import {
   Select,
@@ -530,21 +530,25 @@ export const SeriesActions = React.memo(function SeriesActions({
             href={`/title/${slug}/${readChapterSlug}`}
             className="block"
           >
-            <Button className="h-11 w-full bg-primary text-base font-semibold hover:bg-primary/95 text-primary-foreground shadow-md shadow-primary/10">
-              <BookOpen className="mr-2 h-4 w-4" />
-              {readButtonText}
-            </Button>
+            <AnimatedButton className="h-11 w-full bg-primary text-base font-semibold hover:bg-primary/95 text-primary-foreground shadow-lg shadow-purple-500/10 rounded-xl">
+              <span className="flex items-center justify-center gap-2">
+                <BookOpen className="h-4 w-4" />
+                {readButtonText}
+              </span>
+            </AnimatedButton>
           </Link>
         )}
 
         {user && !isFollowing.data && (
-          <Button
-            className="h-11 w-full bg-primary/90 font-semibold hover:bg-primary text-primary-foreground"
+          <AnimatedButton
+            className="h-11 w-full font-semibold shadow-md rounded-xl"
             onClick={() => toggleFollow.mutate()}
           >
-            <UserPlus className="mr-2 h-4 w-4" />
-            Follow
-          </Button>
+            <span className="flex items-center justify-center gap-2">
+              <UserPlus className="h-4 w-4" />
+              Follow
+            </span>
+          </AnimatedButton>
         )}
 
         {user && isFollowing.data && (

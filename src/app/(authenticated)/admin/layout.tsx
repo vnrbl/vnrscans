@@ -131,17 +131,17 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   return (
     <div className="container mx-auto grid gap-4 px-3 sm:px-6 md:grid-cols-[220px_1fr] md:gap-6 md:px-8 py-3 sm:py-6 lg:px-12 xl:px-16 pb-24 sm:pb-8">
       <aside className="min-w-0 md:sticky md:top-20 md:max-h-[calc(100vh-6rem)] md:self-start md:overflow-y-auto">
-        <div className="mb-2 sm:mb-3 px-2.5 sm:px-3 py-1 text-2xs font-extrabold text-primary uppercase tracking-widest bg-primary/10 rounded-md border border-primary/20 w-fit">
+        <div className="mb-2 sm:mb-3 px-3 py-1 text-2xs font-extrabold text-purple-300 uppercase tracking-widest liquid-glass-pill rounded-lg border border-purple-400/30 w-fit shadow-[0_0_15px_rgba(168,85,247,0.2)]">
           {panelTitle}
         </div>
-        <nav className="flex gap-1.5 overflow-x-auto no-scrollbar rounded-xl border border-border/40 bg-card/80 p-1.5 md:block md:space-y-1 md:overflow-visible">
+        <nav className="liquid-glass-pill rounded-2xl p-2 flex gap-1.5 overflow-x-auto no-scrollbar md:block md:space-y-1 md:overflow-visible shadow-2xl">
           {visibleItems.map((it) => (
             <Link
               key={it.to}
               to={it.to}
-              activeProps={{ className: "bg-primary/15 text-primary font-semibold" }}
+              activeProps={{ className: "liquid-glass bg-purple-600/20 text-white font-semibold border border-purple-400/40 shadow-[0_0_12px_rgba(168,85,247,0.25)]" }}
               activeOptions={{ exact: it.exact }}
-              className="flex shrink-0 items-center gap-1.5 sm:gap-2 rounded-lg px-2.5 py-1.5 sm:px-3 sm:py-2 text-xs sm:text-sm font-medium text-muted-foreground hover:bg-secondary hover:text-foreground md:shrink transition-colors"
+              className="flex shrink-0 items-center gap-1.5 sm:gap-2 rounded-xl px-2.5 py-1.5 sm:px-3 sm:py-2 text-xs sm:text-sm font-medium text-neutral-400 hover:bg-white/[0.05] hover:text-white md:shrink transition-all"
             >
               <it.icon className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
               <span>{it.label}</span>

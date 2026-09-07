@@ -740,7 +740,7 @@ export function LiveSeriesEditor({ series: initialSeries, slug, trigger }: LiveS
           )}
         </DialogTrigger>
 
-        <DialogContent className="w-[calc(100vw-1rem)] sm:w-full max-w-4xl max-h-[92dvh] sm:max-h-[90vh] overflow-hidden flex flex-col p-0 gap-0 bg-[#0d0d12] border-border/40 text-foreground shadow-2xl">
+        <DialogContent className="w-[calc(100vw-1rem)] sm:w-full max-w-4xl max-h-[92dvh] sm:max-h-[90vh] overflow-hidden flex flex-col p-0 gap-0 liquid-glass-window border-white/15 text-foreground shadow-2xl">
           {/* Top Header Bar */}
           <DialogHeader className="p-3 sm:p-6 pb-2.5 sm:pb-3 border-b border-border/20 bg-card/60 backdrop-blur-sm shrink-0">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pr-8 sm:pr-0">

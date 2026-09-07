@@ -90,45 +90,45 @@ export default function AdminHome() {
 
       <div className="mt-4 sm:mt-6 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5 sm:gap-3">
         {cards.map((card) => (
-          <div key={card.label} className="rounded-xl border border-border/40 bg-card p-3 sm:p-5 shadow-sm">
+          <div key={card.label} className="rounded-2xl liquid-glass-card p-3.5 sm:p-5 group">
             <div className="flex items-center justify-between">
-              <span className="text-xs sm:text-sm text-muted-foreground font-medium truncate">{card.label}</span>
-              <card.icon className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-primary shrink-0 ml-1" />
+              <span className="text-xs sm:text-sm text-neutral-400 font-medium truncate">{card.label}</span>
+              <card.icon className="h-4 w-4 text-purple-400 shrink-0 ml-1 group-hover:scale-110 transition-transform" />
             </div>
-            <div className="mt-1.5 sm:mt-2 text-xl sm:text-3xl font-bold tracking-tight">{card.value ?? "-"}</div>
+            <div className="mt-1.5 sm:mt-2 text-xl sm:text-3xl font-bold tracking-tight text-white font-mono">{card.value ?? "-"}</div>
           </div>
         ))}
       </div>
 
-      <div className="mt-6">
-        <div className="mb-3 flex flex-wrap items-end justify-between gap-2.5">
+      <div className="mt-8">
+        <div className="mb-3.5 flex flex-wrap items-end justify-between gap-2.5">
           <div>
-            <h2 className="text-base sm:text-lg font-semibold tracking-tight">Management Queue</h2>
+            <h2 className="text-base sm:text-lg font-semibold tracking-tight text-white">Management Queue</h2>
             <p className="text-xs sm:text-sm text-muted-foreground">
               Quick links for the work that usually needs admin attention first.
             </p>
           </div>
-          <Button asChild variant="outline" size="sm" className="h-8 text-xs">
+          <Button asChild variant="outline" size="sm" className="h-8 text-xs rounded-full border-white/15 hover:border-purple-400/40 liquid-glass">
             <Link to="/admin/comments">Review comments</Link>
           </Button>
         </div>
 
-        <div className="grid gap-2.5 sm:gap-3 sm:grid-cols-2">
+        <div className="grid gap-3 sm:grid-cols-2">
           {managementQueues.map((item) => (
             <Link
               key={item.label}
               to={item.to}
-              className="rounded-xl border border-border/40 bg-card p-3 sm:p-4 transition-colors hover:border-primary/40 hover:bg-secondary/50 shadow-sm"
+              className="rounded-2xl liquid-glass-card p-3.5 sm:p-4 hover:scale-[1.01] transition-all group"
             >
               <div className="flex items-start justify-between gap-2.5">
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
                     <item.icon className={`h-4 w-4 ${item.tone} shrink-0`} />
-                    <span className="font-semibold text-xs sm:text-sm">{item.label}</span>
+                    <span className="font-semibold text-xs sm:text-sm text-white group-hover:text-purple-300 transition-colors">{item.label}</span>
                   </div>
-                  <p className="mt-1 text-xs sm:text-sm text-muted-foreground line-clamp-2">{item.description}</p>
+                  <p className="mt-1 text-xs text-muted-foreground line-clamp-2">{item.description}</p>
                 </div>
-                <span className="rounded-md bg-secondary px-2 py-1 text-xs sm:text-sm font-bold shrink-0">
+                <span className="rounded-lg liquid-glass-pill px-2.5 py-1 text-xs sm:text-sm font-bold font-mono text-purple-300 shrink-0">
                   {item.value ?? "-"}
                 </span>
               </div>
