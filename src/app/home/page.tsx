@@ -30,7 +30,9 @@ export const metadata: Metadata = {
 };
 
 async function fetchHomeInitialData(): Promise<HomeInitialData> {
-  const [carouselRes, latestRes, popularRes, highScoreRes] = await Promise.all([
+  // CRITICAL: Do NOT cap limit_count to small values (e.g. 48).
+  // Home page must load all series (up to 1000) so "Load More" can display and paginate through the entire catalog!
+  const [carouselRes, latestRes, allSeriesRes, popularRes, highScoreRes] = await Promise.all([
     supabase
       .from("carousel_items")
       .select(`
@@ -46,7 +48,8 @@ async function fetchHomeInitialData(): Promise<HomeInitialData> {
       `)
       .eq("is_active", true)
       .order("position", { ascending: true }),
-    supabase.rpc("get_series_with_latest_chapters", { limit_count: 48 }),
+    supabase.rpc("get_series_with_latest_chapters", { limit_count: 1000 }),
+    supabase.from("series").select("id,slug,title,cover_url,type,updated_at").order("title"),
     supabase
       .from("series")
       .select("id,slug,title,cover_url,type,rating_average,status,view_count")
@@ -59,7 +62,43 @@ async function fetchHomeInitialData(): Promise<HomeInitialData> {
       .limit(15),
   ]);
 
-  const latestUpdates: HomeLatestUpdate[] = (latestRes.data ?? []).map((series: any) => ({
+  const rpcMap = new Map((latestRes.data ?? []).map((s: any) => [s.id, s]));
+  const fullSeriesList = (allSeriesRes.data ?? []).map((s: any) => {
+    const existing = rpcMap.get(s.id);
+    if (existing) {
+      // Ensure sorting strictly matches the newest timestamp between DB record and visible chapter cards
+      const chTimestamps = (existing.recent_chapters ?? [])
+        .map((c: any) => new Date(c.created_at || 0).getTime())
+        .filter((t: number) => !isNaN(t) && t > 0);
+      const dbTimestamp = existing.latest_chapter_created_at
+        ? new Date(existing.latest_chapter_created_at).getTime()
+        : 0;
+      const bestTimestamp = Math.max(dbTimestamp, ...chTimestamps);
+      const bestDateStr = bestTimestamp > 0 ? new Date(bestTimestamp).toISOString() : existing.latest_chapter_created_at;
+
+      return {
+        ...existing,
+        latest_chapter_created_at: bestDateStr,
+      };
+    }
+    return {
+      id: s.id,
+      slug: s.slug,
+      title: s.title,
+      cover_url: s.cover_url,
+      type: s.type,
+      latest_chapter_created_at: s.updated_at,
+      recent_chapters: [],
+    };
+  });
+
+  fullSeriesList.sort(
+    (a: any, b: any) =>
+      new Date(b.latest_chapter_created_at || 0).getTime() -
+      new Date(a.latest_chapter_created_at || 0).getTime()
+  );
+
+  const latestUpdates: HomeLatestUpdate[] = fullSeriesList.map((series: any) => ({
     id: series.id,
     slug: series.slug,
     title: series.title,

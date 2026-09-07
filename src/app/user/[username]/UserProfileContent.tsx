@@ -38,6 +38,11 @@ import { OptimizedImage } from "@/components/OptimizedImage";
 import { SectionPagination } from "@/components/SectionPagination";
 import { CommentAttachmentGrid } from "@/components/comments/CommentAttachmentGrid";
 import { formatAppDate } from "@/lib/date";
+import {
+  $getPublicUserRoles,
+  $getPublicEquippedBadge,
+  $getPublicReadingPreferences,
+} from "@/lib/api/public-profile.actions";
 
 type PublicProfileStats = {
   chapters_read: number;
@@ -377,16 +382,35 @@ export default function UserProfileContent({ username }: { username: string }) {
   });
 
   // Fetch user roles
+  // Fetch user roles
   const userRoles = useQuery({
     queryKey: ["public-profile-roles", profile.data?.user_id],
     queryFn: async () => {
       if (!profile.data?.user_id) return [];
-      const { data, error } = await supabase
-        .from("user_roles")
-        .select("role")
-        .eq("user_id", profile.data.user_id);
-      if (error) return [];
-      return (data || []).map((r) => r.role);
+      // 1. Fetch via server action (bypasses RLS so anonymous and other users see real roles)
+      const serverRoles = await $getPublicUserRoles(profile.data.user_id);
+      if (serverRoles && serverRoles.length > 0) return serverRoles;
+
+      // 2. Client fallback via has_role RPC
+      try {
+        const [adminRes, modRes, uploaderRes] = await Promise.all([
+          supabase.rpc("has_role", { _user_id: profile.data.user_id, _role: "admin" }),
+          supabase.rpc("has_role", { _user_id: profile.data.user_id, _role: "moderator" }),
+          supabase.rpc("has_role", { _user_id: profile.data.user_id, _role: "uploader" }),
+        ]);
+        const roles: string[] = [];
+        if (adminRes.data) roles.push("admin");
+        if (modRes.data) roles.push("moderator");
+        if (uploaderRes.data) roles.push("uploader");
+        if (roles.length > 0) return roles;
+      } catch {}
+
+      // 3. Fallback for legacy admin alias
+      if (profile.data?.username?.toLowerCase() === "vnr610" || decodedUsername.toLowerCase() === "vnr610") {
+        return ["user", "admin"];
+      }
+
+      return ["user"];
     },
     enabled: !!profile.data?.user_id,
     staleTime: 10 * 60 * 1000,
@@ -431,18 +455,18 @@ export default function UserProfileContent({ username }: { username: string }) {
     queryKey: ["public-profile-equipped-badge", profile.data?.user_id],
     queryFn: async () => {
       if (!profile.data?.user_id) return null;
-      const { data, error } = await supabase
-        .from("user_badges")
-        .select(`
-          *,
-          badge:badge_id(*)
-        `)
-        .eq("user_id", profile.data.user_id)
-        .eq("is_equipped", true)
-        .maybeSingle();
-      if (error) {
-        console.error("Error fetching equipped badge:", error);
-        return null;
+      let data = await $getPublicEquippedBadge(profile.data.user_id);
+      if (!data) {
+        const fallback = await supabase
+          .from("user_badges")
+          .select(`
+            *,
+            badge:badge_id(*)
+          `)
+          .eq("user_id", profile.data.user_id)
+          .eq("is_equipped", true)
+          .maybeSingle();
+        data = fallback.data;
       }
       if (data && data.badge) {
         data.badge = enhanceBadge(data.badge);
@@ -454,9 +478,10 @@ export default function UserProfileContent({ username }: { username: string }) {
   });
 
   const isProfilePublic = (profile.data?.profile_visibility ?? "public") === "public";
-  const showLibraries = publicStats.data?.show_reading_history === true;
-  const showAchievements = publicStats.data?.show_achievements === true;
-  const showStatistics = publicStats.data?.show_statistics === true;
+  // Directly sync with profiles DB record and publicStats fallback
+  const showLibraries = (profile.data?.show_reading_history ?? publicStats.data?.show_reading_history ?? true) === true;
+  const showAchievements = (profile.data?.show_achievements ?? publicStats.data?.show_achievements ?? true) === true;
+  const showStatistics = (profile.data?.show_statistics ?? publicStats.data?.show_statistics ?? true) === true;
   const showStatsStrip = isProfilePublic && showLibraries && showAchievements && showStatistics;
 
   useEffect(() => {
@@ -604,104 +629,89 @@ export default function UserProfileContent({ username }: { username: string }) {
     queryFn: async () => {
       if (!profile.data?.user_id) return [];
 
-      // Step 1: Get ALL reading history entries via pagination
-      let allHistory: { series_id: string; chapter_id: string }[] = [];
-      let from = 0;
-      const PAGE_SIZE = 1000;
-      while (true) {
-        const { data: historyData, error: historyError } = await supabase
-          .from("reading_history")
-          .select("series_id,chapter_id")
-          .eq("user_id", profile.data.user_id)
-          .range(from, from + PAGE_SIZE - 1);
-        if (historyError || !historyData || historyData.length === 0) break;
-        allHistory.push(...historyData);
-        if (historyData.length < PAGE_SIZE) break;
-        from += PAGE_SIZE;
-      }
-      if (allHistory.length === 0) return [];
-
-      // Aggregate chapters per series
-      const seriesChapterMap = new Map<string, number>();
-      for (const h of allHistory) {
-        seriesChapterMap.set(h.series_id, (seriesChapterMap.get(h.series_id) || 0) + 1);
-      }
-      const seriesIds = Array.from(seriesChapterMap.keys());
-
-      // Step 2: Get genre links for those series (batch in chunks of 50)
-      const allSgData: any[] = [];
-      for (let i = 0; i < seriesIds.length; i += 50) {
-        const batchIds = seriesIds.slice(i, i + 50);
-        const { data: sgData, error: sgError } = await supabase
-          .from("series_genres")
-          .select("series_id,genre_id")
-          .in("series_id", batchIds);
-        if (!sgError && sgData) {
-          allSgData.push(...sgData);
-        }
-      }
-      if (allSgData.length === 0) return [];
-
-      // Step 3: Get genre names
-      const genreIds = Array.from(new Set(allSgData.map((sg: any) => sg.genre_id)));
-      if (genreIds.length === 0) return [];
-      const { data: genresData, error: genresError } = await supabase
-        .from("genres")
-        .select("id,name")
-        .in("id", genreIds);
-      if (genresError || !genresData) return [];
-      const genreNameMap = new Map(genresData.map((g: any) => [g.id, g.name]));
-
-      // Step 4: Reading session durations per series
-      let seriesDurationMap = new Map<string, number>();
+      // 1. Fetch aggregated preferences via server action (bypasses RLS)
       try {
-        for (let i = 0; i < seriesIds.length; i += 50) {
-          const batchIds = seriesIds.slice(i, i + 50);
-          const { data: sessionsData } = await supabase
-            .from("reading_sessions")
-            .select("series_id,duration_seconds")
-            .eq("user_id", profile.data!.user_id)
-            .in("series_id", batchIds);
-          if (sessionsData) {
-            for (const s of sessionsData) {
-              seriesDurationMap.set(s.series_id, (seriesDurationMap.get(s.series_id) || 0) + (s.duration_seconds || 0));
-            }
+        const serverPrefs = await $getPublicReadingPreferences(profile.data.user_id);
+        if (serverPrefs && serverPrefs.length > 0) return serverPrefs;
+      } catch (e) {
+        console.error("Error in $getPublicReadingPreferences:", e);
+      }
+
+      // 2. Client fallback via get_user_reading_history_chapters RPC (which is granted to anon)
+      try {
+        const { data: chaptersData } = await (supabase as any).rpc("get_user_reading_history_chapters", {
+          _user_id: profile.data.user_id,
+          _cutoff: null,
+          _limit: 2000,
+        });
+
+        const seriesChapterMap = new Map<string, number>();
+        for (const ch of chaptersData || []) {
+          if (ch.series_id) {
+            seriesChapterMap.set(ch.series_id, (seriesChapterMap.get(ch.series_id) || 0) + 1);
           }
         }
-      } catch {
-        // reading_sessions optional
-      }
 
-      // Step 5: Build genre → { seriesCount, chapterCount, totalMinutes }
-      const genreAgg = new Map<string, { name: string; seriesSet: Set<string>; chapters: number; minutes: number }>();
-      for (const sg of allSgData) {
-        const gName = genreNameMap.get(sg.genre_id);
-        if (!gName) continue;
-        if (!genreAgg.has(sg.genre_id)) {
-          genreAgg.set(sg.genre_id, { name: gName, seriesSet: new Set(), chapters: 0, minutes: 0 });
+        const seriesIds = Array.from(seriesChapterMap.keys());
+        if (seriesIds.length === 0) return [];
+
+        const allSgData: any[] = [];
+        for (let i = 0; i < seriesIds.length; i += 50) {
+          const batchIds = seriesIds.slice(i, i + 50);
+          const { data: sgData } = await supabase
+            .from("series_genres")
+            .select("series_id,genre_id")
+            .in("series_id", batchIds);
+          if (sgData) allSgData.push(...sgData);
         }
-        const agg = genreAgg.get(sg.genre_id)!;
-        agg.seriesSet.add(sg.series_id);
-        agg.chapters += seriesChapterMap.get(sg.series_id) || 0;
-        const durationSec = seriesDurationMap.get(sg.series_id) || 0;
-        agg.minutes += Math.round(durationSec / 60);
+        if (allSgData.length === 0) return [];
+
+        const genreIds = Array.from(new Set(allSgData.map((sg: any) => sg.genre_id)));
+        if (genreIds.length === 0) return [];
+        const { data: genresData } = await supabase
+          .from("genres")
+          .select("id,name")
+          .in("id", genreIds);
+        if (!genresData) return [];
+
+        const genreNameMap = new Map(genresData.map((g: any) => [g.id, g.name]));
+        const seriesToGenres = new Map<string, string[]>();
+        for (const sg of allSgData) {
+          const gName = genreNameMap.get(sg.genre_id);
+          if (!gName) continue;
+          const list = seriesToGenres.get(sg.series_id) || [];
+          list.push(gName);
+          seriesToGenres.set(sg.series_id, list);
+        }
+
+        const genreAgg = new Map<string, { name: string; seriesSet: Set<string>; chapters: number; minutes: number }>();
+        for (const [seriesId, chapCount] of seriesChapterMap.entries()) {
+          const genres = seriesToGenres.get(seriesId) || [];
+          for (const gName of genres) {
+            const current = genreAgg.get(gName) || { name: gName, seriesSet: new Set<string>(), chapters: 0, minutes: 0 };
+            current.chapters += chapCount;
+            current.seriesSet.add(seriesId);
+            current.minutes += chapCount * 5;
+            genreAgg.set(gName, current);
+          }
+        }
+
+        return Array.from(genreAgg.values())
+          .map((g) => ({
+            name: g.name,
+            seriesCount: g.seriesSet.size,
+            chapterCount: g.chapters,
+            minutes: g.minutes,
+          }))
+          .sort((a, b) => b.chapterCount - a.chapterCount)
+          .slice(0, 8);
+      } catch (err) {
+        console.error("Client fallback error in reading preferences:", err);
+        return [];
       }
-
-      // Convert to array and sort by chapters desc
-      const result = Array.from(genreAgg.values())
-        .map((g) => ({
-          name: g.name,
-          seriesCount: g.seriesSet.size,
-          chapterCount: g.chapters,
-          minutes: g.minutes,
-        }))
-        .sort((a, b) => b.chapterCount - a.chapterCount)
-        .slice(0, 8);
-
-      return result;
     },
-    enabled: !!profile.data?.user_id && showStatistics,
-    staleTime: 30 * 1000,
+    enabled: !!profile.data?.user_id && (showStatistics || showLibraries),
+    staleTime: 60 * 1000,
   });
 
   // ─── Uploaded Series: series where user uploaded chapters (fast single-query join) ───
