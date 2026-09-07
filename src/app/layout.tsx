@@ -5,7 +5,6 @@ import "@/styles.css";
 
 const inter = Inter({
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700", "800", "900"],
   display: "swap",
   variable: "--font-inter",
 });
@@ -71,6 +70,12 @@ export default function RootLayout({
         <link rel="dns-prefetch" href="https://media.qiscans.org" />
         <link rel="preconnect" href="https://cdn.asurascans.com" crossOrigin="" />
         <link rel="dns-prefetch" href="https://cdn.asurascans.com" />
+        <link rel="preconnect" href="https://witchtoons.net" crossOrigin="" />
+        <link rel="dns-prefetch" href="https://witchtoons.net" />
+        <link rel="preconnect" href="https://cdn.duskscans.com" crossOrigin="" />
+        <link rel="dns-prefetch" href="https://cdn.duskscans.com" />
+        <link rel="preconnect" href="https://elftoon.com" crossOrigin="" />
+        <link rel="dns-prefetch" href="https://elftoon.com" />
         <link rel="dns-prefetch" href="https://meo.comick.pictures" />
       </head>
       <body suppressHydrationWarning>

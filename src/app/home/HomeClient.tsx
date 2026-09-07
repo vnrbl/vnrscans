@@ -425,12 +425,12 @@ function HomeContent({ initialData }: { initialData?: HomeInitialData }) {
       }));
     },
     initialData: latestUpdatesInitialData,
-    initialDataUpdatedAt: 0, // Immediately stale on client mount: triggers fast background refetch
-    staleTime: 1000 * 3, // 3 seconds
-    gcTime: 1000 * 60 * 20,
-    refetchInterval: 10000, // 10 seconds polling fallback
-    refetchOnMount: true,
-    refetchOnWindowFocus: true,
+    initialDataUpdatedAt: Date.now(),
+    staleTime: 1000 * 60 * 5, // 5 minutes cache
+    gcTime: 1000 * 60 * 30,
+    refetchInterval: false, // Live updates handled by Supabase Realtime channel below
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
   });
 
   // Realtime subscription: synchronize Latest Updates and Reading History with live DB updates

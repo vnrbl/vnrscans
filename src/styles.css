@@ -746,3 +746,34 @@ html.reader-filter-dim .reader-page-container img {
   overflow: hidden !important;
   word-break: break-word;
 }
+
+/* ==========================================================================
+   ⚡ 60 FPS Smooth Scrolling & Hardware Acceleration Standards
+   ========================================================================== */
+html {
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}
+
+/* Fast GPU compositing & offscreen layout isolation for Reader */
+.reader-page-container {
+  contain: layout paint style;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 800px;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}
+
+/* Optimize series cards offscreen rendering */
+.series-card-item {
+  contain: layout paint;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 340px;
+}
+

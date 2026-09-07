@@ -3,7 +3,7 @@
 import NextLink from "next/link";
 import { useRouter } from "next/navigation";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
-import { useEffect, useState, useRef, useMemo, useCallback, type ReactNode } from "react";
+import { useEffect, useState, useRef, useMemo, useCallback, memo, type ReactNode } from "react";
 import {
   ChevronLeft,
   ChevronRight,
@@ -614,11 +614,22 @@ export default function Reader({
       }
     }
 
-    window.addEventListener("scroll", checkCompletion, { passive: true });
+    let ticking = false;
+    const throttledCheck = () => {
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          checkCompletion();
+          ticking = false;
+        });
+        ticking = true;
+      }
+    };
+
+    window.addEventListener("scroll", throttledCheck, { passive: true });
 
     return () => {
       if (observer) observer.disconnect();
-      window.removeEventListener("scroll", checkCompletion);
+      window.removeEventListener("scroll", throttledCheck);
     };
   }, [user, chapterQ.data, awardXp]);
 
@@ -1698,6 +1709,150 @@ function ScheduledChapterUnlockView({
   );
 }
 
+interface ChapterPageItemProps {
+  page: {
+    id: string;
+    image_url: string;
+    page_number: number;
+  };
+  index: number;
+  seriesTitle?: string;
+  chapterNumber?: number;
+  isPriority: boolean;
+}
+
+const ChapterPageItem = memo(function ChapterPageItem({
+  page,
+  index,
+  seriesTitle,
+  chapterNumber,
+  isPriority,
+}: ChapterPageItemProps) {
+  const [isLoading, setIsLoading] = useState(true);
+  const [hasError, setHasError] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
+  const [imgSrc, setImgSrc] = useState(page.image_url);
+
+  const handleRetry = useCallback(() => {
+    setHasError(false);
+    setIsLoading(true);
+    setRetryCount((prev) => {
+      const next = prev + 1;
+      setImgSrc(
+        page.image_url +
+          (page.image_url.includes("?") ? "&" : "?") +
+          `retry=${next}&t=${Date.now()}`
+      );
+      return next;
+    });
+  }, [page.image_url]);
+
+  const onError = useCallback(() => {
+    if (retryCount < 2) {
+      const next = retryCount + 1;
+      setRetryCount(next);
+      setTimeout(() => {
+        setImgSrc(
+          page.image_url +
+            (page.image_url.includes("?") ? "&" : "?") +
+            `retry=${next}&t=${Date.now()}`
+        );
+      }, 1000 * next);
+    } else {
+      setIsLoading(false);
+      setHasError(true);
+    }
+  }, [page.image_url, retryCount]);
+
+  const onLoad = useCallback(() => {
+    setIsLoading(false);
+  }, []);
+
+  const isVideo = isVideoUrl(page.image_url);
+
+  return (
+    <div
+      id={`chapter-page-${index}`}
+      data-page-index={index}
+      className={`relative scroll-mt-14 reader-page-container w-full max-w-full overflow-hidden transition-[min-height] duration-200 ${
+        isLoading && !hasError ? "min-h-[420px] sm:min-h-[600px] bg-secondary/30" : "min-h-0"
+      }`}
+      style={{
+        contentVisibility: "auto",
+        containIntrinsicSize: "auto 800px",
+      }}
+    >
+      {hasError ? (
+        <div className="mx-auto flex aspect-[2/3] w-full flex-col items-center justify-center rounded-lg border-2 border-dashed border-border bg-secondary/50 text-center">
+          <div className="rounded-full bg-destructive/20 p-4 text-destructive">
+            <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+              />
+            </svg>
+          </div>
+          <p className="mt-4 text-sm font-medium text-foreground">
+            Failed to load Page {page.page_number}
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Image URL may be broken or expired
+          </p>
+          <button
+            onClick={handleRetry}
+            className="mt-4 rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground hover:bg-primary/90 cursor-pointer"
+          >
+            Retry
+          </button>
+        </div>
+      ) : (
+        <>
+          {isLoading && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-secondary/40 animate-pulse select-none pointer-events-none">
+              <div className="h-7 w-7 animate-spin rounded-full border-2 border-primary border-t-transparent mb-2" />
+              <span className="text-[11px] font-medium text-neutral-400">Page {page.page_number}</span>
+            </div>
+          )}
+          {isVideo ? (
+            <video
+              data-page-id={page.id}
+              src={imgSrc}
+              autoPlay
+              loop
+              muted
+              playsInline
+              className="mx-auto block w-full transition-transform duration-200"
+              style={{
+                opacity: isLoading ? 0.3 : 1,
+              }}
+              onLoadedData={onLoad}
+              onError={onError}
+            />
+          ) : (
+            <img
+              data-page-id={page.id}
+              src={imgSrc}
+              alt={`${seriesTitle || "Manga"} Chapter ${chapterNumber} Page ${page.page_number} - vnrscans`}
+              loading={isPriority ? "eager" : "lazy"}
+              decoding="async"
+              fetchPriority={isPriority ? "high" : "auto"}
+              className="mx-auto block w-full max-w-full h-auto object-contain transition-opacity duration-200"
+              referrerPolicy="no-referrer"
+              style={{
+                opacity: isLoading ? 0.2 : 1,
+              }}
+              onLoad={onLoad}
+              onError={onError}
+            />
+          )}
+        </>
+      )}
+    </div>
+  );
+});
+
 function ImageView({
   pages,
   loading,
@@ -1729,11 +1884,6 @@ function ImageView({
 }) {
   // ALL HOOKS MUST BE AT THE TOP - BEFORE ANY CONDITIONAL RETURNS
   const { user } = useAuth();
-
-  // Image error handling state - moved to top
-  const [imageErrors, setImageErrors] = useState<Record<string, boolean>>({});
-  const [imageRetries, setImageRetries] = useState<Record<string, number>>({});
-  const [imageLoading, setImageLoading] = useState<Record<string, boolean>>({});
 
   // Exact reading position tracking & continue where left off prompt
   type ContinuePromptData = {
@@ -1827,9 +1977,54 @@ function ImageView({
     []
   );
 
-  // Track scroll position and visible page element
+  // Native high-performance IntersectionObserver: track visible page with 0 layout thrashing
+  useEffect(() => {
+    if (!pages?.length || typeof window === "undefined" || typeof IntersectionObserver === "undefined") return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            const idxStr = entry.target.getAttribute("data-page-index");
+            if (idxStr != null) {
+              const idx = parseInt(idxStr, 10);
+              if (!isNaN(idx)) {
+                activePageRef.current = idx;
+                // Proactive predictive preloading: preload next 2 pages ahead of reading direction
+                if (pages) {
+                  for (let offset = 1; offset <= 2; offset++) {
+                    const nextPg = pages[idx + offset];
+                    if (nextPg?.image_url && !isVideoUrl(nextPg.image_url)) {
+                      const img = new window.Image();
+                      img.src = nextPg.image_url;
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      {
+        rootMargin: "-35% 0px -35% 0px", // Mid-viewport crossing detection
+        threshold: 0,
+      }
+    );
+
+    for (let i = 0; i < pages.length; i++) {
+      const el = document.getElementById(`chapter-page-${i}`);
+      if (el) observer.observe(el);
+    }
+
+    return () => observer.disconnect();
+  }, [pages]);
+
+  // Track scroll position and save reading progress throttled without forced reflows
   useEffect(() => {
     if (!chapterId || loading || !pages?.length) return;
+
+    let ticking = false;
+    let saveTimeout: NodeJS.Timeout | null = null;
 
     const handleScroll = () => {
       // Do NOT overwrite saved position while page is mounting, restoring, or in grace lock
@@ -1838,20 +2033,7 @@ function ImageView({
       const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
       const scrollHeight = document.documentElement.scrollHeight - window.innerHeight;
       const scrollRatio = scrollHeight > 0 ? scrollTop / scrollHeight : 0;
-
-      // Find which page is currently centered/visible in the viewport
-      const viewportMid = window.innerHeight / 2;
-      let visibleIdx = 0;
-      for (let i = 0; i < pages.length; i++) {
-        const el = document.getElementById(`chapter-page-${i}`);
-        if (el) {
-          const rect = el.getBoundingClientRect();
-          if (rect.top <= viewportMid && rect.bottom >= 0) {
-            visibleIdx = i;
-          }
-        }
-      }
-      activePageRef.current = visibleIdx;
+      const visibleIdx = activePageRef.current;
 
       saveChapterReadingPosition({
         chapterId,
@@ -1864,17 +2046,23 @@ function ImageView({
       });
     };
 
-    let scrollTimeout: NodeJS.Timeout;
-    const throttledScroll = () => {
-      clearTimeout(scrollTimeout);
-      scrollTimeout = setTimeout(handleScroll, 120);
+    const onScroll = () => {
+      if (isRestoringRef.current || Date.now() < restoreLockUntilRef.current) return;
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          ticking = false;
+        });
+        ticking = true;
+      }
+      if (saveTimeout) clearTimeout(saveTimeout);
+      saveTimeout = setTimeout(handleScroll, 200);
     };
 
-    window.addEventListener("scroll", throttledScroll, { passive: true });
+    window.addEventListener("scroll", onScroll, { passive: true });
 
     return () => {
-      clearTimeout(scrollTimeout);
-      window.removeEventListener("scroll", throttledScroll);
+      if (saveTimeout) clearTimeout(saveTimeout);
+      window.removeEventListener("scroll", onScroll);
       if (!isRestoringRef.current && Date.now() >= restoreLockUntilRef.current) {
         handleScroll();
       }
@@ -2017,44 +2205,6 @@ function ImageView({
     );
   }
 
-  const handleImageError = (pageId: string, imageUrl: string) => {
-    setImageLoading((prev) => ({ ...prev, [pageId]: false }));
-    const retryCount = imageRetries[pageId] || 0;
-
-    // Try up to 2 retries
-    if (retryCount < 2) {
-      setImageRetries((prev) => ({ ...prev, [pageId]: retryCount + 1 }));
-      // Force reload by adding timestamp
-      const img = document.querySelector(`img[data-page-id="${pageId}"]`) as HTMLImageElement;
-      if (img) {
-        setTimeout(
-          () => {
-            setImageLoading((prev) => ({ ...prev, [pageId]: true }));
-            img.src =
-              imageUrl +
-              (imageUrl.includes("?") ? "&" : "?") +
-              `retry=${retryCount + 1}&t=${Date.now()}`;
-          },
-          1000 * (retryCount + 1),
-        ); // Progressive delay: 1s, 2s
-      }
-    } else {
-      // Mark as failed after retries
-      setImageErrors((prev) => ({ ...prev, [pageId]: true }));
-    }
-  };
-
-  const handleImageLoad = (pageId: string, pageIdx?: number) => {
-    setImageLoading((prev) => ({ ...prev, [pageId]: false }));
-    if (pageIdx != null && pages && typeof window !== "undefined") {
-      const nextSlice = pages[pageIdx + 1];
-      if (nextSlice?.image_url && !isVideoUrl(nextSlice.image_url)) {
-        const preloadImg = new window.Image();
-        preloadImg.src = nextSlice.image_url;
-      }
-    }
-  };
-
   return (
     <>
       {/* Floating Continue Where You Left Off Prompt (Matching site purple theme & user screenshot) */}
@@ -2099,112 +2249,20 @@ function ImageView({
 
       {/* Pages */}
       <div className="mx-auto max-w-3xl w-full px-0 sm:px-2 py-2 sm:py-4">
-        {pages.map((p, idx) => {
-          const isLoading = imageLoading[p.id] !== false;
-          return (
-            <div
-              key={p.id}
-              id={`chapter-page-${idx}`}
-              data-page-index={idx}
-              className={`relative scroll-mt-14 reader-page-container w-full max-w-full overflow-hidden transition-[min-height] duration-200 ${
-                isLoading && !imageErrors[p.id] ? "min-h-[420px] sm:min-h-[600px] bg-secondary/30" : "min-h-0"
-              }`}
-              style={{
-                contentVisibility: "auto",
-                containIntrinsicSize: "auto 800px",
-              }}
-            >
-              {imageErrors[p.id] ? (
-                // Error fallback UI
-                <div className="mx-auto flex aspect-[2/3] w-full flex-col items-center justify-center rounded-lg border-2 border-dashed border-border bg-secondary/50 text-center">
-                  <div className="rounded-full bg-destructive/20 p-4 text-destructive">
-                    <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-                      />
-                    </svg>
-                  </div>
-                  <p className="mt-4 text-sm font-medium text-foreground">
-                    Failed to load Page {p.page_number}
-                  </p>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Image URL may be broken or expired
-                  </p>
-                  <button
-                    onClick={() => {
-                      setImageErrors((prev) => {
-                        const updated = { ...prev };
-                        delete updated[p.id];
-                        return updated;
-                      });
-                      setImageRetries((prev) => {
-                        const updated = { ...prev };
-                        delete updated[p.id];
-                        return updated;
-                      });
-                      setImageLoading((prev) => ({ ...prev, [p.id]: true }));
-                    }}
-                    className="mt-4 rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground hover:bg-primary/90"
-                  >
-                    Retry
-                  </button>
-                </div>
-              ) : (
-                <>
-                  {isLoading && (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-secondary/40 animate-pulse select-none pointer-events-none">
-                      <div className="h-7 w-7 animate-spin rounded-full border-2 border-primary border-t-transparent mb-2" />
-                      <span className="text-[11px] font-medium text-neutral-400">Page {p.page_number}</span>
-                    </div>
-                  )}
-                  {isVideoUrl(p.image_url) ? (
-                    <video
-                      data-page-id={p.id}
-                      src={p.image_url}
-                      autoPlay
-                      loop
-                      muted
-                      playsInline
-                      className="mx-auto block w-full transition-transform duration-200"
-                      style={{
-                        opacity: isLoading ? 0.3 : 1,
-                      }}
-                      onLoadedData={() => handleImageLoad(p.id, idx)}
-                      onError={() => handleImageError(p.id, p.image_url)}
-                    />
-                  ) : (
-                    <img
-                      data-page-id={p.id}
-                      src={p.image_url}
-                      alt={`${seriesTitle || "Manga"} Chapter ${chapterNumber} Page ${p.page_number} - vnrscans`}
-                      loading={
-                        idx < 2 || (continuePrompt?.targetPage != null && Math.abs(idx - continuePrompt.targetPage) <= 2)
-                          ? "eager"
-                          : "lazy"
-                      }
-                      decoding="async"
-                      fetchPriority={
-                        idx < 2 || (continuePrompt?.targetPage != null && Math.abs(idx - continuePrompt.targetPage) <= 2)
-                          ? "high"
-                          : "auto"
-                      }
-                      className="mx-auto block w-full max-w-full h-auto object-contain transition-opacity duration-200"
-                      referrerPolicy="no-referrer"
-                      style={{
-                        opacity: isLoading ? 0.2 : 1,
-                      }}
-                      onLoad={() => handleImageLoad(p.id, idx)}
-                      onError={() => handleImageError(p.id, p.image_url)}
-                    />
-                  )}
-                </>
-              )}
-            </div>
-          );
-        })}
+        {pages.map((p, idx) => (
+          <ChapterPageItem
+            key={p.id}
+            page={p}
+            index={idx}
+            seriesTitle={seriesTitle}
+            chapterNumber={chapterNumber}
+            isPriority={
+              idx < 2 ||
+              (continuePrompt?.targetPage != null &&
+                Math.abs(idx - continuePrompt.targetPage) <= 2)
+            }
+          />
+        ))}
 
         {/* Chapter bottom completion anchor - triggers Qi when reaching the end */}
         <div id="chapter-bottom-completion-anchor" className="h-4 w-full" />

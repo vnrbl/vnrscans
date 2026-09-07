@@ -26,8 +26,16 @@ import { AuthProvider } from "@/hooks/useAuth";
 import { NavigationProgress } from "@/components/NavigationProgress";
 
 import { ProcessingTaskProvider } from "@/contexts/ProcessingTaskContext";
-import { CommandSearchModal } from "@/components/CommandSearchModal";
-import { PwaInstallPrompt } from "@/components/PwaInstallPrompt";
+
+const CommandSearchModal = dynamic(
+  () => import("@/components/CommandSearchModal").then((m) => m.CommandSearchModal),
+  { ssr: false }
+);
+
+const PwaInstallPrompt = dynamic(
+  () => import("@/components/PwaInstallPrompt").then((m) => m.PwaInstallPrompt),
+  { ssr: false }
+);
 
 export function Providers({ children }: { children: ReactNode }) {
   const [queryClient] = useState(
@@ -35,8 +43,8 @@ export function Providers({ children }: { children: ReactNode }) {
       new QueryClient({
         defaultOptions: {
           queries: {
-            staleTime: 1000 * 60 * 2,
-            gcTime: 1000 * 60 * 20,
+            staleTime: 1000 * 60 * 5, // 5 minutes fresh data
+            gcTime: 1000 * 60 * 30, // 30 minutes in memory cache
             retry: 1,
             refetchOnWindowFocus: false,
             refetchOnReconnect: false,

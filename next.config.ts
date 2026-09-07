@@ -73,6 +73,14 @@ const nextConfig: NextConfig = {
       },
       {
         protocol: "https",
+        hostname: "witchtoons.net",
+      },
+      {
+        protocol: "https",
+        hostname: "cdn.duskscans.com",
+      },
+      {
+        protocol: "https",
         hostname: "cdn.qiscans.org",
       },
       {
