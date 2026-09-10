@@ -1896,7 +1896,7 @@ export async function extractImagesFromChapterUrls(
   options: { concurrency?: number; imageUrlExample?: string | null } = {},
 ): Promise<Map<string, string[]>> {
   const uniqueUrls = Array.from(new Set(chapterUrls)).filter(
-    (url) => !isPremiumOrLockedChapter({ url })
+    (url) => !isPremiumOrLockedChapter({ url }) && url.startsWith('http')
   );
   const results = new Map<string, string[]>();
   const failedUrls: string[] = [];
@@ -3964,6 +3964,8 @@ async function extractElftoonChapters(seriesUrl: string): Promise<ChapterInfo[]>
     const num = parseFloat(m[1]);
     const href = m[2].trim();
     if (isNaN(num) || seen.has(num)) continue;
+    // Skip placeholder/invalid URLs (e.g., "#", "javascript:", empty)
+    if (!href || href === '#' || href.startsWith('javascript:') || !href.startsWith('http')) continue;
     seen.add(num);
     list.push({ chapterNumber: num, url: href });
   }

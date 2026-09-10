@@ -8,6 +8,8 @@ export const metadata: Metadata = {
   },
 };
 
+export const maxDuration = 300; // 5 minutes for admin server actions (chapter imports)
+
 export default function AuthenticatedLayout({
   children,
 }: {

@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { fetchSeriesBySlug } from "@/lib/series-slug";
 
 export const revalidate = 60; // ISR edge caching for 60s
+export const maxDuration = 300; // Allow server actions up to 5 minutes for chapter imports
 
 type PageProps = {
   params: Promise<{ slug: string }>;
