@@ -73,6 +73,18 @@ const nextConfig: NextConfig = {
       },
       {
         protocol: "https",
+        hostname: "en-thunderscans.com",
+      },
+      {
+        protocol: "https",
+        hostname: "scythescans.com",
+      },
+      {
+        protocol: "https",
+        hostname: "i0.wp.com",
+      },
+      {
+        protocol: "https",
         hostname: "witchtoons.net",
       },
       {

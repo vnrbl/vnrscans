@@ -131,7 +131,7 @@ export async function $discoverSiteCatalog(args: {
     const isVortex = isSupportedVortexCatalogUrl(validated.siteUrl);
 
     if (!isAsura && !isQiScans && !isHivetoon && !isElftoon && !isVortex) {
-      throw new Error("Currently supported sites: Asura Scans, Qi Scans, Hive Toons, Elf Toons, and Vortex Scans.");
+      throw new Error("Currently supported sites: Asura Scans, Qi Scans, Hive Toons, Elf Toons, Thunder Scans, Scythe Scans, and Vortex Scans.");
     }
 
     const discovery = isAsura

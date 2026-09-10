@@ -3734,16 +3734,23 @@ async function extractDuskScansChapterImages(chapterUrl: string): Promise<string
 }
 
 // ==========================================
-// ELFTOON EXTRACTOR (Fast MangaThemesia ts_reader / DOM)
+// MANGATHEMESIA EXTRACTOR (ElfToon, Thunder Scans, Scythe Scans)
+// Fast ts_reader.run / DOM extraction for MangaReader WordPress theme
 // ==========================================
+
+const MANGATHEMESIA_HOSTS = [
+  'elftoon.com', 'elftoon.xyz',
+  'en-thunderscans.com', 'thunderscans.com',
+  'scythescans.com',
+];
 
 export function isElftoonUrl(url: string): boolean {
   try {
     const hostname = new URL(url).hostname.toLowerCase();
-    return hostname.includes('elftoon.com') || hostname.includes('elftoon.xyz') || hostname.includes('elftoon');
+    return MANGATHEMESIA_HOSTS.some((h) => hostname.includes(h));
   } catch {
     const lower = url.toLowerCase();
-    return lower.includes('elftoon.com') || lower.includes('elftoon.xyz');
+    return MANGATHEMESIA_HOSTS.some((h) => lower.includes(h));
   }
 }
 
@@ -3751,7 +3758,7 @@ export function isElftoonReaderPageImage(url: string): boolean {
   try {
     const lower = url.toLowerCase();
     return (
-      (lower.includes('elftoon.com') || lower.includes('elftoon.xyz') || isElftoonUrl(url)) &&
+      MANGATHEMESIA_HOSTS.some((h) => lower.includes(h)) &&
       lower.includes('/wp-content/uploads/') &&
       /\.(?:jpe?g|png|webp|avif)(?:$|[?#])/i.test(lower) &&
       !isNonChapterImageUrl(lower)
@@ -3761,19 +3768,38 @@ export function isElftoonReaderPageImage(url: string): boolean {
   }
 }
 
+/**
+ * Decode base64-encoded data: URI scripts and combine with raw HTML
+ * for searching. Some MangaThemesia sites (e.g. Scythe Scans) embed
+ * ts_reader.run() inside base64 data: URI script tags.
+ */
+function decodeBase64Scripts(html: string): string {
+  const b64Matches = html.matchAll(/src="data:text\/javascript;base64,([^"]+)"/g);
+  const decoded: string[] = [];
+  for (const m of b64Matches) {
+    try {
+      decoded.push(Buffer.from(m[1], 'base64').toString('utf-8'));
+    } catch {
+      // skip invalid base64
+    }
+  }
+  return decoded.join('\n');
+}
+
 async function extractElftoonChapters(seriesUrl: string): Promise<ChapterInfo[]> {
+  const origin = new URL(seriesUrl).origin;
   const res = await fetch(seriesUrl, {
     headers: {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/126.0.0.0',
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
       'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-      'Referer': 'https://elftoon.com/',
+      'Referer': `${origin}/`,
     },
     redirect: 'follow',
     signal: AbortSignal.timeout(12_000),
   });
 
   if (!res.ok) {
-    throw new Error(`Failed to fetch ElfToon series page: ${res.status} ${res.statusText}`);
+    throw new Error(`Failed to fetch MangaThemesia series page: ${res.status} ${res.statusText}`);
   }
 
   const html = await res.text();
@@ -3807,29 +3833,39 @@ async function extractElftoonChapters(seriesUrl: string): Promise<ChapterInfo[]>
   }
 
   list.sort((a, b) => b.chapterNumber - a.chapterNumber);
-  console.log(`[Scraper][ElfToon] Extracted ${list.length} chapters from series page`);
+  console.log(`[Scraper][MangaThemesia] Extracted ${list.length} chapters from ${seriesUrl}`);
   return list;
 }
 
 async function extractElftoonChapterImages(chapterUrl: string): Promise<string[]> {
+  const origin = new URL(chapterUrl).origin;
   const res = await fetch(chapterUrl, {
     headers: {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/126.0.0.0',
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
       'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-      'Referer': 'https://elftoon.com/',
+      'Referer': `${origin}/`,
     },
     redirect: 'follow',
     signal: AbortSignal.timeout(12_000),
   });
 
   if (!res.ok) {
-    throw new Error(`Failed to fetch ElfToon chapter: ${res.status} ${res.statusText}`);
+    throw new Error(`Failed to fetch MangaThemesia chapter: ${res.status} ${res.statusText}`);
   }
 
   const html = await res.text();
 
-  // 1. Fast & precise: extract ts_reader.run JSON payload directly
-  const tsMatch = html.match(/ts_reader\.run\(([\s\S]*?)\);/i);
+  // 1. Fast & precise: extract ts_reader.run JSON payload directly from raw HTML
+  let tsMatch = html.match(/ts_reader\.run\(([\s\S]*?)\);/i);
+
+  // 1b. If not found in raw HTML, check base64-encoded data: URI scripts (e.g. Scythe Scans)
+  if (!tsMatch) {
+    const decodedScripts = decodeBase64Scripts(html);
+    if (decodedScripts) {
+      tsMatch = decodedScripts.match(/ts_reader\.run\(([\s\S]*?)\);/i);
+    }
+  }
+
   if (tsMatch) {
     try {
       const data = JSON.parse(tsMatch[1]);
@@ -3848,11 +3884,11 @@ async function extractElftoonChapterImages(chapterUrl: string): Promise<string[]
         .filter((u) => typeof u === 'string' && u.startsWith('http'))
         .filter((u) => !isNonChapterImageUrl(u.toLowerCase()));
       if (images.length > 0) {
-        console.log(`[Scraper][ElfToon] ts_reader.run: ${images.length} images from ${chapterUrl}`);
+        console.log(`[Scraper][MangaThemesia] ts_reader.run: ${images.length} images from ${chapterUrl}`);
         return images;
       }
     } catch (parseErr) {
-      console.warn(`[Scraper][ElfToon] ts_reader JSON parse failed for ${chapterUrl}:`, parseErr);
+      console.warn(`[Scraper][MangaThemesia] ts_reader JSON parse failed for ${chapterUrl}:`, parseErr);
     }
   }
 
@@ -3865,8 +3901,10 @@ async function extractElftoonChapterImages(chapterUrl: string): Promise<string[]
     if (imgs.length > 0) return Array.from(new Set(imgs));
   }
 
-  // 3. Fallback regex for uploads
-  const wpMatches = html.match(/https?:\/\/(?:elftoon\.com|elftoon\.xyz)\/wp-content\/uploads\/\d{4}\/\d{2}\/[^"'\\<>\s]+\.(?:webp|jpg|jpeg|png)/gi);
+  // 3. Fallback regex for wp-content/uploads images from any MangaThemesia host
+  const hostPattern = MANGATHEMESIA_HOSTS.map((h) => h.replace(/\./g, '\\.')).join('|');
+  const wpRegex = new RegExp(`https?://(?:${hostPattern})/wp-content/uploads/\\d{4}/\\d{2}/[^"'\\\\<>\\s]+\\.(?:webp|jpg|jpeg|png)`, 'gi');
+  const wpMatches = html.match(wpRegex);
   if (wpMatches) {
     return Array.from(new Set(wpMatches)).filter((u) => !isNonChapterImageUrl(u.toLowerCase()));
   }

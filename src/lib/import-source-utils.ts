@@ -67,6 +67,18 @@ const SOURCE_PRESETS: Array<{
     imageUrlExample: "https://elftoon.xyz/wp-content/uploads/2024/01/001.webp",
   },
   {
+    hostIncludes: "thunderscans.com",
+    sourceSite: "Thunder Scans",
+    scanlationGroup: "Thunder Scans",
+    imageUrlExample: "https://en-thunderscans.com/wp-content/uploads/2024/01/001.webp",
+  },
+  {
+    hostIncludes: "scythescans.com",
+    sourceSite: "Scythe Scans",
+    scanlationGroup: "Scythe Scans",
+    imageUrlExample: "https://scythescans.com/wp-content/uploads/2024/01/001.webp",
+  },
+  {
     hostIncludes: "hivetoon",
     sourceSite: "Hive Toons",
     scanlationGroup: "Hive Toons",

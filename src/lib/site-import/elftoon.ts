@@ -1,10 +1,19 @@
 import type { SiteCatalogDiscovery, SiteSeriesMetadata } from "./types";
 
-const ELFTOON_HOSTS = new Set(["elftoon.com", "www.elftoon.com"]);
+/** All MangaThemesia-based hosts supported by this catalog importer */
+const MANGATHEMESIA_HOST_MAP: Record<string, string> = {
+  "elftoon.com": "Elf Toons",
+  "www.elftoon.com": "Elf Toons",
+  "en-thunderscans.com": "Thunder Scans",
+  "thunderscans.com": "Thunder Scans",
+  "www.thunderscans.com": "Thunder Scans",
+  "scythescans.com": "Scythe Scans",
+  "www.scythescans.com": "Scythe Scans",
+};
 
 export function isSupportedElftoonCatalogUrl(value: string): boolean {
   try {
-    return ELFTOON_HOSTS.has(new URL(value.trim()).hostname.toLowerCase());
+    return new URL(value.trim()).hostname.toLowerCase() in MANGATHEMESIA_HOST_MAP;
   } catch {
     return false;
   }
@@ -12,8 +21,12 @@ export function isSupportedElftoonCatalogUrl(value: string): boolean {
 
 export async function discoverElftoonCatalog(inputUrl: string): Promise<SiteCatalogDiscovery> {
   const parsed = new URL(inputUrl.trim());
-  if (!ELFTOON_HOSTS.has(parsed.hostname.toLowerCase())) {
-    throw new Error("This version supports elftoon.com catalog URLs only.");
+  const hostname = parsed.hostname.toLowerCase();
+  const siteName = MANGATHEMESIA_HOST_MAP[hostname];
+  if (!siteName) {
+    throw new Error(
+      `Unsupported site. Supported: ${[...new Set(Object.values(MANGATHEMESIA_HOST_MAP))].join(", ")}`
+    );
   }
 
   const origin = parsed.origin;
@@ -22,15 +35,16 @@ export async function discoverElftoonCatalog(inputUrl: string): Promise<SiteCata
   const response = await fetch(url, {
     headers: {
       "User-Agent":
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
       Accept: "text/html,application/xhtml+xml",
+      Referer: `${origin}/`,
     },
     signal: AbortSignal.timeout(30_000),
     cache: "no-store",
   });
 
   if (!response.ok) {
-    throw new Error(`Elftoon catalog page failed: ${response.status} ${response.statusText}`);
+    throw new Error(`${siteName} catalog page failed: ${response.status} ${response.statusText}`);
   }
 
   const html = await response.text();
@@ -42,8 +56,10 @@ export async function discoverElftoonCatalog(inputUrl: string): Promise<SiteCata
   for (let i = 1; i < cardBlocks.length; i++) {
     const block = cardBlocks[i];
     
-    // Extract href/slug
-    const hrefMatch = block.match(/href="https:\/\/elftoon\.com\/manga\/([^"/]+)\/"/i);
+    // Extract href/slug — generic pattern matching any /manga/slug/ link on this origin
+    const escapedHost = hostname.replace(/\./g, "\\.");
+    const hrefRegex = new RegExp(`href="https?://(?:www\\.)?${escapedHost}/manga/([^"/]+)/"`, "i");
+    const hrefMatch = block.match(hrefRegex);
     if (!hrefMatch) continue;
     const slug = decodeHtmlEntities(hrefMatch[1]);
     const sourceUrl = `${origin}/manga/${slug}/`;
@@ -87,11 +103,11 @@ export async function discoverElftoonCatalog(inputUrl: string): Promise<SiteCata
   }
 
   if (series.length === 0) {
-    throw new Error("No series were found in the Elftoon catalog.");
+    throw new Error(`No series were found in the ${siteName} catalog.`);
   }
 
   return {
-    sourceSite: "Elf Toons",
+    sourceSite: siteName,
     canonicalUrl: url,
     series,
   };
