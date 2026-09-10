@@ -50,6 +50,15 @@ export interface ExtractChapterImagesOptions {
 
 const LIVE_READER_IMAGES_PREFIX = '__LIVE_READER_IMAGES__';
 
+/**
+ * Normalize URL by stripping trailing slashes to prevent 308 redirects.
+ * Many Next.js sites (Kayn, Drake, WitchToons, HiveToons) redirect
+ * /series/slug/ → /series/slug via 308, which drops RSC headers.
+ */
+function normalizeSeriesUrl(url: string): string {
+  return url.replace(/\/+$/, '');
+}
+
 export async function extractChaptersFromSeriesUrl(seriesUrl: string): Promise<ChapterInfo[]> {
   assertSafePublicUrl(seriesUrl);
   try {
@@ -131,7 +140,7 @@ export async function extractChaptersFromSeriesUrl(seriesUrl: string): Promise<C
     if (isKaynScansUrl(seriesUrl)) {
       try {
         console.log(`[Scraper] Using custom Kayn Scans chapter extraction for: ${seriesUrl}`);
-        const kaynChapters = await extractKaynScansChapters(seriesUrl);
+        const kaynChapters = await extractKaynScansChapters(normalizeSeriesUrl(seriesUrl));
         if (kaynChapters.length > 0) {
           console.log(`[Scraper] Successfully extracted ${kaynChapters.length} free chapters for Kayn Scans (${seriesUrl})`);
           return kaynChapters;
@@ -145,7 +154,7 @@ export async function extractChaptersFromSeriesUrl(seriesUrl: string): Promise<C
     if (isDrakeComicUrl(seriesUrl)) {
       try {
         console.log(`[Scraper] Using custom Drake Comic chapter extraction for: ${seriesUrl}`);
-        const drakeChapters = await extractDrakeComicChapters(seriesUrl);
+        const drakeChapters = await extractDrakeComicChapters(normalizeSeriesUrl(seriesUrl));
         if (drakeChapters.length > 0) {
           console.log(`[Scraper] Successfully extracted ${drakeChapters.length} free chapters for Drake Comic (${seriesUrl})`);
           return drakeChapters;
@@ -159,13 +168,36 @@ export async function extractChaptersFromSeriesUrl(seriesUrl: string): Promise<C
     if (isWitchToonsUrl(seriesUrl)) {
       try {
         console.log(`[Scraper] Using custom WitchToons chapter extraction for: ${seriesUrl}`);
-        const wtChapters = await extractWitchToonsChapters(seriesUrl);
+        const wtChapters = await extractWitchToonsChapters(normalizeSeriesUrl(seriesUrl));
         if (wtChapters.length > 0) {
           console.log(`[Scraper] Successfully extracted ${wtChapters.length} free chapters for WitchToons (${seriesUrl})`);
           return wtChapters;
         }
       } catch (wtErr) {
         console.warn('[Scraper] Custom WitchToons chapter extraction failed, falling back to standard extraction:', wtErr);
+      }
+    }
+
+    // Custom extraction for HiveToons (Next.js RSC streaming — same platform as Kayn/Drake/Witch)
+    if (isHivetoonUrl(seriesUrl)) {
+      try {
+        // Normalize hivetoon.com → hivetoons.org
+        let normalizedUrl = normalizeSeriesUrl(seriesUrl);
+        try {
+          const parsed = new URL(normalizedUrl);
+          if (parsed.hostname === 'hivetoon.com' || parsed.hostname === 'www.hivetoon.com') {
+            parsed.hostname = 'hivetoons.org';
+            normalizedUrl = parsed.toString();
+          }
+        } catch {}
+        console.log(`[Scraper] Using custom HiveToons chapter extraction for: ${normalizedUrl}`);
+        const hiveChapters = await extractHiveToonsChapters(normalizedUrl);
+        if (hiveChapters.length > 0) {
+          console.log(`[Scraper] Successfully extracted ${hiveChapters.length} free chapters for HiveToons (${normalizedUrl})`);
+          return hiveChapters;
+        }
+      } catch (hiveErr) {
+        console.warn('[Scraper] Custom HiveToons chapter extraction failed, falling back to standard extraction:', hiveErr);
       }
     }
 
@@ -1615,6 +1647,43 @@ export async function extractImagesFromChapterUrl(
       }
     }
 
+    // Direct HiveToons extraction (images are in the Astro SSR HTML, no need for Puppeteer)
+    if (isHivetoonUrl(chapterUrl)) {
+      try {
+        // Normalize hivetoon.com → hivetoons.org
+        let normalizedChapterUrl = normalizeSeriesUrl(chapterUrl);
+        try {
+          const parsed = new URL(normalizedChapterUrl);
+          if (parsed.hostname === 'hivetoon.com' || parsed.hostname === 'www.hivetoon.com') {
+            parsed.hostname = 'hivetoons.org';
+            normalizedChapterUrl = parsed.toString();
+          }
+        } catch {}
+        console.log(`[Scraper] Using custom HiveToons image extraction for: ${normalizedChapterUrl}`);
+        const hiveRes = await fetch(normalizedChapterUrl, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+          },
+          redirect: 'follow',
+          signal: AbortSignal.timeout(20_000),
+        });
+        if (hiveRes.ok) {
+          const hiveHtml = await hiveRes.text();
+          const hiveImages = [...hiveHtml.matchAll(/https?:\/\/storage\.hivetoon\.com\/public\/upload\/series\/[^"'<>\s]+\.(?:webp|jpg|jpeg|png)/gi)]
+            .map((m) => m[0])
+            .filter((u) => isHivetoonReaderPageImage(u));
+          const uniqueImages = Array.from(new Set(hiveImages));
+          if (uniqueImages.length > 0) {
+            console.log(`[Scraper] Successfully extracted ${uniqueImages.length} images for HiveToons (${normalizedChapterUrl})`);
+            return uniqueImages;
+          }
+        }
+      } catch (hiveErr) {
+        console.warn('[Scraper] HiveToons custom image extraction error, falling back to HTML/Puppeteer:', hiveErr);
+      }
+    }
+
     // Direct DuskScans RSC / HTML extraction (strictly series-scoped, no waste images)
     if (isDuskScansUrl(chapterUrl)) {
       try {
@@ -1857,7 +1926,7 @@ export async function extractImagesFromChapterUrls(
   // Skip Puppeteer fallback for sites that use embedded JSON data (ts_reader.run, RSC payloads, etc.)
   // If the fast HTML scraper failed for these, Puppeteer won't help — the data is in inline JSON, not in rendered DOM
   const browserUrls = failedUrls
-    .filter((url) => !isElftoonUrl(url) && !isKaynScansUrl(url) && !isDrakeComicUrl(url) && !isWitchToonsUrl(url) && !isDuskScansUrl(url))
+    .filter((url) => !isElftoonUrl(url) && !isKaynScansUrl(url) && !isDrakeComicUrl(url) && !isWitchToonsUrl(url) && !isDuskScansUrl(url) && !isHivetoonUrl(url))
     .filter((url) => shouldUseSharedReaderBrowser(url, options.imageUrlExample));
   if (browserUrls.length === 0) return results;
 
@@ -3542,6 +3611,85 @@ async function extractWitchToonsChapters(seriesUrl: string): Promise<ChapterInfo
 
   const freeChapters = allChapters.filter((c) => !isPremiumOrLockedChapter(c));
   freeChapters.sort((a, b) => b.chapterNumber - a.chapterNumber);
+  return freeChapters;
+}
+
+/**
+ * HiveToons chapter extractor. HiveToons uses Astro SSR and embeds the full
+ * chapter catalog in the series page HTML as &quot;-encoded JSON blocks.
+ * Domain changed from hivetoon.com → hivetoons.org.
+ */
+async function extractHiveToonsChapters(seriesUrl: string): Promise<ChapterInfo[]> {
+  const res = await fetch(seriesUrl, {
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+    },
+    redirect: 'follow',
+    signal: AbortSignal.timeout(20_000),
+  });
+
+  if (!res.ok) {
+    throw new Error(`Failed to fetch HiveToons series page: ${res.status} ${res.statusText}`);
+  }
+
+  const html = await res.text();
+  const hivetoonOrigin = new URL(res.url || seriesUrl).origin;
+  const pathParts = new URL(res.url || seriesUrl).pathname.split('/').filter(Boolean);
+  const seriesSlug = pathParts.length >= 2 && pathParts[0] === 'series' ? pathParts[1] : pathParts[pathParts.length - 1] || '';
+
+  const chapters: ChapterInfo[] = [];
+  const seen = new Set<number>();
+
+  // Parse embedded &quot;-encoded JSON blocks (Astro SSR serialized chapter data)
+  const blockRegex = /\[0,\{&quot;id&quot;:\[0,\d+\],&quot;number&quot;:\[0,([0-9.]+)\],&quot;slug&quot;:\[0,&quot;([^&]+)&quot;\](?:,&quot;title&quot;:\[0,&quot;([^&]*)&quot;\])?[\s\S]*?&quot;isAccessible&quot;:\[0,(true|false)\]/g;
+  let match: RegExpExecArray | null;
+  while ((match = blockRegex.exec(html)) !== null) {
+    const chapterNumber = parseFloat(match[1]);
+    const chapterSlug = match[2];
+    const rawTitle = match[3] || '';
+    const isAccessible = match[4] === 'true';
+
+    if (!isAccessible) continue;
+    if (isNaN(chapterNumber)) continue;
+    if (seen.has(chapterNumber)) continue;
+
+    const title = rawTitle
+      .replace(/&#39;/g, "'")
+      .replace(/&quot;/g, '"')
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .trim();
+
+    seen.add(chapterNumber);
+    chapters.push({
+      chapterNumber,
+      title: title || undefined,
+      url: `${hivetoonOrigin}/series/${seriesSlug}/${chapterSlug}`,
+    });
+  }
+
+  // Fallback: parse standard HTML chapter links
+  if (chapters.length === 0) {
+    const linkRegex = new RegExp(`href="(${hivetoonOrigin.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/series/${seriesSlug}/[^"]+)"`, 'gi');
+    let linkMatch;
+    while ((linkMatch = linkRegex.exec(html)) !== null) {
+      const href = linkMatch[1];
+      const numMatch = href.match(/chapter[- ]?(\d+(?:\.\d+)?)/i);
+      if (numMatch) {
+        const num = parseFloat(numMatch[1]);
+        if (!isNaN(num) && !seen.has(num)) {
+          seen.add(num);
+          chapters.push({ chapterNumber: num, url: href });
+        }
+      }
+    }
+  }
+
+  const freeChapters = chapters.filter((c) => !isPremiumOrLockedChapter(c));
+  freeChapters.sort((a, b) => b.chapterNumber - a.chapterNumber);
+  console.log(`[Scraper][HiveToons] Extracted ${freeChapters.length} accessible chapters from ${seriesUrl}`);
   return freeChapters;
 }
 

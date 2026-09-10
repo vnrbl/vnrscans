@@ -115,9 +115,9 @@ const WORKABLE_SCAN_PROVIDERS: ScanProviderOption[] = [
     id: "hivetoon",
     name: "Hive / Void",
     icon: "⚡",
-    domain: "hivetoon.com",
-    getUrl: (slug) => `https://hivetoon.com/series/${slug}`,
-    getSearchUrl: (title) => `https://hivetoon.com/?s=${encodeURIComponent(title)}`,
+    domain: "hivetoons.org",
+    getUrl: (slug) => `https://hivetoons.org/series/${slug}`,
+    getSearchUrl: (title) => `https://hivetoons.org/?s=${encodeURIComponent(title)}`,
   },
   {
     id: "qi",
