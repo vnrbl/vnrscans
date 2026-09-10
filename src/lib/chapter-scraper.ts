@@ -1854,7 +1854,11 @@ export async function extractImagesFromChapterUrls(
     );
   }
 
-  const browserUrls = failedUrls.filter((url) => shouldUseSharedReaderBrowser(url, options.imageUrlExample));
+  // Skip Puppeteer fallback for sites that use embedded JSON data (ts_reader.run, RSC payloads, etc.)
+  // If the fast HTML scraper failed for these, Puppeteer won't help — the data is in inline JSON, not in rendered DOM
+  const browserUrls = failedUrls
+    .filter((url) => !isElftoonUrl(url) && !isKaynScansUrl(url) && !isDrakeComicUrl(url) && !isWitchToonsUrl(url) && !isDuskScansUrl(url))
+    .filter((url) => shouldUseSharedReaderBrowser(url, options.imageUrlExample));
   if (browserUrls.length === 0) return results;
 
   const browserResults = await extractReaderImagesWithSharedBrowser(browserUrls, {
@@ -3760,11 +3764,12 @@ export function isElftoonReaderPageImage(url: string): boolean {
 async function extractElftoonChapters(seriesUrl: string): Promise<ChapterInfo[]> {
   const res = await fetch(seriesUrl, {
     headers: {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/122.0.0.0 Safari/537.36',
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/126.0.0.0',
       'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+      'Referer': 'https://elftoon.com/',
     },
     redirect: 'follow',
-    signal: AbortSignal.timeout(20_000),
+    signal: AbortSignal.timeout(12_000),
   });
 
   if (!res.ok) {
@@ -3791,7 +3796,7 @@ async function extractElftoonChapters(seriesUrl: string): Promise<ChapterInfo[]>
 
   // 2. Fallback: match any chapter links inside searchArea
   if (list.length === 0) {
-    const linkRegex = /href="(https?:\/\/[^"/]+(?:\/[^"/]+)?-chapter-([0-9.]+)\/?)"/gi;
+    const linkRegex = /href="(https?:\/\/[^"/]+(?:\/[^"/]+)?-chapter-([0-9.]+)\/?)"(?!.*class="[^"]*ch-(?:prev|next))/gi;
     while ((m = linkRegex.exec(searchArea)) !== null) {
       const href = m[1].trim();
       const num = parseFloat(m[2]);
@@ -3802,17 +3807,19 @@ async function extractElftoonChapters(seriesUrl: string): Promise<ChapterInfo[]>
   }
 
   list.sort((a, b) => b.chapterNumber - a.chapterNumber);
+  console.log(`[Scraper][ElfToon] Extracted ${list.length} chapters from series page`);
   return list;
 }
 
 async function extractElftoonChapterImages(chapterUrl: string): Promise<string[]> {
   const res = await fetch(chapterUrl, {
     headers: {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/122.0.0.0 Safari/537.36',
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/126.0.0.0',
       'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+      'Referer': 'https://elftoon.com/',
     },
     redirect: 'follow',
-    signal: AbortSignal.timeout(20_000),
+    signal: AbortSignal.timeout(12_000),
   });
 
   if (!res.ok) {
@@ -3826,12 +3833,27 @@ async function extractElftoonChapterImages(chapterUrl: string): Promise<string[]
   if (tsMatch) {
     try {
       const data = JSON.parse(tsMatch[1]);
-      const rawImages: string[] = data.sources?.[0]?.images || [];
-      const images = rawImages
+      // Collect images from ALL sources (some chapters have multiple servers)
+      const allImages: string[] = [];
+      if (Array.isArray(data.sources)) {
+        for (const source of data.sources) {
+          if (Array.isArray(source.images)) {
+            allImages.push(...source.images);
+            // Use the first server that has images
+            if (source.images.length > 0) break;
+          }
+        }
+      }
+      const images = allImages
         .filter((u) => typeof u === 'string' && u.startsWith('http'))
         .filter((u) => !isNonChapterImageUrl(u.toLowerCase()));
-      if (images.length > 0) return images;
-    } catch {}
+      if (images.length > 0) {
+        console.log(`[Scraper][ElfToon] ts_reader.run: ${images.length} images from ${chapterUrl}`);
+        return images;
+      }
+    } catch (parseErr) {
+      console.warn(`[Scraper][ElfToon] ts_reader JSON parse failed for ${chapterUrl}:`, parseErr);
+    }
   }
 
   // 2. Check readerarea img tags
@@ -3844,7 +3866,7 @@ async function extractElftoonChapterImages(chapterUrl: string): Promise<string[]
   }
 
   // 3. Fallback regex for uploads
-  const wpMatches = html.match(/https?:\/\/(?:elftoon\.com|elftoon\.xyz)\/wp-content\/uploads\/\d{4}\/\d{2}\/[^"'\\\s<>]+\.(?:webp|jpg|jpeg|png)/gi);
+  const wpMatches = html.match(/https?:\/\/(?:elftoon\.com|elftoon\.xyz)\/wp-content\/uploads\/\d{4}\/\d{2}\/[^"'\\<>\s]+\.(?:webp|jpg|jpeg|png)/gi);
   if (wpMatches) {
     return Array.from(new Set(wpMatches)).filter((u) => !isNonChapterImageUrl(u.toLowerCase()));
   }

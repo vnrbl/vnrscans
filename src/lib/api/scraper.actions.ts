@@ -7,6 +7,7 @@ import {
   extractImagesFromChapterUrl,
   extractImagesFromChapterUrls,
   isPremiumOrLockedChapter,
+  isElftoonUrl,
 } from "../chapter-scraper";
 import { buildChapterSlug } from "../chapter-utils";
 import { detectImportSource, normalizeScanlationGroup } from "../import-source-utils";
@@ -888,9 +889,11 @@ export async function $syncImportSource(args: {
 
     skipped = discovered.length - missing.length;
     const isAsuraSource = source.source_url.toLowerCase().includes('asura');
+    const isElftoonSource = isElftoonUrl(source.source_url);
+    const batchConcurrency = isAsuraSource ? 6 : isElftoonSource ? 15 : 10;
     const batchExtractedImages = await extractImagesFromChapterUrls(
       missing.map((chapter) => chapter.url),
-      { concurrency: isAsuraSource ? 6 : 10, imageUrlExample },
+      { concurrency: batchConcurrency, imageUrlExample },
     );
 
     // First pass: collect all chapter data + images, filtering out failures
@@ -1364,6 +1367,13 @@ function filterImagesByExampleUrl(images: string[], exampleUrl: string) {
       (url) => isDuskScansUrl(url) && url.includes("/storage/uploads/chapters/"),
     );
     if (dsImages.length > 0) return dsImages;
+  }
+
+  if (isElftoonUrl(exampleUrl)) {
+    const elfImages = images.filter(
+      (url) => isElftoonUrl(url) && url.toLowerCase().includes('/wp-content/uploads/'),
+    );
+    if (elfImages.length > 0) return elfImages;
   }
 
   if (exampleUrl.toLowerCase().includes("vortex")) {
