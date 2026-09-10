@@ -236,12 +236,57 @@ export function AddNewSeriesDialog({ trigger }: AddNewSeriesDialogProps) {
   const [description, setDescription] = useState("");
   const [coverUrl, setCoverUrl] = useState("");
 
+  // Resolve the correct Qi Scans slug by validating against their API
+  const resolveQiScansUrl = async (title: string, comickSlug: string): Promise<string> => {
+    const baseApiUrl = "https://api.qimanga.com/api/v1/series";
+    const userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36";
+
+    // Generate slug candidates: the cleaned comick slug, title-based slug, etc.
+    const titleSlug = title.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+    const candidates = [
+      comickSlug,
+      titleSlug,
+      // Some Qi Scans slugs have trailing numbers or slight variations
+      `${titleSlug}-1`,
+      `${titleSlug}-2`,
+      comickSlug.replace(/-\d+$/, ""),
+    ];
+
+    // Deduplicate
+    const uniqueCandidates = [...new Set(candidates.filter(Boolean))];
+
+    for (const slug of uniqueCandidates) {
+      try {
+        const res = await fetch(`${baseApiUrl}/${encodeURIComponent(slug)}`, {
+          headers: { "User-Agent": userAgent, Accept: "application/json" },
+          signal: AbortSignal.timeout(5000),
+        });
+        if (res.ok) {
+          const data = (await res.json()) as any;
+          const resolvedSlug = data?.data?.slug || data?.slug || slug;
+          return `https://qimanga.com/series/${resolvedSlug}`;
+        }
+      } catch {
+        // Try next candidate
+      }
+    }
+
+    // Fallback: return the best-guess URL (user can manually edit it)
+    return `https://qimanga.com/series/${comickSlug}`;
+  };
+
   const handleSelectComic = async (comic: ComickExtractedMetadata) => {
     setSelectedComic(comic);
     const cleanSlug = toCleanSlug(comic.slug || comic.title);
     const provider = WORKABLE_SCAN_PROVIDERS.find((p) => p.id === selectedScanProvider);
     if (provider && provider.id !== "none" && provider.id !== "custom") {
-      setScanSourceUrl(provider.getUrl(cleanSlug));
+      if (provider.id === "qi") {
+        // Set initial URL immediately, then resolve in background
+        setScanSourceUrl(provider.getUrl(cleanSlug));
+        resolveQiScansUrl(comic.title, cleanSlug).then((url) => setScanSourceUrl(url)).catch(() => {});
+      } else {
+        setScanSourceUrl(provider.getUrl(cleanSlug));
+      }
     }
     if ((!comic.author || !comic.artist) && comic.slug && metadataSource === "comick") {
       try {
@@ -268,7 +313,8 @@ export function AddNewSeriesDialog({ trigger }: AddNewSeriesDialogProps) {
     }
   };
 
-  const handleProviderSelect = (providerId: string) => {
+
+  const handleProviderSelect = async (providerId: string) => {
     setSelectedScanProvider(providerId);
     const provider = WORKABLE_SCAN_PROVIDERS.find((p) => p.id === providerId);
     if (!provider) return;
@@ -279,7 +325,26 @@ export function AddNewSeriesDialog({ trigger }: AddNewSeriesDialogProps) {
       // Keep existing URL or leave open for manual pasting
     } else if (selectedComic) {
       const cleanSlug = toCleanSlug(selectedComic.slug || selectedComic.title);
-      setScanSourceUrl(provider.getUrl(cleanSlug));
+
+      // For Qi Scans, validate the slug against their API
+      if (provider.id === "qi") {
+        setScanSourceUrl(`https://qimanga.com/series/${cleanSlug}`);
+        toast.loading("Resolving Qi Scans URL...", { id: "qi-resolve" });
+        try {
+          const resolvedUrl = await resolveQiScansUrl(selectedComic.title, cleanSlug);
+          setScanSourceUrl(resolvedUrl);
+          const resolvedSlug = resolvedUrl.split("/series/")[1];
+          if (resolvedSlug !== cleanSlug) {
+            toast.success(`Connected to Qi Scans: ${resolvedSlug}`, { id: "qi-resolve" });
+          } else {
+            toast.dismiss("qi-resolve");
+          }
+        } catch {
+          toast.error("Could not verify Qi Scans URL — please check the URL manually", { id: "qi-resolve" });
+        }
+      } else {
+        setScanSourceUrl(provider.getUrl(cleanSlug));
+      }
     }
   };
 

@@ -873,7 +873,8 @@ export default function Reader({
   const requestNativeFullscreen = useCallback(async (el: HTMLElement): Promise<boolean> => {
     try {
       if (el.requestFullscreen) {
-        await el.requestFullscreen();
+        // navigationUI: 'hide' tells Android Chrome to hide ALL system UI (status + nav bars)
+        await el.requestFullscreen({ navigationUI: "hide" } as any);
         return true;
       }
       if ((el as any).webkitRequestFullscreen) {
@@ -922,6 +923,20 @@ export default function Reader({
     savedScrollYRef.current = window.scrollY;
     isPseudoFullscreenRef.current = true;
     document.documentElement.classList.add("reader-pseudo-fullscreen");
+
+    // Set theme-color to black so the status bar / notch area blends with the reader
+    let themeMetaTag = document.querySelector('meta[name="theme-color"]') as HTMLMetaElement | null;
+    if (themeMetaTag) {
+      themeMetaTag.setAttribute("data-original-color", themeMetaTag.content);
+      themeMetaTag.content = "#000000";
+    } else {
+      themeMetaTag = document.createElement("meta");
+      themeMetaTag.name = "theme-color";
+      themeMetaTag.content = "#000000";
+      themeMetaTag.setAttribute("data-original-color", "");
+      document.head.appendChild(themeMetaTag);
+    }
+
     // Restore scroll position inside the pseudo-fullscreen wrapper
     requestAnimationFrame(() => {
       if (readerWrapperRef.current) {
@@ -936,6 +951,18 @@ export default function Reader({
     const wrapperScrollTop = readerWrapperRef.current?.scrollTop ?? 0;
     document.documentElement.classList.remove("reader-pseudo-fullscreen");
     isPseudoFullscreenRef.current = false;
+
+    // Restore original theme-color
+    const themeMetaTag = document.querySelector('meta[name="theme-color"]') as HTMLMetaElement | null;
+    if (themeMetaTag) {
+      const original = themeMetaTag.getAttribute("data-original-color");
+      if (original) {
+        themeMetaTag.content = original;
+      } else {
+        themeMetaTag.remove();
+      }
+    }
+
     // Restore scroll position back to the main document
     requestAnimationFrame(() => {
       window.scrollTo(0, wrapperScrollTop);
@@ -949,8 +976,22 @@ export default function Reader({
       const isNativeFs = !!getNativeFullscreenElement();
       if (!isNativeFs && !isPseudoFullscreenRef.current) {
         setIsFullscreen(false);
+        // Restore theme-color when exiting native fullscreen
+        const metaTag = document.querySelector('meta[name="theme-color"]') as HTMLMetaElement | null;
+        if (metaTag) {
+          const original = metaTag.getAttribute("data-original-color");
+          if (original) metaTag.content = original;
+        }
       } else if (isNativeFs) {
         setIsFullscreen(true);
+        // Set theme-color to black for native fullscreen (Android status bar blending)
+        const metaTag = document.querySelector('meta[name="theme-color"]') as HTMLMetaElement | null;
+        if (metaTag) {
+          if (!metaTag.hasAttribute("data-original-color")) {
+            metaTag.setAttribute("data-original-color", metaTag.content);
+          }
+          metaTag.content = "#000000";
+        }
       }
     };
     document.addEventListener("fullscreenchange", handleFullscreenChange);
@@ -971,6 +1012,14 @@ export default function Reader({
       if (isPseudoFullscreenRef.current) {
         document.documentElement.classList.remove("reader-pseudo-fullscreen");
         isPseudoFullscreenRef.current = false;
+        // Restore theme-color on unmount
+        const metaTag = document.querySelector('meta[name="theme-color"]') as HTMLMetaElement | null;
+        if (metaTag) {
+          const original = metaTag.getAttribute("data-original-color");
+          if (original) {
+            metaTag.content = original;
+          }
+        }
       }
     };
   }, []);

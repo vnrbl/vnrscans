@@ -894,13 +894,16 @@ html {
 
 /* ==========================================================================
    📺 Reader Pseudo-Fullscreen (iOS Safari & Fullscreen API fallback)
+   Fills the ENTIRE display including notch / status bar / home indicator.
    ========================================================================== */
 
 /*
  * On iOS Safari, the Fullscreen API only works on <video> elements.
- * This CSS-based pseudo-fullscreen hides everything except the reader,
- * takes over the entire viewport, and tricks Safari into collapsing
- * its address bar by scrolling into a minimal-ui-like state.
+ * On Android, the native Fullscreen API hides the status/nav bars, but
+ * we still set these styles as a fallback and for PWA consistency.
+ *
+ * With viewport-fit=cover (set in layout.tsx), the browser lets content
+ * extend behind the notch / status bar when we set padding to 0.
  */
 html.reader-pseudo-fullscreen,
 html.reader-pseudo-fullscreen body {
@@ -909,43 +912,86 @@ html.reader-pseudo-fullscreen body {
   position: fixed !important;
   inset: 0 !important;
   width: 100% !important;
+  height: 100% !important;
   height: 100dvh !important;
   height: -webkit-fill-available !important;
+  /* Remove all safe-area padding — fill behind notch */
+  padding: 0 !important;
+  margin: 0 !important;
 }
 
-/* The reader wrapper becomes the scrollable container */
+/* The reader wrapper becomes the scrollable container filling the entire display */
 html.reader-pseudo-fullscreen .reader-fullscreen-wrapper {
   position: fixed !important;
-  inset: 0 !important;
+  /* Extend behind the notch/status bar by using 0 instead of safe-area insets */
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
   z-index: 9999 !important;
   overflow-y: auto !important;
   overflow-x: hidden !important;
   -webkit-overflow-scrolling: touch !important;
   overscroll-behavior-y: contain !important;
-  background-color: var(--background, #0a0a0a) !important;
+  background-color: #000000 !important;
   width: 100% !important;
+  height: 100% !important;
   height: 100dvh !important;
   height: -webkit-fill-available !important;
+  /* Zero out safe-area padding so content fills behind the notch */
+  padding: 0 !important;
 }
 
-/* Hide site header/footer when in pseudo-fullscreen */
-html.reader-pseudo-fullscreen > body > *:not(.reader-fullscreen-wrapper):not(script):not(style):not(link):not(noscript) {
-  /* Don't hide — the wrapper is inside body > div > ... so we target via the wrapper z-index instead */
+/* ── Native Fullscreen: ensure edge-to-edge on Android/Desktop too ── */
+:fullscreen .reader-fullscreen-wrapper,
+:-webkit-full-screen .reader-fullscreen-wrapper,
+:-moz-full-screen .reader-fullscreen-wrapper {
+  background-color: #000000 !important;
+  width: 100% !important;
+  height: 100% !important;
 }
 
-/* Ensure top bar and bottom nav in pseudo-fullscreen render above the wrapper */
-html.reader-pseudo-fullscreen .reader-fullscreen-wrapper [data-reader-topbar],
+/* ── Top bar: pad behind the notch so buttons stay tappable ── */
+html.reader-pseudo-fullscreen .reader-fullscreen-wrapper [data-reader-topbar] {
+  z-index: 10002 !important;
+  /* Push content below the notch/status bar so it's tappable */
+  padding-top: env(safe-area-inset-top, 0px) !important;
+  padding-left: env(safe-area-inset-left, 0px) !important;
+  padding-right: env(safe-area-inset-right, 0px) !important;
+}
+
+/* ── Bottom nav: pad above home indicator ── */
 html.reader-pseudo-fullscreen .reader-fullscreen-wrapper [data-reader-bottomnav] {
   z-index: 10002 !important;
+  /* Ensure buttons sit above the home indicator */
+  padding-bottom: max(0.5rem, env(safe-area-inset-bottom, 0px)) !important;
+  padding-left: env(safe-area-inset-left, 0px) !important;
+  padding-right: env(safe-area-inset-right, 0px) !important;
 }
 
-/* Ensure floating controls render above everything */
+/* ── Floating controls: avoid notch overlap ── */
 html.reader-pseudo-fullscreen .reader-fullscreen-wrapper [data-reader-floating] {
   z-index: 10003 !important;
 }
 
-/* Scroll-to-top and speed control above the reader */
+/* ── Overlays (scroll-to-top, speed control) ── */
 html.reader-pseudo-fullscreen .reader-fullscreen-wrapper [data-reader-overlay] {
   z-index: 10004 !important;
+}
+
+/* ── Black background bleeding behind notch on both sides ── */
+@supports (padding-top: env(safe-area-inset-top)) {
+  html.reader-pseudo-fullscreen::before {
+    content: "" !important;
+    display: block !important;
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    height: env(safe-area-inset-top, 0px) !important;
+    background: #000000 !important;
+    z-index: 10001 !important;
+    pointer-events: none !important;
+  }
 }
 

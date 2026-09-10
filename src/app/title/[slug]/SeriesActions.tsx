@@ -421,7 +421,7 @@ export const SeriesActions = React.memo(function SeriesActions({
                 loop
                 muted
                 playsInline
-                className="relative z-10 w-full h-full object-contain"
+                className="relative z-10 w-full h-full object-cover"
               />
             ) : (
               <Image
@@ -431,7 +431,7 @@ export const SeriesActions = React.memo(function SeriesActions({
                 priority
                 unoptimized
                 sizes="(max-width: 640px) 180px, 220px"
-                className="relative z-10 object-contain transition-transform duration-500 hover:scale-102"
+                className="relative z-10 object-cover transition-transform duration-500 hover:scale-102"
                 referrerPolicy="no-referrer"
               />
             )}

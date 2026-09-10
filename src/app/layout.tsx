@@ -48,6 +48,7 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
+  viewportFit: "cover",
 };
 
 export default function RootLayout({
@@ -62,6 +63,9 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <head>
+        {/* iOS: enable standalone PWA mode and extend content behind notch */}
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <link rel="preconnect" href="https://edvqhmvqbtujzcfqkrbe.supabase.co" crossOrigin="" />
         <link rel="dns-prefetch" href="https://edvqhmvqbtujzcfqkrbe.supabase.co" />
         <link rel="preconnect" href="https://media.qimanga.com" crossOrigin="" />
