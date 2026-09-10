@@ -150,6 +150,9 @@ export default function Reader({
   const [autoScrollSpeed, setAutoScrollSpeed] = useState(2);
   const lastScrollYRef = useRef(0);
   const autoScrollIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const readerWrapperRef = useRef<HTMLDivElement>(null);
+  const savedScrollYRef = useRef(0);
+  const isPseudoFullscreenRef = useRef(false);
 
   // Eye-comfort filter sync
   const { settings, updateSettings } = useReaderSettings();
@@ -800,10 +803,17 @@ export default function Reader({
   useEffect(() => {
     let ticking = false;
 
+    const getScrollY = () => {
+      if (isPseudoFullscreenRef.current && readerWrapperRef.current) {
+        return readerWrapperRef.current.scrollTop;
+      }
+      return window.scrollY;
+    };
+
     const handleScroll = () => {
       if (!ticking) {
         window.requestAnimationFrame(() => {
-          const currentScrollY = window.scrollY;
+          const currentScrollY = getScrollY();
           const delta = currentScrollY - lastScrollYRef.current;
 
           if (currentScrollY <= 8) {
@@ -831,37 +841,169 @@ export default function Reader({
       }
     };
 
-    lastScrollYRef.current = window.scrollY;
-    setControlsVisible(window.scrollY <= 8 || showChapters || showSpeedControl);
+    lastScrollYRef.current = getScrollY();
+    setControlsVisible(getScrollY() <= 8 || showChapters || showSpeedControl);
     setShowScrollTop(false);
 
     window.addEventListener("scroll", handleScroll, { passive: true });
+    // Also listen on the wrapper for pseudo-fullscreen mode
+    const wrapper = readerWrapperRef.current;
+    if (wrapper) {
+      wrapper.addEventListener("scroll", handleScroll, { passive: true });
+    }
     return () => {
       window.removeEventListener("scroll", handleScroll);
+      if (wrapper) {
+        wrapper.removeEventListener("scroll", handleScroll);
+      }
     };
   }, [showChapters, showSpeedControl]);
 
-  // Fullscreen management
-  useEffect(() => {
-    const handleFullscreenChange = () => {
-      setIsFullscreen(!!document.fullscreenElement);
-    };
-    document.addEventListener("fullscreenchange", handleFullscreenChange);
-    return () => document.removeEventListener("fullscreenchange", handleFullscreenChange);
+  // Fullscreen management — works on mobile (iOS Safari pseudo-fullscreen + Android native)
+  const getNativeFullscreenElement = useCallback((): Element | null => {
+    return (
+      document.fullscreenElement ||
+      (document as any).webkitFullscreenElement ||
+      (document as any).mozFullScreenElement ||
+      (document as any).msFullscreenElement ||
+      null
+    );
   }, []);
 
-  const toggleFullscreen = () => {
-    if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen().catch((err) => {
-        toast.error(`Error attempting to enable fullscreen: ${err.message}`);
-      });
-    } else {
-      document.exitFullscreen();
+  const requestNativeFullscreen = useCallback(async (el: HTMLElement): Promise<boolean> => {
+    try {
+      if (el.requestFullscreen) {
+        await el.requestFullscreen();
+        return true;
+      }
+      if ((el as any).webkitRequestFullscreen) {
+        (el as any).webkitRequestFullscreen();
+        return true;
+      }
+      if ((el as any).mozRequestFullScreen) {
+        (el as any).mozRequestFullScreen();
+        return true;
+      }
+      if ((el as any).msRequestFullscreen) {
+        (el as any).msRequestFullscreen();
+        return true;
+      }
+    } catch {
+      // Native fullscreen not available
     }
-  };
+    return false;
+  }, []);
+
+  const exitNativeFullscreen = useCallback(async (): Promise<boolean> => {
+    try {
+      if (document.exitFullscreen) {
+        await document.exitFullscreen();
+        return true;
+      }
+      if ((document as any).webkitExitFullscreen) {
+        (document as any).webkitExitFullscreen();
+        return true;
+      }
+      if ((document as any).mozCancelFullScreen) {
+        (document as any).mozCancelFullScreen();
+        return true;
+      }
+      if ((document as any).msExitFullscreen) {
+        (document as any).msExitFullscreen();
+        return true;
+      }
+    } catch {
+      // Native exit not available
+    }
+    return false;
+  }, []);
+
+  const enterPseudoFullscreen = useCallback(() => {
+    savedScrollYRef.current = window.scrollY;
+    isPseudoFullscreenRef.current = true;
+    document.documentElement.classList.add("reader-pseudo-fullscreen");
+    // Restore scroll position inside the pseudo-fullscreen wrapper
+    requestAnimationFrame(() => {
+      if (readerWrapperRef.current) {
+        readerWrapperRef.current.scrollTop = savedScrollYRef.current;
+      }
+    });
+    setIsFullscreen(true);
+    toast.success("Fullscreen mode", { duration: 1200 });
+  }, []);
+
+  const exitPseudoFullscreen = useCallback(() => {
+    const wrapperScrollTop = readerWrapperRef.current?.scrollTop ?? 0;
+    document.documentElement.classList.remove("reader-pseudo-fullscreen");
+    isPseudoFullscreenRef.current = false;
+    // Restore scroll position back to the main document
+    requestAnimationFrame(() => {
+      window.scrollTo(0, wrapperScrollTop);
+    });
+    setIsFullscreen(false);
+  }, []);
+
+  // Sync native fullscreen state changes (also handles Escape key exit)
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      const isNativeFs = !!getNativeFullscreenElement();
+      if (!isNativeFs && !isPseudoFullscreenRef.current) {
+        setIsFullscreen(false);
+      } else if (isNativeFs) {
+        setIsFullscreen(true);
+      }
+    };
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    document.addEventListener("webkitfullscreenchange", handleFullscreenChange);
+    document.addEventListener("mozfullscreenchange", handleFullscreenChange);
+    document.addEventListener("MSFullscreenChange", handleFullscreenChange);
+    return () => {
+      document.removeEventListener("fullscreenchange", handleFullscreenChange);
+      document.removeEventListener("webkitfullscreenchange", handleFullscreenChange);
+      document.removeEventListener("mozfullscreenchange", handleFullscreenChange);
+      document.removeEventListener("MSFullscreenChange", handleFullscreenChange);
+    };
+  }, [getNativeFullscreenElement]);
+
+  // Cleanup pseudo-fullscreen on unmount (prevent stuck state when navigating)
+  useEffect(() => {
+    return () => {
+      if (isPseudoFullscreenRef.current) {
+        document.documentElement.classList.remove("reader-pseudo-fullscreen");
+        isPseudoFullscreenRef.current = false;
+      }
+    };
+  }, []);
+
+  const toggleFullscreen = useCallback(async () => {
+    const currentNativeFs = getNativeFullscreenElement();
+    const currentPseudoFs = isPseudoFullscreenRef.current;
+
+    // --- EXIT ---
+    if (currentNativeFs) {
+      await exitNativeFullscreen();
+      return;
+    }
+    if (currentPseudoFs) {
+      exitPseudoFullscreen();
+      return;
+    }
+
+    // --- ENTER ---
+    // Try native fullscreen first (works on Android Chrome, desktop browsers)
+    const nativeSuccess = await requestNativeFullscreen(document.documentElement);
+    if (nativeSuccess) return;
+
+    // Fallback to pseudo-fullscreen (iOS Safari, older browsers)
+    enterPseudoFullscreen();
+  }, [getNativeFullscreenElement, exitNativeFullscreen, requestNativeFullscreen, enterPseudoFullscreen, exitPseudoFullscreen]);
 
   const scrollToTop = () => {
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    if (isPseudoFullscreenRef.current && readerWrapperRef.current) {
+      readerWrapperRef.current.scrollTo({ top: 0, behavior: "smooth" });
+    } else {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
   };
 
   const toggleAutoScroll = () => {
@@ -894,12 +1036,21 @@ export default function Reader({
       const delta = Math.min(now - lastTime, 64);
       lastTime = now;
       const pixels = (delta / 16.67) * autoScrollSpeed;
-      window.scrollBy(0, pixels);
 
-      // Stop if reached bottom
-      if (window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 10) {
-        setIsAutoScrolling(false);
-        return;
+      // Scroll the correct container
+      if (isPseudoFullscreenRef.current && readerWrapperRef.current) {
+        readerWrapperRef.current.scrollBy(0, pixels);
+        const el = readerWrapperRef.current;
+        if (el.scrollTop + el.clientHeight >= el.scrollHeight - 10) {
+          setIsAutoScrolling(false);
+          return;
+        }
+      } else {
+        window.scrollBy(0, pixels);
+        if (window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 10) {
+          setIsAutoScrolling(false);
+          return;
+        }
       }
 
       autoScrollIntervalRef.current = requestAnimationFrame(tick) as unknown as NodeJS.Timeout;
@@ -983,9 +1134,10 @@ export default function Reader({
   const isNovel = c.chapter_type === "novel";
 
   return (
-    <div className="min-h-screen bg-background w-full max-w-full overflow-x-clip">
+    <div ref={readerWrapperRef} className={`min-h-screen bg-background w-full max-w-full overflow-x-clip ${isFullscreen && isPseudoFullscreenRef.current ? 'reader-fullscreen-wrapper' : ''}`}>
       {/* Top Bar - Auto-hide */}
       <div
+        data-reader-topbar
         className={`sticky top-0 z-30 w-full transition-transform duration-300 ${
           controlsVisible ? "translate-y-0" : "-translate-y-full"
         }`}
@@ -1100,6 +1252,7 @@ export default function Reader({
 
       {/* Floating Controls Sidebar - Scroll-based visibility */}
       <div
+        data-reader-floating
         className={`transition-opacity duration-300 ${
           controlsVisible ? "opacity-100" : "opacity-0 pointer-events-none"
         }`}
@@ -1140,6 +1293,7 @@ export default function Reader({
 
       {/* Bottom Nav - Fixed at bottom (Mobile only) */}
       <nav
+        data-reader-bottomnav
         className={`fixed bottom-0 left-0 right-0 z-30 border-t border-border/50 bg-background/95 backdrop-blur-md md:hidden transition-transform duration-300 pb-[max(0.5rem,env(safe-area-inset-bottom,0px))] shadow-xl ${
           controlsVisible ? "translate-y-0" : "translate-y-full"
         }`}
@@ -1237,7 +1391,7 @@ export default function Reader({
 
       {/* Auto-scroll Speed Control - Mobile only */}
       {isAutoScrolling && (
-        <div className="fixed bottom-[calc(4.25rem+env(safe-area-inset-bottom,0px))] left-1/2 z-40 -translate-x-1/2 rounded-full bg-background/95 px-4 py-2 shadow-lg backdrop-blur md:hidden">
+        <div data-reader-overlay className="fixed bottom-[calc(4.25rem+env(safe-area-inset-bottom,0px))] left-1/2 z-40 -translate-x-1/2 rounded-full bg-background/95 px-4 py-2 shadow-lg backdrop-blur md:hidden">
           <div className="flex items-center gap-3">
             <span className="text-xs text-muted-foreground">Speed:</span>
             <div className="flex items-center gap-2">
@@ -1281,6 +1435,7 @@ export default function Reader({
 
       {/* Scroll to Top Button - Both Mobile and Desktop */}
       <button
+        data-reader-overlay
         onClick={scrollToTop}
         className={`fixed bottom-20 right-6 z-40 rounded-full bg-primary p-3 text-primary-foreground shadow-lg transition-all duration-300 hover:scale-110 hover:shadow-xl md:bottom-6 ${
           showScrollTop

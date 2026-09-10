@@ -202,6 +202,17 @@ export async function $extractCoversFromScanUrl(args: {
           }
         }
 
+        // Match Next.js /uploads/series cover images for Drake Comic
+        if (isDrakeComicUrl(targetUrl)) {
+          const coverMatch = html.match(/\/uploads\/series\/[^\/&"']+\/cover\.(?:jpe?g|png|webp|avif)/i) ||
+            html.match(/url=(?:%2F|\/)uploads(?:%2F|\/)series(?:%2F|\/)[^&"']+/i);
+          if (coverMatch) {
+            const rawCover = decodeURIComponent(coverMatch[0].replace(/^url=/, ''));
+            const fullCover = rawCover.startsWith('http') ? rawCover : `https://drakecomic.net${rawCover.startsWith('/') ? '' : '/'}${rawCover}`;
+            candidateCovers.unshift(fullCover);
+          }
+        }
+
         // Match Next.js /uploads/series cover images for WitchToons
         if (isWitchToonsUrl(targetUrl)) {
           const coverMatch = html.match(/\/uploads\/series\/[^\/&"']+\/cover\.(?:jpe?g|png|webp|avif)/i) ||
@@ -1334,6 +1345,13 @@ function filterImagesByExampleUrl(images: string[], exampleUrl: string) {
     if (kaynImages.length > 0) return kaynImages;
   }
 
+  if (isDrakeComicUrl(exampleUrl)) {
+    const drakeImages = images.filter(
+      (url) => isDrakeComicUrl(url) && (url.includes("/uploads/series/") || url.includes("/upload/series/")),
+    );
+    if (drakeImages.length > 0) return drakeImages;
+  }
+
   if (isWitchToonsUrl(exampleUrl)) {
     const wtImages = images.filter(
       (url) => isWitchToonsUrl(url) && (url.includes("/uploads/comic-pages/") || url.includes("/uploads/series/")),
@@ -1408,6 +1426,15 @@ function isKaynScansUrl(url: string) {
     return hostname.includes("kaynscans") || hostname.includes("kaynscan");
   } catch {
     return url.toLowerCase().includes("kaynscans") || url.toLowerCase().includes("kaynscan");
+  }
+}
+
+function isDrakeComicUrl(url: string) {
+  try {
+    const hostname = new URL(url).hostname.toLowerCase();
+    return hostname.includes("drakecomic");
+  } catch {
+    return url.toLowerCase().includes("drakecomic");
   }
 }
 

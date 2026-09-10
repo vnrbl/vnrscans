@@ -141,6 +141,20 @@ export async function extractChaptersFromSeriesUrl(seriesUrl: string): Promise<C
       }
     }
 
+    // Custom extraction for Drake Comic (Next.js RSC streaming — same platform as Kayn Scans)
+    if (isDrakeComicUrl(seriesUrl)) {
+      try {
+        console.log(`[Scraper] Using custom Drake Comic chapter extraction for: ${seriesUrl}`);
+        const drakeChapters = await extractDrakeComicChapters(seriesUrl);
+        if (drakeChapters.length > 0) {
+          console.log(`[Scraper] Successfully extracted ${drakeChapters.length} free chapters for Drake Comic (${seriesUrl})`);
+          return drakeChapters;
+        }
+      } catch (drakeErr) {
+        console.warn('[Scraper] Custom Drake Comic chapter extraction failed, falling back to standard extraction:', drakeErr);
+      }
+    }
+
     // Custom extraction for WitchToons (Next.js RSC streaming)
     if (isWitchToonsUrl(seriesUrl)) {
       try {
@@ -404,10 +418,12 @@ async function scrapeWithPuppeteer(url: string, isChapterPage: boolean = false):
       const isQimanhwa = isQimanhwaLikeUrl(url);
       const isAsura = isAsuraScansUrl(url);
       const isKayn = isKaynScansUrl(url);
+      const isDrake = isDrakeComicUrl(url);
       const shouldSkipScroll =
         (isAsura && immediateImages.length > 0) ||
         (isKayn && immediateImages.length > 0) ||
-        (!isAsura && !isKayn && ((isQimanhwa && immediateImages.length > 0) || immediateImages.length >= 10));
+        (isDrake && immediateImages.length > 0) ||
+        (!isAsura && !isKayn && !isDrake && ((isQimanhwa && immediateImages.length > 0) || immediateImages.length >= 10));
 
       if (shouldSkipScroll) {
         console.log(`[Scraper] Collected ${immediateImages.length} images immediately. Skipping scroll.`);
@@ -1356,6 +1372,21 @@ export function extractChapterLinks(html: string, baseUrl: string): ChapterInfo[
     }
   }
 
+  // Support Drake Comic embedded RSC / script data (same platform as Kayn Scans)
+  if ((isDrakeComicUrl(baseUrl) || html.includes('drakecomic')) && chapters.length === 0) {
+    try {
+      const parsedDrake = parseKaynChaptersFromText(html, baseUrl);
+      for (const c of parsedDrake) {
+        if (!seenUrls.has(c.url)) {
+          seenUrls.add(c.url);
+          chapters.push(c);
+        }
+      }
+    } catch (drakeErr) {
+      console.warn('[Scraper] Failed parsing Drake Comic embedded text:', drakeErr);
+    }
+  }
+
   // Support Asura Scans embedded Astro island data
   if (isAsuraScansUrl(baseUrl) || html.includes('ChapterListReact')) {
     try {
@@ -1553,6 +1584,20 @@ export async function extractImagesFromChapterUrl(
         }
       } catch (kaynErr) {
         console.warn('[Scraper] Kayn Scans custom image extraction error, falling back to HTML/Puppeteer:', kaynErr);
+      }
+    }
+
+    // Direct Drake Comic RSC extraction (same platform as Kayn Scans)
+    if (isDrakeComicUrl(chapterUrl)) {
+      try {
+        console.log(`[Scraper] Using custom Drake Comic image extraction for: ${chapterUrl}`);
+        const drakeImages = await extractDrakeComicChapterImages(chapterUrl);
+        if (drakeImages.length > 0) {
+          console.log(`[Scraper] Successfully extracted ${drakeImages.length} images for Drake Comic (${chapterUrl})`);
+          return drakeImages;
+        }
+      } catch (drakeErr) {
+        console.warn('[Scraper] Drake Comic custom image extraction error, falling back to HTML/Puppeteer:', drakeErr);
       }
     }
 
@@ -2318,6 +2363,11 @@ function filterReaderImagesForSource(
     return sourceImages.filter(isKaynReaderPageImage);
   }
 
+  if (isDrakeComicUrl(pageUrl) || isDrakeComicUrl(exampleUrl || '')) {
+    // Drake Comic uses the same platform and UUID filenames as Kayn Scans.
+    return sourceImages.filter(isDrakeComicReaderPageImage);
+  }
+
   if (isWitchToonsUrl(pageUrl) || isWitchToonsUrl(exampleUrl || '')) {
     return sourceImages.filter(isWitchToonsReaderPageImage);
   }
@@ -2365,6 +2415,11 @@ function findImagesMatchingExampleUrl(images: string[], exampleUrl?: string | nu
   if (isKaynScansUrl(cleanExampleUrl)) {
     const kaynImages = images.filter((url) => isKaynReaderPageImage(url));
     if (kaynImages.length > 0) return kaynImages;
+  }
+
+  if (isDrakeComicUrl(cleanExampleUrl)) {
+    const drakeImages = images.filter((url) => isDrakeComicReaderPageImage(url));
+    if (drakeImages.length > 0) return drakeImages;
   }
 
   if (isWitchToonsUrl(cleanExampleUrl)) {
@@ -2472,6 +2527,11 @@ function isLikelyChapterReaderImage(url: string, pageUrl: string = '', exampleUr
     // Custom check for Kayn Scans
     if (isKaynScansUrl(url) || isKaynScansUrl(pageUrl) || isKaynScansUrl(exampleUrl || '')) {
       return isKaynReaderPageImage(url);
+    }
+
+    // Custom check for Drake Comic
+    if (isDrakeComicUrl(url) || isDrakeComicUrl(pageUrl) || isDrakeComicUrl(exampleUrl || '')) {
+      return isDrakeComicReaderPageImage(url);
     }
 
     // Custom check for WitchToons
@@ -2872,6 +2932,29 @@ function isKaynReaderPageImage(url: string): boolean {
   }
 }
 
+function isDrakeComicUrl(url: string): boolean {
+  try {
+    const hostname = new URL(url).hostname.toLowerCase();
+    return hostname.includes('drakecomic');
+  } catch {
+    return url.toLowerCase().includes('drakecomic');
+  }
+}
+
+function isDrakeComicReaderPageImage(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    const pathname = parsed.pathname.toLowerCase();
+    const isDrakeDomain = isDrakeComicUrl(url);
+    const isUploadPath = pathname.includes('/uploads/series/') || pathname.includes('/upload/series/');
+    const isImage = /\.(?:jpe?g|png|webp|avif)(?:$|[?#])/i.test(pathname);
+    return (isDrakeDomain || isUploadPath) && isUploadPath && isImage;
+  } catch {
+    const lower = url.toLowerCase();
+    return lower.includes('/uploads/series/') && /\.(?:jpe?g|png|webp|avif)/i.test(lower);
+  }
+}
+
 function parseKaynChaptersFromText(rscText: string, baseUrl: string): ChapterInfo[] {
   const cleanBase = baseUrl.split('?')[0].replace(/\/+$/, '');
   const list: ChapterInfo[] = [];
@@ -3068,6 +3151,188 @@ async function extractKaynScansChapterImages(chapterUrl: string): Promise<string
 
   if (!res.ok) {
     throw new Error(`Failed to fetch Kayn Scans chapter: ${res.status} ${res.statusText}`);
+  }
+
+  const text = await res.text();
+  const canonicalOrigin = res.url ? new URL(res.url).origin : origin;
+
+  // 1. Extract from the structured pages JSON array
+  const pagesMatch = text.match(/"pages":\s*(\[\{.*?"imageUrl".*?\}\])/);
+  if (pagesMatch) {
+    try {
+      const pages = JSON.parse(pagesMatch[1]);
+      if (Array.isArray(pages) && pages.length > 0) {
+        pages.sort((a: any, b: any) => (Number(a.pageNumber) || 0) - (Number(b.pageNumber) || 0));
+        const urls = pages
+          .map((p: any) => (typeof p.imageUrl === 'string' ? p.imageUrl.trim() : ''))
+          .filter((u: string) => u.length > 0)
+          .map((u: string) => (u.startsWith('http') ? u : `${canonicalOrigin}${u.startsWith('/') ? '' : '/'}${u}`));
+        if (urls.length > 0) return urls;
+      }
+    } catch {}
+  }
+
+  // 2. Regex for pageNumber and imageUrl objects
+  const pageRegex = /\{"id":"[^"]+","pageNumber":(\d+)[^{}]*?"imageUrl":"([^"]+)"/g;
+  const matches = [...text.matchAll(pageRegex)];
+  if (matches.length > 0) {
+    const sorted = matches
+      .map((m) => ({ pageNumber: parseInt(m[1], 10), imageUrl: m[2].trim() }))
+      .filter((p) => p.imageUrl.length > 0)
+      .sort((a, b) => a.pageNumber - b.pageNumber)
+      .map((p) => (p.imageUrl.startsWith('http') ? p.imageUrl : `${canonicalOrigin}${p.imageUrl.startsWith('/') ? '' : '/'}${p.imageUrl}`));
+    if (sorted.length > 0) return sorted;
+  }
+
+  // 3. Fallback regex for /uploads/series/... paths in the RSC text
+  const rawMatches = text.match(/\/uploads\/series\/[^"'\\\s]+\.(?:webp|jpe?g|png|avif)/gi);
+  if (rawMatches && rawMatches.length > 0) {
+    const unique = Array.from(new Set(rawMatches));
+    return unique.map((u) => `${canonicalOrigin}${u.startsWith('/') ? '' : '/'}${u}`);
+  }
+
+  // 4. Fallback: fetch standard HTML if RSC had no images
+  try {
+    const htmlRes = await fetch(chapterUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+      },
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (htmlRes.ok) {
+      const htmlText = await htmlRes.text();
+      const htmlMatches = htmlText.match(/\/uploads\/series\/[^"'\\\s]+\.(?:webp|jpe?g|png|avif)/gi);
+      if (htmlMatches && htmlMatches.length > 0) {
+        const unique = Array.from(new Set(htmlMatches));
+        return unique.map((u) => `${canonicalOrigin}${u.startsWith('/') ? '' : '/'}${u}`);
+      }
+    }
+  } catch {}
+
+  return [];
+}
+
+// ==========================================
+// DRAKE COMIC EXTRACTOR (Next.js App Router RSC — same platform as Kayn Scans)
+// ==========================================
+
+async function extractDrakeComicChapters(seriesUrl: string): Promise<ChapterInfo[]> {
+  const res = await fetch(seriesUrl, {
+    headers: {
+      'RSC': '1',
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      'Accept': '*/*',
+    },
+    redirect: 'follow',
+    signal: AbortSignal.timeout(20_000),
+  });
+
+  if (!res.ok) {
+    throw new Error(`Failed to fetch Drake Comic series page: ${res.status} ${res.statusText}`);
+  }
+
+  const text = await res.text();
+  const canonicalBaseUrl = (res.url || seriesUrl).split('?')[0].replace(/\/+$/, '');
+
+  const allChapters = parseKaynChaptersFromText(text, canonicalBaseUrl);
+  const seen = new Set<number>(allChapters.map((c) => c.chapterNumber));
+
+  // Check pagination if totalPages > 1
+  const totalPagesMatch = text.match(/"totalPages":\s*([0-9]+)/);
+  const totalPages = Math.min(30, Math.max(1, totalPagesMatch ? parseInt(totalPagesMatch[1], 10) : 1));
+
+  if (totalPages > 1) {
+    const pageNumbers = Array.from({ length: totalPages - 1 }, (_, i) => i + 2);
+    const additionalPayloads = await Promise.all(
+      pageNumbers.map(async (page) => {
+        try {
+          const pageRes = await fetch(`${canonicalBaseUrl}?page=${page}`, {
+            headers: {
+              'RSC': '1',
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+              'Accept': '*/*',
+            },
+            signal: AbortSignal.timeout(15_000),
+          });
+          if (pageRes.ok) {
+            return await pageRes.text();
+          }
+        } catch (err) {
+          console.warn(`[Scraper] Failed to fetch Drake Comic chapters page ${page}:`, err);
+        }
+        return '';
+      }),
+    );
+
+    for (const payload of additionalPayloads) {
+      if (payload) {
+        const moreChapters = parseKaynChaptersFromText(payload, canonicalBaseUrl);
+        for (const ch of moreChapters) {
+          if (!seen.has(ch.chapterNumber)) {
+            seen.add(ch.chapterNumber);
+            allChapters.push(ch);
+          }
+        }
+      }
+    }
+  }
+
+  // Fallback: If RSC stream gave 0 chapters, try HTML self.__next_f or API
+  if (allChapters.length === 0) {
+    try {
+      const segments = new URL(canonicalBaseUrl).pathname.split('/').filter(Boolean);
+      const slug = segments[segments.length - 1];
+      if (slug) {
+        const apiRes = await fetch(`https://drakecomic.net/api/series?q=${encodeURIComponent(slug)}`, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'application/json',
+          },
+          signal: AbortSignal.timeout(10_000),
+        });
+        if (apiRes.ok) {
+          const apiJson = (await apiRes.json()) as any;
+          const seriesItem = (apiJson?.data || []).find((s: any) => s.slug === slug || s.urlSlug === slug) || apiJson?.data?.[0];
+          if (seriesItem?.chapters && Array.isArray(seriesItem.chapters)) {
+            for (const ch of seriesItem.chapters) {
+              const num = Number(ch.number);
+              if (!ch.isLocked && !ch.coinPrice && !isNaN(num) && !seen.has(num)) {
+                seen.add(num);
+                allChapters.push({
+                  chapterNumber: num,
+                  title: ch.title || undefined,
+                  url: `${canonicalBaseUrl}/chapter/${num}`,
+                });
+              }
+            }
+          }
+        }
+      }
+    } catch (apiErr) {
+      console.warn('[Scraper] Drake Comic API fallback failed:', apiErr);
+    }
+  }
+
+  const freeChapters = allChapters.filter((c) => !isPremiumOrLockedChapter(c));
+  freeChapters.sort((a, b) => b.chapterNumber - a.chapterNumber);
+  return freeChapters;
+}
+
+async function extractDrakeComicChapterImages(chapterUrl: string): Promise<string[]> {
+  const origin = new URL(chapterUrl).origin;
+  const res = await fetch(chapterUrl, {
+    headers: {
+      'RSC': '1',
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      'Accept': '*/*',
+    },
+    redirect: 'follow',
+    signal: AbortSignal.timeout(20_000),
+  });
+
+  if (!res.ok) {
+    throw new Error(`Failed to fetch Drake Comic chapter: ${res.status} ${res.statusText}`);
   }
 
   const text = await res.text();

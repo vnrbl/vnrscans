@@ -892,3 +892,60 @@ html {
   contain-intrinsic-size: auto 340px;
 }
 
+/* ==========================================================================
+   📺 Reader Pseudo-Fullscreen (iOS Safari & Fullscreen API fallback)
+   ========================================================================== */
+
+/*
+ * On iOS Safari, the Fullscreen API only works on <video> elements.
+ * This CSS-based pseudo-fullscreen hides everything except the reader,
+ * takes over the entire viewport, and tricks Safari into collapsing
+ * its address bar by scrolling into a minimal-ui-like state.
+ */
+html.reader-pseudo-fullscreen,
+html.reader-pseudo-fullscreen body {
+  overflow: hidden !important;
+  overscroll-behavior: none !important;
+  position: fixed !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100dvh !important;
+  height: -webkit-fill-available !important;
+}
+
+/* The reader wrapper becomes the scrollable container */
+html.reader-pseudo-fullscreen .reader-fullscreen-wrapper {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 9999 !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  -webkit-overflow-scrolling: touch !important;
+  overscroll-behavior-y: contain !important;
+  background-color: var(--background, #0a0a0a) !important;
+  width: 100% !important;
+  height: 100dvh !important;
+  height: -webkit-fill-available !important;
+}
+
+/* Hide site header/footer when in pseudo-fullscreen */
+html.reader-pseudo-fullscreen > body > *:not(.reader-fullscreen-wrapper):not(script):not(style):not(link):not(noscript) {
+  /* Don't hide — the wrapper is inside body > div > ... so we target via the wrapper z-index instead */
+}
+
+/* Ensure top bar and bottom nav in pseudo-fullscreen render above the wrapper */
+html.reader-pseudo-fullscreen .reader-fullscreen-wrapper [data-reader-topbar],
+html.reader-pseudo-fullscreen .reader-fullscreen-wrapper [data-reader-bottomnav] {
+  z-index: 10002 !important;
+}
+
+/* Ensure floating controls render above everything */
+html.reader-pseudo-fullscreen .reader-fullscreen-wrapper [data-reader-floating] {
+  z-index: 10003 !important;
+}
+
+/* Scroll-to-top and speed control above the reader */
+html.reader-pseudo-fullscreen .reader-fullscreen-wrapper [data-reader-overlay] {
+  z-index: 10004 !important;
+}
+

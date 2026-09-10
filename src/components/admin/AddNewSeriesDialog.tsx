@@ -147,6 +147,15 @@ const WORKABLE_SCAN_PROVIDERS: ScanProviderOption[] = [
     getSearchUrl: (title) => `https://kaynscans.com/search?query=${encodeURIComponent(title)}`,
   },
   {
+    id: "drake",
+    name: "Drake Scans",
+    icon: "🐉",
+    badge: "Super Fast",
+    domain: "drakecomic.net",
+    getUrl: (slug) => `https://drakecomic.net/series/comic/${slug}`,
+    getSearchUrl: (title) => `https://drakecomic.net/search?q=${encodeURIComponent(title)}`,
+  },
+  {
     id: "witchtoons",
     name: "WitchToons",
     icon: "🧙‍♀️",

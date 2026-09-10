@@ -77,6 +77,10 @@ const nextConfig: NextConfig = {
       },
       {
         protocol: "https",
+        hostname: "drakecomic.net",
+      },
+      {
+        protocol: "https",
         hostname: "cdn.duskscans.com",
       },
       {

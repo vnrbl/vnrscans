@@ -1092,6 +1092,15 @@ export default function ChapterManager({ seriesId, onBack }: { seriesId: string;
     }
   };
 
+  const isDrakeComicUrl = (url: string) => {
+    try {
+      const hostname = new URL(url).hostname.toLowerCase();
+      return hostname.includes("drakecomic");
+    } catch {
+      return url.toLowerCase().includes("drakecomic");
+    }
+  };
+
   const filterImagesByExampleUrl = (
     images: string[],
     exampleUrl: string,
@@ -1107,6 +1116,11 @@ export default function ChapterManager({ seriesId, onBack }: { seriesId: string;
     if (isKaynScansUrl(exampleUrl)) {
       const kaynImages = images.filter((url) => isKaynScansUrl(url) && (url.includes("/uploads/series/") || url.includes("/upload/series/")));
       if (kaynImages.length > 0) return kaynImages;
+    }
+
+    if (isDrakeComicUrl(exampleUrl)) {
+      const drakeImages = images.filter((url) => isDrakeComicUrl(url) && (url.includes("/uploads/series/") || url.includes("/upload/series/")));
+      if (drakeImages.length > 0) return drakeImages;
     }
 
     const prefixMatches = images.filter((url) => url.startsWith(imageUrlPrefix));

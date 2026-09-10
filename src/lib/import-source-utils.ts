@@ -80,6 +80,13 @@ const SOURCE_PRESETS: Array<{
       "https://kaynscans.com/uploads/series/echoes-of-the-reverse-planet/0044/p-6247461e-5129-40be-a735-9b5684e60237.webp",
   },
   {
+    hostIncludes: "drakecomic",
+    sourceSite: "Drake Scans",
+    scanlationGroup: "Drake Scans",
+    imageUrlExample:
+      "https://drakecomic.net/uploads/series/disastrous-necromancer/0001/p-example.webp",
+  },
+  {
     hostIncludes: "witchtoons",
     sourceSite: "WitchToons",
     scanlationGroup: "WitchToons",
