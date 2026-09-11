@@ -392,60 +392,106 @@ export async function $autoImportSeriesCover(args: {
   }
 }
 
+/** Trusted CDN sources that don't need mirroring — their URLs are stable and fast */
+function isTrustedCdnSource(sourceUrl: string): boolean {
+  const lower = sourceUrl.toLowerCase();
+  return (
+    lower.includes('cdn.duskscans.com') ||
+    lower.includes('cdn.asurascans.com') ||
+    lower.includes('asura-images') ||
+    lower.includes('storage.hivetoon.com') ||
+    lower.includes('media.qimanga.com') ||
+    lower.includes('kaynscans.com/uploads') ||
+    lower.includes('drakecomic.net/uploads') ||
+    lower.includes('witchtoons.net/uploads')
+  );
+}
+
+/** Check if all images in the batch come from a trusted CDN that doesn't need mirroring */
+function shouldSkipMirroring(images: string[]): boolean {
+  if (images.length === 0) return false;
+  return images.every((url) => isTrustedCdnSource(url) || url.includes('supabase.co/storage'));
+}
+
 async function mirrorPagesForChapter(
   admin: ReturnType<typeof getAdminSupabase>,
   seriesSlug: string,
   chapterSlug: string,
   images: string[]
 ): Promise<string[]> {
-  return Promise.all(
-    images.map(async (rawImgUrl, idx) => {
+  // Skip mirroring entirely for trusted CDN sources
+  if (shouldSkipMirroring(images)) {
+    console.log(`[StorageMirror] Skipping mirror for ${chapterSlug} — ${images.length} images from trusted CDN`);
+    return images;
+  }
+
+  // Process images in batches of 8 to avoid overwhelming memory/connections
+  const BATCH_SIZE = 8;
+  const result: string[] = new Array(images.length);
+
+  for (let batchStart = 0; batchStart < images.length; batchStart += BATCH_SIZE) {
+    const batchEnd = Math.min(batchStart + BATCH_SIZE, images.length);
+    const batchPromises = [];
+
+    for (let idx = batchStart; idx < batchEnd; idx++) {
+      const rawImgUrl = images[idx];
       const pageNum = idx + 1;
-      // Already mirrored in Supabase storage?
-      if (rawImgUrl.includes("supabase.co/storage")) {
-        return rawImgUrl;
-      }
-      try {
-        const isVortex = rawImgUrl.includes("vortexscans.org");
-        const isComix = rawImgUrl.includes("wowpic") || rawImgUrl.includes("comix.to");
-        const referer = isVortex ? "https://vortexscans.org/" : isComix ? "https://comix.to/" : undefined;
 
-        const res = await fetch(rawImgUrl, {
-          headers: {
-            ...(referer ? { Referer: referer } : {}),
-            "User-Agent":
-              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-            Accept: "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
-          },
-          signal: AbortSignal.timeout(20_000),
-        });
+      batchPromises.push(
+        (async () => {
+          if (rawImgUrl.includes("supabase.co/storage")) {
+            return { idx, url: rawImgUrl };
+          }
+          try {
+            const isVortex = rawImgUrl.includes("vortexscans.org");
+            const isComix = rawImgUrl.includes("wowpic") || rawImgUrl.includes("comix.to");
+            const referer = isVortex ? "https://vortexscans.org/" : isComix ? "https://comix.to/" : undefined;
 
-        if (res.ok) {
-          const contentType = res.headers.get("content-type") || "image/webp";
-          const ext = contentType.includes("jpeg") || contentType.includes("jpg") ? "jpg" : "webp";
-          const arrayBuffer = await res.arrayBuffer();
-          const storagePath = `${seriesSlug}/${chapterSlug}/page-${String(pageNum).padStart(3, "0")}.${ext}`;
-
-          const { error: upErr } = await admin.storage
-            .from("chapter-pages")
-            .upload(storagePath, Buffer.from(arrayBuffer), {
-              contentType,
-              upsert: true,
+            const res = await fetch(rawImgUrl, {
+              headers: {
+                ...(referer ? { Referer: referer } : {}),
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+                Accept: "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
+              },
+              signal: AbortSignal.timeout(10_000),
             });
 
-          if (!upErr) {
-            const { data: { publicUrl } } = admin.storage
-              .from("chapter-pages")
-              .getPublicUrl(storagePath);
-            return publicUrl;
+            if (res.ok) {
+              const contentType = res.headers.get("content-type") || "image/webp";
+              const ext = contentType.includes("jpeg") || contentType.includes("jpg") ? "jpg" : "webp";
+              const arrayBuffer = await res.arrayBuffer();
+              const storagePath = `${seriesSlug}/${chapterSlug}/page-${String(pageNum).padStart(3, "0")}.${ext}`;
+
+              const { error: upErr } = await admin.storage
+                .from("chapter-pages")
+                .upload(storagePath, Buffer.from(arrayBuffer), {
+                  contentType,
+                  upsert: true,
+                });
+
+              if (!upErr) {
+                const { data: { publicUrl } } = admin.storage
+                  .from("chapter-pages")
+                  .getPublicUrl(storagePath);
+                return { idx, url: publicUrl };
+              }
+            }
+          } catch (e) {
+            console.warn(`[StorageMirror] Failed for ${chapterSlug} p${pageNum}:`, e);
           }
-        }
-      } catch (e) {
-        console.warn(`[StorageMirror] Failed for ${chapterSlug} p${pageNum}:`, e);
-      }
-      return rawImgUrl;
-    })
-  );
+          // Fall back to raw CDN URL on mirror failure
+          return { idx, url: rawImgUrl };
+        })()
+      );
+    }
+
+    const batchResults = await Promise.all(batchPromises);
+    for (const { idx, url } of batchResults) {
+      result[idx] = url;
+    }
+  }
+
+  return result;
 }
 
 export async function $runCloudScrape(args: {
@@ -572,9 +618,10 @@ export async function $runCloudScrape(args: {
   }
 
   const isAsura = validated.url.toLowerCase().includes('asura');
+  const isDusk = validated.url.toLowerCase().includes('duskscans');
   const extractedImages = await extractImagesFromChapterUrls(
     missing.map((chapter) => chapter.url),
-    { concurrency: isAsura ? 6 : 10, imageUrlExample },
+    { concurrency: isAsura ? 6 : isDusk ? 15 : 10, imageUrlExample },
   );
 
   const chapterRows: Array<{
@@ -695,18 +742,53 @@ export async function $runCloudScrape(args: {
     }
 
     const pageRows: Array<{ chapter_id: string; page_number: number; image_url: string }> = [];
-    for (const chapter of insertedChapters ?? []) {
+
+    // Check if all images across all chapters are from trusted CDNs (skip mirroring entirely)
+    const allImagesAreTrusted = (insertedChapters ?? []).every((chapter: any) => {
       const key = chapterScanKey(Number(chapter.chapter_number), chapter.scanlation_group);
-      const rawImages = chapterImages.get(key) ?? [];
-      const chSlug = chapter.slug || `chapter-${chapter.chapter_number}`;
-      const mirroredUrls = await mirrorPagesForChapter(admin, seriesSlug, chSlug, rawImages);
-      mirroredUrls.forEach((url, index) => {
-        pageRows.push({
-          chapter_id: chapter.id,
-          page_number: index + 1,
-          image_url: url,
+      const imgs = chapterImages.get(key) ?? [];
+      return shouldSkipMirroring(imgs);
+    });
+
+    if (allImagesAreTrusted) {
+      // Fast path: skip mirroring entirely, use CDN URLs directly
+      console.log(`[CloudScrape] All images from trusted CDNs — skipping mirror for ${insertedChapters?.length ?? 0} chapter(s)`);
+      for (const chapter of insertedChapters ?? []) {
+        const key = chapterScanKey(Number(chapter.chapter_number), chapter.scanlation_group);
+        const rawImages = chapterImages.get(key) ?? [];
+        rawImages.forEach((url, index) => {
+          pageRows.push({
+            chapter_id: chapter.id,
+            page_number: index + 1,
+            image_url: url,
+          });
         });
-      });
+      }
+    } else {
+      // Mirror path: process up to 3 chapters in parallel
+      const CHAPTER_CONCURRENCY = 3;
+      const chaptersToMirror = [...(insertedChapters ?? [])];
+      for (let ci = 0; ci < chaptersToMirror.length; ci += CHAPTER_CONCURRENCY) {
+        const chapterBatch = chaptersToMirror.slice(ci, ci + CHAPTER_CONCURRENCY);
+        const batchResults = await Promise.all(
+          chapterBatch.map(async (chapter: any) => {
+            const key = chapterScanKey(Number(chapter.chapter_number), chapter.scanlation_group);
+            const rawImages = chapterImages.get(key) ?? [];
+            const chSlug = chapter.slug || `chapter-${chapter.chapter_number}`;
+            const mirroredUrls = await mirrorPagesForChapter(admin, seriesSlug, chSlug, rawImages);
+            return { chapter, mirroredUrls };
+          })
+        );
+        for (const { chapter, mirroredUrls } of batchResults) {
+          mirroredUrls.forEach((url, index) => {
+            pageRows.push({
+              chapter_id: chapter.id,
+              page_number: index + 1,
+              image_url: url,
+            });
+          });
+        }
+      }
     }
 
     const { error: pagesError } = await admin.from("chapter_pages").insert(pageRows);
@@ -890,7 +972,8 @@ export async function $syncImportSource(args: {
     skipped = discovered.length - missing.length;
     const isAsuraSource = source.source_url.toLowerCase().includes('asura');
     const isElftoonSource = isElftoonUrl(source.source_url);
-    const batchConcurrency = isAsuraSource ? 6 : isElftoonSource ? 15 : 10;
+    const isDuskSource = source.source_url.toLowerCase().includes('duskscans');
+    const batchConcurrency = isAsuraSource ? 6 : isDuskSource ? 15 : isElftoonSource ? 15 : 10;
     const batchExtractedImages = await extractImagesFromChapterUrls(
       missing.map((chapter) => chapter.url),
       { concurrency: batchConcurrency, imageUrlExample },

@@ -35,6 +35,20 @@ async function retryAsync<T>(
   throw lastError;
 }
 
+/** Check if a URL belongs to a source with a dedicated fast (non-Puppeteer) extractor */
+function hasFastExtractor(url: string): boolean {
+  return (
+    isDuskScansUrl(url) ||
+    isKaynScansUrl(url) ||
+    isDrakeComicUrl(url) ||
+    isWitchToonsUrl(url) ||
+    isHivetoonUrl(url) ||
+    isElftoonUrl(url) ||
+    isQimanhwaLikeUrl(url) ||
+    isAsuraScansUrl(url)
+  );
+}
+
 export interface ChapterInfo {
   chapterNumber: number;
   title?: string;
@@ -1907,9 +1921,13 @@ export async function extractImagesFromChapterUrls(
     await Promise.allSettled(
       chunk.map(async (url) => {
         try {
+          // Fast sources get 1 retry with 1s delay; others get 2 retries with 3s delay
+          const isFast = hasFastExtractor(url);
           const images = await retryAsync(
             () => extractImagesFromChapterUrl(url, options),
             `Direct extraction for ${url}`,
+            isFast ? 1 : 2,
+            isFast ? 1000 : 3000,
           );
           if (images && images.length > 0) {
             results.set(url, images);
@@ -3773,7 +3791,47 @@ async function extractDuskScansChapters(seriesUrl: string): Promise<ChapterInfo[
   const cleanBase = seriesUrl.split('?')[0].replace(/\/+$/, '');
   const slugMatch = cleanBase.match(/\/series\/([^/?#]+)/i);
   const seriesSlug = slugMatch ? slugMatch[1] : '';
+  const list: ChapterInfo[] = [];
+  const seen = new Set<number>();
 
+  // 1. Try DuskScans API endpoint (fastest, most reliable)
+  if (seriesSlug) {
+    try {
+      const apiUrl = `https://duskscans.com/api/series/${encodeURIComponent(seriesSlug)}/chapters`;
+      const apiRes = await fetch(apiUrl, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/122.0.0.0 Safari/537.36',
+          'Accept': 'application/json',
+        },
+        signal: AbortSignal.timeout(8_000),
+      });
+      if (apiRes.ok) {
+        const apiData = (await apiRes.json()) as any;
+        const chapters = Array.isArray(apiData) ? apiData : apiData?.chapters || apiData?.data || [];
+        for (const c of chapters) {
+          const num = parseFloat(c.number ?? c.chapterNumber ?? c.chapter_number);
+          const price = parseFloat(c.price ?? 0);
+          if (isNaN(num) || price > 0 || seen.has(num)) continue;
+          seen.add(num);
+          list.push({
+            chapterNumber: num,
+            title: c.title && c.title.trim() && c.title !== String(num) ? c.title.trim() : undefined,
+            url: `https://duskscans.com/series/${seriesSlug}/chapter-${num}`,
+            isFree: true,
+          });
+        }
+        if (list.length > 0) {
+          console.log(`[Scraper] DuskScans API returned ${list.length} chapters for ${seriesSlug}`);
+          list.sort((a, b) => b.chapterNumber - a.chapterNumber);
+          return list;
+        }
+      }
+    } catch (apiErr) {
+      console.warn('[Scraper] DuskScans API chapter fetch failed, trying RSC:', apiErr);
+    }
+  }
+
+  // 2. RSC fetch with flexible regex matching
   const res = await fetch(seriesUrl, {
     headers: {
       'RSC': '1',
@@ -3781,7 +3839,7 @@ async function extractDuskScansChapters(seriesUrl: string): Promise<ChapterInfo[
       'Accept': '*/*',
     },
     redirect: 'follow',
-    signal: AbortSignal.timeout(20_000),
+    signal: AbortSignal.timeout(10_000),
   });
 
   if (!res.ok) {
@@ -3789,17 +3847,21 @@ async function extractDuskScansChapters(seriesUrl: string): Promise<ChapterInfo[
   }
 
   const text = await res.text();
-  const list: ChapterInfo[] = [];
-  const seen = new Set<number>();
 
-  // 1. Match chapter objects from RSC text
-  const chRegex = /\{"id":"([^"]+)","mangaId":"([^"]+)","number":([0-9.]+)(?:,"title":"([^"]*)")?[^{}]*?(?:,"price":([0-9.]+))?[^{}]*?\}/g;
+  // 2a. Flexible JSON object matching — handles field reordering
+  const flexRegex = /\{[^{}]*?"number"\s*:\s*([0-9.]+)[^{}]*?\}/g;
   let match: RegExpExecArray | null;
-  while ((match = chRegex.exec(text)) !== null) {
-    const num = parseFloat(match[3]);
-    const title = match[4];
-    const price = match[5] ? parseFloat(match[5]) : 0;
-    if (price > 0 || isNaN(num) || seen.has(num)) continue;
+  while ((match = flexRegex.exec(text)) !== null) {
+    const block = match[0];
+    const num = parseFloat(match[1]);
+    if (isNaN(num) || seen.has(num)) continue;
+    // Skip paid/premium chapters
+    const priceMatch = block.match(/"price"\s*:\s*([0-9.]+)/);
+    if (priceMatch && parseFloat(priceMatch[1]) > 0) continue;
+    // Must look like a chapter object (has mangaId or id or slug field)
+    if (!/"(?:mangaId|id|slug)"\s*:/.test(block)) continue;
+    const titleMatch = block.match(/"title"\s*:\s*"([^"]*)"/);
+    const title = titleMatch?.[1];
     seen.add(num);
     list.push({
       chapterNumber: num,
@@ -3808,7 +3870,7 @@ async function extractDuskScansChapters(seriesUrl: string): Promise<ChapterInfo[
     });
   }
 
-  // 2. Fallback: match from HTML links
+  // 2b. Fallback: match from HTML links
   if (list.length === 0) {
     const htmlRegex = /href="(\/series\/[^"]*?\/chapter-([0-9.]+)[^"]*)"/g;
     while ((match = htmlRegex.exec(text)) !== null) {
@@ -3829,8 +3891,36 @@ async function extractDuskScansChapters(seriesUrl: string): Promise<ChapterInfo[
 async function extractDuskScansChapterImages(chapterUrl: string): Promise<string[]> {
   const urlMatch = chapterUrl.match(/\/series\/([^/?#]+)\/chapter-([0-9.]+)/i);
   const seriesSlug = urlMatch ? urlMatch[1] : '';
+  const chapterNum = urlMatch ? urlMatch[2] : '';
 
-  // 1. Try RSC header
+  // 1. Try DuskScans API endpoint for chapter images (fastest)
+  if (seriesSlug && chapterNum) {
+    try {
+      const apiUrl = `https://duskscans.com/api/series/${encodeURIComponent(seriesSlug)}/chapters/${encodeURIComponent(chapterNum)}`;
+      const apiRes = await fetch(apiUrl, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/122.0.0.0 Safari/537.36',
+          'Accept': 'application/json',
+        },
+        signal: AbortSignal.timeout(8_000),
+      });
+      if (apiRes.ok) {
+        const data = (await apiRes.json()) as any;
+        const pages = data?.pages || data?.images || data?.data?.pages || data?.data?.images;
+        if (Array.isArray(pages) && pages.length > 0) {
+          const urls = pages
+            .map((p: any) => typeof p === 'string' ? p : p?.url || p?.image)
+            .filter((u: any): u is string => typeof u === 'string' && u.startsWith('http') && !isNonChapterImageUrl(u.toLowerCase()));
+          if (urls.length > 0) {
+            console.log(`[Scraper] DuskScans API returned ${urls.length} images for ${seriesSlug}/chapter-${chapterNum}`);
+            return urls;
+          }
+        }
+      }
+    } catch {}
+  }
+
+  // 2. Try RSC header (fast, no browser needed)
   try {
     const rscRes = await fetch(chapterUrl, {
       headers: {
@@ -3839,33 +3929,62 @@ async function extractDuskScansChapterImages(chapterUrl: string): Promise<string
         'Accept': '*/*',
       },
       redirect: 'follow',
-      signal: AbortSignal.timeout(15_000),
+      signal: AbortSignal.timeout(8_000),
     });
     if (rscRes.ok) {
       const text = await rscRes.text();
-      const pagesMatch = text.match(/"pages":\s*("\[.*?\]"|\[.*?\])/);
-      if (pagesMatch) {
-        let raw = pagesMatch[1];
-        if (raw.startsWith('"')) raw = JSON.parse(raw);
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          const valid = parsed
-            .filter((u) => typeof u === 'string' && (!seriesSlug || u.includes(seriesSlug)))
-            .filter((u) => !isNonChapterImageUrl(u.toLowerCase()));
-          if (valid.length > 0) return valid;
+      // Try multiple patterns for the pages array — handles both raw and double-encoded JSON
+      const pagesPatterns = [
+        /"pages"\s*:\s*("\[.*?\]"|\[[^\]]*\])/,
+        /"pages"\s*:\s*"(\[\\"https?:.*?\])"/,
+        /pages["']?\s*[,:=]\s*(\["https?:.*?\])/,
+      ];
+      for (const pattern of pagesPatterns) {
+        const pagesMatch = text.match(pattern);
+        if (pagesMatch) {
+          try {
+            let raw = pagesMatch[1];
+            if (raw.startsWith('"')) raw = JSON.parse(raw);
+            // Handle escaped JSON strings
+            if (typeof raw === 'string' && raw.startsWith('[')) {
+              raw = raw.replace(/\\"/g, '"');
+            }
+            const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              const valid = parsed
+                .filter((u) => typeof u === 'string' && u.startsWith('http'))
+                .filter((u) => !seriesSlug || u.includes(seriesSlug))
+                .filter((u) => !isNonChapterImageUrl(u.toLowerCase()));
+              if (valid.length > 0) {
+                console.log(`[Scraper] DuskScans RSC returned ${valid.length} images for ${chapterUrl}`);
+                return valid;
+              }
+            }
+          } catch {}
         }
+      }
+
+      // Also try extracting CDN image URLs directly from RSC text
+      const cdnPattern = seriesSlug
+        ? new RegExp(`https://cdn\\.duskscans\\.com/storage/uploads/chapters/${seriesSlug}/[^"'\\s<>]+\\.(?:webp|jpg|jpeg|png|avif)`, 'gi')
+        : /https:\/\/cdn\.duskscans\.com\/storage\/uploads\/chapters\/[^"'\s<>]+\.(?:webp|jpg|jpeg|png|avif)/gi;
+      const cdnMatches = [...text.matchAll(cdnPattern)].map((m) => m[0]);
+      const uniqueCdn = Array.from(new Set(cdnMatches)).filter((u) => !isNonChapterImageUrl(u.toLowerCase()));
+      if (uniqueCdn.length > 0) {
+        console.log(`[Scraper] DuskScans RSC CDN extracted ${uniqueCdn.length} images for ${chapterUrl}`);
+        return uniqueCdn;
       }
     }
   } catch {}
 
-  // 2. Fetch standard HTML
+  // 3. Fetch standard HTML (fallback)
   const htmlRes = await fetch(chapterUrl, {
     headers: {
       'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/122.0.0.0 Safari/537.36',
       'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
     },
     redirect: 'follow',
-    signal: AbortSignal.timeout(15_000),
+    signal: AbortSignal.timeout(8_000),
   });
 
   if (!htmlRes.ok) {

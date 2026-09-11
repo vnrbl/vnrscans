@@ -37,16 +37,14 @@ export function SpotlightNavbar({
     return pathname.startsWith(item.href);
   });
 
-  const [activeIndex, setActiveIndex] = useState(matchedIndex !== -1 ? matchedIndex : defaultActiveIndex);
+  const [activeIndex, setActiveIndex] = useState(matchedIndex !== -1 ? matchedIndex : -1);
   const [hoverX, setHoverX] = useState<number | null>(null);
 
   const spotlightX = useRef(0);
   const ambienceX = useRef(0);
 
   useEffect(() => {
-    if (matchedIndex !== -1) {
-      setActiveIndex(matchedIndex);
-    }
+    setActiveIndex(matchedIndex);
   }, [matchedIndex]);
 
   useEffect(() => {
