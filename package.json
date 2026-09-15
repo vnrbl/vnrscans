@@ -22,6 +22,7 @@
     "import:comix": "node scripts/import-comix.cjs",
     "sync-chapters": "npx tsx scripts/sync-all-chapters.ts",
     "sync-scheduled": "npx tsx scripts/auto-import-sources.ts",
+    "migrate:r2": "npx tsx scripts/migrate-supabase-storage-to-r2.ts",
     "cf:login": "wrangler login",
     "cf:dev": "wrangler dev",
     "cf:deploy": "wrangler deploy",
