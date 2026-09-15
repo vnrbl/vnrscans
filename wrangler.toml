@@ -39,3 +39,11 @@ bucket_name = "vnrscans-media"
 # routes = [
 #   { pattern = "api.vnrscans.com/*", zone_name = "vnrscans.com" }
 # ]
+
+# ==================== OBSERVABILITY & TRACING ====================
+[observability]
+enabled = true
+head_sampling_rate = 1
+
+[observability.traces]
+enabled = true
