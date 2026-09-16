@@ -904,13 +904,16 @@ export async function $importComixChaptersToSeries(args: {
           continue;
         }
 
-        // Parallel mirror images to Supabase storage to bypass hotlink 403 blocks
+        // Parallel mirror images to Cloudflare R2 to bypass hotlink 403 blocks
+        const workerUrl = (process.env.WORKER_URL || process.env.CLOUDFLARE_WORKER_URL || '').replace(/\/$/, '');
+        const uploadSecret = process.env.WORKER_UPLOAD_SECRET;
+
         const mirroredPages = await Promise.all(
           images.map(async (rawImgUrl, idx) => {
             const pageNum = idx + 1;
             let finalUrl = rawImgUrl;
 
-            if (rawImgUrl.includes("wowpic") || rawImgUrl.includes("comix.to")) {
+            if ((rawImgUrl.includes("wowpic") || rawImgUrl.includes("comix.to")) && workerUrl) {
               try {
                 const res = await fetch(rawImgUrl, {
                   headers: {
@@ -928,22 +931,26 @@ export async function $importComixChaptersToSeries(args: {
                   const arrayBuffer = await res.arrayBuffer();
                   const storagePath = `${series.slug}/${chapterSlug}/page-${String(pageNum).padStart(3, "0")}.${ext}`;
 
-                  const { error: upErr } = await admin.storage
-                    .from("chapter-pages")
-                    .upload(storagePath, Buffer.from(arrayBuffer), {
+                  const r2Res = await fetch(`${workerUrl}/assets/upload`, {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      ...(uploadSecret ? { 'x-worker-secret': uploadSecret } : {}),
+                    },
+                    body: JSON.stringify({
+                      key: `chapter-pages/${storagePath}`,
+                      data: Buffer.from(arrayBuffer).toString('base64'),
                       contentType,
-                      upsert: true,
-                    });
+                    }),
+                    signal: AbortSignal.timeout(15_000),
+                  });
 
-                  if (!upErr) {
-                    const { data: { publicUrl } } = admin.storage
-                      .from("chapter-pages")
-                      .getPublicUrl(storagePath);
-                    finalUrl = publicUrl;
+                  if (r2Res.ok) {
+                    finalUrl = `${workerUrl}/assets/chapter-pages/${storagePath}`;
                   }
                 }
               } catch (mirrorErr) {
-                console.warn(`[ComixImport] Storage mirror failed for page ${pageNum}:`, mirrorErr);
+                console.warn(`[ComixImport] R2 mirror failed for page ${pageNum}:`, mirrorErr);
               }
             }
 

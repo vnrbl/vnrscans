@@ -410,11 +410,61 @@ function isTrustedCdnSource(sourceUrl: string): boolean {
 /** Check if all images in the batch come from a trusted CDN that doesn't need mirroring */
 function shouldSkipMirroring(images: string[]): boolean {
   if (images.length === 0) return false;
-  return images.every((url) => isTrustedCdnSource(url) || url.includes('supabase.co/storage'));
+  return images.every((url) => isTrustedCdnSource(url) || url.includes('supabase.co/storage') || url.includes('/assets/'));
+}
+
+/** Check if an image is already hosted on our infrastructure (Supabase Storage or R2) */
+function isAlreadyMirrored(url: string): boolean {
+  return url.includes('supabase.co/storage') || url.includes('/assets/');
+}
+
+/** Get the Cloudflare Worker URL for R2 uploads */
+function getWorkerUrl(): string | null {
+  const url = process.env.WORKER_URL || process.env.CLOUDFLARE_WORKER_URL;
+  return url ? url.replace(/\/$/, '') : null;
+}
+
+/** Upload a single image to Cloudflare R2 via the Worker */
+async function uploadToR2(
+  workerUrl: string,
+  storagePath: string,
+  imageBuffer: ArrayBuffer,
+  contentType: string
+): Promise<string | null> {
+  try {
+    const uploadSecret = process.env.WORKER_UPLOAD_SECRET;
+    const base64Data = Buffer.from(imageBuffer).toString('base64');
+
+    const res = await fetch(`${workerUrl}/assets/upload`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(uploadSecret ? { 'x-worker-secret': uploadSecret } : {}),
+      },
+      body: JSON.stringify({
+        key: `chapter-pages/${storagePath}`,
+        data: base64Data,
+        contentType,
+      }),
+      signal: AbortSignal.timeout(15_000),
+    });
+
+    if (res.ok) {
+      // Return the full public URL for the R2 asset
+      return `${workerUrl}/assets/chapter-pages/${storagePath}`;
+    }
+
+    const errBody = await res.text().catch(() => '');
+    console.warn(`[R2Mirror] Upload failed (${res.status}): ${errBody}`);
+    return null;
+  } catch (e) {
+    console.warn(`[R2Mirror] Upload error for ${storagePath}:`, e);
+    return null;
+  }
 }
 
 async function mirrorPagesForChapter(
-  admin: ReturnType<typeof getAdminSupabase>,
+  _admin: ReturnType<typeof getAdminSupabase>,
   seriesSlug: string,
   chapterSlug: string,
   images: string[]
@@ -422,6 +472,12 @@ async function mirrorPagesForChapter(
   // Skip mirroring entirely for trusted CDN sources
   if (shouldSkipMirroring(images)) {
     console.log(`[StorageMirror] Skipping mirror for ${chapterSlug} — ${images.length} images from trusted CDN`);
+    return images;
+  }
+
+  const workerUrl = getWorkerUrl();
+  if (!workerUrl) {
+    console.warn(`[StorageMirror] No WORKER_URL set — skipping R2 mirror, using raw URLs`);
     return images;
   }
 
@@ -439,7 +495,8 @@ async function mirrorPagesForChapter(
 
       batchPromises.push(
         (async () => {
-          if (rawImgUrl.includes("supabase.co/storage")) {
+          // Skip if already on our infrastructure
+          if (isAlreadyMirrored(rawImgUrl)) {
             return { idx, url: rawImgUrl };
           }
           try {
@@ -462,18 +519,9 @@ async function mirrorPagesForChapter(
               const arrayBuffer = await res.arrayBuffer();
               const storagePath = `${seriesSlug}/${chapterSlug}/page-${String(pageNum).padStart(3, "0")}.${ext}`;
 
-              const { error: upErr } = await admin.storage
-                .from("chapter-pages")
-                .upload(storagePath, Buffer.from(arrayBuffer), {
-                  contentType,
-                  upsert: true,
-                });
-
-              if (!upErr) {
-                const { data: { publicUrl } } = admin.storage
-                  .from("chapter-pages")
-                  .getPublicUrl(storagePath);
-                return { idx, url: publicUrl };
+              const r2Url = await uploadToR2(workerUrl, storagePath, arrayBuffer, contentType);
+              if (r2Url) {
+                return { idx, url: r2Url };
               }
             }
           } catch (e) {

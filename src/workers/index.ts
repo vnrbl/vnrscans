@@ -311,30 +311,6 @@ export default {
     // ==================== R2 ASSET STORAGE ====================
     const r2 = env.MEDIA;
 
-    // Serve file from R2: GET /assets/<key>
-    if (pathname.startsWith("/assets/") && r2) {
-      const key = pathname.replace(/^\/assets\//, "");
-      if (!key) {
-        return Response.json({ error: "Missing key" }, { status: 400 });
-      }
-
-      try {
-        const object = await r2.get(key);
-        if (!object) {
-          return new Response("Not found", { status: 404 });
-        }
-
-        const headers = new Headers();
-        object.writeHttpMetadata(headers);
-        headers.set("etag", object.httpEtag);
-        headers.set("Cache-Control", "public, max-age=31536000, immutable");
-
-        return new Response(object.body, { headers });
-      } catch (e) {
-        return Response.json({ error: "Failed to fetch asset" }, { status: 500 });
-      }
-    }
-
     // Upload to R2: POST /assets/upload
     // Body: { key: string, data: base64string, contentType?: string, metadata?: object }
     // Protected by optional X-Worker-Secret (set via secret)
@@ -384,10 +360,33 @@ export default {
             size: o.size,
             uploaded: o.uploaded,
           })),
-          truncated: listed.truncated,
         });
+      } catch (err: any) {
+        return Response.json({ error: "Failed to list assets", details: err?.message }, { status: 500 });
+      }
+    }
+
+    // Serve file from R2: GET /assets/<key>
+    if (pathname.startsWith("/assets/") && request.method === "GET" && r2) {
+      const key = pathname.replace(/^\/assets\//, "");
+      if (!key) {
+        return Response.json({ error: "Missing key" }, { status: 400 });
+      }
+
+      try {
+        const object = await r2.get(key);
+        if (!object) {
+          return new Response("Not found", { status: 404 });
+        }
+
+        const headers = new Headers();
+        object.writeHttpMetadata(headers);
+        headers.set("etag", object.httpEtag);
+        headers.set("Cache-Control", "public, max-age=31536000, immutable");
+
+        return new Response(object.body, { headers });
       } catch (e) {
-        return Response.json({ error: "Failed to list" }, { status: 500 });
+        return Response.json({ error: "Failed to fetch asset" }, { status: 500 });
       }
     }
 
