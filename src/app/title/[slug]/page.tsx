@@ -41,7 +41,7 @@ const getChaptersData = cache(async (seriesId: string) => {
     data = (fallback.data ?? []).map((c: any) => ({ ...c, source_url: null }));
   }
 
-  return (data ?? []).filter((c) => c.chapter_number !== 0);
+  return (data ?? []).filter((c) => c.chapter_number != null);
 });
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {

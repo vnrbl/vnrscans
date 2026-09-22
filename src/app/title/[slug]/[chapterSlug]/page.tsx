@@ -128,7 +128,7 @@ const getChapterFullData = cache(async (seriesSlug: string, chapterSlug: string)
       .order("page_number"),
     supabase
       .from("chapters")
-      .select("id,slug,chapter_number,scanlation_group")
+      .select("id,slug,chapter_number,title,scanlation_group")
       .eq("series_id", chapter.series_id)
       .in("status", ["published", "scheduled"])
       .order("chapter_number", { ascending: true }),

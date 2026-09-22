@@ -995,3 +995,38 @@ html.reader-pseudo-fullscreen .reader-fullscreen-wrapper [data-reader-overlay] {
   }
 }
 
+/* ── Novel reader & writer typography (preserves exact spaces, indentation, and line gaps) ── */
+.novel-body-text {
+  white-space: pre-wrap !important;
+  word-break: break-word;
+  tab-size: 4;
+}
+
+.novel-body-text p {
+  margin-top: 0;
+  margin-bottom: 1.6em !important;
+  line-height: inherit;
+  white-space: pre-wrap !important;
+}
+
+.novel-body-text p:last-child {
+  margin-bottom: 0 !important;
+}
+
+.novel-body-text h1,
+.novel-body-text h2,
+.novel-body-text h3 {
+  margin-top: 1.75em !important;
+  margin-bottom: 0.75em !important;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.novel-body-text blockquote {
+  border-left: 3px solid currentColor;
+  opacity: 0.85;
+  padding-left: 1.25rem;
+  margin: 1.5em 0 !important;
+  font-style: italic;
+}
+

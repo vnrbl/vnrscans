@@ -184,7 +184,7 @@ export const ChapterList = React.memo(function ChapterList({
         error = fallbackRes.error;
       }
       if (error) throw error;
-      return (data ?? []).filter((c) => c.chapter_number !== 0);
+      return (data ?? []).filter((c) => c.chapter_number != null);
     },
     placeholderData: selectedGroup === "all" && sortOrder === "desc" ? initialChaptersData : undefined,
     staleTime: 1000 * 60 * 2,

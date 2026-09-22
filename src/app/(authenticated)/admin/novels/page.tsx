@@ -31,6 +31,9 @@ import {
   Star,
   Settings,
   Tags,
+  WrapText,
+  Indent,
+  Outdent,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -56,6 +59,14 @@ import { buildChapterSlug } from "@/lib/chapter-utils";
 import { logAdminAction } from "@/lib/adminLog";
 import { useNavigate } from "@/lib/router-compat";
 import { useSearchParams } from "next/navigation";
+import { sanitizeHtml } from "@/lib/html-sanitizer";
+import {
+  extractClipboardNovelText,
+  autoFormatLineGaps,
+  indentParagraphs,
+  removeIndentation,
+  cleanSpacedText,
+} from "@/lib/novel-formatter";
 
 type ChapterRow = {
   id: string;
@@ -147,6 +158,7 @@ function NovelsWriterContent() {
   const [scheduledAt, setScheduledAt] = useState("");
   const [novelContent, setNovelContent] = useState("");
   const [imageUrls, setImageUrls] = useState("");
+  const [previewMode, setPreviewMode] = useState(false);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [uploadingCover, setUploadingCover] = useState(false);
@@ -524,6 +536,85 @@ function NovelsWriterContent() {
       textarea.focus();
       textarea.setSelectionRange(start + tagOpen.length, start + tagOpen.length + selected.length);
     }, 50);
+  };
+
+  // Spacing & formatting handlers (preserves exact spaces, indentation, and line gaps from source)
+  const handleAutoLineGaps = () => {
+    if (!novelContent.trim()) {
+      toast.info("Please enter or paste novel text first");
+      return;
+    }
+    const formatted = autoFormatLineGaps(novelContent);
+    setNovelContent(formatted);
+    toast.success("Applied paragraph line gaps (spaces between paragraphs preserved)");
+  };
+
+  const handleIndentParagraphs = () => {
+    if (!novelContent.trim()) {
+      toast.info("Please enter or paste novel text first");
+      return;
+    }
+    const formatted = indentParagraphs(novelContent);
+    setNovelContent(formatted);
+    toast.success("Added novel indentation (4 spaces per paragraph)");
+  };
+
+  const handleRemoveIndentation = () => {
+    if (!novelContent.trim()) return;
+    const formatted = removeIndentation(novelContent);
+    setNovelContent(formatted);
+    toast.success("Removed paragraph indentation");
+  };
+
+  const handleCleanSpacing = () => {
+    if (!novelContent.trim()) return;
+    const formatted = cleanSpacedText(novelContent);
+    setNovelContent(formatted);
+    toast.success("Normalized line gaps & cleaned extra spacing");
+  };
+
+  // Smart Paste Handler: parses HTML/plain clipboard data to preserve spaces, indents, and line gaps
+  const handleSmartPaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const formattedText = extractClipboardNovelText(e.clipboardData);
+    if (!formattedText) return; // let native paste handle if empty
+
+    e.preventDefault();
+    const textarea = textareaRef.current;
+    if (!textarea) {
+      setNovelContent((prev) => prev + formattedText);
+      return;
+    }
+
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const currentText = textarea.value;
+
+    const newContent = currentText.substring(0, start) + formattedText + currentText.substring(end);
+    setNovelContent(newContent);
+
+    setTimeout(() => {
+      textarea.focus();
+      textarea.setSelectionRange(start + formattedText.length, start + formattedText.length);
+    }, 20);
+
+    toast.success("Smart Pasted: exact spaces & paragraph line gaps preserved from source!");
+  };
+
+  // Tab key indents by 4 spaces without losing focus
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Tab") {
+      e.preventDefault();
+      const textarea = textareaRef.current;
+      if (!textarea) return;
+      const start = textarea.selectionStart;
+      const end = textarea.selectionEnd;
+      const currentText = textarea.value;
+      const newContent = currentText.substring(0, start) + "    " + currentText.substring(end);
+      setNovelContent(newContent);
+      setTimeout(() => {
+        textarea.setSelectionRange(start + 4, start + 4);
+      }, 10);
+    }
   };
 
   // Word & Character count calculation
@@ -1207,72 +1298,169 @@ function NovelsWriterContent() {
                   </p>
                 </div>
 
-                {/* Formatted Tags Editor Toolbar */}
-                <div className="flex flex-wrap items-center gap-1.5 p-1.5 rounded-lg border border-border/40 bg-card/60 backdrop-blur-sm mt-2">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => injectTag("<p>", "</p>")}
-                    className="h-8 px-2 hover:bg-secondary hover:text-primary text-xs font-semibold"
-                    title="Paragraph tag"
-                  >
-                    Paragraph
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => injectTag("<strong>", "</strong>")}
-                    className="h-8 px-2.5 hover:bg-secondary hover:text-primary"
-                    title="Bold tag"
-                  >
-                    <Bold className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => injectTag("<em>", "</em>")}
-                    className="h-8 px-2.5 hover:bg-secondary hover:text-primary"
-                    title="Italic tag"
-                  >
-                    <Italic className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => injectTag("<h3>", "</h3>")}
-                    className="h-8 px-2.5 hover:bg-secondary hover:text-primary"
-                    title="Heading 3"
-                  >
-                    <Heading3 className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => injectTag("<blockquote>", "</blockquote>")}
-                    className="h-8 px-2.5 hover:bg-secondary hover:text-primary"
-                    title="Blockquote"
-                  >
-                    <Quote className="h-4 w-4" />
-                  </Button>
-                  
-                  <div className="h-4 w-px bg-border/45 mx-2" />
+                {/* Formatted Tags & Novel Spacing Toolbar */}
+                <div className="flex flex-wrap items-center justify-between gap-1.5 p-1.5 rounded-lg border border-border/40 bg-card/60 backdrop-blur-sm mt-2">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => injectTag("<p>", "</p>")}
+                      className="h-8 px-2 hover:bg-secondary hover:text-primary text-xs font-semibold"
+                      title="Paragraph tag"
+                    >
+                      Paragraph
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => injectTag("<strong>", "</strong>")}
+                      className="h-8 px-2.5 hover:bg-secondary hover:text-primary"
+                      title="Bold tag"
+                    >
+                      <Bold className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => injectTag("<em>", "</em>")}
+                      className="h-8 px-2.5 hover:bg-secondary hover:text-primary"
+                      title="Italic tag"
+                    >
+                      <Italic className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => injectTag("<h3>", "</h3>")}
+                      className="h-8 px-2.5 hover:bg-secondary hover:text-primary"
+                      title="Heading 3"
+                    >
+                      <Heading3 className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => injectTag("<blockquote>", "</blockquote>")}
+                      className="h-8 px-2.5 hover:bg-secondary hover:text-primary"
+                      title="Blockquote"
+                    >
+                      <Quote className="h-4 w-4" />
+                    </Button>
+                    
+                    <div className="h-4 w-px bg-border/45 mx-1" />
 
-                  <span className="text-[10px] text-muted-foreground flex items-center gap-1">
-                    Tip: Highlight text and click any styling tool to wrap it!
-                  </span>
+                    {/* Auto Spacing & Line Gap Tools */}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={handleAutoLineGaps}
+                      className="h-8 px-2.5 bg-primary/10 border-primary/30 text-primary hover:bg-primary/20 text-xs font-semibold gap-1.5 shadow-sm"
+                      title="Auto-insert a blank line gap between paragraphs to match source"
+                    >
+                      <WrapText className="h-3.5 w-3.5" />
+                      <span>Line Gap (Double Space)</span>
+                    </Button>
+
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleIndentParagraphs}
+                      className="h-8 px-2 hover:bg-secondary text-xs font-medium gap-1"
+                      title="Indent every paragraph with 4 spaces"
+                    >
+                      <Indent className="h-3.5 w-3.5" />
+                      <span className="hidden min-[600px]:inline">Indent</span>
+                    </Button>
+
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleRemoveIndentation}
+                      className="h-8 px-2 hover:bg-secondary text-xs font-medium gap-1"
+                      title="Remove leading indentation"
+                    >
+                      <Outdent className="h-3.5 w-3.5" />
+                      <span className="hidden min-[600px]:inline">Unindent</span>
+                    </Button>
+
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleCleanSpacing}
+                      className="h-8 px-2 hover:bg-secondary text-xs font-medium gap-1"
+                      title="Normalize spaces & limit empty lines to 1"
+                    >
+                      <Sparkles className="h-3.5 w-3.5" />
+                      <span className="hidden min-[600px]:inline">Clean Gaps</span>
+                    </Button>
+                  </div>
+
+                  {/* Reader Live Preview Toggle */}
+                  <div className="flex items-center gap-1.5">
+                    <Button
+                      type="button"
+                      variant={previewMode ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setPreviewMode(!previewMode)}
+                      className={`h-8 px-2.5 text-xs font-semibold gap-1.5 ${previewMode ? "bg-violet-600 text-white hover:bg-violet-700" : "border-border/60 hover:bg-secondary"}`}
+                    >
+                      <Eye className="h-3.5 w-3.5" />
+                      <span>{previewMode ? "Back to Editor" : "Reader Preview"}</span>
+                    </Button>
+                  </div>
                 </div>
 
-                {/* Textarea Editor Area */}
-                <div className="flex-1 flex flex-col relative mt-2">
-                  <Textarea
-                    ref={textareaRef}
-                    placeholder="Write your story here... HTML formatting (<p>, <strong>, etc.) is fully supported."
-                    value={novelContent}
-                    onChange={(e) => setNovelContent(e.target.value)}
-                    className="flex-1 font-serif text-base leading-relaxed p-4 bg-card/30 border-border/45 focus-visible:ring-primary min-h-[400px] resize-none"
-                    style={{ tabSize: 4 }}
-                  />
-                </div>
+                {/* Textarea Editor or Reader Live Preview */}
+                {previewMode ? (
+                  <div className="flex-1 rounded-lg border border-border/45 bg-[#121212] p-6 text-[#e0e0e0] overflow-y-auto min-h-[400px] max-h-[700px]">
+                    <div className="mb-4 pb-3 border-b border-neutral-800 text-xs text-neutral-400 font-mono flex items-center justify-between">
+                      <span className="font-semibold text-primary">LIVE NOVEL READER PREVIEW</span>
+                      <span className="text-[11px] opacity-75">Matches exact line gaps, margins & spaces</span>
+                    </div>
+                    <div className="font-serif text-lg leading-relaxed novel-body-text whitespace-pre-wrap select-text max-w-2xl mx-auto">
+                      {novelContent.trim() ? (
+                        /<\/?(p|div|br|strong|b|em|i|h[1-6]|blockquote|span|ul|ol|li)[>\s]/i.test(novelContent) ? (
+                          <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(novelContent) }} />
+                        ) : (
+                          <div className="space-y-6">
+                            {(/\n\s*\n/.test(novelContent) ? novelContent.split(/\n\s*\n/) : novelContent.split(/\n/))
+                              .map((p) => p.replace(/\r+$/, "").replace(/[ \t]+$/, ""))
+                              .filter((p) => p.length > 0)
+                              .map((p, idx) => (
+                                <p key={idx} className="whitespace-pre-wrap">{p}</p>
+                              ))}
+                          </div>
+                        )
+                      ) : (
+                        <p className="text-muted-foreground italic text-center py-12">
+                          No content yet. Type or paste your story to preview.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex-1 flex flex-col relative mt-2">
+                    <Textarea
+                      ref={textareaRef}
+                      placeholder="Write or paste your story here... Exact line gaps and spaces from source sites are automatically preserved on paste."
+                      value={novelContent}
+                      onChange={(e) => setNovelContent(e.target.value)}
+                      onPaste={handleSmartPaste}
+                      onKeyDown={handleKeyDown}
+                      className="flex-1 font-serif text-base leading-relaxed p-4 bg-card/30 border-border/45 focus-visible:ring-primary min-h-[400px] resize-none whitespace-pre-wrap"
+                      style={{ tabSize: 4 }}
+                    />
+                  </div>
+                )}
 
                 {/* Bottom info bar */}
                 <div className="flex flex-wrap items-center justify-between border-t border-border/20 pt-4 gap-4 text-xs text-muted-foreground mt-4">

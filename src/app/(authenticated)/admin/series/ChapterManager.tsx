@@ -24,7 +24,9 @@ import {
   Lock,
   Unlock,
   Zap,
+  WrapText,
 } from "lucide-react";
+import { extractClipboardNovelText, autoFormatLineGaps } from "@/lib/novel-formatter";
 import { supabase } from "@/integrations/supabase/client";
 import { logAdminAction } from "@/lib/adminLog";
 import { useAuth } from "@/hooks/useAuth";
@@ -2316,16 +2318,40 @@ export default function ChapterManager({ seriesId, onBack }: { seriesId: string;
 
                 {series.data?.type === "novel" ? (
                   <div>
-                    <Label>Novel Content (HTML supported) *</Label>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <Label>Novel Content (HTML supported) *</Label>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          if (!form.novel_content.trim()) return;
+                          setForm({ ...form, novel_content: autoFormatLineGaps(form.novel_content) });
+                          toast.success("Applied paragraph line gaps");
+                        }}
+                        className="h-7 text-xs gap-1"
+                      >
+                        <WrapText className="h-3 w-3" />
+                        <span>Auto Line Gaps</span>
+                      </Button>
+                    </div>
                     <Textarea
                       rows={15}
-                      placeholder="<p>Write or paste your novel chapter here...</p>"
+                      placeholder="Write or paste your novel chapter here... Exact spaces and line gaps are preserved."
                       value={form.novel_content}
                       onChange={(e) => setForm({ ...form, novel_content: e.target.value })}
-                      className="font-mono text-sm mt-1.5"
+                      onPaste={(e) => {
+                        const parsed = extractClipboardNovelText(e.clipboardData);
+                        if (parsed) {
+                          e.preventDefault();
+                          setForm({ ...form, novel_content: parsed });
+                          toast.success("Smart pasted: line gaps & spaces preserved!");
+                        }
+                      }}
+                      className="font-mono text-sm mt-1.5 whitespace-pre-wrap"
                     />
                     <p className="mt-1 text-xs text-muted-foreground">
-                      Write or paste your novel chapter text here. HTML tags like &lt;p&gt; and &lt;strong&gt; are supported.
+                      Write or paste your novel chapter text here. Exact line gaps and spaces from source sites are preserved.
                     </p>
                   </div>
                 ) : (
@@ -2704,15 +2730,39 @@ export default function ChapterManager({ seriesId, onBack }: { seriesId: string;
             </div>
             {series.data?.type === "novel" ? (
               <div>
-                <Label>Novel Content (HTML supported) *</Label>
+                <div className="flex items-center justify-between mb-1.5">
+                  <Label>Novel Content (HTML supported) *</Label>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      if (!form.novel_content.trim()) return;
+                      setForm({ ...form, novel_content: autoFormatLineGaps(form.novel_content) });
+                      toast.success("Applied paragraph line gaps");
+                    }}
+                    className="h-7 text-xs gap-1"
+                  >
+                    <WrapText className="h-3 w-3" />
+                    <span>Auto Line Gaps</span>
+                  </Button>
+                </div>
                 <Textarea
                   rows={15}
                   value={form.novel_content}
                   onChange={(e) => setForm({ ...form, novel_content: e.target.value })}
-                  className="font-mono text-sm mt-1.5"
+                  onPaste={(e) => {
+                    const parsed = extractClipboardNovelText(e.clipboardData);
+                    if (parsed) {
+                      e.preventDefault();
+                      setForm({ ...form, novel_content: parsed });
+                      toast.success("Smart pasted: line gaps & spaces preserved!");
+                    }
+                  }}
+                  className="font-mono text-sm mt-1.5 whitespace-pre-wrap"
                 />
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Edit your novel chapter text. HTML tags like &lt;p&gt; and &lt;strong&gt; are supported.
+                  Edit your novel chapter text. Exact line gaps and spaces from source sites are preserved.
                 </p>
               </div>
             ) : (

@@ -326,7 +326,7 @@ export default function Reader({
     queryFn: async () => {
       const { data, error } = await supabase
         .from("chapters")
-        .select("id,slug,chapter_number,scanlation_group")
+        .select("id,slug,chapter_number,title,scanlation_group")
         .eq("series_id", chapterQ.data!.series!.id)
         .in("status", ["published", "scheduled"])
         .order("chapter_number", { ascending: true });
@@ -1262,6 +1262,7 @@ export default function Reader({
               chapterNumber={c.chapter_number}
               chapterSlug={c.slug || chapterSlug}
               illustrations={pagesQ.data?.map((p: any) => p.image_url) ?? []}
+              allChapters={navChapters}
             />
           ) : (
             <ImageView
@@ -2543,6 +2544,7 @@ function NovelView({
   chapterNumber,
   illustrations = [],
   chapterSlug,
+  allChapters = [],
 }: {
   content: string;
   chapterId: string;
@@ -2556,7 +2558,9 @@ function NovelView({
   chapterNumber: number;
   illustrations?: string[];
   chapterSlug?: string;
+  allChapters?: Array<{ id: string; slug: string; chapter_number: number; title?: string | null }>;
 }) {
+  const navigate = useNavigate();
   const [fontSize, setFontSize] = useState(18);
   const [fontFamily, setFontFamily] = useState("sans-serif");
   const [lineHeight, setLineHeight] = useState(1.8);
@@ -2746,13 +2750,18 @@ function NovelView({
   }, [chapterId, content, performNovelScrollToTarget]);
 
   // Determine content mode (HTML vs Plain Text split)
-  const isHtml = useMemo(() => /<[a-z][\s\S]*>/i.test(content), [content]);
+  const isHtml = useMemo(() => /<\/?(p|div|br|strong|b|em|i|h[1-6]|blockquote|span|ul|ol|li)[>\s]/i.test(content), [content]);
   const plainTextParagraphs = useMemo(() => {
     if (isHtml) return [];
-    return content
-      .split(/\n{2,}/)
-      .map((p) => p.trim())
-      .filter(Boolean);
+    // Normalize line breaks
+    const normalized = content.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+    // In web novels (Novel Fire style), every non-empty line or dialogue represents an independent paragraph
+    // with its own vertical line gap.
+    const rawLines = normalized.split("\n");
+
+    return rawLines
+      .map((line) => line.replace(/[ \t]+$/, "")) // Preserve leading indentation / spaces, trim trailing spaces
+      .filter((line) => line.trim().length > 0);
   }, [content, isHtml]);
 
   // Theme color definitions
@@ -2849,9 +2858,61 @@ function NovelView({
           <p className={`text-xs uppercase tracking-widest ${themeStyles.meta} mb-1 font-semibold`}>
             {seriesTitle}
           </p>
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight mb-2">
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight mb-4">
             Chapter {chapterNumber}
           </h1>
+
+          {/* Novel Fire Style Top Chapter Navigation Bar */}
+          <div className="flex items-center justify-center gap-1 select-none mt-4">
+            <Button
+              variant="default"
+              size="sm"
+              disabled={!hasPrev}
+              onClick={onPrev}
+              className="h-9 px-3 bg-[#1e293b] hover:bg-[#334155] disabled:opacity-30 disabled:hover:bg-[#1e293b] text-white border border-[#334155] rounded-l-lg transition-colors cursor-pointer"
+              title="Previous Chapter"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+
+            {allChapters && allChapters.length > 0 ? (
+              <Select
+                value={chapterSlug || currentChapterSlug}
+                onValueChange={(slug) => {
+                  navigate({
+                    to: "/title/$titleSlug/$chapterSlug",
+                    params: { titleSlug: seriesSlug, chapterSlug: slug },
+                  });
+                }}
+              >
+                <SelectTrigger className="h-9 min-w-[200px] sm:min-w-[280px] max-w-[420px] bg-[#0284c7] hover:bg-[#0369a1] text-white font-semibold text-xs sm:text-sm border-0 rounded-none px-3.5 justify-between shadow-md">
+                  <SelectValue placeholder={`Chapter ${chapterNumber}`} />
+                </SelectTrigger>
+                <SelectContent className="max-h-[380px] bg-neutral-900 border-neutral-800 text-neutral-200">
+                  {allChapters.map((ch) => (
+                    <SelectItem key={ch.id} value={ch.slug} className="text-xs sm:text-sm py-2 hover:bg-neutral-800 focus:bg-neutral-800 cursor-pointer">
+                      Chapter {ch.chapter_number}{ch.title ? `: ${ch.title}` : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : (
+              <div className="h-9 px-4 bg-[#0284c7] text-white font-semibold text-xs sm:text-sm flex items-center justify-center">
+                Chapter {chapterNumber}
+              </div>
+            )}
+
+            <Button
+              variant="default"
+              size="sm"
+              disabled={!hasNext}
+              onClick={onNext}
+              className="h-9 px-3 bg-[#1e293b] hover:bg-[#334155] disabled:opacity-30 disabled:hover:bg-[#1e293b] text-white border border-[#334155] rounded-r-lg transition-colors cursor-pointer"
+              title="Next Chapter"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
 
         {/* Content Body */}
@@ -2891,13 +2952,13 @@ function NovelView({
           
           {isHtml ? (
             <div 
-              className="novel-body-text whitespace-pre-wrap"
+              className="novel-body-text whitespace-pre-wrap select-text"
               dangerouslySetInnerHTML={{ __html: sanitizeHtml(content) }}
             />
           ) : (
-            <div className="novel-body-text space-y-6">
+            <div className="novel-body-text space-y-6 select-text">
               {plainTextParagraphs.map((p, i) => (
-                <p key={i}>
+                <p key={i} className="whitespace-pre-wrap">
                   {p}
                 </p>
               ))}
@@ -2908,15 +2969,58 @@ function NovelView({
         {/* Chapter bottom completion anchor - triggers Qi when reaching the end */}
         <div id="chapter-bottom-completion-anchor" className="h-4 w-full" />
 
-        {/* Chapter Navigation Buttons - Above Reactions */}
-        <div className={`mt-10 border-t ${themeStyles.border} pt-6`}>
-          <ChapterNavigation
-            hasPrev={hasPrev}
-            hasNext={hasNext}
-            onPrev={onPrev}
-            onNext={onNext}
-            seriesSlug={seriesSlug}
-          />
+        {/* Chapter Navigation Buttons - Novel Fire Style */}
+        <div className={`mt-10 border-t ${themeStyles.border} pt-6 flex items-center justify-center gap-1 select-none`}>
+          <Button
+            variant="default"
+            size="sm"
+            disabled={!hasPrev}
+            onClick={onPrev}
+            className="h-10 px-4 bg-[#1e293b] hover:bg-[#334155] disabled:opacity-30 disabled:hover:bg-[#1e293b] text-white border border-[#334155] rounded-l-lg transition-colors cursor-pointer"
+            title="Previous Chapter"
+          >
+            <ChevronLeft className="h-4 w-4 mr-1" />
+            <span className="text-xs sm:text-sm">Prev</span>
+          </Button>
+
+          {allChapters && allChapters.length > 0 ? (
+            <Select
+              value={chapterSlug || currentChapterSlug}
+              onValueChange={(slug) => {
+                navigate({
+                  to: "/title/$titleSlug/$chapterSlug",
+                  params: { titleSlug: seriesSlug, chapterSlug: slug },
+                });
+              }}
+            >
+              <SelectTrigger className="h-10 min-w-[200px] sm:min-w-[280px] max-w-[420px] bg-[#0284c7] hover:bg-[#0369a1] text-white font-semibold text-xs sm:text-sm border-0 rounded-none px-3.5 justify-between shadow-md">
+                <SelectValue placeholder={`Chapter ${chapterNumber}`} />
+              </SelectTrigger>
+              <SelectContent className="max-h-[380px] bg-neutral-900 border-neutral-800 text-neutral-200">
+                {allChapters.map((ch) => (
+                  <SelectItem key={ch.id} value={ch.slug} className="text-xs sm:text-sm py-2 hover:bg-neutral-800 focus:bg-neutral-800 cursor-pointer">
+                    Chapter {ch.chapter_number}{ch.title ? `: ${ch.title}` : ""}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : (
+            <div className="h-10 px-4 bg-[#0284c7] text-white font-semibold text-xs sm:text-sm flex items-center justify-center">
+              Chapter {chapterNumber}
+            </div>
+          )}
+
+          <Button
+            variant="default"
+            size="sm"
+            disabled={!hasNext}
+            onClick={onNext}
+            className="h-10 px-4 bg-[#1e293b] hover:bg-[#334155] disabled:opacity-30 disabled:hover:bg-[#1e293b] text-white border border-[#334155] rounded-r-lg transition-colors cursor-pointer"
+            title="Next Chapter"
+          >
+            <span className="text-xs sm:text-sm">Next</span>
+            <ChevronRight className="h-4 w-4 ml-1" />
+          </Button>
         </div>
 
         <div className={`mt-8 border-t ${themeStyles.border} pt-6`}>

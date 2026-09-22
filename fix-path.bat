@@ -1,0 +1,3 @@
+@echo off
+echo Fixing Windows System PATH quotes...
+powershell -NoProfile -Command "Start-Process powershell -Verb RunAs -ArgumentList '-NoProfile -Command \"$p = (Get-ItemProperty -Path ''HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager\Environment'' -Name ''Path'').Path; $p = $p -replace ''\"'', ''''; Set-ItemProperty -Path ''HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager\Environment'' -Name ''Path'' -Value $p; Write-Host ''Fixed System PATH successfully!'' -ForegroundColor Green; Start-Sleep 2\"'"
