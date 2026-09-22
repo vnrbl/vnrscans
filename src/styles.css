@@ -1021,14 +1021,17 @@ html.reader-pseudo-fullscreen .reader-fullscreen-wrapper [data-reader-overlay] {
   tab-size: 4;
 }
 
-.novel-body-text p {
+.novel-body-text p,
+.novel-body-text > div {
   margin-top: 0;
-  margin-bottom: 1.6em !important;
+  margin-bottom: var(--novel-paragraph-spacing, 1.6em) !important;
+  text-indent: var(--novel-text-indent, 0px) !important;
   line-height: inherit;
   white-space: pre-wrap !important;
 }
 
-.novel-body-text p:last-child {
+.novel-body-text p:last-child,
+.novel-body-text > div:last-child {
   margin-bottom: 0 !important;
 }
 

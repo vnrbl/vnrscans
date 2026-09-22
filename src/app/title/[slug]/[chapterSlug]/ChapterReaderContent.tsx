@@ -2580,6 +2580,7 @@ function NovelView({
       const storedV2 = localStorage.getItem("novel-reader-settings-v2");
       if (storedV2) {
         const parsed = JSON.parse(storedV2);
+        if (parsed.accentColor === "sky") parsed.accentColor = "purple";
         setSettings((prev) => ({ ...prev, ...parsed }));
       } else {
         // Fallback migration from older legacy keys if they exist
@@ -3142,6 +3143,8 @@ function NovelView({
             fontFamily: resolvedFontFamily,
             lineHeight: settings.lineHeight,
             textAlign: settings.textAlign,
+            ["--novel-paragraph-spacing" as any]: `${settings.paragraphSpacing}px`,
+            ["--novel-text-indent" as any]: settings.textIndent ? "2rem" : "0px",
           }}
         >
           {/* Illustrations if any exist */}
@@ -3178,12 +3181,19 @@ function NovelView({
             <div
               className="novel-body-text whitespace-pre-wrap select-text"
               style={{
-                textIndent: settings.textIndent ? "2rem" : undefined,
+                ["--novel-paragraph-spacing" as any]: `${settings.paragraphSpacing}px`,
+                ["--novel-text-indent" as any]: settings.textIndent ? "2rem" : "0px",
               }}
               dangerouslySetInnerHTML={{ __html: sanitizeHtml(content) }}
             />
           ) : (
-            <div className="novel-body-text select-text">
+            <div
+              className="novel-body-text select-text"
+              style={{
+                ["--novel-paragraph-spacing" as any]: `${settings.paragraphSpacing}px`,
+                ["--novel-text-indent" as any]: settings.textIndent ? "2rem" : "0px",
+              }}
+            >
               {plainTextParagraphs.map((p, i) => (
                 <p
                   key={i}

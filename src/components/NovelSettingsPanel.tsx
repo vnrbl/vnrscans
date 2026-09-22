@@ -58,7 +58,7 @@ export const DEFAULT_NOVEL_SETTINGS: NovelReaderSettings = {
   autoScrollSpeed: 3,
   autoNext: true,
   theme: "pitch-black",
-  accentColor: "sky",
+  accentColor: "purple",
 };
 
 export const NOVEL_THEMES = [
@@ -463,20 +463,21 @@ export default function NovelSettingsPanel({
 
       {/* ─── DRAWER OVERLAY & SIDEBAR (LEFT) ─── */}
       {isOpen && (
-        <div className="fixed inset-0 z-50 flex justify-start">
-          {/* Backdrop */}
+        <div className="fixed inset-0 z-50 flex justify-start pointer-events-none">
+          {/* Transparent Backdrop (no blur, no darkening, so preview layout is 100% visible live) */}
           <div
             onClick={onClose}
-            className="fixed inset-0 bg-black/70 backdrop-blur-sm transition-opacity duration-300 animate-in fade-in"
+            className="fixed inset-0 bg-black/15 pointer-events-auto cursor-default"
           />
 
           {/* Drawer Panel */}
           <div
-            className="relative w-full max-w-[400px] sm:max-w-[430px] h-full shadow-2xl flex flex-col z-10 transition-transform duration-300 ease-out animate-in slide-in-from-left select-none border-r overflow-hidden"
+            className="relative w-full max-w-[390px] sm:max-w-[420px] h-full shadow-2xl flex flex-col z-10 transition-transform duration-300 ease-out animate-in slide-in-from-left select-none border-r overflow-hidden pointer-events-auto"
             style={{
               backgroundColor: activeTheme.panelHex,
               borderColor: activeTheme.borderHex,
               color: activeTheme.textHex,
+              boxShadow: "0 20px 40px -10px rgba(0,0,0,0.8)",
             }}
           >
             {/* Header */}
