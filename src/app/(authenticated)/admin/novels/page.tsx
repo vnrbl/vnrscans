@@ -34,6 +34,7 @@ import {
   WrapText,
   Indent,
   Outdent,
+  FileUp,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -67,6 +68,7 @@ import {
   removeIndentation,
   cleanSpacedText,
 } from "@/lib/novel-formatter";
+import { parseNovelDocumentFile } from "@/lib/document-parser";
 
 type ChapterRow = {
   id: string;
@@ -161,8 +163,64 @@ function NovelsWriterContent() {
   const [previewMode, setPreviewMode] = useState(false);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const docInputRef = useRef<HTMLInputElement>(null);
   const [uploadingCover, setUploadingCover] = useState(false);
   const [uploadingIllustrations, setUploadingIllustrations] = useState(false);
+  const [importingDoc, setImportingDoc] = useState(false);
+  const [isDraggingDoc, setIsDraggingDoc] = useState(false);
+
+  const processUploadedDocument = async (file: File) => {
+    setImportingDoc(true);
+    const toastId = toast.loading(`Importing text from "${file.name}"...`);
+
+    try {
+      const result = await parseNovelDocumentFile(file);
+
+      // If existing content exists, ask whether to replace or append
+      if (novelContent.trim().length > 0) {
+        const replace = window.confirm(
+          `The editor already has content. Do you want to replace it with "${file.name}"?\n\nClick OK to replace, or Cancel to append to the end.`
+        );
+        if (replace) {
+          setNovelContent(result.text);
+        } else {
+          setNovelContent((prev) => `${prev.trim()}\n\n${result.text}`);
+        }
+      } else {
+        setNovelContent(result.text);
+      }
+
+      // Pre-fill empty chapter number if detected
+      if (!chapterNumber && result.chapterNumberSuggestion) {
+        setChapterNumber(result.chapterNumberSuggestion);
+      }
+
+      // Pre-fill empty chapter title if detected
+      if (!chapterTitle && result.chapterTitleSuggestion) {
+        setChapterTitle(result.chapterTitleSuggestion);
+      }
+
+      toast.success(
+        `Successfully imported ${result.wordCount.toLocaleString()} words (${result.sourceFormat.toUpperCase()})!`,
+        { id: toastId }
+      );
+
+      if (result.warnings && result.warnings.length > 0) {
+        toast.info(result.warnings[0], { duration: 6000 });
+      }
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Failed to import document", { id: toastId });
+    } finally {
+      setImportingDoc(false);
+    }
+  };
+
+  const onDocumentFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = "";
+    await processUploadedDocument(file);
+  };
 
   const handleUploadImage = async (file: File) => {
     if (!user) throw new Error("Must be logged in to upload files");
@@ -1354,6 +1412,31 @@ function NovelsWriterContent() {
                     
                     <div className="h-4 w-px bg-border/45 mx-1" />
 
+                    {/* Document Upload Button */}
+                    <input
+                      type="file"
+                      ref={docInputRef}
+                      accept=".docx,.doc,.pdf,.txt,.md"
+                      onChange={onDocumentFileChange}
+                      className="hidden"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={importingDoc}
+                      onClick={() => docInputRef.current?.click()}
+                      className="h-8 px-2.5 bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20 text-xs font-semibold gap-1.5 shadow-sm"
+                      title="Upload Word (.docx, .doc), PDF, or Text file to auto-import chapter text"
+                    >
+                      {importingDoc ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <FileUp className="h-3.5 w-3.5" />
+                      )}
+                      <span>Import Doc / PDF</span>
+                    </Button>
+
                     {/* Auto Spacing & Line Gap Tools */}
                     <Button
                       type="button"
@@ -1448,10 +1531,37 @@ function NovelsWriterContent() {
                     </div>
                   </div>
                 ) : (
-                  <div className="flex-1 flex flex-col relative mt-2">
+                  <div
+                    className={`flex-1 flex flex-col relative mt-2 transition-all rounded-lg ${
+                      isDraggingDoc ? "ring-2 ring-emerald-500 bg-emerald-500/5" : ""
+                    }`}
+                    onDragOver={(e) => {
+                      if (e.dataTransfer.types.includes("Files")) {
+                        e.preventDefault();
+                        setIsDraggingDoc(true);
+                      }
+                    }}
+                    onDragLeave={() => setIsDraggingDoc(false)}
+                    onDrop={async (e) => {
+                      e.preventDefault();
+                      setIsDraggingDoc(false);
+                      const file = e.dataTransfer.files?.[0];
+                      if (!file) return;
+                      const ext = file.name.split(".").pop()?.toLowerCase();
+                      if (["docx", "doc", "pdf", "txt", "md"].includes(ext || "")) {
+                        await processUploadedDocument(file);
+                      }
+                    }}
+                  >
+                    {isDraggingDoc && (
+                      <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-background/90 backdrop-blur-sm rounded-lg border-2 border-dashed border-emerald-500 pointer-events-none">
+                        <FileUp className="h-10 w-10 text-emerald-400 animate-bounce mb-2" />
+                        <p className="text-sm font-bold text-emerald-400">Drop document here to import (.docx, .doc, .pdf, .txt)</p>
+                      </div>
+                    )}
                     <Textarea
                       ref={textareaRef}
-                      placeholder="Write or paste your story here... Exact line gaps and spaces from source sites are automatically preserved on paste."
+                      placeholder="Write, paste, or drop your PDF/Word document here... Exact line gaps and spaces from source sites are automatically preserved."
                       value={novelContent}
                       onChange={(e) => setNovelContent(e.target.value)}
                       onPaste={handleSmartPaste}

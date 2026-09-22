@@ -25,8 +25,11 @@ import {
   Unlock,
   Zap,
   WrapText,
+  FileUp,
+  Loader2,
 } from "lucide-react";
 import { extractClipboardNovelText, autoFormatLineGaps } from "@/lib/novel-formatter";
+import { parseNovelDocumentFile } from "@/lib/document-parser";
 import { supabase } from "@/integrations/supabase/client";
 import { logAdminAction } from "@/lib/adminLog";
 import { useAuth } from "@/hooks/useAuth";
@@ -636,6 +639,47 @@ export default function ChapterManager({ seriesId, onBack }: { seriesId: string;
   const [autoSourcePublish, setAutoSourcePublish] = useState(true);
   const [autoSourceEnabled, setAutoSourceEnabled] = useState(true);
   const [syncingSourceId, setSyncingSourceId] = useState<string | null>(null);
+  const [importingDoc, setImportingDoc] = useState(false);
+
+  const handleDocumentUpload = async (file: File) => {
+    setImportingDoc(true);
+    const toastId = toast.loading(`Importing text from "${file.name}"...`);
+    try {
+      const result = await parseNovelDocumentFile(file);
+      let updatedContent = result.text;
+      if (form.novel_content && form.novel_content.trim()) {
+        const replace = window.confirm(
+          `Novel content is not empty. Do you want to replace existing text with "${file.name}"?\n\nClick OK to replace, or Cancel to append.`
+        );
+        if (!replace) {
+          updatedContent = `${form.novel_content.trim()}\n\n${result.text}`;
+        }
+      }
+
+      setForm((prev) => ({
+        ...prev,
+        novel_content: updatedContent,
+        chapter_number: (!prev.chapter_number && result.chapterNumberSuggestion)
+          ? result.chapterNumberSuggestion
+          : prev.chapter_number,
+        title: (!prev.title && result.chapterTitleSuggestion)
+          ? result.chapterTitleSuggestion
+          : prev.title,
+      }));
+
+      toast.success(
+        `Imported ${result.wordCount.toLocaleString()} words (${result.sourceFormat.toUpperCase()})!`,
+        { id: toastId }
+      );
+      if (result.warnings && result.warnings.length > 0) {
+        toast.info(result.warnings[0], { duration: 6000 });
+      }
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Failed to import document", { id: toastId });
+    } finally {
+      setImportingDoc(false);
+    }
+  };
 
   const resetChapterForm = () => {
     setForm({
@@ -2318,22 +2362,56 @@ export default function ChapterManager({ seriesId, onBack }: { seriesId: string;
 
                 {series.data?.type === "novel" ? (
                   <div>
-                    <div className="flex items-center justify-between mb-1.5">
+                    <div className="flex items-center justify-between mb-1.5 flex-wrap gap-2">
                       <Label>Novel Content (HTML supported) *</Label>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          if (!form.novel_content.trim()) return;
-                          setForm({ ...form, novel_content: autoFormatLineGaps(form.novel_content) });
-                          toast.success("Applied paragraph line gaps");
-                        }}
-                        className="h-7 text-xs gap-1"
-                      >
-                        <WrapText className="h-3 w-3" />
-                        <span>Auto Line Gaps</span>
-                      </Button>
+                      <div className="flex items-center gap-1.5">
+                        <label className="cursor-pointer">
+                          <input
+                            type="file"
+                            accept=".docx,.doc,.pdf,.txt,.md"
+                            disabled={importingDoc}
+                            onChange={(e) => {
+                              const f = e.target.files?.[0];
+                              if (f) {
+                                e.target.value = "";
+                                handleDocumentUpload(f);
+                              }
+                            }}
+                            className="hidden"
+                          />
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            asChild
+                            disabled={importingDoc}
+                            className="h-7 text-xs gap-1 text-emerald-400 border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20"
+                          >
+                            <span>
+                              {importingDoc ? (
+                                <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                              ) : (
+                                <FileUp className="h-3 w-3 mr-1" />
+                              )}
+                              Import Doc / PDF
+                            </span>
+                          </Button>
+                        </label>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            if (!form.novel_content.trim()) return;
+                            setForm({ ...form, novel_content: autoFormatLineGaps(form.novel_content) });
+                            toast.success("Applied paragraph line gaps");
+                          }}
+                          className="h-7 text-xs gap-1"
+                        >
+                          <WrapText className="h-3 w-3" />
+                          <span>Auto Line Gaps</span>
+                        </Button>
+                      </div>
                     </div>
                     <Textarea
                       rows={15}
@@ -2730,22 +2808,56 @@ export default function ChapterManager({ seriesId, onBack }: { seriesId: string;
             </div>
             {series.data?.type === "novel" ? (
               <div>
-                <div className="flex items-center justify-between mb-1.5">
+                <div className="flex items-center justify-between mb-1.5 flex-wrap gap-2">
                   <Label>Novel Content (HTML supported) *</Label>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      if (!form.novel_content.trim()) return;
-                      setForm({ ...form, novel_content: autoFormatLineGaps(form.novel_content) });
-                      toast.success("Applied paragraph line gaps");
-                    }}
-                    className="h-7 text-xs gap-1"
-                  >
-                    <WrapText className="h-3 w-3" />
-                    <span>Auto Line Gaps</span>
-                  </Button>
+                  <div className="flex items-center gap-1.5">
+                    <label className="cursor-pointer">
+                      <input
+                        type="file"
+                        accept=".docx,.doc,.pdf,.txt,.md"
+                        disabled={importingDoc}
+                        onChange={(e) => {
+                          const f = e.target.files?.[0];
+                          if (f) {
+                            e.target.value = "";
+                            handleDocumentUpload(f);
+                          }
+                        }}
+                        className="hidden"
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        asChild
+                        disabled={importingDoc}
+                        className="h-7 text-xs gap-1 text-emerald-400 border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20"
+                      >
+                        <span>
+                          {importingDoc ? (
+                            <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                          ) : (
+                            <FileUp className="h-3 w-3 mr-1" />
+                          )}
+                          Import Doc / PDF
+                        </span>
+                      </Button>
+                    </label>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        if (!form.novel_content.trim()) return;
+                        setForm({ ...form, novel_content: autoFormatLineGaps(form.novel_content) });
+                        toast.success("Applied paragraph line gaps");
+                      }}
+                      className="h-7 text-xs gap-1"
+                    >
+                      <WrapText className="h-3 w-3" />
+                      <span>Auto Line Gaps</span>
+                    </Button>
+                  </div>
                 </div>
                 <Textarea
                   rows={15}
