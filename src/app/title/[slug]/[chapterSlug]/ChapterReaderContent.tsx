@@ -3020,35 +3020,35 @@ function NovelView({
           width: "100%",
         }}
       >
-        {/* Title Header (NovelFire Style) */}
+        {/* Title Header */}
         <div
-          className="mb-8 border-b pb-6 relative text-center"
+          className="mb-8 border-b pb-6 text-center"
           style={{ borderColor: activeTheme.borderHex }}
         >
-          {/* Top-Right Settings Gear Trigger (NovelFire Style) */}
-          <div className="absolute right-0 top-0">
-            <button
-              onClick={() => setIsSettingsOpen(true)}
-              className="flex items-center justify-center h-10 w-10 sm:h-11 sm:w-11 rounded-xl text-white shadow-lg transition-transform hover:scale-105 active:scale-95 cursor-pointer"
-              style={{
-                backgroundColor: activeAccent.hex,
-                boxShadow: `0 8px 20px -4px ${activeAccent.glowHex}`,
-              }}
-              title="Novel Reading Settings"
-            >
-              <Settings className="h-5 w-5" />
-            </button>
-          </div>
-
           <p
-            className="text-xs uppercase tracking-widest mb-1 font-bold"
+            className="text-xs uppercase tracking-widest mb-1.5 font-bold"
             style={{ color: activeAccent.textHex }}
           >
             {seriesTitle}
           </p>
-          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight mb-2">
-            Chapter {chapterNumber}
-          </h1>
+
+          <div className="flex items-center justify-center gap-3 mb-2">
+            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
+              Chapter {chapterNumber}
+            </h1>
+            <button
+              onClick={() => setIsSettingsOpen(true)}
+              className="flex items-center justify-center h-8 w-8 sm:h-9 sm:w-9 rounded-xl text-white shadow-md transition-transform hover:scale-105 active:scale-95 cursor-pointer shrink-0"
+              style={{
+                backgroundColor: activeAccent.hex,
+                boxShadow: `0 6px 16px -3px ${activeAccent.glowHex}`,
+              }}
+              title="Reader Options (Opens Left Sidebar)"
+            >
+              <Settings className="h-4 w-4 sm:h-4.5 sm:w-4.5" />
+            </button>
+          </div>
+
           {wordCount > 0 && (
             <p className="text-xs font-mono font-medium opacity-70 mb-4">
               [ {wordCount.toLocaleString()} words ]

@@ -443,9 +443,9 @@ export default function NovelSettingsPanel({
 
   return (
     <>
-      {/* ─── FLOATING ACTION BUTTON (Visible when drawer is closed) ─── */}
+      {/* ─── FLOATING ACTION BUTTON (Visible on bottom-left when drawer is closed) ─── */}
       {!isOpen && (
-        <div className="fixed bottom-6 right-6 z-40 animate-in fade-in zoom-in-75 duration-200">
+        <div className="fixed bottom-6 left-6 z-40 animate-in fade-in zoom-in-75 duration-200">
           <button
             onClick={onOpen}
             className="flex items-center gap-2 px-4 py-3 rounded-2xl shadow-2xl text-white font-semibold text-xs border border-white/10 backdrop-blur-xl transition-all duration-300 transform hover:scale-105 active:scale-95 group cursor-pointer"
@@ -461,9 +461,9 @@ export default function NovelSettingsPanel({
         </div>
       )}
 
-      {/* ─── DRAWER OVERLAY & SIDEBAR ─── */}
+      {/* ─── DRAWER OVERLAY & SIDEBAR (LEFT) ─── */}
       {isOpen && (
-        <div className="fixed inset-0 z-50 flex justify-end">
+        <div className="fixed inset-0 z-50 flex justify-start">
           {/* Backdrop */}
           <div
             onClick={onClose}
@@ -472,7 +472,7 @@ export default function NovelSettingsPanel({
 
           {/* Drawer Panel */}
           <div
-            className="relative w-full max-w-[400px] sm:max-w-[430px] h-full shadow-2xl flex flex-col z-10 transition-transform duration-300 ease-out animate-in slide-in-from-right select-none border-l overflow-hidden"
+            className="relative w-full max-w-[400px] sm:max-w-[430px] h-full shadow-2xl flex flex-col z-10 transition-transform duration-300 ease-out animate-in slide-in-from-left select-none border-r overflow-hidden"
             style={{
               backgroundColor: activeTheme.panelHex,
               borderColor: activeTheme.borderHex,
