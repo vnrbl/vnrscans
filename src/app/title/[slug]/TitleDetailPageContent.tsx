@@ -421,6 +421,7 @@ export default function TitleDetailPageContent({
               seriesTitle={s.title}
               seriesCoverUrl={s.cover_url}
               seriesStatus={s.status}
+              seriesType={s.type}
               initialChaptersData={initialChaptersData}
             />
           </div>

@@ -19,6 +19,8 @@ import {
   Unlock,
   ExternalLink,
   Check,
+  Pencil,
+  Plus,
 } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -52,6 +54,7 @@ import {
   TooltipContent,
   TooltipProvider,
 } from "@/components/ui/tooltip";
+import { LiveChapterModal } from "@/components/admin/LiveChapterModal";
 
 /* ------------------------------------------------------------------ */
 /*  ChapterList — ALL chapter interaction state lives here.           */
@@ -65,6 +68,7 @@ interface ChapterListProps {
   seriesTitle?: string;
   seriesCoverUrl?: string | null;
   seriesStatus?: string | null;
+  seriesType?: string;
   initialChaptersData?: any[];
 }
 
@@ -74,6 +78,7 @@ export const ChapterList = React.memo(function ChapterList({
   seriesTitle,
   seriesCoverUrl,
   seriesStatus,
+  seriesType,
   initialChaptersData,
 }: ChapterListProps) {
   const { user } = useAuth();
@@ -82,7 +87,9 @@ export const ChapterList = React.memo(function ChapterList({
   const qc = useQueryClient();
   const { settings } = useReaderSettings();
 
-
+  const [liveEditOpen, setLiveEditOpen] = React.useState(false);
+  const [liveCreateOpen, setLiveCreateOpen] = React.useState(false);
+  const [editingChapter, setEditingChapter] = React.useState<any>(null);
   const [deletingChapterId, setDeletingChapterId] = React.useState<string | null>(null);
   const [unlockingChapterId, setUnlockingChapterId] = React.useState<string | null>(null);
 
@@ -620,6 +627,19 @@ export const ChapterList = React.memo(function ChapterList({
               <Download className="h-4 w-4 text-emerald-400" />
               <span className="text-xs">Download Chapters</span>
             </Button>
+
+            {canManage && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setLiveCreateOpen(true)}
+                title="Add New Chapter Live (Admin)"
+                className="w-full gap-2 sm:w-auto border-purple-500/50 bg-purple-950/20 text-purple-400 hover:bg-purple-950/40 hover:border-purple-500/70 transition-all cursor-pointer font-bold shadow-sm"
+              >
+                <Plus className="h-4 w-4 text-purple-400" />
+                <span className="text-xs">Add Chapter</span>
+              </Button>
+            )}
           </div>
         </div>
 
@@ -784,6 +804,21 @@ export const ChapterList = React.memo(function ChapterList({
                           ) : (
                             <Unlock className="h-3.5 w-3.5" />
                           )}
+                        </button>
+                      )}
+                      {canManage && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setEditingChapter(c);
+                            setLiveEditOpen(true);
+                          }}
+                          className="p-1 rounded text-amber-400 hover:text-amber-300 hover:bg-amber-500/10 transition-colors"
+                          title={`Live Edit Chapter ${c.chapter_number}`}
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
                         </button>
                       )}
                       {canManage && (
@@ -1060,6 +1095,21 @@ export const ChapterList = React.memo(function ChapterList({
                               onClick={(e) => {
                                 e.preventDefault();
                                 e.stopPropagation();
+                                setEditingChapter(c);
+                                setLiveEditOpen(true);
+                              }}
+                              className="h-7 w-7 text-amber-400 hover:text-amber-300 hover:bg-amber-500/10 transition-colors cursor-pointer"
+                              title={`Live Edit Chapter ${c.chapter_number}`}
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
                                 handleDeleteChapter(c.id, c.chapter_number);
                               }}
                               disabled={deletingChapterId === c.id}
@@ -1166,6 +1216,50 @@ export const ChapterList = React.memo(function ChapterList({
         scanlationGroups={scanlationGroups.data || []}
         readChapterIds={readChapters.data}
       />
+
+      {/* Admin Live Chapter Modals */}
+      {canManage && editingChapter && (
+        <LiveChapterModal
+          isOpen={liveEditOpen}
+          onClose={() => {
+            setLiveEditOpen(false);
+            setEditingChapter(null);
+          }}
+          mode="edit"
+          seriesId={seriesId}
+          seriesSlug={slug}
+          seriesTitle={seriesTitle || slug}
+          seriesType={seriesType || "manga"}
+          chapter={editingChapter}
+          onSuccess={() => {
+            refreshChapterTable();
+            qc.invalidateQueries({ queryKey: ["series", "detail", slug] });
+            qc.invalidateQueries({ queryKey: ["series"] });
+          }}
+        />
+      )}
+
+      {canManage && (
+        <LiveChapterModal
+          isOpen={liveCreateOpen}
+          onClose={() => setLiveCreateOpen(false)}
+          mode="create"
+          seriesId={seriesId}
+          seriesSlug={slug}
+          seriesTitle={seriesTitle || slug}
+          seriesType={seriesType || "manga"}
+          initialChapterNumber={
+            chaptersQ.data && chaptersQ.data.length > 0
+              ? Math.max(...chaptersQ.data.map((c: any) => c.chapter_number || 0)) + 1
+              : 1
+          }
+          onSuccess={() => {
+            refreshChapterTable();
+            qc.invalidateQueries({ queryKey: ["series", "detail", slug] });
+            qc.invalidateQueries({ queryKey: ["series"] });
+          }}
+        />
+      )}
     </section>
   );
 });

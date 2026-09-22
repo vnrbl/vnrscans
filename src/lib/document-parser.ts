@@ -5,6 +5,7 @@
  */
 
 import { parseHtmlToNovelText, autoFormatLineGaps, normalizePlainNovelText } from "@/lib/novel-formatter";
+export { autoFormatLineGaps, normalizePlainNovelText };
 
 export interface ParsedDocumentResult {
   text: string;

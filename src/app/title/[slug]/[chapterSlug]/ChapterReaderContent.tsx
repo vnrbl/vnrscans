@@ -53,6 +53,8 @@ import {
   Clock,
   ShieldCheck,
   RefreshCw,
+  Pencil,
+  Plus,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { renderCommentMarkdown, COMMENT_TEXT_COLORS } from "@/lib/bbcode";
@@ -84,6 +86,7 @@ import NovelSettingsPanel, {
   NOVEL_ACCENTS,
 } from "@/components/NovelSettingsPanel";
 import { fetchSeriesBySlug } from "@/lib/series-slug";
+import { LiveChapterModal } from "@/components/admin/LiveChapterModal";
 
 const isVideoUrl = (url: string) => {
   if (!url) return false;
@@ -190,6 +193,8 @@ export default function Reader({
   // Admin & staff role check
   const { isAdmin, isMod, isUploader } = useIsAdmin();
   const canManage = isAdmin || isMod || isUploader;
+  const [liveEditOpen, setLiveEditOpen] = useState(false);
+  const [liveCreateOpen, setLiveCreateOpen] = useState(false);
 
   const [adminViewBypassed, setAdminViewBypassed] = useState<boolean>(() => {
     if (typeof window !== "undefined" && initialChapterData?.id) {
@@ -1213,8 +1218,78 @@ export default function Reader({
           downloadProgress={downloadProgress}
           isDownloaded={isDownloaded}
           onDownload={handleDownload}
+          canManage={canManage}
+          onLiveEdit={() => setLiveEditOpen(true)}
+          onLiveCreate={() => setLiveCreateOpen(true)}
         />
       </div>
+
+      {/* Floating Admin Live Pill */}
+      {canManage && (
+        <div className="fixed top-14 sm:top-16 right-3 sm:right-6 z-40 flex items-center gap-1.5 sm:gap-2 px-3 py-1.5 rounded-full bg-neutral-900/90 border border-amber-500/50 shadow-2xl backdrop-blur-md text-xs font-semibold text-white pointer-events-auto">
+          <span className="flex h-2 w-2 rounded-full bg-amber-400 animate-pulse" />
+          <span className="text-amber-300 font-bold text-2xs uppercase tracking-wider hidden sm:inline">Admin Live</span>
+          <div className="h-3 w-px bg-neutral-700 hidden sm:inline" />
+          <button
+            type="button"
+            onClick={() => setLiveEditOpen(true)}
+            className="flex items-center gap-1 text-neutral-300 hover:text-amber-300 transition-colors cursor-pointer text-xs"
+            title="Live Edit this Chapter"
+          >
+            <Pencil className="h-3.5 w-3.5 text-amber-400" />
+            <span>Edit</span>
+          </button>
+          <div className="h-3 w-px bg-neutral-700" />
+          <button
+            type="button"
+            onClick={() => setLiveCreateOpen(true)}
+            className="flex items-center gap-1 text-neutral-300 hover:text-purple-300 transition-colors cursor-pointer text-xs"
+            title="Add New Chapter Live"
+          >
+            <Plus className="h-3.5 w-3.5 text-purple-400" />
+            <span>Add Next</span>
+          </button>
+        </div>
+      )}
+
+      {/* Admin Live Modals */}
+      {canManage && c && (
+        <>
+          <LiveChapterModal
+            isOpen={liveEditOpen}
+            onClose={() => setLiveEditOpen(false)}
+            mode="edit"
+            seriesId={c.series_id}
+            seriesSlug={seriesSlug}
+            seriesTitle={c.series?.title || ""}
+            seriesType={c.series?.type || (isNovel ? "novel" : "manga")}
+            chapter={c}
+            onSuccess={(updatedCh, action) => {
+              if (action === "updated") {
+                chapterQ.refetch();
+                qc.invalidateQueries({ queryKey: ["chapter", slug, chapterSlug] });
+                qc.invalidateQueries({ queryKey: ["chapters"] });
+              }
+            }}
+          />
+
+          <LiveChapterModal
+            isOpen={liveCreateOpen}
+            onClose={() => setLiveCreateOpen(false)}
+            mode="create"
+            seriesId={c.series_id}
+            seriesSlug={seriesSlug}
+            seriesTitle={c.series?.title || ""}
+            seriesType={c.series?.type || (isNovel ? "novel" : "manga")}
+            initialChapterNumber={c.chapter_number + 1}
+            onSuccess={() => {
+              qc.invalidateQueries({ queryKey: ["chapter"] });
+              qc.invalidateQueries({ queryKey: ["chapters"] });
+              siblingsQ.refetch();
+            }}
+          />
+        </>
+      )}
 
       <div className="w-full max-w-full">
         {/* Main content */}
@@ -1346,6 +1421,9 @@ export default function Reader({
           setShowChapters={setShowChapters}
           showSpeedControl={showSpeedControl}
           setShowSpeedControl={setShowSpeedControl}
+          canManage={canManage}
+          onLiveEdit={() => setLiveEditOpen(true)}
+          onLiveCreate={() => setLiveCreateOpen(true)}
         />
       </div>
 
@@ -1524,6 +1602,9 @@ function ReaderTopBar({
   downloadProgress,
   isDownloaded,
   onDownload,
+  canManage,
+  onLiveEdit,
+  onLiveCreate,
 }: {
   title: string;
   seriesTitle: string;
@@ -1544,6 +1625,9 @@ function ReaderTopBar({
   downloadProgress?: number;
   isDownloaded?: boolean;
   onDownload?: () => void;
+  canManage?: boolean;
+  onLiveEdit?: () => void;
+  onLiveCreate?: () => void;
 }) {
   const navigate = useNavigate();
   const showGroupSwitcher = alternateGroups.length > 1;
@@ -1578,6 +1662,34 @@ function ReaderTopBar({
           >
             <Search className="h-3.5 w-3.5" />
           </button>
+
+          {/* Admin Live Controls */}
+          {canManage && (
+            <div className="flex items-center gap-1 shrink-0">
+              {onLiveEdit && (
+                <button
+                  type="button"
+                  onClick={onLiveEdit}
+                  title="Live Edit Chapter"
+                  className="flex items-center gap-1 text-xs h-8 sm:h-9 px-2 sm:px-2.5 rounded-lg border border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 transition-colors cursor-pointer shrink-0 font-medium"
+                >
+                  <Pencil className="h-3.5 w-3.5 text-amber-400" />
+                  <span className="hidden md:inline">Edit</span>
+                </button>
+              )}
+              {onLiveCreate && (
+                <button
+                  type="button"
+                  onClick={onLiveCreate}
+                  title="Add Next Chapter Live"
+                  className="flex items-center gap-1 text-xs h-8 sm:h-9 px-2 sm:px-2.5 rounded-lg border border-purple-500/40 bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 transition-colors cursor-pointer shrink-0 font-medium"
+                >
+                  <Plus className="h-3.5 w-3.5 text-purple-400" />
+                  <span className="hidden md:inline">Add</span>
+                </button>
+              )}
+            </div>
+          )}
 
           {/* Eye Comfort Filter Toggle */}
           {onCycleFilter && (
@@ -3311,6 +3423,9 @@ function FloatingControls({
   setShowChapters,
   showSpeedControl,
   setShowSpeedControl,
+  canManage,
+  onLiveEdit,
+  onLiveCreate,
 }: {
   isFullscreen: boolean;
   toggleFullscreen: () => void;
@@ -3328,6 +3443,9 @@ function FloatingControls({
   setShowChapters: (show: boolean) => void;
   showSpeedControl: boolean;
   setShowSpeedControl: (show: boolean) => void;
+  canManage?: boolean;
+  onLiveEdit?: () => void;
+  onLiveCreate?: () => void;
 }) {
   const navigate = useNavigate();
   const [showReport, setShowReport] = useState(false);
@@ -3486,6 +3604,32 @@ function FloatingControls({
         >
           <Flag className="h-4 w-4 lg:h-5 lg:w-5" />
         </button>
+
+        {/* Admin Live Controls */}
+        {canManage && (
+          <>
+            {onLiveEdit && (
+              <button
+                type="button"
+                onClick={onLiveEdit}
+                className="p-2 lg:p-2.5 xl:p-3 rounded-full hover:bg-amber-500/20 text-amber-400 hover:text-amber-300 transition-colors"
+                title="Live Edit Chapter (Admin)"
+              >
+                <Pencil className="h-4 w-4 lg:h-5 lg:w-5" />
+              </button>
+            )}
+            {onLiveCreate && (
+              <button
+                type="button"
+                onClick={onLiveCreate}
+                className="p-2 lg:p-2.5 xl:p-3 rounded-full hover:bg-purple-500/20 text-purple-400 hover:text-purple-300 transition-colors"
+                title="Add Next Chapter Live (Admin)"
+              >
+                <Plus className="h-4 w-4 lg:h-5 lg:w-5" />
+              </button>
+            )}
+          </>
+        )}
 
         {/* Next Chapter */}
         <button
