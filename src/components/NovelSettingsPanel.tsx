@@ -35,7 +35,7 @@ export interface NovelReaderSettings {
   copyText: boolean;
   textAlign: "left" | "center" | "right" | "justify";
   lineHeight: number; // 1.2 to 3.0
-  paragraphSpacing: number; // 18 to 64
+  paragraphSpacing: number; // 5 to 64
   pageWidth: number; // 50 to 100
   autoScroll: boolean;
   autoScrollSpeed: number; // 1 to 10
@@ -1021,14 +1021,14 @@ export default function NovelSettingsPanel({
                     className="font-mono font-bold"
                     style={{ color: activeAccent.textHex }}
                   >
-                    {Math.max(18, settings.paragraphSpacing)}px
+                    {Math.max(5, settings.paragraphSpacing)}px
                   </span>
                 </div>
                 <Slider
-                  min={18}
+                  min={5}
                   max={64}
-                  step={2}
-                  value={[Math.max(18, settings.paragraphSpacing)]}
+                  step={1}
+                  value={[Math.max(5, settings.paragraphSpacing)]}
                   onValueChange={([val]) =>
                     updateSettings({ paragraphSpacing: val })
                   }

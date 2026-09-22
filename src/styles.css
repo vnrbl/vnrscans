@@ -1067,12 +1067,15 @@ article.font-novel * {
 }
 
 /* ── Google Translate Frame & Banner Cleanups ───────────────────────── */
+.VIpgJd-ZVi9od-ORHb-OEVmcd,
 .goog-te-banner-frame.skiptranslate,
 .goog-te-banner-frame {
   display: none !important;
+  visibility: hidden !important;
 }
 body {
   top: 0px !important;
+  position: static !important;
 }
 #goog-gt-tt,
 .goog-te-balloon-frame {
