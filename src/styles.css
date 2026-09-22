@@ -1,24 +1,24 @@
 @import url('https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400..700;1,400..700&family=Roboto:ital,wght@0,400..700;1,400..700&family=JetBrains+Mono:wght@400;500;600&display=swap');
-@import url('https://cdn.jsdelivr.net/npm/opendyslexic@1.0.3/open-dyslexic.min.css');
+@import url('https://fonts.cdnfonts.com/css/open-dyslexic');
 @import "tailwindcss" source(none);
 @source "../src";
 @import "tw-animate-css";
 
 /* Novel Font Classes */
 .font-novel-default {
-  font-family: var(--font-sans), 'Inter', system-ui, -apple-system, sans-serif;
+  font-family: var(--font-sans), 'Inter', system-ui, -apple-system, sans-serif !important;
 }
 .font-novel-dyslexic {
-  font-family: 'OpenDyslexic', 'Comic Sans MS', sans-serif;
+  font-family: 'OpenDyslexic', 'Open-Dyslexic', 'Comic Sans MS', sans-serif !important;
 }
 .font-novel-roboto {
-  font-family: 'Roboto', 'Inter', sans-serif;
+  font-family: 'Roboto', 'Inter', sans-serif !important;
 }
 .font-novel-lora {
-  font-family: 'Lora', Georgia, 'Times New Roman', serif;
+  font-family: 'Lora', Georgia, 'Times New Roman', serif !important;
 }
 .font-novel-mono {
-  font-family: 'JetBrains Mono', monospace;
+  font-family: 'JetBrains Mono', monospace !important;
 }
 
 /*
@@ -1016,22 +1016,36 @@ html.reader-pseudo-fullscreen .reader-fullscreen-wrapper [data-reader-overlay] {
 
 /* ── Novel reader & writer typography (preserves exact spaces, indentation, and line gaps) ── */
 .novel-body-text {
+  font-family: var(--novel-font-family, inherit) !important;
   white-space: pre-wrap !important;
   word-break: break-word;
   tab-size: 4;
 }
 
+.novel-body-text,
+.novel-body-text *,
 .novel-body-text p,
-.novel-body-text > div {
-  margin-top: 0;
-  margin-bottom: var(--novel-paragraph-spacing, 1.6em) !important;
+.novel-body-text > div,
+.novel-body-text div,
+.novel-body-text span,
+article.font-novel,
+article.font-novel * {
+  font-family: var(--novel-font-family, inherit) !important;
+}
+
+.novel-body-text p,
+.novel-body-text > div,
+.novel-body-text div {
+  margin-top: 0 !important;
+  margin-bottom: var(--novel-paragraph-spacing, 28px) !important;
   text-indent: var(--novel-text-indent, 0px) !important;
   line-height: inherit;
   white-space: pre-wrap !important;
 }
 
 .novel-body-text p:last-child,
-.novel-body-text > div:last-child {
+.novel-body-text > div:last-child,
+.novel-body-text div:last-child {
   margin-bottom: 0 !important;
 }
 
@@ -1051,4 +1065,22 @@ html.reader-pseudo-fullscreen .reader-fullscreen-wrapper [data-reader-overlay] {
   margin: 1.5em 0 !important;
   font-style: italic;
 }
+
+/* ── Google Translate Frame & Banner Cleanups ───────────────────────── */
+.goog-te-banner-frame.skiptranslate,
+.goog-te-banner-frame {
+  display: none !important;
+}
+body {
+  top: 0px !important;
+}
+#goog-gt-tt,
+.goog-te-balloon-frame {
+  display: none !important;
+}
+.goog-text-highlight {
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
 

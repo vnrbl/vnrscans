@@ -35,7 +35,7 @@ export interface NovelReaderSettings {
   copyText: boolean;
   textAlign: "left" | "center" | "right" | "justify";
   lineHeight: number; // 1.2 to 3.0
-  paragraphSpacing: number; // 10 to 50
+  paragraphSpacing: number; // 18 to 64
   pageWidth: number; // 50 to 100
   autoScroll: boolean;
   autoScrollSpeed: number; // 1 to 10
@@ -52,7 +52,7 @@ export const DEFAULT_NOVEL_SETTINGS: NovelReaderSettings = {
   copyText: true,
   textAlign: "left",
   lineHeight: 1.9,
-  paragraphSpacing: 26,
+  paragraphSpacing: 28,
   pageWidth: 90,
   autoScroll: false,
   autoScrollSpeed: 3,
@@ -386,41 +386,116 @@ export default function NovelSettingsPanel({
     setIsPaused(false);
   };
 
+  // Pre-load Google Translate Script and global callback once on mount
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    (window as any).googleTranslateElementInit = () => {
+      try {
+        if ((window as any).google?.translate?.TranslateElement) {
+          new (window as any).google.translate.TranslateElement(
+            {
+              pageLanguage: "auto",
+              autoDisplay: false,
+              layout: (window as any).google.translate.TranslateElement.InlineLayout?.SIMPLE,
+            },
+            "google_translate_element"
+          );
+        }
+      } catch (e) {
+        console.warn("Google translate element initialization note:", e);
+      }
+    };
+
+    if (!document.getElementById("google-translate-script")) {
+      const script = document.createElement("script");
+      script.id = "google-translate-script";
+      script.src = "https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit";
+      script.async = true;
+      document.head.appendChild(script);
+    } else if ((window as any).google?.translate?.TranslateElement) {
+      (window as any).googleTranslateElementInit();
+    }
+  }, []);
+
   // Google Translate Helper
   const handleApplyTranslation = () => {
     if (typeof window === "undefined") return;
 
+    const hostname = window.location.hostname;
+    const hostParts = hostname.split(".");
+    const rootDomain = hostParts.length > 1 ? hostParts.slice(-2).join(".") : hostname;
+
+    const clearCookies = () => {
+      const exp = "Thu, 01 Jan 1970 00:00:00 UTC";
+      document.cookie = `googtrans=; expires=${exp}; path=/;`;
+      document.cookie = `googtrans=; expires=${exp}; path=/; domain=${hostname};`;
+      document.cookie = `googtrans=; expires=${exp}; path=/; domain=.${hostname};`;
+      if (rootDomain !== hostname) {
+        document.cookie = `googtrans=; expires=${exp}; path=/; domain=.${rootDomain};`;
+      }
+    };
+
+    const setCookies = (val: string) => {
+      document.cookie = `googtrans=${val}; path=/;`;
+      document.cookie = `googtrans=${val}; path=/; domain=${hostname};`;
+      document.cookie = `googtrans=${val}; path=/; domain=.${hostname};`;
+      if (rootDomain !== hostname) {
+        document.cookie = `googtrans=${val}; path=/; domain=.${rootDomain};`;
+      }
+    };
+
     if (selectedLang === "en") {
-      // Clear translation cookie
-      document.cookie = "googtrans=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
-      document.cookie = "googtrans=; expires=Thu, 01 Jan 1970 00:00:00 UTC; domain=" + window.location.hostname + "; path=/;";
-      window.location.reload();
+      clearCookies();
+      const select = document.querySelector(".goog-te-combo") as any;
+      if (select) {
+        select.value = "en";
+        select.dispatchEvent(new Event("change"));
+        toast.success("Restored original language");
+      } else {
+        window.location.reload();
+      }
       return;
     }
 
-    // Set Google Translate cookie
     const target = `/auto/${selectedLang}`;
-    document.cookie = `googtrans=${target}; path=/;`;
-    document.cookie = `googtrans=${target}; domain=${window.location.hostname}; path=/;`;
+    setCookies(target);
 
-    // Load Google Translate script if not present
-    if (!document.getElementById("google-translate-script")) {
-      const script = document.createElement("script");
-      script.id = "google-translate-script";
-      script.src = "//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit";
-      document.body.appendChild(script);
+    const triggerCombo = () => {
+      const select = document.querySelector(".goog-te-combo") as any;
+      if (select) {
+        select.value = selectedLang;
+        select.dispatchEvent(new Event("change"));
+        return true;
+      }
+      return false;
+    };
 
-      (window as any).googleTranslateElementInit = () => {
-        new (window as any).google.translate.TranslateElement(
-          { pageLanguage: "en", layout: (window as any).google.translate.TranslateElement.InlineLayout.SIMPLE },
-          "google_translate_element"
-        );
-      };
-    } else {
-      window.location.reload();
+    if (triggerCombo()) {
+      const langObj = TRANSLATION_LANGUAGES.find((l) => l.code === selectedLang);
+      toast.success(`Translating to ${langObj?.name || selectedLang}`);
+      return;
     }
 
-    toast.success(`Translating to ${TRANSLATION_LANGUAGES.find((l) => l.code === selectedLang)?.name || selectedLang}`);
+    // If combo isn't populated yet, poll briefly
+    toast.loading("Activating translation...", { duration: 1200 });
+    let attempts = 0;
+    const timer = setInterval(() => {
+      attempts++;
+      if (triggerCombo()) {
+        clearInterval(timer);
+        const langObj = TRANSLATION_LANGUAGES.find((l) => l.code === selectedLang);
+        toast.success(`Translating to ${langObj?.name || selectedLang}`);
+      } else if (attempts > 8) {
+        clearInterval(timer);
+        // Fallback for strict browser adblockers (e.g. uBlock Origin) blocking in-page script
+        toast("Opening Google Translate for this chapter...", { icon: "🌐" });
+        window.open(
+          `https://translate.google.com/translate?sl=auto&tl=${selectedLang}&u=${encodeURIComponent(window.location.href)}`,
+          "_blank"
+        );
+      }
+    }, 300);
   };
 
   const handleDecreaseFont = () => {
@@ -733,7 +808,18 @@ export default function NovelSettingsPanel({
                   </button>
                 </div>
                 {/* Hidden container for Google Translate widget */}
-                <div id="google_translate_element" className="hidden" />
+                <div
+                  id="google_translate_element"
+                  aria-hidden="true"
+                  style={{
+                    position: "absolute",
+                    opacity: 0,
+                    pointerEvents: "none",
+                    width: 1,
+                    height: 1,
+                    overflow: "hidden",
+                  }}
+                />
               </div>
 
               {/* 4. Text to Speech (TTS) Controls */}
@@ -925,24 +1011,24 @@ export default function NovelSettingsPanel({
                 />
               </div>
 
-              {/* 8. Paragraph Height / Spacing Slider */}
+              {/* 8. Paragraph Spacing Slider */}
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between text-xs">
                   <span className="font-bold text-muted-foreground uppercase text-[10px] tracking-wider">
-                    Paragraph Height
+                    Paragraph Spacing
                   </span>
                   <span
                     className="font-mono font-bold"
                     style={{ color: activeAccent.textHex }}
                   >
-                    {settings.paragraphSpacing}px
+                    {Math.max(18, settings.paragraphSpacing)}px
                   </span>
                 </div>
                 <Slider
-                  min={10}
-                  max={50}
+                  min={18}
+                  max={64}
                   step={2}
-                  value={[settings.paragraphSpacing]}
+                  value={[Math.max(18, settings.paragraphSpacing)]}
                   onValueChange={([val]) =>
                     updateSettings({ paragraphSpacing: val })
                   }

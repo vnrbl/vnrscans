@@ -2581,6 +2581,9 @@ function NovelView({
       if (storedV2) {
         const parsed = JSON.parse(storedV2);
         if (parsed.accentColor === "sky") parsed.accentColor = "purple";
+        if (typeof parsed.paragraphSpacing === "number" && parsed.paragraphSpacing < 18) {
+          parsed.paragraphSpacing = 28;
+        }
         setSettings((prev) => ({ ...prev, ...parsed }));
       } else {
         // Fallback migration from older legacy keys if they exist
@@ -2944,11 +2947,11 @@ function NovelView({
   const resolvedFontFamily = useMemo(() => {
     switch (settings.fontFamily) {
       case "dyslexic":
-        return "'OpenDyslexic', 'Comic Sans MS', sans-serif";
+        return "'OpenDyslexic', 'Open-Dyslexic', 'Comic Sans MS', sans-serif";
       case "roboto":
         return "'Roboto', 'Inter', sans-serif";
       case "lora":
-        return "'Lora', Georgia, serif";
+        return "'Lora', Georgia, 'Times New Roman', serif";
       case "mono":
         return "'JetBrains Mono', monospace";
       default:
@@ -3054,7 +3057,8 @@ function NovelView({
             fontFamily: resolvedFontFamily,
             lineHeight: settings.lineHeight,
             textAlign: settings.textAlign,
-            ["--novel-paragraph-spacing" as any]: `${settings.paragraphSpacing}px`,
+            ["--novel-font-family" as any]: resolvedFontFamily,
+            ["--novel-paragraph-spacing" as any]: `${Math.max(18, settings.paragraphSpacing)}px`,
             ["--novel-text-indent" as any]: settings.textIndent ? "2rem" : "0px",
           }}
         >
@@ -3092,7 +3096,9 @@ function NovelView({
             <div
               className="novel-body-text whitespace-pre-wrap select-text"
               style={{
-                ["--novel-paragraph-spacing" as any]: `${settings.paragraphSpacing}px`,
+                fontFamily: resolvedFontFamily,
+                ["--novel-font-family" as any]: resolvedFontFamily,
+                ["--novel-paragraph-spacing" as any]: `${Math.max(18, settings.paragraphSpacing)}px`,
                 ["--novel-text-indent" as any]: settings.textIndent ? "2rem" : "0px",
               }}
               dangerouslySetInnerHTML={{ __html: sanitizeHtml(content) }}
@@ -3101,7 +3107,9 @@ function NovelView({
             <div
               className="novel-body-text select-text"
               style={{
-                ["--novel-paragraph-spacing" as any]: `${settings.paragraphSpacing}px`,
+                fontFamily: resolvedFontFamily,
+                ["--novel-font-family" as any]: resolvedFontFamily,
+                ["--novel-paragraph-spacing" as any]: `${Math.max(18, settings.paragraphSpacing)}px`,
                 ["--novel-text-indent" as any]: settings.textIndent ? "2rem" : "0px",
               }}
             >
@@ -3110,7 +3118,8 @@ function NovelView({
                   key={i}
                   className="whitespace-pre-wrap"
                   style={{
-                    marginBottom: `${settings.paragraphSpacing}px`,
+                    fontFamily: resolvedFontFamily,
+                    marginBottom: `${Math.max(18, settings.paragraphSpacing)}px`,
                     textIndent: settings.textIndent ? "2rem" : undefined,
                   }}
                 >
