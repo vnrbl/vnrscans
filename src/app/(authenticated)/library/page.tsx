@@ -27,6 +27,7 @@ import {
   deleteOfflineChapters,
   type OfflineChapterMetadata,
 } from "@/lib/offlineStorage";
+import { getCleanChapterSlug } from "@/lib/chapter-utils";
 
 type OfflineSeries = {
   seriesId: string;
@@ -511,7 +512,7 @@ export default function LibraryPage() {
                 <div className="flex items-center gap-2 w-full sm:w-auto shrink-0">
                   {selectedOfflineSeries.chapters[0] && (
                     <Link
-                      href={`/title/${selectedOfflineSeries.seriesSlug}/${selectedOfflineSeries.chapters[0].chapterSlug}`}
+                      href={`/title/${selectedOfflineSeries.seriesSlug}/${getCleanChapterSlug(selectedOfflineSeries.chapters[0].chapterSlug)}`}
                       className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs transition-colors shadow-sm"
                     >
                       <Play className="h-3.5 w-3.5 fill-current" />
@@ -567,7 +568,7 @@ export default function LibraryPage() {
 
                     <div className="flex items-center gap-1.5 shrink-0">
                       <Link
-                        href={`/title/${selectedOfflineSeries.seriesSlug}/${ch.chapterSlug}`}
+                        href={`/title/${selectedOfflineSeries.seriesSlug}/${getCleanChapterSlug(ch.chapterSlug)}`}
                         className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-secondary hover:bg-primary hover:text-white text-foreground text-xs font-semibold transition-colors"
                       >
                         <BookOpen className="h-3.5 w-3.5" />

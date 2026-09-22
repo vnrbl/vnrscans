@@ -1,3 +1,5 @@
+import { getCleanChapterSlug } from "./chapter-utils";
+
 export interface ReadingPosition {
   chapterId: string;
   chapterSlug: string;
@@ -16,8 +18,10 @@ const LAST_READ_PREFIX = "vnr-last-read-";
 export function saveChapterReadingPosition(pos: Omit<ReadingPosition, "timestamp">) {
   if (typeof window === "undefined") return;
   try {
+    const cleanSlug = getCleanChapterSlug(pos.chapterSlug) || pos.chapterSlug;
     const payload: ReadingPosition = {
       ...pos,
+      chapterSlug: cleanSlug,
       timestamp: Date.now(),
     };
 
@@ -27,7 +31,7 @@ export function saveChapterReadingPosition(pos: Omit<ReadingPosition, "timestamp
     // Save per series last read chapter
     if (pos.seriesSlug) {
       localStorage.setItem(`${LAST_READ_PREFIX}${pos.seriesSlug}`, JSON.stringify({
-        slug: pos.chapterSlug,
+        slug: cleanSlug,
         chapter_number: pos.chapterNumber,
         chapter_id: pos.chapterId,
         page_index: pos.pageIndex,
@@ -36,7 +40,7 @@ export function saveChapterReadingPosition(pos: Omit<ReadingPosition, "timestamp
       }));
       // Legacy compatibility keys
       localStorage.setItem(`last-read-${pos.seriesSlug}`, JSON.stringify({
-        slug: pos.chapterSlug,
+        slug: cleanSlug,
         chapter_number: pos.chapterNumber,
         chapter_id: pos.chapterId,
       }));

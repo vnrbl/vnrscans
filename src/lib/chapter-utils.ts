@@ -6,7 +6,7 @@ export function slugifyChapterPart(s: string): string {
     .replace(/^-|-$/g, "");
 }
 
-/** Unique slug per series; includes scanlation group when set. */
+/** Unique slug per series; includes scanlation group when set (does NOT include chapter title). */
 export function buildChapterSlug(
   chapterNumber: number,
   options?: { title?: string | null; scanlationGroup?: string | null }
@@ -17,11 +17,56 @@ export function buildChapterSlug(
   if (group) {
     slug += `-${slugifyChapterPart(group)}`;
   }
-  const title = options?.title?.trim();
-  if (title) {
-    slug += `-${slugifyChapterPart(title)}`;
-  }
   return slug;
+}
+
+/**
+ * Normalizes any chapter slug, chapter record, or chapter number into the clean format:
+ * `chapter-${chapterNumber}` (or `chapter-${chapterNumber}-${group}`).
+ * Strips out chapter title names from URL slugs.
+ */
+export function getCleanChapterSlug(
+  chapter:
+    | {
+        chapter_number?: number | string | null;
+        chapterNumber?: number | string | null;
+        slug?: string | null;
+        scanlation_group?: string | null;
+        scanlationGroup?: string | null;
+      }
+    | string
+    | number
+): string {
+  if (typeof chapter === "number") {
+    return `chapter-${chapter}`;
+  }
+  if (typeof chapter === "string") {
+    const match = chapter.match(/^(chapter-[0-9]+(?:\.[0-9]+)?)(?:-.*)?$/i);
+    if (match) {
+      return match[1].toLowerCase();
+    }
+    const numMatch = chapter.match(/^([0-9]+(?:\.[0-9]+)?)$/);
+    if (numMatch) {
+      return `chapter-${numMatch[1]}`;
+    }
+    return chapter;
+  }
+
+  const num = chapter.chapter_number ?? chapter.chapterNumber;
+  if (num != null && !isNaN(Number(num))) {
+    const group = chapter.scanlation_group ?? chapter.scanlationGroup;
+    return buildChapterSlug(Number(num), { scanlationGroup: group });
+  }
+
+  if (chapter.slug) {
+    const match = chapter.slug.match(/^(chapter-[0-9]+(?:\.[0-9]+)?)(?:-.*)?$/i);
+    if (match) {
+      return match[1].toLowerCase();
+    }
+    return chapter.slug;
+  }
+
+  return "chapter-1";
 }
 
 export const SCANLATION_GROUP_NONE = "__none__";

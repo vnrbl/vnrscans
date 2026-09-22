@@ -1,9 +1,10 @@
 import { cache } from "react";
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import ChapterReaderContent from "./ChapterReaderContent";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchSeriesBySlug } from "@/lib/series-slug";
+import { getCleanChapterSlug } from "@/lib/chapter-utils";
 
 export const revalidate = 120; // Edge cached for 2 minutes — fast instant loading
 
@@ -185,18 +186,20 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     seriesType,
   ].filter(Boolean);
 
+  const cleanChapterSlug = data ? getCleanChapterSlug(data) : chapterSlug;
+
   return {
     title,
     description,
     keywords,
     alternates: {
-      canonical: `https://www.vnrscans.com/title/${slug}/${chapterSlug}`,
+      canonical: `https://www.vnrscans.com/title/${slug}/${cleanChapterSlug}`,
     },
     openGraph: {
       title,
       description,
       type: "article",
-      url: `https://www.vnrscans.com/title/${slug}/${chapterSlug}`,
+      url: `https://www.vnrscans.com/title/${slug}/${cleanChapterSlug}`,
       images: series.cover_url ? [{ url: series.cover_url, alt: `${seriesTitle} Chapter ${chapterNum} Cover` }] : [],
     },
     twitter: {
@@ -215,6 +218,12 @@ export default async function Page({ params }: PageProps) {
 
   if (!data || !data.series) {
     notFound();
+  }
+
+  // Canonical clean slug strictly up to chapter number (e.g. chapter-1, not chapter-1-the-change)
+  const cleanSlug = getCleanChapterSlug(data);
+  if (chapterSlug !== cleanSlug) {
+    redirect(`/title/${slug}/${cleanSlug}`);
   }
 
   const series = data.series as unknown as {
@@ -241,7 +250,7 @@ export default async function Page({ params }: PageProps) {
         "@type": "ListItem",
         "position": 3,
         "name": `Chapter ${data.chapter_number}`,
-        "item": `https://www.vnrscans.com/title/${slug}/${chapterSlug}`
+        "item": `https://www.vnrscans.com/title/${slug}/${cleanSlug}`
       }
     ]
   };
@@ -256,7 +265,7 @@ export default async function Page({ params }: PageProps) {
       )}
       <ChapterReaderContent
         slug={slug}
-        chapterSlug={chapterSlug}
+        chapterSlug={cleanSlug}
         initialChapterData={data}
         initialPagesData={fullData?.pages}
         initialSiblingsData={fullData?.siblings}

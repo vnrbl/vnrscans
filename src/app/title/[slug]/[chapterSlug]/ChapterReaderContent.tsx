@@ -76,7 +76,7 @@ import { toast } from "sonner";
 import { safeUrlOrNull, serializeAttachmentUrls, parseSafeAttachmentUrls } from "@/lib/safe-url";
 import { CommentAttachmentGrid } from "@/components/comments/CommentAttachmentGrid";
 import { sanitizeHtml } from "@/lib/html-sanitizer";
-import { resolveChapterImageUrl } from "@/lib/chapter-utils";
+import { resolveChapterImageUrl, getCleanChapterSlug } from "@/lib/chapter-utils";
 import NovelSettingsPanel, {
   NovelReaderSettings,
   DEFAULT_NOVEL_SETTINGS,
@@ -703,17 +703,18 @@ export default function Reader({
     if (!next || !chapterQ.data?.series?.id) return;
 
     // Prefetch Next.js page route bundle for instant transition
+    const cleanNextSlug = getCleanChapterSlug(next);
     try {
-      router.prefetch(`/title/${seriesSlug}/${next.slug}`);
+      router.prefetch(`/title/${seriesSlug}/${cleanNextSlug}`);
     } catch {}
 
-    if (prefetchedNextRef.current === next.slug) return;
+    if (prefetchedNextRef.current === cleanNextSlug) return;
 
     const triggerPrefetch = () => {
-      if (prefetchedNextRef.current === next.slug) return;
-      prefetchedNextRef.current = next.slug;
+      if (prefetchedNextRef.current === cleanNextSlug) return;
+      prefetchedNextRef.current = cleanNextSlug;
 
-      const nextChapterSlug = next.slug;
+      const nextChapterSlug = cleanNextSlug;
       const seriesData = chapterQ.data?.series;
       if (!seriesData) return;
 
@@ -790,12 +791,12 @@ export default function Reader({
       if (e.key === "ArrowLeft" && prev) {
         navigate({
           to: "/title/$titleSlug/$chapterSlug",
-          params: { titleSlug: seriesSlug, chapterSlug: prev.slug },
+          params: { titleSlug: seriesSlug, chapterSlug: getCleanChapterSlug(prev) },
         });
       } else if (e.key === "ArrowRight" && next) {
         navigate({
           to: "/title/$titleSlug/$chapterSlug",
-          params: { titleSlug: seriesSlug, chapterSlug: next.slug },
+          params: { titleSlug: seriesSlug, chapterSlug: getCleanChapterSlug(next) },
         });
       }
     };
@@ -1251,7 +1252,7 @@ export default function Reader({
                 prev &&
                 navigate({
                   to: "/title/$titleSlug/$chapterSlug",
-                  params: { titleSlug: seriesSlug, chapterSlug: prev.slug },
+                  params: { titleSlug: seriesSlug, chapterSlug: getCleanChapterSlug(prev) },
                 })
               }
               onNext={() => {
@@ -1259,14 +1260,15 @@ export default function Reader({
                 if (next) {
                   navigate({
                     to: "/title/$titleSlug/$chapterSlug",
-                    params: { titleSlug: seriesSlug, chapterSlug: next.slug },
+                    params: { titleSlug: seriesSlug, chapterSlug: getCleanChapterSlug(next) },
                   });
                 }
               }}
               seriesSlug={seriesSlug}
               seriesTitle={c.series?.title ?? ""}
               chapterNumber={c.chapter_number}
-              chapterSlug={c.slug || chapterSlug}
+              chapterTitle={c.title}
+              chapterSlug={getCleanChapterSlug(c)}
               illustrations={pagesQ.data?.map((p: any) => p.image_url) ?? []}
               allChapters={navChapters}
             />
@@ -1283,7 +1285,7 @@ export default function Reader({
                 prev &&
                 navigate({
                   to: "/title/$titleSlug/$chapterSlug",
-                  params: { titleSlug: seriesSlug, chapterSlug: prev.slug },
+                  params: { titleSlug: seriesSlug, chapterSlug: getCleanChapterSlug(prev) },
                 })
               }
               onNext={() => {
@@ -1291,14 +1293,14 @@ export default function Reader({
                 if (next) {
                   navigate({
                     to: "/title/$titleSlug/$chapterSlug",
-                    params: { titleSlug: seriesSlug, chapterSlug: next.slug },
+                    params: { titleSlug: seriesSlug, chapterSlug: getCleanChapterSlug(next) },
                   });
                 }
               }}
               seriesSlug={seriesSlug}
               seriesTitle={c.series?.title ?? ""}
               chapterNumber={c.chapter_number}
-              chapterSlug={c.slug || chapterSlug}
+              chapterSlug={getCleanChapterSlug(c)}
             />
           )}
         </>
@@ -1322,7 +1324,7 @@ export default function Reader({
             prev &&
             navigate({
               to: "/title/$titleSlug/$chapterSlug",
-              params: { titleSlug: seriesSlug, chapterSlug: prev.slug },
+              params: { titleSlug: seriesSlug, chapterSlug: getCleanChapterSlug(prev) },
             })
           }
           onNext={() => {
@@ -1330,13 +1332,13 @@ export default function Reader({
             if (next) {
               navigate({
                 to: "/title/$titleSlug/$chapterSlug",
-                params: { titleSlug: seriesSlug, chapterSlug: next.slug },
+                params: { titleSlug: seriesSlug, chapterSlug: getCleanChapterSlug(next) },
               });
             }
           }}
           seriesSlug={seriesSlug}
           allChapters={navChapters}
-          currentChapterSlug={chapterSlug}
+          currentChapterSlug={getCleanChapterSlug(chapterSlug)}
           chapterId={c.id}
           seriesId={c.series_id}
           seriesTitle={c.series?.title ?? ""}
@@ -1363,7 +1365,7 @@ export default function Reader({
               prev &&
               navigate({
                 to: "/title/$titleSlug/$chapterSlug",
-                params: { titleSlug: seriesSlug, chapterSlug: prev.slug },
+                params: { titleSlug: seriesSlug, chapterSlug: getCleanChapterSlug(prev) },
               })
             }
             className="shrink-0 h-8 min-[380px]:h-8.5 px-2 min-[360px]:px-2.5 min-[400px]:px-3 text-xs font-medium"
@@ -1434,7 +1436,7 @@ export default function Reader({
               next &&
               navigate({
                 to: "/title/$titleSlug/$chapterSlug",
-                params: { titleSlug: seriesSlug, chapterSlug: next.slug },
+                params: { titleSlug: seriesSlug, chapterSlug: getCleanChapterSlug(next) },
               })
             }
             className="shrink-0 h-8 min-[380px]:h-8.5 px-2 min-[360px]:px-2.5 min-[400px]:px-3 text-xs font-medium"
@@ -1624,11 +1626,11 @@ function ReaderTopBar({
 
           {showGroupSwitcher && (
             <Select
-              value={currentChapterSlug}
+              value={getCleanChapterSlug(currentChapterSlug)}
               onValueChange={(slug) =>
                 navigate({
                   to: "/title/$titleSlug/$chapterSlug",
-                  params: { titleSlug: seriesSlug, chapterSlug: slug },
+                  params: { titleSlug: seriesSlug, chapterSlug: getCleanChapterSlug(slug) },
                 })
               }
             >
@@ -1637,7 +1639,7 @@ function ReaderTopBar({
               </SelectTrigger>
               <SelectContent>
                 {alternateGroups.map((ch) => (
-                  <SelectItem key={ch.id} value={ch.slug}>
+                  <SelectItem key={ch.id} value={getCleanChapterSlug(ch)}>
                     {ch.scanlation_group || "Default"}
                   </SelectItem>
                 ))}
@@ -1649,11 +1651,11 @@ function ReaderTopBar({
           )}
           {allChapters.length > 0 && (
             <Select
-              value={currentChapterSlug}
+              value={getCleanChapterSlug(currentChapterSlug)}
               onValueChange={(slug) =>
                 navigate({
                   to: "/title/$titleSlug/$chapterSlug",
-                  params: { titleSlug: seriesSlug, chapterSlug: slug },
+                  params: { titleSlug: seriesSlug, chapterSlug: getCleanChapterSlug(slug) },
                 })
               }
             >
@@ -1663,7 +1665,7 @@ function ReaderTopBar({
               </SelectTrigger>
               <SelectContent className="max-h-72">
                 {allChapters.map((ch) => (
-                  <SelectItem key={ch.id} value={ch.slug} className="text-xs">
+                  <SelectItem key={ch.id} value={getCleanChapterSlug(ch)} className="text-xs">
                     <span className="sm:hidden">Ch. {ch.chapter_number}</span>
                     <span className="hidden sm:inline">Chapter {ch.chapter_number}</span>
                   </SelectItem>
@@ -2151,7 +2153,7 @@ function ImageView({
   const activePageRef = useRef(0);
   const isRestoringRef = useRef(true);
   const restoreLockUntilRef = useRef(0);
-  const currentChapterSlug = chapterSlug || chapterNumber.toString();
+  const currentChapterSlug = getCleanChapterSlug(chapterSlug || chapterNumber.toString());
 
   // Release restoration guard ONLY after restoration lock window has passed
   useEffect(() => {
@@ -2548,6 +2550,7 @@ function NovelView({
   seriesSlug,
   seriesTitle,
   chapterNumber,
+  chapterTitle,
   illustrations = [],
   chapterSlug,
   allChapters = [],
@@ -2562,6 +2565,7 @@ function NovelView({
   seriesSlug: string;
   seriesTitle: string;
   chapterNumber: number;
+  chapterTitle?: string | null;
   illustrations?: string[];
   chapterSlug?: string;
   allChapters?: Array<{ id: string; slug: string; chapter_number: number; title?: string | null }>;
@@ -2703,7 +2707,30 @@ function NovelView({
   const restoredNovelChapterRef = useRef<string | null>(null);
   const isRestoringRef = useRef(true);
   const restoreLockUntilRef = useRef(0);
-  const currentChapterSlug = chapterSlug || chapterNumber.toString();
+  const currentChapterSlug = getCleanChapterSlug(chapterSlug || chapterNumber.toString());
+
+  // Resolve chapter title nicely
+  const resolvedChapterTitle = useMemo(() => {
+    const raw = (
+      chapterTitle ||
+      allChapters?.find(
+        (c) =>
+          c.id === chapterId ||
+          c.chapter_number === chapterNumber ||
+          c.slug === chapterSlug ||
+          getCleanChapterSlug(c) === getCleanChapterSlug(chapterSlug || "")
+      )?.title ||
+      ""
+    ).trim();
+
+    if (!raw) return "";
+
+    const prefixRegex = new RegExp(`^(?:chapter|ch\\.?)\\s*${chapterNumber}\\s*[:\\-–—]?\\s*`, "i");
+    if (prefixRegex.test(raw)) {
+      return raw.replace(prefixRegex, "").trim();
+    }
+    return raw;
+  }, [chapterTitle, allChapters, chapterId, chapterNumber, chapterSlug]);
 
   // Release restoration guard ONLY after restoration grace window has passed
   useEffect(() => {
@@ -3069,7 +3096,7 @@ function NovelView({
           </p>
 
           <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight mb-2">
-            Chapter {chapterNumber}
+            Chapter {chapterNumber}{resolvedChapterTitle ? `: ${resolvedChapterTitle}` : ""}
           </h1>
 
           {wordCount > 0 && (
@@ -3185,11 +3212,7 @@ function NovelView({
         isOpen={isSettingsOpen}
         onOpen={() => setIsSettingsOpen(true)}
         onClose={() => setIsSettingsOpen(false)}
-        chapterTitle={
-          allChapters?.find(
-            (c) => c.slug === (chapterSlug || currentChapterSlug)
-          )?.title || ""
-        }
+        chapterTitle={resolvedChapterTitle}
         chapterNumber={chapterNumber}
         seriesSlug={seriesSlug}
         hasPrev={hasPrev}
@@ -3296,7 +3319,7 @@ function FloatingControls({
   onPrev: () => void;
   onNext: () => void;
   seriesSlug: string;
-  allChapters: Array<{ id: string; slug: string; chapter_number: number }>;
+  allChapters: Array<{ id: string; slug: string; chapter_number: number; title?: string | null }>;
   currentChapterSlug: string;
   chapterId: string;
   seriesId: string;
@@ -3544,25 +3567,29 @@ function FloatingControls({
             </button>
           </div>
           <div className="overflow-y-auto max-h-[calc(70vh-4rem)] sm:max-h-[420px] p-2.5 sm:p-3 space-y-1.5 scrollbar-thin">
-            {allChapters.map((ch) => (
-              <button
-                key={ch.id}
-                onClick={() => {
-                  navigate({
-                    to: "/title/$titleSlug/$chapterSlug",
-                    params: { titleSlug: seriesSlug, chapterSlug: ch.slug },
-                  });
-                  setShowChapters(false);
-                }}
-                className={`w-full text-left px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg text-xs sm:text-sm hover:bg-primary/20 transition-all ${
-                  ch.slug === currentChapterSlug
-                    ? "bg-violet-600 text-white font-semibold shadow-md"
-                    : "hover:shadow-sm"
-                }`}
-              >
-                Chapter {ch.chapter_number}
-              </button>
-            ))}
+            {allChapters.map((ch) => {
+              const cleanChSlug = getCleanChapterSlug(ch);
+              const isCurrent = cleanChSlug === getCleanChapterSlug(currentChapterSlug);
+              return (
+                <button
+                  key={ch.id}
+                  onClick={() => {
+                    navigate({
+                      to: "/title/$titleSlug/$chapterSlug",
+                      params: { titleSlug: seriesSlug, chapterSlug: cleanChSlug },
+                    });
+                    setShowChapters(false);
+                  }}
+                  className={`w-full text-left px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg text-xs sm:text-sm hover:bg-primary/20 transition-all ${
+                    isCurrent
+                      ? "bg-violet-600 text-white font-semibold shadow-md"
+                      : "hover:shadow-sm"
+                  }`}
+                >
+                  Chapter {ch.chapter_number}{ch.title ? `: ${ch.title}` : ""}
+                </button>
+              );
+            })}
           </div>
         </div>
       )}

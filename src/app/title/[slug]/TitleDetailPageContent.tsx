@@ -50,6 +50,7 @@ import { useRouter } from "next/navigation";
 import { ReleaseScheduleCard } from "@/components/ReleaseScheduleCard";
 import { formatAppDate } from "@/lib/date";
 import { fetchSeriesBySlug } from "@/lib/series-slug";
+import { getCleanChapterSlug } from "@/lib/chapter-utils";
 
 function SideWidgets({
   seriesId,
@@ -305,8 +306,8 @@ export default function TitleDetailPageContent({
   const firstChapter = initialChaptersData?.[initialChaptersData.length - 1];
   const isContinue = !!lastReadChapter;
   const readChapterSlug = isContinue
-    ? lastReadChapter.slug
-    : firstChapter?.slug;
+    ? (lastReadChapter ? getCleanChapterSlug(lastReadChapter) : undefined)
+    : (firstChapter ? getCleanChapterSlug(firstChapter) : undefined);
   const readChapterNumber = isContinue
     ? lastReadChapter.chapter_number
     : firstChapter?.chapter_number;

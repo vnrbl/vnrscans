@@ -6,6 +6,7 @@ import TitleDetailPageContent from "./TitleDetailPageContent";
 import { supabase } from "@/integrations/supabase/client";
 
 import { fetchSeriesBySlug } from "@/lib/series-slug";
+import { getCleanChapterSlug } from "@/lib/chapter-utils";
 
 export const revalidate = 60; // ISR edge caching for 60s
 export const maxDuration = 300; // Allow server actions up to 5 minutes for chapter imports
@@ -147,7 +148,7 @@ export default async function Page({ params }: PageProps) {
     "hasPart": initialChaptersData?.slice(0, 50).map((c: any) => ({
       "@type": "WebPage",
       "name": `${initialSeriesData.title} Chapter ${c.chapter_number}${c.title ? `: ${c.title}` : ""}`,
-      "url": `https://www.vnrscans.com/title/${slug}/${c.slug}`
+      "url": `https://www.vnrscans.com/title/${slug}/${getCleanChapterSlug(c)}`
     }))
   } : null;
 

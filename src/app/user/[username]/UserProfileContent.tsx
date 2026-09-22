@@ -38,6 +38,7 @@ import { OptimizedImage } from "@/components/OptimizedImage";
 import { SectionPagination } from "@/components/SectionPagination";
 import { CommentAttachmentGrid } from "@/components/comments/CommentAttachmentGrid";
 import { formatAppDate } from "@/lib/date";
+import { getCleanChapterSlug } from "@/lib/chapter-utils";
 import { PageKineticLoader } from "@/components/ui/kinetic-text-loader";
 import {
   $getPublicUserRoles,
@@ -1868,7 +1869,7 @@ export default function UserProfileContent({ username }: { username: string }) {
                             if (chapterInfo?.slug) {
                               navigate({
                                 to: "/title/$slug/$chapterSlug",
-                                params: { slug: seriesInfo.slug, chapterSlug: chapterInfo.slug },
+                                params: { slug: seriesInfo.slug, chapterSlug: getCleanChapterSlug(chapterInfo) },
                                 hash: `comment-${comment.id}`,
                               });
                             } else {
@@ -1976,7 +1977,7 @@ export default function UserProfileContent({ username }: { username: string }) {
                                   <span className="text-border">•</span>
                                   <Link
                                     to="/title/$slug/$chapterSlug"
-                                    params={{ slug: seriesInfo?.slug || "", chapterSlug: chapterInfo.slug }}
+                                    params={{ slug: seriesInfo?.slug || "", chapterSlug: getCleanChapterSlug(chapterInfo) }}
                                     className="font-medium transition-colors hover:underline"
                                     style={{ color: accentColor }}
                                   >

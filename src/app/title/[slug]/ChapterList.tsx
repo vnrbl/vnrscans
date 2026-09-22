@@ -44,6 +44,7 @@ import {
 import { DownloadChaptersModal } from "@/components/DownloadChaptersModal";
 import { useReaderSettings } from "@/contexts/ReaderSettingsContext";
 import { formatAppDate } from "@/lib/date";
+import { getCleanChapterSlug } from "@/lib/chapter-utils";
 import { UserAvatarFrame } from "@/components/UserAvatarFrame";
 import {
   Tooltip,
@@ -684,7 +685,7 @@ export const ChapterList = React.memo(function ChapterList({
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <Link
-                                href={`/title/${slug}/${c.slug}`}
+                                href={`/title/${slug}/${getCleanChapterSlug(c)}`}
                                 className={`text-sm transition-colors flex items-center gap-1.5 py-0.5 ${
                                   isRead ? "text-neutral-500 font-medium hover:text-neutral-300" : "text-white font-semibold hover:text-purple-400"
                                 }`}
@@ -720,7 +721,7 @@ export const ChapterList = React.memo(function ChapterList({
                         </TooltipProvider>
                         {isScheduledLock && (
                           <Link
-                            href={`/title/${slug}/${c.slug}`}
+                            href={`/title/${slug}/${getCleanChapterSlug(c)}`}
                             className="inline-flex items-center text-amber-400 hover:text-amber-300 transition-colors"
                             title={
                               canManage
@@ -877,7 +878,7 @@ export const ChapterList = React.memo(function ChapterList({
                             <Tooltip>
                               <TooltipTrigger asChild>
                                 <Link
-                                  href={`/title/${slug}/${c.slug}`}
+                                  href={`/title/${slug}/${getCleanChapterSlug(c)}`}
                                   className="flex items-center gap-1.5"
                                   title={c.title ? `Chapter ${c.chapter_number}: ${c.title}` : `Chapter ${c.chapter_number}`}
                                 >
@@ -920,7 +921,7 @@ export const ChapterList = React.memo(function ChapterList({
                           </TooltipProvider>
                           {isScheduledLock && (
                             <Link
-                              href={`/title/${slug}/${c.slug}`}
+                              href={`/title/${slug}/${getCleanChapterSlug(c)}`}
                               className="inline-flex items-center text-amber-400 hover:text-amber-300 transition-colors"
                               title={
                                 canManage
