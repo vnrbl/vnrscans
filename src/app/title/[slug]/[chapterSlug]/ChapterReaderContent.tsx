@@ -2959,12 +2959,44 @@ function NovelView({
     }
   }, [settings.fontFamily]);
 
+  const isLightTheme = settings.theme === "sepia" || settings.theme === "cream";
+
   return (
     <div
       className="relative min-h-screen transition-colors duration-300"
       style={{
         backgroundColor: activeTheme.bgHex,
         color: activeTheme.textHex,
+        borderColor: activeTheme.borderHex,
+        ["--background" as any]: activeTheme.bgHex,
+        ["--color-background" as any]: activeTheme.bgHex,
+        ["--foreground" as any]: activeTheme.textHex,
+        ["--color-foreground" as any]: activeTheme.textHex,
+        ["--card" as any]: activeTheme.cardHex,
+        ["--color-card" as any]: activeTheme.cardHex,
+        ["--card-foreground" as any]: activeTheme.textHex,
+        ["--color-card-foreground" as any]: activeTheme.textHex,
+        ["--popover" as any]: activeTheme.panelHex,
+        ["--color-popover" as any]: activeTheme.panelHex,
+        ["--popover-foreground" as any]: activeTheme.textHex,
+        ["--color-popover-foreground" as any]: activeTheme.textHex,
+        ["--border" as any]: activeTheme.borderHex,
+        ["--color-border" as any]: activeTheme.borderHex,
+        ["--muted" as any]: activeTheme.panelHex,
+        ["--color-muted" as any]: activeTheme.panelHex,
+        ["--muted-foreground" as any]: activeTheme.metaHex,
+        ["--color-muted-foreground" as any]: activeTheme.metaHex,
+        ["--secondary" as any]: isLightTheme ? "rgba(0, 0, 0, 0.05)" : "rgba(255, 255, 255, 0.08)",
+        ["--color-secondary" as any]: isLightTheme ? "rgba(0, 0, 0, 0.05)" : "rgba(255, 255, 255, 0.08)",
+        ["--secondary-foreground" as any]: activeTheme.textHex,
+        ["--input" as any]: activeTheme.cardHex,
+        ["--color-input" as any]: activeTheme.cardHex,
+        ["--primary" as any]: activeAccent.hex,
+        ["--color-primary" as any]: activeAccent.hex,
+        ["--primary-foreground" as any]: "#ffffff",
+        ["--accent" as any]: activeAccent.hex,
+        ["--color-accent" as any]: activeAccent.hex,
+        ["--accent-foreground" as any]: "#ffffff",
       }}
     >
       {/* Floating Continue Where You Left Off Prompt */}
@@ -3133,92 +3165,16 @@ function NovelView({
         {/* Chapter bottom completion anchor */}
         <div id="chapter-bottom-completion-anchor" className="h-4 w-full" />
 
-        {/* Chapter Navigation Buttons - Novel Fire Style */}
-        <div
-          className="mt-10 border-t pt-6 flex items-center justify-center gap-1 select-none"
-          style={{ borderColor: activeTheme.borderHex }}
-        >
-          <Button
-            variant="default"
-            size="sm"
-            disabled={!hasPrev}
-            onClick={onPrev}
-            className="h-10 px-4 disabled:opacity-30 text-white rounded-l-lg transition-colors cursor-pointer border-0"
-            style={{
-              backgroundColor: activeTheme.cardHex,
-              border: `1px solid ${activeTheme.borderHex}`,
-            }}
-            title="Previous Chapter"
-          >
-            <ChevronLeft className="h-4 w-4 mr-1" />
-            <span className="text-xs sm:text-sm">Prev</span>
-          </Button>
-
-          {allChapters && allChapters.length > 0 ? (
-            <Select
-              value={chapterSlug || currentChapterSlug}
-              onValueChange={(slug) => {
-                navigate({
-                  to: "/title/$titleSlug/$chapterSlug",
-                  params: { titleSlug: seriesSlug, chapterSlug: slug },
-                });
-              }}
-            >
-              <SelectTrigger
-                className="h-10 min-w-[200px] sm:min-w-[280px] max-w-[420px] text-white font-semibold text-xs sm:text-sm border-0 rounded-none px-3.5 justify-between shadow-md"
-                style={{ backgroundColor: activeAccent.hex }}
-              >
-                <SelectValue placeholder={`Chapter ${chapterNumber}`} />
-              </SelectTrigger>
-              <SelectContent
-                className="max-h-[380px] border text-neutral-200"
-                style={{
-                  backgroundColor: activeTheme.panelHex,
-                  borderColor: activeTheme.borderHex,
-                }}
-              >
-                {allChapters.map((ch) => (
-                  <SelectItem
-                    key={ch.id}
-                    value={ch.slug}
-                    className="text-xs sm:text-sm py-2 hover:bg-white/10 focus:bg-white/10 cursor-pointer"
-                  >
-                    Chapter {ch.chapter_number}{ch.title ? `: ${ch.title}` : ""}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          ) : (
-            <div
-              className="h-10 px-4 text-white font-semibold text-xs sm:text-sm flex items-center justify-center"
-              style={{ backgroundColor: activeAccent.hex }}
-            >
-              Chapter {chapterNumber}
-            </div>
-          )}
-
-          <Button
-            variant="default"
-            size="sm"
-            disabled={!hasNext}
-            onClick={onNext}
-            className="h-10 px-4 disabled:opacity-30 text-white rounded-r-lg transition-colors cursor-pointer border-0"
-            style={{
-              backgroundColor: activeTheme.cardHex,
-              border: `1px solid ${activeTheme.borderHex}`,
-            }}
-            title="Next Chapter"
-          >
-            <span className="text-xs sm:text-sm">Next</span>
-            <ChevronRight className="h-4 w-4 ml-1" />
-          </Button>
-        </div>
-
         <div
           className="mt-8 border-t pt-6"
           style={{ borderColor: activeTheme.borderHex }}
         >
-          <ChapterLikeAndMemes chapterId={chapterId} seriesId={seriesId} />
+          <ChapterLikeAndMemes
+            chapterId={chapterId}
+            seriesId={seriesId}
+            theme={activeTheme}
+            accent={activeAccent}
+          />
         </div>
       </div>
 
@@ -3796,10 +3752,21 @@ function ReportButton({
 }
 
 // Chapter Like and Memes Component
-function ChapterLikeAndMemes({ chapterId, seriesId }: { chapterId: string; seriesId: string }) {
+function ChapterLikeAndMemes({
+  chapterId,
+  seriesId,
+  theme,
+  accent,
+}: {
+  chapterId: string;
+  seriesId: string;
+  theme?: (typeof NOVEL_THEMES)[0];
+  accent?: (typeof NOVEL_ACCENTS)[0];
+}) {
   const { user } = useAuth();
   const qc = useQueryClient();
   const [likeBurst, setLikeBurst] = useState(false);
+  const isLight = theme ? theme.id === "sepia" || theme.id === "cream" : false;
 
   // Chapter hype and community reaction types
   const memeReactions = [
@@ -3939,17 +3906,29 @@ function ChapterLikeAndMemes({ chapterId, seriesId }: { chapterId: string; serie
   };
 
   return (
-    <div className="mt-12 mb-8 border-t border-border/50 pt-8">
+    <div
+      className="mt-12 mb-8 border-t pt-8"
+      style={{ borderColor: theme ? theme.borderHex : undefined }}
+    >
       {/* Primary Like Feature */}
-      <div className="mb-8 rounded-2xl border border-border/50 bg-gradient-to-b from-card/80 via-card/40 to-background/80 p-6 sm:p-8 shadow-xl backdrop-blur-md text-center flex flex-col items-center justify-center relative overflow-hidden">
-        {/* Glow effect */}
-        <div className="absolute -top-12 -left-12 w-36 h-36 bg-pink-500/15 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute -bottom-12 -right-12 w-36 h-36 bg-primary/15 rounded-full blur-3xl pointer-events-none" />
-
-        <h3 className="text-xl font-black tracking-tight text-foreground sm:text-2xl flex items-center justify-center gap-2">
+      <div
+        className="mb-8 rounded-2xl border p-6 sm:p-8 shadow-lg text-center flex flex-col items-center justify-center relative overflow-hidden transition-colors"
+        style={{
+          backgroundColor: theme ? theme.cardHex : undefined,
+          borderColor: theme ? theme.borderHex : undefined,
+          color: theme ? theme.textHex : undefined,
+        }}
+      >
+        <h3
+          className="text-xl font-black tracking-tight sm:text-2xl flex items-center justify-center gap-2"
+          style={{ color: theme ? theme.textHex : undefined }}
+        >
           <span>Show Some Love for This Chapter!</span>
         </h3>
-        <p className="text-xs sm:text-sm text-muted-foreground mt-1.5 max-w-md">
+        <p
+          className="text-xs sm:text-sm mt-1.5 max-w-md"
+          style={{ color: theme ? theme.metaHex : undefined }}
+        >
           Enjoyed reading? Drop a like to support the scans and climb the hype ladder.
         </p>
 
@@ -3957,9 +3936,20 @@ function ChapterLikeAndMemes({ chapterId, seriesId }: { chapterId: string; serie
         <div className="mt-6 flex flex-col items-center">
           <button
             onClick={() => handleToggleReaction("heart")}
+            style={
+              isLiked
+                ? { backgroundColor: accent ? accent.hex : undefined }
+                : {
+                    backgroundColor: theme
+                      ? (isLight ? "rgba(0,0,0,0.06)" : "rgba(255,255,255,0.08)")
+                      : undefined,
+                    borderColor: theme ? theme.borderHex : undefined,
+                    color: theme ? theme.textHex : undefined,
+                  }
+            }
             className={`group relative flex items-center gap-3 px-9 py-4 rounded-full font-bold text-base transition-all duration-300 transform active:scale-95 cursor-pointer shadow-xl select-none ${
               isLiked
-                ? "bg-gradient-to-r from-pink-600 via-rose-500 to-pink-600 text-white shadow-pink-500/30 ring-2 ring-pink-400/60 scale-105"
+                ? "text-white shadow-lg ring-2 ring-white/30 scale-105"
                 : "bg-secondary/80 hover:bg-pink-500/10 text-foreground border border-border hover:border-pink-500/40 hover:text-pink-400"
             }`}
           >
@@ -3970,9 +3960,13 @@ function ChapterLikeAndMemes({ chapterId, seriesId }: { chapterId: string; serie
             />
             <span>{isLiked ? "Liked!" : "Like Chapter"}</span>
             <span
-              className={`ml-1 text-xs font-mono font-bold px-2.5 py-0.5 rounded-full transition-colors ${
-                isLiked ? "bg-white/20 text-white" : "bg-background/80 text-muted-foreground"
-              }`}
+              className="ml-1 text-xs font-mono font-bold px-2.5 py-0.5 rounded-full transition-colors"
+              style={{
+                backgroundColor: isLiked
+                  ? "rgba(255,255,255,0.25)"
+                  : (theme ? (isLight ? "rgba(0,0,0,0.08)" : "rgba(255,255,255,0.1)") : undefined),
+                color: isLiked ? "#ffffff" : (theme ? theme.metaHex : undefined),
+              }}
             >
               {likeCount.toLocaleString()}
             </span>
@@ -3990,13 +3984,17 @@ function ChapterLikeAndMemes({ chapterId, seriesId }: { chapterId: string; serie
       {/* Chapter Memes & Reactions Stats Bar */}
       <div className="mb-6">
         <div className="flex items-center justify-between mb-4">
-          <h4 className="text-base font-bold flex items-center gap-2 text-foreground">
+          <h4
+            className="text-base font-bold flex items-center gap-2"
+            style={{ color: theme ? theme.textHex : undefined }}
+          >
             <span className="text-xl">🏆</span>
             <span>Quick Chapter Hype & Reactions</span>
           </h4>
           <button
             onClick={scrollToComments}
-            className="text-xs text-primary font-semibold hover:underline flex items-center gap-1 cursor-pointer"
+            className="text-xs font-semibold hover:underline flex items-center gap-1 cursor-pointer"
+            style={{ color: accent ? accent.textHex : undefined }}
           >
             <span>Jump to comments</span>
             <span>⬇</span>
@@ -4012,10 +4010,19 @@ function ChapterLikeAndMemes({ chapterId, seriesId }: { chapterId: string; serie
               <button
                 key={reaction.type}
                 onClick={() => handleToggleReaction(reaction.type)}
+                style={{
+                  backgroundColor: hasReacted
+                    ? (accent ? `${accent.hex}25` : undefined)
+                    : (theme ? theme.cardHex : undefined),
+                  borderColor: hasReacted
+                    ? (accent ? accent.hex : undefined)
+                    : (theme ? theme.borderHex : undefined),
+                  color: hasReacted && accent ? accent.textHex : (theme ? theme.textHex : undefined),
+                }}
                 className={`group flex items-center justify-between p-3.5 rounded-xl border transition-all duration-200 transform active:scale-95 cursor-pointer select-none ${
                   hasReacted
-                    ? "bg-primary/20 border-primary text-primary font-bold shadow-md shadow-primary/10 scale-[1.02]"
-                    : "bg-card/60 border-border/60 hover:bg-primary/10 hover:border-primary/50 text-foreground hover:shadow-sm"
+                    ? "font-bold shadow-md scale-[1.02]"
+                    : "hover:shadow-sm"
                 }`}
                 title={reaction.label}
               >
@@ -4023,9 +4030,15 @@ function ChapterLikeAndMemes({ chapterId, seriesId }: { chapterId: string; serie
                   <span className="text-2xl transition-transform duration-200 group-hover:scale-125 select-none">{reaction.emoji}</span>
                   <span className="text-xs font-bold truncate">{reaction.label}</span>
                 </div>
-                <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded-md transition-all shrink-0 ml-1.5 ${
-                  hasReacted ? "bg-primary/30 text-primary" : "bg-secondary/80 text-muted-foreground"
-                }`}>
+                <span
+                  className="text-xs font-mono font-bold px-2 py-0.5 rounded-md transition-all shrink-0 ml-1.5"
+                  style={{
+                    backgroundColor: hasReacted
+                      ? (accent ? accent.hex : undefined)
+                      : (theme ? (isLight ? "rgba(0,0,0,0.08)" : "rgba(255,255,255,0.08)") : undefined),
+                    color: hasReacted ? "#ffffff" : (theme ? theme.metaHex : undefined),
+                  }}
+                >
                   {count}
                 </span>
               </button>
@@ -4035,12 +4048,27 @@ function ChapterLikeAndMemes({ chapterId, seriesId }: { chapterId: string; serie
       </div>
 
       {/* Comments section — deferred until user reaches near bottom */}
-      <LazyChapterComments chapterId={chapterId} seriesId={seriesId} />
+      <LazyChapterComments
+        chapterId={chapterId}
+        seriesId={seriesId}
+        theme={theme}
+        accent={accent}
+      />
     </div>
   );
 }
 
-function LazyChapterComments({ chapterId, seriesId }: { chapterId: string; seriesId: string }) {
+function LazyChapterComments({
+  chapterId,
+  seriesId,
+  theme,
+  accent,
+}: {
+  chapterId: string;
+  seriesId: string;
+  theme?: (typeof NOVEL_THEMES)[0];
+  accent?: (typeof NOVEL_ACCENTS)[0];
+}) {
   const [shouldLoad, setShouldLoad] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -4063,9 +4091,21 @@ function LazyChapterComments({ chapterId, seriesId }: { chapterId: string; serie
   return (
     <div ref={containerRef} id="comments-section" className="min-h-[200px]">
       {shouldLoad ? (
-        <ChapterComments chapterId={chapterId} seriesId={seriesId} />
+        <ChapterComments
+          chapterId={chapterId}
+          seriesId={seriesId}
+          theme={theme}
+          accent={accent}
+        />
       ) : (
-        <div className="flex h-24 items-center justify-center text-xs text-muted-foreground animate-pulse border border-border/40 rounded-xl bg-card/20">
+        <div
+          className="flex h-24 items-center justify-center text-xs animate-pulse border rounded-xl"
+          style={{
+            backgroundColor: theme ? theme.cardHex : undefined,
+            borderColor: theme ? theme.borderHex : undefined,
+            color: theme ? theme.metaHex : undefined,
+          }}
+        >
           Loading discussion and comments...
         </div>
       )}
@@ -4312,11 +4352,15 @@ function ChapterComments({
   seriesId,
   pendingMeme,
   onClearPendingMeme,
+  theme,
+  accent,
 }: {
   chapterId: string;
   seriesId: string;
   pendingMeme?: { url: string; name: string } | null;
   onClearPendingMeme?: () => void;
+  theme?: (typeof NOVEL_THEMES)[0];
+  accent?: (typeof NOVEL_ACCENTS)[0];
 }) {
   const { user } = useAuth();
   const qc = useQueryClient();
@@ -4981,8 +5025,11 @@ function ChapterComments({
           </>
         )}
         <div 
-          className="rounded-xl border border-border/50 bg-card p-4 transition-all duration-300 hover:shadow-md"
+          className="rounded-xl border p-4 transition-all duration-300 hover:shadow-md"
           style={{
+            backgroundColor: theme ? theme.panelHex : undefined,
+            borderColor: theme ? theme.borderHex : undefined,
+            color: theme ? theme.textHex : undefined,
             borderLeft: profile?.accent_color ? `3px solid ${profile.accent_color}` : undefined
           }}
         >
@@ -5160,7 +5207,14 @@ function ChapterComments({
           </div>
 
           {replyTo === comment.id && (
-            <div className="mt-4 rounded-xl border border-border/50 bg-card/60 p-3 transition-all duration-300 focus-within:border-primary/60 focus-within:ring-1 focus-within:ring-primary/40 focus-within:shadow-[0_0_12px_rgba(139,92,246,0.15)]">
+            <div
+              className="mt-4 rounded-xl border p-3 transition-all duration-300"
+              style={{
+                backgroundColor: theme ? theme.cardHex : undefined,
+                borderColor: theme ? theme.borderHex : undefined,
+                color: theme ? theme.textHex : undefined,
+              }}
+            >
               <div className="flex gap-3 items-start">
                 <div className="shrink-0 mt-1">
                   <CommentAvatarFrame
@@ -5178,6 +5232,7 @@ function ChapterComments({
                     onChange={(event) => setReplyContent(event.target.value)}
                     placeholder="Write a reply..."
                     className="min-h-16 resize-none border-0 bg-transparent p-0 focus-visible:ring-0 focus-visible:ring-offset-0 text-sm leading-relaxed"
+                    style={{ color: theme ? theme.textHex : undefined }}
                   />
                 </div>
               </div>
@@ -5364,21 +5419,52 @@ function ChapterComments({
   };
 
   return (
-    <section className="rounded-2xl border border-border/40 bg-background/35 backdrop-blur-md p-5 sm:p-6 shadow-xl relative overflow-hidden">
+    <section
+      className="rounded-2xl border p-5 sm:p-6 shadow-xl relative overflow-hidden transition-colors"
+      style={{
+        backgroundColor: theme ? theme.cardHex : undefined,
+        borderColor: theme ? theme.borderHex : undefined,
+        color: theme ? theme.textHex : undefined,
+      }}
+    >
 
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3 relative z-10">
         <div>
-          <h3 className="flex items-center gap-2 text-lg font-bold tracking-tight">
-            <MessageSquare className="h-5 w-5 text-primary" />
+          <h3
+            className="flex items-center gap-2 text-lg font-bold tracking-tight"
+            style={{ color: theme ? theme.textHex : undefined }}
+          >
+            <MessageSquare
+              className="h-5 w-5"
+              style={{ color: accent ? accent.hex : undefined }}
+            />
             Comments
           </h3>
-          <p className="text-xs text-muted-foreground mt-0.5">Discuss this chapter with other readers.</p>
+          <p
+            className="text-xs mt-0.5"
+            style={{ color: theme ? theme.metaHex : undefined }}
+          >
+            Discuss this chapter with other readers.
+          </p>
         </div>
         <Select value={sort} onValueChange={(value: any) => setSort(value)}>
-          <SelectTrigger className="h-9 w-[130px] bg-background/50 border-border/50">
+          <SelectTrigger
+            className="h-9 w-[130px]"
+            style={{
+              backgroundColor: theme ? theme.panelHex : undefined,
+              borderColor: theme ? theme.borderHex : undefined,
+              color: theme ? theme.textHex : undefined,
+            }}
+          >
             <SelectValue />
           </SelectTrigger>
-          <SelectContent>
+          <SelectContent
+            style={{
+              backgroundColor: theme ? theme.panelHex : undefined,
+              borderColor: theme ? theme.borderHex : undefined,
+              color: theme ? theme.textHex : undefined,
+            }}
+          >
             <SelectItem value="newest">Newest</SelectItem>
             <SelectItem value="top">Top</SelectItem>
             <SelectItem value="oldest">Oldest</SelectItem>
@@ -5386,7 +5472,14 @@ function ChapterComments({
         </Select>
       </div>
 
-      <div className="mb-6 rounded-xl border border-border/50 bg-card/60 p-4 transition-all duration-300 focus-within:border-primary/60 focus-within:ring-1 focus-within:ring-primary/40 focus-within:shadow-[0_0_12px_rgba(139,92,246,0.15)] relative z-10">
+      <div
+        className="mb-6 rounded-xl border p-4 transition-all duration-300 relative z-10"
+        style={{
+          backgroundColor: theme ? theme.panelHex : undefined,
+          borderColor: theme ? theme.borderHex : undefined,
+          color: theme ? theme.textHex : undefined,
+        }}
+      >
         <div className="flex gap-4 items-start">
           {/* Active User Avatar with Frame */}
           <div className="shrink-0 mt-1">
@@ -5407,6 +5500,7 @@ function ChapterComments({
               placeholder={user ? "Share your thoughts or drop a meme..." : "Sign in to comment"}
               disabled={!user}
               className="min-h-20 resize-none border-0 bg-transparent p-0 focus-visible:ring-0 focus-visible:ring-offset-0 text-sm leading-relaxed"
+              style={{ color: theme ? theme.textHex : undefined }}
             />
           </div>
         </div>
