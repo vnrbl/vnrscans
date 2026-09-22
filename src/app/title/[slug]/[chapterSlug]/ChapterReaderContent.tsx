@@ -3033,104 +3033,15 @@ function NovelView({
             {seriesTitle}
           </p>
 
-          <div className="flex items-center justify-center gap-3 mb-2">
-            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
-              Chapter {chapterNumber}
-            </h1>
-            <button
-              onClick={() => setIsSettingsOpen(true)}
-              className="flex items-center justify-center h-8 w-8 sm:h-9 sm:w-9 rounded-xl text-white shadow-md transition-transform hover:scale-105 active:scale-95 cursor-pointer shrink-0"
-              style={{
-                backgroundColor: activeAccent.hex,
-                boxShadow: `0 6px 16px -3px ${activeAccent.glowHex}`,
-              }}
-              title="Reader Options (Opens Left Sidebar)"
-            >
-              <Settings className="h-4 w-4 sm:h-4.5 sm:w-4.5" />
-            </button>
-          </div>
+          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight mb-2">
+            Chapter {chapterNumber}
+          </h1>
 
           {wordCount > 0 && (
-            <p className="text-xs font-mono font-medium opacity-70 mb-4">
+            <p className="text-xs font-mono font-medium opacity-70">
               [ {wordCount.toLocaleString()} words ]
             </p>
           )}
-
-          {/* Top Chapter Navigation Bar with Theme & Accent */}
-          <div className="flex items-center justify-center gap-1 select-none mt-2">
-            <Button
-              variant="default"
-              size="sm"
-              disabled={!hasPrev}
-              onClick={onPrev}
-              className="h-9 px-3 disabled:opacity-30 text-white rounded-l-lg transition-colors cursor-pointer border-0"
-              style={{
-                backgroundColor: activeTheme.cardHex,
-                border: `1px solid ${activeTheme.borderHex}`,
-              }}
-              title="Previous Chapter"
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-
-            {allChapters && allChapters.length > 0 ? (
-              <Select
-                value={chapterSlug || currentChapterSlug}
-                onValueChange={(slug) => {
-                  navigate({
-                    to: "/title/$titleSlug/$chapterSlug",
-                    params: { titleSlug: seriesSlug, chapterSlug: slug },
-                  });
-                }}
-              >
-                <SelectTrigger
-                  className="h-9 min-w-[200px] sm:min-w-[280px] max-w-[420px] text-white font-semibold text-xs sm:text-sm border-0 rounded-none px-3.5 justify-between shadow-md"
-                  style={{ backgroundColor: activeAccent.hex }}
-                >
-                  <SelectValue placeholder={`Chapter ${chapterNumber}`} />
-                </SelectTrigger>
-                <SelectContent
-                  className="max-h-[380px] border text-neutral-200"
-                  style={{
-                    backgroundColor: activeTheme.panelHex,
-                    borderColor: activeTheme.borderHex,
-                  }}
-                >
-                  {allChapters.map((ch) => (
-                    <SelectItem
-                      key={ch.id}
-                      value={ch.slug}
-                      className="text-xs sm:text-sm py-2 hover:bg-white/10 focus:bg-white/10 cursor-pointer"
-                    >
-                      Chapter {ch.chapter_number}{ch.title ? `: ${ch.title}` : ""}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            ) : (
-              <div
-                className="h-9 px-4 text-white font-semibold text-xs sm:text-sm flex items-center justify-center"
-                style={{ backgroundColor: activeAccent.hex }}
-              >
-                Chapter {chapterNumber}
-              </div>
-            )}
-
-            <Button
-              variant="default"
-              size="sm"
-              disabled={!hasNext}
-              onClick={onNext}
-              className="h-9 px-3 disabled:opacity-30 text-white rounded-r-lg transition-colors cursor-pointer border-0"
-              style={{
-                backgroundColor: activeTheme.cardHex,
-                border: `1px solid ${activeTheme.borderHex}`,
-              }}
-              title="Next Chapter"
-            >
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          </div>
         </div>
 
         {/* Content Body */}
