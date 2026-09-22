@@ -13,6 +13,7 @@ import {
   BookOpen,
   Home,
   List,
+  Settings,
   Maximize,
   Minimize,
   Flag,
@@ -76,7 +77,12 @@ import { safeUrlOrNull, serializeAttachmentUrls, parseSafeAttachmentUrls } from 
 import { CommentAttachmentGrid } from "@/components/comments/CommentAttachmentGrid";
 import { sanitizeHtml } from "@/lib/html-sanitizer";
 import { resolveChapterImageUrl } from "@/lib/chapter-utils";
-import NovelSettingsPanel from "@/components/NovelSettingsPanel";
+import NovelSettingsPanel, {
+  NovelReaderSettings,
+  DEFAULT_NOVEL_SETTINGS,
+  NOVEL_THEMES,
+  NOVEL_ACCENTS,
+} from "@/components/NovelSettingsPanel";
 import { fetchSeriesBySlug } from "@/lib/series-slug";
 
 const isVideoUrl = (url: string) => {
@@ -2561,29 +2567,127 @@ function NovelView({
   allChapters?: Array<{ id: string; slug: string; chapter_number: number; title?: string | null }>;
 }) {
   const navigate = useNavigate();
-  const [fontSize, setFontSize] = useState(18);
-  const [fontFamily, setFontFamily] = useState("sans-serif");
-  const [lineHeight, setLineHeight] = useState(1.8);
-  const [theme, setTheme] = useState("dark");
+  const { user } = useAuth();
+  const [settings, setSettings] = useState<NovelReaderSettings>(DEFAULT_NOVEL_SETTINGS);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [scrollProgress, setScrollProgress] = useState(0);
+  const [isBookmarked, setIsBookmarked] = useState(false);
 
   // Load preferences from localStorage on client-side mount
   useEffect(() => {
     if (typeof window === "undefined") return;
     try {
-      const storedSize = localStorage.getItem("novel-font-size");
-      const storedFamily = localStorage.getItem("novel-font-family");
-      const storedLineHeight = localStorage.getItem("novel-line-height");
-      const storedTheme = localStorage.getItem("novel-theme");
+      const storedV2 = localStorage.getItem("novel-reader-settings-v2");
+      if (storedV2) {
+        const parsed = JSON.parse(storedV2);
+        setSettings((prev) => ({ ...prev, ...parsed }));
+      } else {
+        // Fallback migration from older legacy keys if they exist
+        const storedSize = localStorage.getItem("novel-font-size");
+        const storedFamily = localStorage.getItem("novel-font-family");
+        const storedLineHeight = localStorage.getItem("novel-line-height");
+        const storedTheme = localStorage.getItem("novel-theme");
 
-      if (storedSize) setFontSize(parseInt(storedSize, 10));
-      if (storedFamily) setFontFamily(storedFamily);
-      if (storedLineHeight) setLineHeight(parseFloat(storedLineHeight));
-      if (storedTheme) setTheme(storedTheme);
+        setSettings((prev) => ({
+          ...prev,
+          fontSize: storedSize ? parseInt(storedSize, 10) : prev.fontSize,
+          fontFamily:
+            storedFamily === "serif"
+              ? "lora"
+              : storedFamily === "mono"
+              ? "mono"
+              : "default",
+          lineHeight: storedLineHeight ? parseFloat(storedLineHeight) : prev.lineHeight,
+          theme:
+            storedTheme === "charcoal"
+              ? "charcoal"
+              : storedTheme === "sepia"
+              ? "sepia"
+              : storedTheme === "slate"
+              ? "slate"
+              : "pitch-black",
+        }));
+      }
     } catch (e) {
       console.error("Failed to load novel preferences", e);
     }
   }, []);
+
+  const updateSettings = useCallback((updater: Partial<NovelReaderSettings>) => {
+    setSettings((prev) => {
+      const next = { ...prev, ...updater };
+      try {
+        localStorage.setItem("novel-reader-settings-v2", JSON.stringify(next));
+      } catch (e) {
+        console.error("Failed to save novel reader settings", e);
+      }
+      return next;
+    });
+  }, []);
+
+  // Sync bookmark state for series
+  useEffect(() => {
+    if (!seriesId) return;
+    if (!user) {
+      try {
+        const favs: string[] = JSON.parse(localStorage.getItem("vnr_favorites") || "[]");
+        setIsBookmarked(favs.includes(seriesId));
+      } catch {
+        setIsBookmarked(false);
+      }
+      return;
+    }
+
+    supabase
+      .from("bookmarks")
+      .select("id")
+      .eq("user_id", user.id)
+      .eq("series_id", seriesId)
+      .maybeSingle()
+      .then(({ data }) => {
+        setIsBookmarked(!!data);
+      });
+  }, [seriesId, user]);
+
+  const handleToggleBookmark = useCallback(async () => {
+    if (!seriesId) return;
+    if (!user) {
+      try {
+        const favs: string[] = JSON.parse(localStorage.getItem("vnr_favorites") || "[]");
+        const already = favs.includes(seriesId);
+        const next = already ? favs.filter((id) => id !== seriesId) : [...favs, seriesId];
+        localStorage.setItem("vnr_favorites", JSON.stringify(next));
+        setIsBookmarked(!already);
+        toast.success(!already ? "Added to your bookmarks" : "Removed from bookmarks");
+      } catch {
+        toast.error("Could not update bookmarks");
+      }
+      return;
+    }
+
+    if (isBookmarked) {
+      const { error } = await supabase
+        .from("bookmarks")
+        .delete()
+        .eq("user_id", user.id)
+        .eq("series_id", seriesId);
+      if (!error) {
+        setIsBookmarked(false);
+        toast.success("Removed from bookmarks");
+      }
+    } else {
+      const { error } = await supabase
+        .from("bookmarks")
+        .insert({
+          user_id: user.id,
+          series_id: seriesId,
+        });
+      if (!error) {
+        setIsBookmarked(true);
+        toast.success("Added to your bookmarks");
+      }
+    }
+  }, [seriesId, user, isBookmarked]);
 
   // Exact reading position tracking & continue where left off prompt for novels
   type NovelContinuePromptData = {
@@ -2749,76 +2853,129 @@ function NovelView({
     }
   }, [chapterId, content, performNovelScrollToTarget]);
 
+  // Auto Scroll Engine
+  useEffect(() => {
+    if (!settings.autoScroll) return;
+    let rafId: number;
+    let lastTime = performance.now();
+    const pxPerSec = settings.autoScrollSpeed * 18;
+
+    const step = (now: number) => {
+      const delta = (now - lastTime) / 1000;
+      lastTime = now;
+      window.scrollBy(0, pxPerSec * delta);
+      rafId = requestAnimationFrame(step);
+    };
+    rafId = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(rafId);
+  }, [settings.autoScroll, settings.autoScrollSpeed]);
+
+  // Auto Next upon reaching bottom
+  useEffect(() => {
+    if (!settings.autoNext || !hasNext) return;
+    const checkBottom = () => {
+      if (
+        window.innerHeight + window.scrollY >=
+        document.documentElement.scrollHeight - 60
+      ) {
+        onNext();
+      }
+    };
+    window.addEventListener("scroll", checkBottom, { passive: true });
+    return () => window.removeEventListener("scroll", checkBottom);
+  }, [settings.autoNext, hasNext, onNext]);
+
+  // Word count calculation
+  const wordCount = useMemo(() => {
+    if (!content) return 0;
+    const clean = content.replace(/<[^>]+>/g, " ").trim();
+    if (!clean) return 0;
+    return clean.split(/\s+/).length;
+  }, [content]);
+
+  // Bionic Reading formatter
+  const renderBionicParagraph = useCallback((text: string) => {
+    const tokens = text.split(/(\s+)/);
+    return tokens.map((token, idx) => {
+      if (/^\s+$/.test(token)) return token;
+      const match = token.match(/^([^a-zA-Z0-9]*)([a-zA-Z0-9]+)([^a-zA-Z0-9]*)$/);
+      if (!match) return token;
+      const [, leading, word, trailing] = match;
+      const mid = Math.ceil(word.length / 2);
+      const boldPart = word.slice(0, mid);
+      const restPart = word.slice(mid);
+      return (
+        <span key={idx}>
+          {leading}
+          <strong className="font-extrabold opacity-100">{boldPart}</strong>
+          <span className="opacity-80">{restPart}</span>
+          {trailing}
+        </span>
+      );
+    });
+  }, []);
+
   // Determine content mode (HTML vs Plain Text split)
-  const isHtml = useMemo(() => /<\/?(p|div|br|strong|b|em|i|h[1-6]|blockquote|span|ul|ol|li)[>\s]/i.test(content), [content]);
+  const isHtml = useMemo(
+    () => /<\/?(p|div|br|strong|b|em|i|h[1-6]|blockquote|span|ul|ol|li)[>\s]/i.test(content),
+    [content]
+  );
+
   const plainTextParagraphs = useMemo(() => {
     if (isHtml) return [];
-    // Normalize line breaks
     const normalized = content.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
-    // In web novels (Novel Fire style), every non-empty line or dialogue represents an independent paragraph
-    // with its own vertical line gap.
     const rawLines = normalized.split("\n");
 
     return rawLines
-      .map((line) => line.replace(/[ \t]+$/, "")) // Preserve leading indentation / spaces, trim trailing spaces
+      .map((line) => line.replace(/[ \t]+$/, ""))
       .filter((line) => line.trim().length > 0);
   }, [content, isHtml]);
 
-  // Theme color definitions
-  const themeStyles = {
-    dark: {
-      bg: "bg-[#121212]",
-      text: "text-[#e0e0e0]",
-      border: "border-neutral-800",
-      accent: "text-primary",
-      meta: "text-neutral-400",
-      card: "bg-neutral-900/50",
-    },
-    light: {
-      bg: "bg-[#fcfbf9]",
-      text: "text-[#242424]",
-      border: "border-neutral-200",
-      accent: "text-primary",
-      meta: "text-neutral-500",
-      card: "bg-neutral-100/50",
-    },
-    sepia: {
-      bg: "bg-[#f4ecd8]",
-      text: "text-[#5b4636]",
-      border: "border-[#e0d6be]",
-      accent: "text-[#8c6b4f]",
-      meta: "text-[#8c7a6b]",
-      card: "bg-[#ede2c8]/60",
-    },
-    midnight: {
-      bg: "bg-[#0b0e14]",
-      text: "text-[#b0b8c4]",
-      border: "border-[#1e2638]",
-      accent: "text-blue-400",
-      meta: "text-[#62728d]",
-      card: "bg-[#121722]",
-    },
-  }[theme as "dark" | "light" | "sepia" | "midnight"] || {
-    bg: "bg-background",
-    text: "text-foreground",
-    border: "border-border",
-    accent: "text-primary",
-    meta: "text-muted-foreground",
-    card: "bg-card",
-  };
+  // Theme & Accent Configurations
+  const activeTheme = useMemo(() => {
+    return NOVEL_THEMES.find((t) => t.id === settings.theme) || NOVEL_THEMES[0];
+  }, [settings.theme]);
+
+  const activeAccent = useMemo(() => {
+    return NOVEL_ACCENTS.find((a) => a.id === settings.accentColor) || NOVEL_ACCENTS[0];
+  }, [settings.accentColor]);
+
+  const resolvedFontFamily = useMemo(() => {
+    switch (settings.fontFamily) {
+      case "dyslexic":
+        return "'OpenDyslexic', 'Comic Sans MS', sans-serif";
+      case "roboto":
+        return "'Roboto', 'Inter', sans-serif";
+      case "lora":
+        return "'Lora', Georgia, serif";
+      case "mono":
+        return "'JetBrains Mono', monospace";
+      default:
+        return "var(--font-sans), 'Inter', system-ui, -apple-system, sans-serif";
+    }
+  }, [settings.fontFamily]);
 
   return (
-    <div className={`relative min-h-screen ${themeStyles.bg} ${themeStyles.text} transition-colors duration-300`}>
-      {/* Floating Continue Where You Left Off Prompt for Novels */}
+    <div
+      className="relative min-h-screen transition-colors duration-300"
+      style={{
+        backgroundColor: activeTheme.bgHex,
+        color: activeTheme.textHex,
+      }}
+    >
+      {/* Floating Continue Where You Left Off Prompt */}
       {continuePrompt && (
         <div className="fixed bottom-14 min-[400px]:bottom-16 md:bottom-8 left-1/2 -translate-x-1/2 z-50 animate-in fade-in slide-in-from-bottom-5 duration-300 pointer-events-auto select-none max-w-[calc(100vw-1.5rem)]">
-          <div className="flex items-center gap-1.5 sm:gap-2 px-3 sm:pl-4 sm:pr-2.5 py-2 sm:py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white shadow-2xl shadow-purple-950/80 border border-purple-400/40 backdrop-blur-md transition-all">
+          <div
+            className="flex items-center gap-1.5 sm:gap-2 px-3 sm:pl-4 sm:pr-2.5 py-2 sm:py-2.5 rounded-xl text-white shadow-2xl border border-white/20 backdrop-blur-md transition-all"
+            style={{ backgroundColor: activeAccent.hex }}
+          >
             <button
               type="button"
               onClick={() => {
                 performNovelScrollToTarget(continuePrompt.scrollRatio, continuePrompt.scrollTop, true);
               }}
-              className="flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm font-semibold text-white hover:text-purple-100 transition-colors cursor-pointer truncate"
+              className="flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm font-semibold text-white hover:opacity-90 transition-opacity cursor-pointer truncate"
             >
               <ArrowDown className="h-3.5 w-3.5 sm:h-4 sm:w-4 stroke-[2.5] shrink-0 animate-bounce" />
               <span className="truncate">Continue where you left off</span>
@@ -2844,32 +3001,72 @@ function NovelView({
         </div>
       )}
 
-      {/* Top Reading Progress Bar */}
-      <div className="fixed top-0 left-0 w-full h-1 bg-transparent z-40">
+      {/* Top Reading Progress Bar with Selected Accent Color */}
+      <div className="fixed top-0 left-0 w-full h-1 bg-transparent z-40 pointer-events-none">
         <div
-          className="h-full bg-primary transition-all duration-150 ease-out"
-          style={{ width: `${scrollProgress}%` }}
+          className="h-full transition-all duration-150 ease-out"
+          style={{
+            width: `${scrollProgress}%`,
+            backgroundColor: activeAccent.hex,
+          }}
         />
       </div>
 
-      <div className="mx-auto max-w-3xl px-4 sm:px-6 py-10">
-        {/* Title Header */}
-        <div className={`mb-8 border-b ${themeStyles.border} pb-6 text-center`}>
-          <p className={`text-xs uppercase tracking-widest ${themeStyles.meta} mb-1 font-semibold`}>
+      {/* Dynamic Max-Width Container */}
+      <div
+        className="mx-auto px-4 sm:px-6 py-10 transition-all duration-300"
+        style={{
+          maxWidth: `${settings.pageWidth}%`,
+          width: "100%",
+        }}
+      >
+        {/* Title Header (NovelFire Style) */}
+        <div
+          className="mb-8 border-b pb-6 relative text-center"
+          style={{ borderColor: activeTheme.borderHex }}
+        >
+          {/* Top-Right Settings Gear Trigger (NovelFire Style) */}
+          <div className="absolute right-0 top-0">
+            <button
+              onClick={() => setIsSettingsOpen(true)}
+              className="flex items-center justify-center h-10 w-10 sm:h-11 sm:w-11 rounded-xl text-white shadow-lg transition-transform hover:scale-105 active:scale-95 cursor-pointer"
+              style={{
+                backgroundColor: activeAccent.hex,
+                boxShadow: `0 8px 20px -4px ${activeAccent.glowHex}`,
+              }}
+              title="Novel Reading Settings"
+            >
+              <Settings className="h-5 w-5" />
+            </button>
+          </div>
+
+          <p
+            className="text-xs uppercase tracking-widest mb-1 font-bold"
+            style={{ color: activeAccent.textHex }}
+          >
             {seriesTitle}
           </p>
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight mb-4">
+          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight mb-2">
             Chapter {chapterNumber}
           </h1>
+          {wordCount > 0 && (
+            <p className="text-xs font-mono font-medium opacity-70 mb-4">
+              [ {wordCount.toLocaleString()} words ]
+            </p>
+          )}
 
-          {/* Novel Fire Style Top Chapter Navigation Bar */}
-          <div className="flex items-center justify-center gap-1 select-none mt-4">
+          {/* Top Chapter Navigation Bar with Theme & Accent */}
+          <div className="flex items-center justify-center gap-1 select-none mt-2">
             <Button
               variant="default"
               size="sm"
               disabled={!hasPrev}
               onClick={onPrev}
-              className="h-9 px-3 bg-[#1e293b] hover:bg-[#334155] disabled:opacity-30 disabled:hover:bg-[#1e293b] text-white border border-[#334155] rounded-l-lg transition-colors cursor-pointer"
+              className="h-9 px-3 disabled:opacity-30 text-white rounded-l-lg transition-colors cursor-pointer border-0"
+              style={{
+                backgroundColor: activeTheme.cardHex,
+                border: `1px solid ${activeTheme.borderHex}`,
+              }}
               title="Previous Chapter"
             >
               <ChevronLeft className="h-4 w-4" />
@@ -2885,19 +3082,35 @@ function NovelView({
                   });
                 }}
               >
-                <SelectTrigger className="h-9 min-w-[200px] sm:min-w-[280px] max-w-[420px] bg-[#0284c7] hover:bg-[#0369a1] text-white font-semibold text-xs sm:text-sm border-0 rounded-none px-3.5 justify-between shadow-md">
+                <SelectTrigger
+                  className="h-9 min-w-[200px] sm:min-w-[280px] max-w-[420px] text-white font-semibold text-xs sm:text-sm border-0 rounded-none px-3.5 justify-between shadow-md"
+                  style={{ backgroundColor: activeAccent.hex }}
+                >
                   <SelectValue placeholder={`Chapter ${chapterNumber}`} />
                 </SelectTrigger>
-                <SelectContent className="max-h-[380px] bg-neutral-900 border-neutral-800 text-neutral-200">
+                <SelectContent
+                  className="max-h-[380px] border text-neutral-200"
+                  style={{
+                    backgroundColor: activeTheme.panelHex,
+                    borderColor: activeTheme.borderHex,
+                  }}
+                >
                   {allChapters.map((ch) => (
-                    <SelectItem key={ch.id} value={ch.slug} className="text-xs sm:text-sm py-2 hover:bg-neutral-800 focus:bg-neutral-800 cursor-pointer">
+                    <SelectItem
+                      key={ch.id}
+                      value={ch.slug}
+                      className="text-xs sm:text-sm py-2 hover:bg-white/10 focus:bg-white/10 cursor-pointer"
+                    >
                       Chapter {ch.chapter_number}{ch.title ? `: ${ch.title}` : ""}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             ) : (
-              <div className="h-9 px-4 bg-[#0284c7] text-white font-semibold text-xs sm:text-sm flex items-center justify-center">
+              <div
+                className="h-9 px-4 text-white font-semibold text-xs sm:text-sm flex items-center justify-center"
+                style={{ backgroundColor: activeAccent.hex }}
+              >
                 Chapter {chapterNumber}
               </div>
             )}
@@ -2907,7 +3120,11 @@ function NovelView({
               size="sm"
               disabled={!hasNext}
               onClick={onNext}
-              className="h-9 px-3 bg-[#1e293b] hover:bg-[#334155] disabled:opacity-30 disabled:hover:bg-[#1e293b] text-white border border-[#334155] rounded-r-lg transition-colors cursor-pointer"
+              className="h-9 px-3 disabled:opacity-30 text-white rounded-r-lg transition-colors cursor-pointer border-0"
+              style={{
+                backgroundColor: activeTheme.cardHex,
+                border: `1px solid ${activeTheme.borderHex}`,
+              }}
               title="Next Chapter"
             >
               <ChevronRight className="h-4 w-4" />
@@ -2917,18 +3134,25 @@ function NovelView({
 
         {/* Content Body */}
         <article
-          className="font-novel leading-relaxed select-text"
+          className={`font-novel leading-relaxed ${
+            settings.copyText ? "select-text" : "select-none"
+          }`}
           style={{
-            fontSize: `${fontSize}px`,
-            fontFamily: fontFamily,
-            lineHeight: lineHeight,
+            fontSize: `${settings.fontSize}px`,
+            fontFamily: resolvedFontFamily,
+            lineHeight: settings.lineHeight,
+            textAlign: settings.textAlign,
           }}
         >
           {/* Illustrations if any exist */}
           {illustrations && illustrations.length > 0 && (
             <div className="mb-8 space-y-4">
               {illustrations.map((url, idx) => (
-                <div key={idx} className="rounded-lg overflow-hidden border border-border/40 shadow-md">
+                <div
+                  key={idx}
+                  className="rounded-lg overflow-hidden border shadow-md"
+                  style={{ borderColor: activeTheme.borderHex }}
+                >
                   {isVideoUrl(url) ? (
                     <video
                       src={url}
@@ -2949,34 +3173,51 @@ function NovelView({
               ))}
             </div>
           )}
-          
+
           {isHtml ? (
-            <div 
+            <div
               className="novel-body-text whitespace-pre-wrap select-text"
+              style={{
+                textIndent: settings.textIndent ? "2rem" : undefined,
+              }}
               dangerouslySetInnerHTML={{ __html: sanitizeHtml(content) }}
             />
           ) : (
-            <div className="novel-body-text space-y-6 select-text">
+            <div className="novel-body-text select-text">
               {plainTextParagraphs.map((p, i) => (
-                <p key={i} className="whitespace-pre-wrap">
-                  {p}
+                <p
+                  key={i}
+                  className="whitespace-pre-wrap"
+                  style={{
+                    marginBottom: `${settings.paragraphSpacing}px`,
+                    textIndent: settings.textIndent ? "2rem" : undefined,
+                  }}
+                >
+                  {settings.bionicReading ? renderBionicParagraph(p) : p}
                 </p>
               ))}
             </div>
           )}
         </article>
 
-        {/* Chapter bottom completion anchor - triggers Qi when reaching the end */}
+        {/* Chapter bottom completion anchor */}
         <div id="chapter-bottom-completion-anchor" className="h-4 w-full" />
 
         {/* Chapter Navigation Buttons - Novel Fire Style */}
-        <div className={`mt-10 border-t ${themeStyles.border} pt-6 flex items-center justify-center gap-1 select-none`}>
+        <div
+          className="mt-10 border-t pt-6 flex items-center justify-center gap-1 select-none"
+          style={{ borderColor: activeTheme.borderHex }}
+        >
           <Button
             variant="default"
             size="sm"
             disabled={!hasPrev}
             onClick={onPrev}
-            className="h-10 px-4 bg-[#1e293b] hover:bg-[#334155] disabled:opacity-30 disabled:hover:bg-[#1e293b] text-white border border-[#334155] rounded-l-lg transition-colors cursor-pointer"
+            className="h-10 px-4 disabled:opacity-30 text-white rounded-l-lg transition-colors cursor-pointer border-0"
+            style={{
+              backgroundColor: activeTheme.cardHex,
+              border: `1px solid ${activeTheme.borderHex}`,
+            }}
             title="Previous Chapter"
           >
             <ChevronLeft className="h-4 w-4 mr-1" />
@@ -2993,19 +3234,35 @@ function NovelView({
                 });
               }}
             >
-              <SelectTrigger className="h-10 min-w-[200px] sm:min-w-[280px] max-w-[420px] bg-[#0284c7] hover:bg-[#0369a1] text-white font-semibold text-xs sm:text-sm border-0 rounded-none px-3.5 justify-between shadow-md">
+              <SelectTrigger
+                className="h-10 min-w-[200px] sm:min-w-[280px] max-w-[420px] text-white font-semibold text-xs sm:text-sm border-0 rounded-none px-3.5 justify-between shadow-md"
+                style={{ backgroundColor: activeAccent.hex }}
+              >
                 <SelectValue placeholder={`Chapter ${chapterNumber}`} />
               </SelectTrigger>
-              <SelectContent className="max-h-[380px] bg-neutral-900 border-neutral-800 text-neutral-200">
+              <SelectContent
+                className="max-h-[380px] border text-neutral-200"
+                style={{
+                  backgroundColor: activeTheme.panelHex,
+                  borderColor: activeTheme.borderHex,
+                }}
+              >
                 {allChapters.map((ch) => (
-                  <SelectItem key={ch.id} value={ch.slug} className="text-xs sm:text-sm py-2 hover:bg-neutral-800 focus:bg-neutral-800 cursor-pointer">
+                  <SelectItem
+                    key={ch.id}
+                    value={ch.slug}
+                    className="text-xs sm:text-sm py-2 hover:bg-white/10 focus:bg-white/10 cursor-pointer"
+                  >
                     Chapter {ch.chapter_number}{ch.title ? `: ${ch.title}` : ""}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           ) : (
-            <div className="h-10 px-4 bg-[#0284c7] text-white font-semibold text-xs sm:text-sm flex items-center justify-center">
+            <div
+              className="h-10 px-4 text-white font-semibold text-xs sm:text-sm flex items-center justify-center"
+              style={{ backgroundColor: activeAccent.hex }}
+            >
               Chapter {chapterNumber}
             </div>
           )}
@@ -3015,7 +3272,11 @@ function NovelView({
             size="sm"
             disabled={!hasNext}
             onClick={onNext}
-            className="h-10 px-4 bg-[#1e293b] hover:bg-[#334155] disabled:opacity-30 disabled:hover:bg-[#1e293b] text-white border border-[#334155] rounded-r-lg transition-colors cursor-pointer"
+            className="h-10 px-4 disabled:opacity-30 text-white rounded-r-lg transition-colors cursor-pointer border-0"
+            style={{
+              backgroundColor: activeTheme.cardHex,
+              border: `1px solid ${activeTheme.borderHex}`,
+            }}
             title="Next Chapter"
           >
             <span className="text-xs sm:text-sm">Next</span>
@@ -3023,33 +3284,35 @@ function NovelView({
           </Button>
         </div>
 
-        <div className={`mt-8 border-t ${themeStyles.border} pt-6`}>
+        <div
+          className="mt-8 border-t pt-6"
+          style={{ borderColor: activeTheme.borderHex }}
+        >
           <ChapterLikeAndMemes chapterId={chapterId} seriesId={seriesId} />
         </div>
       </div>
 
-      {/* Typography & Color Theme panel */}
+      {/* Typography, Themes, Spacing, and Reading Preferences Drawer */}
       <NovelSettingsPanel
-        fontSize={fontSize}
-        setFontSize={(size) => {
-          setFontSize(size);
-          localStorage.setItem("novel-font-size", size.toString());
-        }}
-        fontFamily={fontFamily}
-        setFontFamily={(family) => {
-          setFontFamily(family);
-          localStorage.setItem("novel-font-family", family);
-        }}
-        lineHeight={lineHeight}
-        setLineHeight={(height) => {
-          setLineHeight(height);
-          localStorage.setItem("novel-line-height", height.toString());
-        }}
-        theme={theme}
-        setTheme={(newTheme) => {
-          setTheme(newTheme);
-          localStorage.setItem("novel-theme", newTheme);
-        }}
+        settings={settings}
+        updateSettings={updateSettings}
+        isOpen={isSettingsOpen}
+        onOpen={() => setIsSettingsOpen(true)}
+        onClose={() => setIsSettingsOpen(false)}
+        chapterTitle={
+          allChapters?.find(
+            (c) => c.slug === (chapterSlug || currentChapterSlug)
+          )?.title || ""
+        }
+        chapterNumber={chapterNumber}
+        seriesSlug={seriesSlug}
+        hasPrev={hasPrev}
+        hasNext={hasNext}
+        onPrev={onPrev}
+        onNext={onNext}
+        isBookmarked={isBookmarked}
+        onToggleBookmark={handleToggleBookmark}
+        novelTextContent={content}
       />
     </div>
   );
