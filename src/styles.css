@@ -1058,8 +1058,12 @@ html.reader-pseudo-fullscreen .reader-fullscreen-wrapper [data-reader-overlay] {
 /* ── Novel reader & writer typography (preserves exact spaces, indentation, and line gaps) ── */
 .novel-body-text {
   font-family: var(--novel-font-family, inherit) !important;
-  white-space: pre-wrap !important;
+  white-space: var(--novel-white-space, pre-wrap) !important;
+  text-align: var(--novel-text-align, inherit) !important;
+  text-justify: var(--novel-text-justify, auto);
+  text-align-last: var(--novel-text-align-last, auto);
   word-break: break-word;
+  overflow-wrap: break-word;
   tab-size: 4;
 }
 
@@ -1081,7 +1085,10 @@ article.font-novel * {
   margin-bottom: var(--novel-paragraph-spacing, 28px) !important;
   text-indent: var(--novel-text-indent, 0px) !important;
   line-height: inherit;
-  white-space: pre-wrap !important;
+  white-space: var(--novel-white-space, pre-wrap) !important;
+  text-align: var(--novel-text-align, inherit) !important;
+  text-justify: var(--novel-text-justify, auto);
+  text-align-last: var(--novel-text-align-last, auto);
 }
 
 .novel-body-text p:last-child,

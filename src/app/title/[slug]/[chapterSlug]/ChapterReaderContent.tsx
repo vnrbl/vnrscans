@@ -3228,9 +3228,15 @@ function NovelView({
             fontFamily: resolvedFontFamily,
             lineHeight: settings.lineHeight,
             textAlign: settings.textAlign,
+            textJustify: settings.textAlign === "justify" ? "inter-word" : undefined,
+            textAlignLast: settings.textAlign === "justify" ? "left" : (settings.textAlign as any),
             ["--novel-font-family" as any]: resolvedFontFamily,
             ["--novel-paragraph-spacing" as any]: `${Math.max(5, settings.paragraphSpacing)}px`,
             ["--novel-text-indent" as any]: settings.textIndent ? "2rem" : "0px",
+            ["--novel-text-align" as any]: settings.textAlign,
+            ["--novel-text-justify" as any]: settings.textAlign === "justify" ? "inter-word" : "auto",
+            ["--novel-text-align-last" as any]: settings.textAlign === "justify" ? "left" : settings.textAlign,
+            ["--novel-white-space" as any]: settings.textAlign === "justify" ? "normal" : "pre-wrap",
           }}
         >
           {/* Illustrations if any exist */}
@@ -3265,33 +3271,53 @@ function NovelView({
 
           {isHtml ? (
             <div
-              className="novel-body-text whitespace-pre-wrap select-text"
+              className={`novel-body-text select-text ${settings.textAlign === "justify" ? "whitespace-normal" : "whitespace-pre-wrap"}`}
               style={{
                 fontFamily: resolvedFontFamily,
+                textAlign: settings.textAlign,
+                textJustify: settings.textAlign === "justify" ? "inter-word" : undefined,
+                textAlignLast: settings.textAlign === "justify" ? "left" : undefined,
+                whiteSpace: settings.textAlign === "justify" ? "normal" : "pre-wrap",
                 ["--novel-font-family" as any]: resolvedFontFamily,
                 ["--novel-paragraph-spacing" as any]: `${Math.max(5, settings.paragraphSpacing)}px`,
                 ["--novel-text-indent" as any]: settings.textIndent ? "2rem" : "0px",
+                ["--novel-text-align" as any]: settings.textAlign,
+                ["--novel-text-justify" as any]: settings.textAlign === "justify" ? "inter-word" : "auto",
+                ["--novel-text-align-last" as any]: settings.textAlign === "justify" ? "left" : settings.textAlign,
+                ["--novel-white-space" as any]: settings.textAlign === "justify" ? "normal" : "pre-wrap",
               }}
               dangerouslySetInnerHTML={{ __html: sanitizeHtml(content) }}
             />
           ) : (
             <div
-              className="novel-body-text select-text"
+              className={`novel-body-text select-text ${settings.textAlign === "justify" ? "whitespace-normal" : "whitespace-pre-wrap"}`}
               style={{
                 fontFamily: resolvedFontFamily,
+                textAlign: settings.textAlign,
+                textJustify: settings.textAlign === "justify" ? "inter-word" : undefined,
+                textAlignLast: settings.textAlign === "justify" ? "left" : undefined,
+                whiteSpace: settings.textAlign === "justify" ? "normal" : "pre-wrap",
                 ["--novel-font-family" as any]: resolvedFontFamily,
                 ["--novel-paragraph-spacing" as any]: `${Math.max(5, settings.paragraphSpacing)}px`,
                 ["--novel-text-indent" as any]: settings.textIndent ? "2rem" : "0px",
+                ["--novel-text-align" as any]: settings.textAlign,
+                ["--novel-text-justify" as any]: settings.textAlign === "justify" ? "inter-word" : "auto",
+                ["--novel-text-align-last" as any]: settings.textAlign === "justify" ? "left" : settings.textAlign,
+                ["--novel-white-space" as any]: settings.textAlign === "justify" ? "normal" : "pre-wrap",
               }}
             >
               {plainTextParagraphs.map((p, i) => (
                 <p
                   key={i}
-                  className="whitespace-pre-wrap"
+                  className={settings.textAlign === "justify" ? "whitespace-normal" : "whitespace-pre-wrap"}
                   style={{
                     fontFamily: resolvedFontFamily,
                     marginBottom: `${Math.max(5, settings.paragraphSpacing)}px`,
                     textIndent: settings.textIndent ? "2rem" : undefined,
+                    textAlign: settings.textAlign,
+                    textJustify: settings.textAlign === "justify" ? "inter-word" : undefined,
+                    textAlignLast: settings.textAlign === "justify" ? "left" : undefined,
+                    whiteSpace: settings.textAlign === "justify" ? "normal" : "pre-wrap",
                   }}
                 >
                   {settings.bionicReading ? renderBionicParagraph(p) : p}
