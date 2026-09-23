@@ -22,9 +22,9 @@ export const SeriesCard = memo(function SeriesCard({ s, rank }: { s: Series; ran
       to="/title/$slug"
       params={{ slug: s.slug }}
       title={s.title}
-      className="glass-card group block rounded-[4px] overflow-hidden hover-lift relative"
+      className="glass-card focus-ring group block rounded-xl overflow-hidden hover-lift relative"
     >
-      <div className={`${TITLE_COVER_CLASS} relative overflow-hidden bg-neutral-950`}>
+      <div className={`${TITLE_COVER_CLASS} relative overflow-hidden rounded-t-xl bg-neutral-950`}>
         <OptimizedImage
           src={s.cover_url}
           alt={s.title}
@@ -36,19 +36,19 @@ export const SeriesCard = memo(function SeriesCard({ s, rank }: { s: Series; ran
         <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent opacity-80 group-hover:opacity-60 transition-opacity duration-300 pointer-events-none" />
 
         {rank !== undefined && (
-          <div className="absolute left-2.5 top-2.5 flex h-7 w-7 items-center justify-center rounded bg-black/85 border border-neutral-700/80 text-xs font-mono font-bold text-white shadow-md">
+          <div className="absolute left-2.5 top-2.5 flex h-7 w-7 items-center justify-center rounded-lg bg-black/85 border border-neutral-700/80 text-xs font-mono font-bold text-white shadow-md">
             #{rank}
           </div>
         )}
         
         <div className={rank !== undefined ? "absolute right-2 top-2" : "absolute left-2 top-2"}>
-          <Badge variant="outline" className="badge-glass text-neutral-200 text-3xs uppercase tracking-wider py-0.5 px-1.5 font-bold leading-none rounded-[3px]">
+          <Badge variant="outline" className="badge-glass text-neutral-200 text-3xs uppercase tracking-wider py-0.5 px-1.5 font-bold leading-none rounded-md">
             {s.type}
           </Badge>
         </div>
 
         {s.rating_average && Number(s.rating_average) > 0 ? (
-          <div className="absolute right-2.5 bottom-2.5 flex items-center gap-1 rounded border border-white/10 bg-black/85 px-2 py-0.5 text-3xs text-amber-300 font-mono font-bold shadow-sm transition-opacity group-hover:opacity-0">
+          <div className="absolute right-2.5 bottom-2.5 flex items-center gap-1 rounded-md border border-white/10 bg-black/85 px-2 py-0.5 text-3xs text-amber-300 font-mono font-bold shadow-sm transition-opacity group-hover:opacity-0">
             <Star className="h-3 w-3 fill-amber-400 text-amber-400 stroke-[1.5]" />
             {Number(s.rating_average).toFixed(1)}
           </div>
@@ -59,13 +59,13 @@ export const SeriesCard = memo(function SeriesCard({ s, rank }: { s: Series; ran
           <p className="text-xs font-bold leading-snug text-white break-words drop-shadow-md">
             {s.title}
           </p>
-          <div className="mt-1 flex items-center gap-1.5 text-[10px] text-neutral-300 font-medium">
+          <div className="mt-1 flex items-center gap-1.5 text-2xs text-neutral-300 font-medium">
             <span className="uppercase font-semibold text-purple-400">{s.type}</span>
             {s.status && <span>• {s.status}</span>}
           </div>
         </div>
       </div>
-      <div className="p-2.5 sm:p-3 bg-surface-1/90">
+      <div className="p-2.5 sm:p-3 bg-surface-1/90 rounded-b-xl">
         <h3
           title={s.title}
           className="line-clamp-2 text-xs sm:text-sm font-semibold leading-snug text-white group-hover:text-purple-400 transition-colors duration-200 min-h-[2rem] sm:min-h-[2.4rem]"
@@ -84,8 +84,8 @@ export const SeriesCard = memo(function SeriesCard({ s, rank }: { s: Series; ran
 
 export function SeriesCardSkeleton() {
   return (
-    <div className="glass-card rounded-[4px] overflow-hidden">
-      <div className={`${TITLE_COVER_CLASS} shimmer-dark`} />
+    <div className="glass-card rounded-xl overflow-hidden">
+      <div className={`${TITLE_COVER_CLASS} shimmer-dark rounded-t-xl`} />
       <div className="p-3.5 space-y-2">
         <div className="h-3 w-3/4 rounded shimmer-dark" />
         <div className="h-2.5 w-1/3 rounded shimmer-dark" />

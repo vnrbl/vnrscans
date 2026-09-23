@@ -676,9 +676,9 @@ function ChapterCarouselSection({
       <div className="mb-4 sm:mb-5 flex items-center justify-between gap-2 sm:gap-4">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 min-w-0">
-            <span className="h-2 w-2 rounded-full bg-cyan-400 shadow-[0_0_8px_rgba(6,182,212,0.8)] animate-pulse shrink-0" />
-            {icon && <span className="text-cyan-400 shrink-0">{icon}</span>}
-            <h2 className="text-base sm:text-lg md:text-xl font-bold text-white tracking-tight truncate" title={title}>
+            <span className="h-2 w-2 rounded-full bg-purple-400 shadow-[0_0_8px_rgba(168,85,247,0.8)] animate-pulse shrink-0" />
+            {icon && <span className="text-purple-400 shrink-0">{icon}</span>}
+            <h2 className="font-display text-lg sm:text-xl md:text-2xl font-bold text-white uppercase tracking-wide truncate" title={title}>
               {title}
             </h2>
           </div>
@@ -695,7 +695,7 @@ function ChapterCarouselSection({
                 variant="outline"
                 size="icon"
                 onClick={() => scrollBy("left")}
-                className="h-8 w-8 rounded-[4px] border-border/60 bg-surface-1/80 hover:border-cyan-500/50 hover:text-cyan-300 transition-colors"
+                className="h-8 w-8 rounded-lg border-border/60 bg-surface-1/80 hover:border-purple-500/50 hover:text-purple-300 transition-colors"
               >
                 <ChevronLeft className="h-4 w-4" />
               </Button>
@@ -703,7 +703,7 @@ function ChapterCarouselSection({
                 variant="outline"
                 size="icon"
                 onClick={() => scrollBy("right")}
-                className="h-8 w-8 rounded-[4px] border-border/60 bg-surface-1/80 hover:border-cyan-500/50 hover:text-cyan-300 transition-colors"
+                className="h-8 w-8 rounded-lg border-border/60 bg-surface-1/80 hover:border-purple-500/50 hover:text-purple-300 transition-colors"
               >
                 <ChevronRight className="h-4 w-4" />
               </Button>
@@ -711,7 +711,7 @@ function ChapterCarouselSection({
           )}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-[4px] text-muted-foreground hover:text-white" aria-label="Section options">
+              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg text-muted-foreground hover:text-white" aria-label="Section options">
                 <MoreVertical className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
@@ -722,7 +722,7 @@ function ChapterCarouselSection({
                   params={{ section: "reading-history" }}
                   className="flex items-center"
                 >
-                  <ExternalLink className="mr-2 h-4 w-4 text-cyan-400" />
+                  <ExternalLink className="mr-2 h-4 w-4 text-purple-400" />
                   View All History
                 </Link>
               </DropdownMenuItem>
@@ -740,8 +740,8 @@ function ChapterCarouselSection({
       {loading ? (
         <div className="flex gap-4 overflow-hidden">
           {[...Array(6)].map((_, i) => (
-            <div key={i} className={`${TITLE_CARD_WIDTH} glass-card rounded-[4px] overflow-hidden`}>
-              <div className={`${TITLE_COVER_CLASS} shimmer-dark`} />
+            <div key={i} className={`${TITLE_CARD_WIDTH} glass-card rounded-xl overflow-hidden`}>
+              <div className={`${TITLE_COVER_CLASS} shimmer-dark rounded-t-xl`} />
               <div className="space-y-2 p-3">
                 <div className="h-3.5 w-3/4 shimmer-dark rounded" />
                 <div className="h-3 w-1/2 shimmer-dark rounded" />
@@ -799,8 +799,8 @@ function FollowedUpdatesCarouselSection({
       <div className="mb-4 sm:mb-5 flex items-center justify-between gap-2 sm:gap-4">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 min-w-0">
-            <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)] animate-pulse shrink-0" />
-            <h2 className="text-base sm:text-lg md:text-xl font-bold text-white tracking-tight truncate" title={title}>
+            <span className="h-2 w-2 rounded-full bg-purple-400 shadow-[0_0_8px_rgba(168,85,247,0.8)] animate-pulse shrink-0" />
+            <h2 className="font-display text-lg sm:text-xl md:text-2xl font-bold text-white uppercase tracking-wide truncate" title={title}>
               {title}
             </h2>
           </div>
@@ -817,7 +817,7 @@ function FollowedUpdatesCarouselSection({
                 variant="outline"
                 size="icon"
                 onClick={() => scrollBy("left")}
-                className="h-8 w-8 rounded-[4px] border-border/60 bg-surface-1/80 hover:border-emerald-500/50 hover:text-emerald-300 transition-colors"
+                className="h-8 w-8 rounded-lg border-border/60 bg-surface-1/80 hover:border-purple-500/50 hover:text-purple-300 transition-colors"
               >
                 <ChevronLeft className="h-4 w-4" />
               </Button>
@@ -825,7 +825,7 @@ function FollowedUpdatesCarouselSection({
                 variant="outline"
                 size="icon"
                 onClick={() => scrollBy("right")}
-                className="h-8 w-8 rounded-[4px] border-border/60 bg-surface-1/80 hover:border-emerald-500/50 hover:text-emerald-300 transition-colors"
+                className="h-8 w-8 rounded-lg border-border/60 bg-surface-1/100 bg-surface-1/80 hover:border-purple-500/50 hover:text-purple-300 transition-colors"
               >
                 <ChevronRight className="h-4 w-4" />
               </Button>
@@ -833,7 +833,7 @@ function FollowedUpdatesCarouselSection({
           )}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-[4px] text-muted-foreground hover:text-white" aria-label="Section options">
+              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg text-muted-foreground hover:text-white" aria-label="Section options">
                 <MoreVertical className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
@@ -844,7 +844,7 @@ function FollowedUpdatesCarouselSection({
                   params={{ section: "followed-chapters" }}
                   className="flex items-center"
                 >
-                  <ExternalLink className="mr-2 h-4 w-4 text-emerald-400" />
+                  <ExternalLink className="mr-2 h-4 w-4 text-purple-400" />
                   View All Followed Updates
                 </Link>
               </DropdownMenuItem>
@@ -862,8 +862,8 @@ function FollowedUpdatesCarouselSection({
       {loading ? (
         <div className="flex gap-4 overflow-hidden">
           {[...Array(6)].map((_, i) => (
-            <div key={i} className={`${TITLE_CARD_WIDTH} glass-card rounded-[4px] overflow-hidden`}>
-              <div className={`${TITLE_COVER_CLASS} shimmer-dark`} />
+            <div key={i} className={`${TITLE_CARD_WIDTH} glass-card rounded-xl overflow-hidden`}>
+              <div className={`${TITLE_COVER_CLASS} shimmer-dark rounded-t-xl`} />
               <div className="space-y-2 p-3">
                 <div className="h-3.5 w-3/4 shimmer-dark rounded" />
                 <div className="h-3 w-1/2 shimmer-dark rounded" />
@@ -922,8 +922,8 @@ function SeriesCarouselSection({
       <div className="mb-4 sm:mb-5 flex items-center justify-between gap-2 sm:gap-4">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 min-w-0">
-            <span className="h-2 w-2 rounded-full bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.8)] animate-pulse shrink-0" />
-            <h2 className="text-base sm:text-lg md:text-xl font-bold text-white tracking-tight truncate" title={title}>
+            <span className="h-2 w-2 rounded-full bg-purple-400 shadow-[0_0_8px_rgba(168,85,247,0.8)] animate-pulse shrink-0" />
+            <h2 className="font-display text-lg sm:text-xl md:text-2xl font-bold text-white uppercase tracking-wide truncate" title={title}>
               {title}
             </h2>
           </div>
@@ -940,7 +940,7 @@ function SeriesCarouselSection({
                 variant="outline"
                 size="icon"
                 onClick={() => scrollBy("left")}
-                className="h-8 w-8 rounded-[4px] border-border/60 bg-surface-1/80 hover:border-amber-500/50 hover:text-amber-300 transition-colors"
+                className="h-8 w-8 rounded-lg border-border/60 bg-surface-1/80 hover:border-purple-500/50 hover:text-purple-300 transition-colors"
               >
                 <ChevronLeft className="h-4 w-4" />
               </Button>
@@ -948,7 +948,7 @@ function SeriesCarouselSection({
                 variant="outline"
                 size="icon"
                 onClick={() => scrollBy("right")}
-                className="h-8 w-8 rounded-[4px] border-border/60 bg-surface-1/80 hover:border-amber-500/50 hover:text-amber-300 transition-colors"
+                className="h-8 w-8 rounded-lg border-border/60 bg-surface-1/80 hover:border-purple-500/50 hover:text-purple-300 transition-colors"
               >
                 <ChevronRight className="h-4 w-4" />
               </Button>
@@ -956,7 +956,7 @@ function SeriesCarouselSection({
           )}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-[4px] text-muted-foreground hover:text-white" aria-label="Section options">
+              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg text-muted-foreground hover:text-white" aria-label="Section options">
                 <MoreVertical className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
@@ -967,7 +967,7 @@ function SeriesCarouselSection({
                   search={{ tab: sectionId === "popular" ? "most-viewed" : "top-rated" }}
                   className="flex items-center"
                 >
-                  <Trophy className="mr-2 h-4 w-4 text-amber-400" />
+                  <Trophy className="mr-2 h-4 w-4 text-purple-400" />
                   View in Rankings
                 </Link>
               </DropdownMenuItem>
@@ -985,8 +985,8 @@ function SeriesCarouselSection({
       {loading ? (
         <div className="flex gap-4 overflow-hidden">
           {[...Array(6)].map((_, i) => (
-            <div key={i} className={`${TITLE_CARD_WIDTH} glass-card rounded-[4px] overflow-hidden`}>
-              <div className={`${TITLE_COVER_CLASS} shimmer-dark`} />
+            <div key={i} className={`${TITLE_CARD_WIDTH} glass-card rounded-xl overflow-hidden`}>
+              <div className={`${TITLE_COVER_CLASS} shimmer-dark rounded-t-xl`} />
               <div className="space-y-2 p-3">
                 <div className="h-3.5 w-3/4 shimmer-dark rounded" />
                 <div className="h-3 w-1/2 shimmer-dark rounded" />
@@ -1007,9 +1007,9 @@ function SeriesCarouselSection({
               to="/title/$slug"
               params={{ slug: item.slug }}
               title={item.title}
-              className={`group ${TITLE_CARD_WIDTH} glass-card flex flex-col h-full rounded-lg overflow-hidden hover-lift block flex-shrink-0`}
+              className={`focus-ring group ${TITLE_CARD_WIDTH} glass-card flex flex-col h-full rounded-xl overflow-hidden hover-lift block flex-shrink-0`}
             >
-              <div className={`${TITLE_COVER_CLASS} relative overflow-hidden bg-neutral-950 shrink-0`}>
+              <div className={`${TITLE_COVER_CLASS} relative overflow-hidden rounded-t-xl bg-neutral-950 shrink-0`}>
                 <OptimizedImage
                   src={item.cover_url}
                   alt={item.title}
@@ -1018,18 +1018,18 @@ function SeriesCarouselSection({
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-transparent to-transparent pointer-events-none" />
                 <div className="absolute left-2 top-2">
-                  <Badge variant="outline" className="badge-glass text-3xs font-semibold uppercase tracking-wider py-0.5 px-1.5 leading-none rounded-[3px]">
+                  <Badge variant="outline" className="badge-glass text-3xs font-semibold uppercase tracking-wider py-0.5 px-1.5 leading-none rounded-md">
                     {item.type}
                   </Badge>
                 </div>
                 {item.rating_average && Number(item.rating_average) > 0 ? (
-                  <div className="absolute right-2.5 bottom-2.5 flex items-center gap-1 rounded border border-white/10 bg-black/75 px-1.5 py-0.5 text-xs backdrop-blur-md text-amber-300 font-bold">
+                  <div className="absolute right-2.5 bottom-2.5 flex items-center gap-1 rounded-md border border-white/10 bg-black/75 px-1.5 py-0.5 text-xs backdrop-blur-md text-amber-300 font-bold">
                     <Star className="h-3 w-3 fill-amber-400 text-amber-400 stroke-[1.5]" />
                     {Number(item.rating_average).toFixed(1)}
                   </div>
                 ) : null}
               </div>
-              <div className="p-3 bg-surface-1/90 flex flex-col justify-between flex-1 min-w-0">
+              <div className="p-3 bg-surface-1/90 flex flex-col justify-between flex-1 min-w-0 rounded-b-xl">
                 <h3 className="truncate text-sm font-semibold leading-snug text-white group-hover:text-purple-400 transition-colors">
                   {item.title}
                 </h3>
@@ -1120,8 +1120,8 @@ function LatestUpdatesSection({
       <div className="mb-4 sm:mb-5 flex items-center justify-between gap-2 sm:gap-4">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 min-w-0">
-            <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)] animate-pulse shrink-0" />
-            <h2 className="text-base sm:text-lg md:text-xl font-bold text-white tracking-tight truncate" title={title}>
+            <span className="h-2 w-2 rounded-full bg-purple-400 shadow-[0_0_8px_rgba(168,85,247,0.8)] animate-pulse shrink-0" />
+            <h2 className="font-display text-lg sm:text-xl md:text-2xl font-bold text-white uppercase tracking-wide truncate" title={title}>
               {title}
             </h2>
           </div>
@@ -1134,7 +1134,7 @@ function LatestUpdatesSection({
         <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-8 w-8 rounded text-neutral-400 hover:text-white" aria-label="Section options">
+              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg text-neutral-400 hover:text-white" aria-label="Section options">
                 <MoreVertical className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
@@ -1145,7 +1145,7 @@ function LatestUpdatesSection({
                   params={{ section: "latest-updates" }}
                   className="flex items-center"
                 >
-                  <ExternalLink className="mr-2 h-4 w-4 text-emerald-400" />
+                  <ExternalLink className="mr-2 h-4 w-4 text-purple-400" />
                   View All Updates
                 </Link>
               </DropdownMenuItem>
@@ -1185,13 +1185,12 @@ function LatestUpdatesSection({
                 className="glass-card group rounded-lg p-3 hover-lift transition-[border-color,box-shadow] flex flex-col justify-between"
               >
                 <div className="flex gap-3 items-stretch">
-                  {/* Cover Column touching the bottom without cutting any part */}
                   <Link
                     to="/title/$slug"
                     params={{ slug: item.slug }}
                     className="shrink-0 self-stretch block"
                   >
-                    <div className="relative h-full w-[125px] sm:w-[130px] md:w-[135px] min-h-[160px] overflow-hidden rounded bg-neutral-950">
+                    <div className="relative h-full w-[125px] sm:w-[130px] md:w-[135px] min-h-[160px] overflow-hidden rounded-lg bg-neutral-950">
                       <OptimizedImage
                         src={item.cover_url}
                         alt={item.title}
@@ -1205,7 +1204,7 @@ function LatestUpdatesSection({
                         className="absolute top-2 left-2 z-10 pointer-events-none"
                         title={getTypeLabel(item.type)}
                       >
-                        <div className="flex items-center justify-center p-0.5 rounded bg-black/75 border border-white/20 shadow-md backdrop-blur-md">
+                        <div className="flex items-center justify-center p-0.5 rounded-md bg-black/75 border border-white/20 shadow-md backdrop-blur-md">
                           <CountryFlag type={item.type} className="h-3.5 w-5 rounded-[2px] shadow-xs overflow-hidden" />
                         </div>
                       </div>
@@ -1213,7 +1212,7 @@ function LatestUpdatesSection({
                       {/* Scheduled Lock at top right */}
                       {item.recent_chapters.some((c) => c.status === "scheduled" || (c.scheduled_at && new Date(c.scheduled_at) > new Date())) && (
                         <div
-                          className="absolute top-2 right-2 z-10 rounded bg-amber-950/90 border border-amber-500/50 p-1 text-amber-300 shadow-md backdrop-blur-md"
+                          className="absolute top-2 right-2 z-10 rounded-md bg-amber-950/90 border border-amber-500/50 p-1 text-amber-300 shadow-md backdrop-blur-md"
                           title="Has chapters currently on early-access hold"
                         >
                           <Lock className="h-2.5 w-2.5 text-amber-400 animate-pulse" />
@@ -1530,7 +1529,7 @@ function RecentChapterCard({
   const timeLabel = timeField === "updated" ? "Last read" : "Uploaded";
 
   const cover = (
-    <div className={`${TITLE_COVER_CLASS} relative overflow-hidden bg-neutral-950`}>
+    <div className={`${TITLE_COVER_CLASS} relative overflow-hidden rounded-t-xl bg-neutral-950`}>
       <OptimizedImage
         src={chapter.series?.cover_url ?? null}
         alt={chapter.series?.title ?? ""}
@@ -1544,7 +1543,7 @@ function RecentChapterCard({
           {chapter.series?.title}
         </p>
         {(chapter.series as any)?.type && (
-          <span className="mt-1 text-[9px] uppercase font-semibold text-purple-400">
+          <span className="mt-1 text-3xs uppercase font-semibold text-purple-400">
             {(chapter.series as any).type}
           </span>
         )}
@@ -1567,11 +1566,11 @@ function RecentChapterCard({
   const isScheduledLock = (chapter as any).status === "scheduled" || (!!chapter.scheduled_at && new Date(chapter.scheduled_at) > new Date());
 
   return (
-    <article className="group glass-card flex flex-col h-full rounded-lg overflow-hidden hover-lift transition-[border-color,box-shadow]">
+    <article className="group glass-card focus-ring flex flex-col h-full rounded-xl overflow-hidden hover-lift transition-[border-color,box-shadow]">
       <Link to="/title/$slug" params={{ slug: seriesSlug }} className="block shrink-0">
         {cover}
       </Link>
-      <div className="p-3 bg-surface-1/90 flex flex-col justify-between flex-1 min-w-0">
+      <div className="p-3 bg-surface-1/90 flex flex-col justify-between flex-1 min-w-0 rounded-b-xl">
         <div>
           <Link
             to="/title/$slug"
@@ -1603,7 +1602,7 @@ function RecentChapterCard({
                 <Link
                   to="/title/$titleSlug/$chapterSlug"
                   params={{ titleSlug: seriesSlug, chapterSlug: chapter.slug }}
-                  className="flex items-center justify-center gap-1.5"
+                  className="focus-ring flex items-center justify-center gap-1.5"
                 >
                   {isScheduledLock && <Lock className="h-3 w-3 shrink-0 text-amber-400 animate-pulse" />}
                   <span>Chapter {chapter.chapter_number}</span>

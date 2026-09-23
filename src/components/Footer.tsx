@@ -32,11 +32,11 @@ export function Footer() {
         <div className="grid gap-8 grid-cols-2 lg:grid-cols-4 text-center sm:text-left">
           {/* Logo & Description */}
           <div className="col-span-2 lg:col-span-1 flex flex-col items-center sm:items-start text-center sm:text-left space-y-4">
-            <Link to="/home" className="flex items-center gap-2.5 transition-transform hover:scale-102 w-fit group">
-              <div className="relative grid h-9 w-9 place-items-center rounded-[4px] border border-purple-500/40 bg-purple-950/20 font-bold text-white text-xs shadow-[0_0_12px_rgba(168,85,247,0.2)] group-hover:border-purple-400 group-hover:shadow-[0_0_16px_rgba(168,85,247,0.4)] transition-all">
+            <Link to="/home" className="focus-ring flex items-center gap-2.5 transition-transform hover:scale-102 w-fit group">
+              <div className="relative grid h-9 w-9 place-items-center rounded-lg border border-purple-500/40 bg-purple-950/20 font-bold text-white text-xs shadow-[0_0_12px_rgba(168,85,247,0.2)] group-hover:border-purple-400 group-hover:shadow-[0_0_16px_rgba(168,85,247,0.4)] transition-all">
                 VS
               </div>
-              <span className="text-lg font-bold text-white tracking-widest uppercase group-hover:text-purple-300 transition-colors whitespace-nowrap">
+              <span className="font-display text-lg font-bold text-white tracking-widest uppercase group-hover:text-purple-300 transition-colors whitespace-nowrap">
                 vnrscans
               </span>
             </Link>
@@ -51,50 +51,50 @@ export function Footer() {
 
           {/* Navigation Links */}
           <div className="flex flex-col items-center sm:items-start">
-            <h4 className="text-xs font-bold text-white uppercase tracking-widest mb-4">Navigation</h4>
+            <h4 className="font-display text-xs font-bold text-white uppercase tracking-widest mb-4">Navigation</h4>
             <ul className="space-y-2 text-xs flex flex-col items-center sm:items-start">
               <li>
-                <Link to="/home" className="hover:text-purple-300 transition-colors">Home Page</Link>
+                <Link to="/home" className="focus-ring hover:text-purple-300 transition-colors">Home Page</Link>
               </li>
               <li>
-                <Link to="/browse" className="hover:text-purple-300 transition-colors">Browse Directory</Link>
+                <Link to="/browse" className="focus-ring hover:text-purple-300 transition-colors">Browse Directory</Link>
               </li>
               <li>
-                <Link to="/rankings" className="hover:text-purple-300 transition-colors">Top Rankings</Link>
+                <Link to="/rankings" className="focus-ring hover:text-purple-300 transition-colors">Top Rankings</Link>
               </li>
               <li>
-                <Link to="/leaderboard" className="hover:text-purple-300 transition-colors">User Leaderboard</Link>
+                <Link to="/leaderboard" className="focus-ring hover:text-purple-300 transition-colors">User Leaderboard</Link>
               </li>
               <li>
-                <Link to="/recommendations" className="hover:text-purple-300 transition-colors">Recommendations</Link>
+                <Link to="/recommendations" className="focus-ring hover:text-purple-300 transition-colors">Recommendations</Link>
               </li>
               <li>
-                <Link to="/request-series" className="hover:text-purple-300 transition-colors">Request Series</Link>
+                <Link to="/request-series" className="focus-ring hover:text-purple-300 transition-colors">Request Series</Link>
               </li>
               <li>
-                <Link to="/data-map" className="hover:text-purple-300 transition-colors">Data Directory Map</Link>
+                <Link to="/data-map" className="focus-ring hover:text-purple-300 transition-colors">Data Directory Map</Link>
               </li>
             </ul>
           </div>
 
           {/* Legal & Info */}
           <div className="flex flex-col items-center sm:items-start">
-            <h4 className="text-xs font-bold text-foreground uppercase tracking-widest mb-4">Legal & Support</h4>
+            <h4 className="font-display text-xs font-bold text-foreground uppercase tracking-widest mb-4">Legal & Support</h4>
             <ul className="space-y-2 text-xs flex flex-col items-center sm:items-start">
               <li>
-                <Link to="/about" className="hover:text-primary transition-colors">About Platform</Link>
+                <Link to="/about" className="focus-ring hover:text-primary transition-colors">About Platform</Link>
               </li>
               <li>
-                <Link to="/dmca" className="hover:text-primary transition-colors">DMCA Takedown</Link>
+                <Link to="/dmca" className="focus-ring hover:text-primary transition-colors">DMCA Takedown</Link>
               </li>
               <li>
-                <Link to="/contact" className="hover:text-primary transition-colors">Inquiries & Contact</Link>
+                <Link to="/contact" className="focus-ring hover:text-primary transition-colors">Inquiries & Contact</Link>
               </li>
               <li>
-                <NextLink href="/privacy" className="hover:text-primary transition-colors">Privacy Policy</NextLink>
+                <NextLink href="/privacy" className="focus-ring hover:text-primary transition-colors">Privacy Policy</NextLink>
               </li>
               <li>
-                <NextLink href="/terms" className="hover:text-primary transition-colors">Terms of Service</NextLink>
+                <NextLink href="/terms" className="focus-ring hover:text-primary transition-colors">Terms of Service</NextLink>
               </li>
               <li>
                 <a
@@ -116,7 +116,7 @@ export function Footer() {
 
           {/* Community & Socials */}
           <div className="flex flex-col items-center sm:items-start">
-            <h4 className="text-xs font-bold text-foreground uppercase tracking-widest mb-4">Community</h4>
+            <h4 className="font-display text-xs font-bold text-foreground uppercase tracking-widest mb-4">Community</h4>
             <ul className="space-y-2.5 text-xs flex flex-col items-center sm:items-start">
               <li>
                 <a

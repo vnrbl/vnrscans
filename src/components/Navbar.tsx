@@ -70,7 +70,7 @@ export function Navbar() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [menuDrawerOpen]);
 
-  // Ctrl+K / ⌘K hotkey toggles search console
+  // Ctrl+K / ⌘K hotkey toggles search console (single canonical listener)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key.toLowerCase() === "k" && (e.metaKey || e.ctrlKey)) {
@@ -242,18 +242,6 @@ export function Navbar() {
     setIsRolling(false);
   };
 
-  // Ctrl+K shortcut to open search
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === "k") {
-        e.preventDefault();
-        setSearchOpen(true);
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, []);
-
   return (
     <>
       <header className="sticky top-0 z-50 navbar-ios-glass">
@@ -264,7 +252,7 @@ export function Navbar() {
               variant="ghost"
               size="icon"
               onClick={() => setMenuDrawerOpen((prev) => !prev)}
-              className="h-9 w-9 text-foreground hover:bg-secondary/60 transition-colors cursor-pointer select-none active:scale-95"
+              className="focus-ring h-9 w-9 text-foreground hover:bg-secondary/60 transition-colors cursor-pointer select-none active:scale-95"
               title={menuDrawerOpen ? "Close Menu" : "Menu"}
               aria-label={menuDrawerOpen ? "Close Menu" : "Open Menu"}
               aria-expanded={menuDrawerOpen}
@@ -315,18 +303,19 @@ export function Navbar() {
               />
             </div>
           ) : (
-            /* Default SpaceX Centralized Search Bar */
-            <div className="hidden xl:flex items-center justify-center absolute left-1/2 -translate-x-1/2 z-10 pointer-events-auto">
+            /* Default Centralized Search Bar — visible from lg (was xl: dead space 1024–1279px) */
+            <div className="hidden lg:flex items-center justify-center absolute left-1/2 -translate-x-1/2 z-10 pointer-events-auto">
               <button
                 onClick={() => setSearchOpen(true)}
                 title="Search (Ctrl+K)"
-                className="flex items-center gap-2.5 w-[280px] xl:w-[320px] h-9 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 hover:border-white/30 px-3 text-xs text-neutral-400 hover:text-white transition-all focus:outline-none shadow-sm cursor-pointer"
+                aria-label="Search titles and authors (Ctrl+K)"
+                className="focus-ring flex items-center gap-2.5 w-[240px] lg:w-[240px] xl:w-[320px] h-9 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 hover:border-white/30 px-3 text-xs text-neutral-400 hover:text-white transition-all shadow-sm cursor-pointer"
               >
                 <Search className="h-3.5 w-3.5 shrink-0 text-neutral-400 stroke-[1.8]" />
                 <span className="flex-1 truncate text-left font-sans font-normal tracking-normal text-neutral-400">
                   Search titles, authors...
                 </span>
-                <kbd className="inline-flex items-center rounded border border-border/60 bg-neutral-900/80 px-1.5 py-0.5 text-[9px] font-mono font-bold text-neutral-400">
+                <kbd className="inline-flex items-center rounded border border-border/60 bg-neutral-900/80 px-1.5 py-0.5 text-2xs font-mono font-bold text-neutral-400">
                   Ctrl K
                 </kbd>
               </button>
@@ -338,8 +327,8 @@ export function Navbar() {
             {/* Search Button (Icon for mobile/tablets or when center is occupied by dock/spotlight) */}
             <button
               className={cn(
-                "items-center justify-center h-9 w-9 rounded-lg text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors cursor-pointer active:scale-95",
-                !settings.navbarStyle || settings.navbarStyle === "default" ? "flex xl:hidden" : "flex"
+                "focus-ring items-center justify-center h-9 w-9 rounded-lg text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors cursor-pointer active:scale-95",
+                !settings.navbarStyle || settings.navbarStyle === "default" ? "flex lg:hidden" : "flex"
               )}
               onClick={() => setSearchOpen(true)}
               aria-label="Search"
@@ -389,7 +378,7 @@ export function Navbar() {
               const DiceIcon = [Dice1, Dice2, Dice3, Dice4, Dice5, Dice6][navDiceFace - 1];
               return (
                 <button
-                  className="flex sm:hidden items-center justify-center h-9 w-9 rounded-lg text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors disabled:opacity-50"
+                  className="focus-ring flex sm:hidden items-center justify-center h-9 w-9 rounded-lg text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors disabled:opacity-50"
                   onClick={handleRandom}
                   disabled={isRolling}
                   aria-label="Roll Random"
@@ -408,7 +397,7 @@ export function Navbar() {
             {mounted && user ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="rounded-full p-0 transition-all hover:bg-transparent hover:scale-105 focus-visible:ring-0 focus-visible:ring-offset-0">
+                  <Button variant="ghost" size="icon" className="rounded-full p-0 transition-all hover:bg-transparent hover:scale-105 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background">
                     <NavbarAvatarFrame 
                       avatarUrl={userStats.data?.avatar_url}
                       avatarFrame={userStats.data?.avatar_frame || 'none'}
@@ -499,7 +488,7 @@ export function Navbar() {
                 key={l.to}
                 to={l.to}
                 onClick={() => setMenuDrawerOpen(false)}
-                className="flex items-center gap-4 w-full px-3 py-2.5 rounded-xl text-sm font-medium text-neutral-300 hover:text-white hover:bg-neutral-800/80 transition-colors cursor-pointer"
+                className="focus-ring flex items-center gap-4 w-full px-3 py-2.5 rounded-xl text-sm font-medium text-neutral-300 hover:text-white hover:bg-neutral-800/80 transition-colors cursor-pointer"
                 activeProps={{ className: "text-white bg-neutral-800 font-bold" }}
               >
                 <l.icon className="h-5 w-5 stroke-[1.8] text-neutral-400" />
@@ -517,7 +506,7 @@ export function Navbar() {
               <Link
                 to="/library"
                 onClick={() => setMenuDrawerOpen(false)}
-                className="flex items-center gap-4 w-full px-3 py-2.5 rounded-xl text-sm font-medium text-neutral-300 hover:text-white hover:bg-neutral-800/80 transition-colors cursor-pointer"
+                className="focus-ring flex items-center gap-4 w-full px-3 py-2.5 rounded-xl text-sm font-medium text-neutral-300 hover:text-white hover:bg-neutral-800/80 transition-colors cursor-pointer"
                 activeProps={{ className: "text-white bg-neutral-800 font-bold" }}
               >
                 <Library className="h-5 w-5 stroke-[1.8] text-neutral-400" />
@@ -529,7 +518,7 @@ export function Navbar() {
               <Link
                 to="/settings"
                 onClick={() => setMenuDrawerOpen(false)}
-                className="flex items-center gap-4 w-full px-3 py-2.5 rounded-xl text-sm font-medium text-neutral-300 hover:text-white hover:bg-neutral-800/80 transition-colors cursor-pointer"
+                className="focus-ring flex items-center gap-4 w-full px-3 py-2.5 rounded-xl text-sm font-medium text-neutral-300 hover:text-white hover:bg-neutral-800/80 transition-colors cursor-pointer"
                 activeProps={{ className: "text-white bg-neutral-800 font-bold" }}
               >
                 <SettingsIcon className="h-5 w-5 stroke-[1.8] text-neutral-400" />
@@ -598,7 +587,7 @@ export function Navbar() {
       <nav className="fixed bottom-0 left-0 right-0 z-50 flex sm:hidden h-[calc(3.5rem+env(safe-area-inset-bottom,0px))] pb-[env(safe-area-inset-bottom,0px)] items-center justify-around navbar-ios-glass border-t border-white/10 px-1 shadow-2xl">
         <Link
           to="/home"
-          className="flex flex-col items-center justify-center gap-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground hover:text-primary transition-colors py-1 flex-1"
+          className="focus-ring flex flex-col items-center justify-center gap-0.5 text-2xs font-bold uppercase tracking-wider text-muted-foreground hover:text-primary transition-colors py-1 flex-1"
           activeProps={{ className: "text-primary font-black" }}
         >
           <Home className="h-5 w-5 stroke-[1.8]" />
@@ -607,7 +596,7 @@ export function Navbar() {
 
         <Link
           to="/browse"
-          className="flex flex-col items-center justify-center gap-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground hover:text-primary transition-colors py-1 flex-1"
+          className="focus-ring flex flex-col items-center justify-center gap-0.5 text-2xs font-bold uppercase tracking-wider text-muted-foreground hover:text-primary transition-colors py-1 flex-1"
           activeProps={{ className: "text-primary font-black" }}
         >
           <BookOpen className="h-5 w-5 stroke-[1.8]" />
@@ -634,7 +623,7 @@ export function Navbar() {
 
             <Link
               to="/library"
-              className="flex flex-col items-center justify-center gap-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground hover:text-primary transition-colors py-1 flex-1"
+              className="focus-ring flex flex-col items-center justify-center gap-0.5 text-2xs font-bold uppercase tracking-wider text-muted-foreground hover:text-primary transition-colors py-1 flex-1"
               activeProps={{ className: "text-primary font-black" }}
             >
               <Library className="h-5 w-5 stroke-[1.8]" />
@@ -643,7 +632,7 @@ export function Navbar() {
 
             <Link
               to={mounted && user ? "/profile" : "/auth"}
-              className="flex flex-col items-center justify-center gap-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground hover:text-primary transition-colors py-1 flex-1"
+              className="focus-ring flex flex-col items-center justify-center gap-0.5 text-2xs font-bold uppercase tracking-wider text-muted-foreground hover:text-primary transition-colors py-1 flex-1"
               activeProps={{ className: "text-primary font-black" }}
             >
               <UserIcon className="h-5 w-5 stroke-[1.8]" />
@@ -654,7 +643,7 @@ export function Navbar() {
           <>
             <Link
               to="/library"
-              className="flex flex-col items-center justify-center gap-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground hover:text-primary transition-colors py-1 flex-1"
+              className="focus-ring flex flex-col items-center justify-center gap-0.5 text-2xs font-bold uppercase tracking-wider text-muted-foreground hover:text-primary transition-colors py-1 flex-1"
               activeProps={{ className: "text-primary font-black" }}
             >
               <Library className="h-5 w-5 stroke-[1.8]" />
@@ -663,7 +652,7 @@ export function Navbar() {
 
             <Link
               to="/novels"
-              className="flex flex-col items-center justify-center gap-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground hover:text-primary transition-colors py-1 flex-1"
+              className="focus-ring flex flex-col items-center justify-center gap-0.5 text-2xs font-bold uppercase tracking-wider text-muted-foreground hover:text-primary transition-colors py-1 flex-1"
               activeProps={{ className: "text-primary font-black" }}
             >
               <BookOpen className="h-5 w-5 stroke-[1.8]" />
@@ -672,7 +661,7 @@ export function Navbar() {
 
             <Link
               to={mounted && user ? "/profile" : "/auth"}
-              className="flex flex-col items-center justify-center gap-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground hover:text-primary transition-colors py-1 flex-1"
+              className="focus-ring flex flex-col items-center justify-center gap-0.5 text-2xs font-bold uppercase tracking-wider text-muted-foreground hover:text-primary transition-colors py-1 flex-1"
               activeProps={{ className: "text-primary font-black" }}
             >
               <UserIcon className="h-5 w-5 stroke-[1.8]" />

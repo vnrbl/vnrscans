@@ -1,4 +1,5 @@
-@import url('https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400..700;1,400..700&family=Roboto:ital,wght@0,400..700;1,400..700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+/* Novel fonts (Lora, Roboto, JetBrains Mono) are self-hosted via next/font in app/layout.tsx.
+   Only OpenDyslexic remains on CDN (not available via next/font). */
 @import url('https://fonts.cdnfonts.com/css/open-dyslexic');
 @import "tailwindcss" source(none);
 @source "../src";
@@ -12,13 +13,13 @@
   font-family: 'OpenDyslexic', 'Open-Dyslexic', 'Comic Sans MS', sans-serif !important;
 }
 .font-novel-roboto {
-  font-family: 'Roboto', 'Inter', sans-serif !important;
+  font-family: var(--font-roboto), 'Roboto', 'Inter', sans-serif !important;
 }
 .font-novel-lora {
-  font-family: 'Lora', Georgia, 'Times New Roman', serif !important;
+  font-family: var(--font-lora), 'Lora', Georgia, 'Times New Roman', serif !important;
 }
 .font-novel-mono {
-  font-family: 'JetBrains Mono', monospace !important;
+  font-family: var(--font-jetbrains-mono), 'JetBrains Mono', monospace !important;
 }
 
 /*
@@ -56,6 +57,8 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
+  --font-display: var(--font-barlow-condensed), 'Barlow Condensed', 'Arial Narrow', Arial, sans-serif;
+
   --radius-sm:  calc(var(--radius) - 4px);
   --radius-md:  calc(var(--radius) - 2px);
   --radius-lg:  var(--radius);
@@ -106,10 +109,20 @@
   --font-outfit: var(--font-inter), 'Inter', sans-serif;
 
   /*
-   * SpaceX radius scale: xs=4 sm=8 md=16 pill=32
-   * We use 4px as base (xs) — everything is tight and engineered.
+   * Radius scale — modern genre standard (MangaDex/Tapas-like softness):
+   * base 8px → md 6px buttons/inputs · lg 8px cards & media · xl 12px heroes.
    */
-  --radius: 0.25rem; /* 4px */
+  --radius: 0.5rem; /* 8px */
+
+  /* ── GLASS LADDER (single source of truth for every translucent surface) ── */
+  --glass-1: rgba(6, 6, 8, 0.72);          /* cards, panels, navbar             */
+  --glass-2: rgba(6, 6, 8, 0.85);          /* modals, drawers, search console   */
+  --glass-blur: 24px;                      /* one blur value sitewide           */
+  --glass-border: rgba(255, 255, 255, 0.09);
+  --glass-border-hover: rgba(255, 255, 255, 0.18);
+
+  /* ── DISPLAY FACE (condensed industrial — page & section titles) ───────── */
+  --font-display: var(--font-barlow-condensed), 'Barlow Condensed', 'Arial Narrow', Arial, sans-serif;
 
   /* ── SURFACES (pure black — SpaceX canvas-night ladder) ─────────────────── */
   --background:  oklch(0.04 0.002 270);    /* #000000 / pure black canvas     */
@@ -267,6 +280,13 @@
   --surface-3:            #f4f0e8;
   --hairline:             rgba(0, 0, 0, 0.08);
   --hairline-strong:      rgba(0, 0, 0, 0.16);
+
+  /* Light glass ladder */
+  --glass-1:              rgba(255, 255, 255, 0.88);
+  --glass-2:              #ffffff;
+  --glass-blur:           24px;
+  --glass-border:         rgba(0, 0, 0, 0.08);
+  --glass-border-hover:   rgba(0, 0, 0, 0.16);
 }
 
 /* ─── COMPONENTS ──────────────────────────────────────────────────────────── */
@@ -321,10 +341,10 @@
   }
 
   h1, h2, h3, h4, h5, h6, .font-heading, .font-display, .font-outfit, .font-title {
-    font-family: var(--font-inter), 'Inter', sans-serif !important;
-    font-weight: 800 !important;
-    line-height: 1.18;
-    letter-spacing: -0.025em;
+    font-family: var(--font-display) !important;
+    font-weight: 700 !important;
+    line-height: 1.15;
+    letter-spacing: 0.005em;
   }
 
   .font-body, .font-sans {
@@ -355,7 +375,7 @@
 
 
   /* ── Scrollbars (minimal — SpaceX doesn't style chrome) ────────────────── */
-  ::-webkit-scrollbar        { width: 4px; height: 4px; }
+  ::-webkit-scrollbar        { width: 6px; height: 6px; }
   ::-webkit-scrollbar-track  { background: transparent; }
   ::-webkit-scrollbar-thumb  {
     background: oklch(0.28 0.003 270 / 0.60);
@@ -382,11 +402,8 @@
     100% { left: 150%; opacity: 0; }
   }
 
-  /* Avatar frame keyframes — shared across Profile, Leaderboard, Navbar & Comments */
-  @keyframes rotationCW  { 0% { transform: rotate(0deg); }   100% { transform: rotate(360deg); } }
-  @keyframes rotationCCW { 0% { transform: rotate(360deg); } 100% { transform: rotate(0deg); } }
-  @keyframes navRotCW    { 0% { transform: rotate(0deg); }   100% { transform: rotate(360deg); } }
-  @keyframes navRotCCW   { 0% { transform: rotate(360deg); } 100% { transform: rotate(0deg); } }
+  /* Avatar frame keyframes — shared across Profile, Leaderboard, Navbar & Comments.
+     rotationCW/CCW canonical definitions live at file bottom; navRot* are aliases. */
   @keyframes navPulse    { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.06); } }
   @keyframes navGlitch   { 0%, 100% { filter: hue-rotate(0deg); } 50% { filter: hue-rotate(30deg); } }
   @keyframes lightningFlicker {
@@ -511,8 +528,11 @@
     height: 100%;
     background: linear-gradient(90deg, transparent, rgba(192, 132, 252, 0.25), transparent);
     transform: skewX(-20deg);
-    animation: beamShineSweep 3.5s ease-in-out infinite 1.5s;
+    opacity: 0;
     pointer-events: none;
+  }
+  .btn-ghost-pill:hover::after {
+    animation: beamShineSweep 1.2s ease-in-out;
   }
   .btn-ghost-pill:hover {
     border-color: rgba(192, 132, 252, 0.6);
@@ -542,19 +562,8 @@
     text-transform: uppercase;
     line-height: 0.94;
     overflow: hidden;
-    box-shadow: 0 10px 25px -5px rgba(255, 255, 255, 0.25), 0 0 15px rgba(168, 85, 247, 0.2);
+    box-shadow: 0 8px 24px -6px rgba(0, 0, 0, 0.6);
     transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s ease, background 0.2s ease;
-  }
-  .btn-solid-pill::before {
-    content: "";
-    position: absolute;
-    inset: -2px;
-    border-radius: 2rem;
-    background: conic-gradient(from 0deg, #c084fc, #ffffff, #a855f7, #06b6d4, #c084fc);
-    animation: navRotCW 4s linear infinite;
-    z-index: -1;
-    opacity: 0.6;
-    transition: opacity 0.3s ease;
   }
   .btn-solid-pill::after {
     content: "";
@@ -565,66 +574,66 @@
     height: 100%;
     background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.85), transparent);
     transform: skewX(-20deg);
-    animation: beamShineSweep 3s ease-in-out infinite;
+    opacity: 0;
     pointer-events: none;
+  }
+  .btn-solid-pill:hover::after {
+    animation: beamShineSweep 1.2s ease-in-out;
   }
   .btn-solid-pill:hover {
     transform: scale(1.02);
-    box-shadow: 0 12px 30px -4px rgba(255, 255, 255, 0.4), 0 0 22px rgba(168, 85, 247, 0.45);
-  }
-  .btn-solid-pill:hover::before {
-    opacity: 1;
+    box-shadow: 0 10px 28px -4px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.2);
   }
   .btn-solid-pill:active {
     transform: scale(0.97);
   }
 
   /*
-   * ─── TRANSLUCENT LIQUID GLASS DESIGN SYSTEM (NEAR-BLACK OLED) ───────────
-   * Deep near-black glassmorphism matching the navbar (rgba(6, 6, 8, ...)),
-   * crystal clear specular highlight, zero milky grey haze, high-saturate blur.
+   * ─── GLASS SYSTEM (3 tiers on one ladder) ───────────────────────────────
+   * Every translucent surface derives from --glass-1 / --glass-2 tokens.
+   * Tier 1: cards, panels, navbar · Tier 2: modals, drawers, search console.
    */
   .liquid-glass {
     position: relative;
-    background-color: rgba(6, 6, 8, 0.72);
-    backdrop-filter: blur(24px) saturate(190%) contrast(95%);
-    -webkit-backdrop-filter: blur(24px) saturate(190%) contrast(95%);
-    border: 1px solid rgba(255, 255, 255, 0.09);
+    background-color: var(--glass-1);
+    backdrop-filter: blur(var(--glass-blur)) saturate(190%) contrast(95%);
+    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(190%) contrast(95%);
+    border: 1px solid var(--glass-border);
     box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);
   }
 
   .liquid-glass-card {
     position: relative;
-    background-color: rgba(6, 6, 8, 0.72);
-    backdrop-filter: blur(24px) saturate(190%) contrast(95%);
-    -webkit-backdrop-filter: blur(24px) saturate(190%) contrast(95%);
-    border: 1px solid rgba(255, 255, 255, 0.09);
-    border-radius: 1rem;
+    background-color: var(--glass-1);
+    backdrop-filter: blur(var(--glass-blur)) saturate(190%) contrast(95%);
+    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(190%) contrast(95%);
+    border: 1px solid var(--glass-border);
+    border-radius: 0.75rem;
     box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);
     transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.25s ease, box-shadow 0.25s ease;
   }
 
   .liquid-glass-card:hover {
-    border-color: rgba(255, 255, 255, 0.16);
+    border-color: var(--glass-border-hover);
     box-shadow: 0 8px 36px rgba(0, 0, 0, 0.7), 0 0 20px -4px rgba(168, 85, 247, 0.15);
   }
 
-  /* Mini window / Modal / Dialog floating liquid glass */
+  /* Mini window / Modal / Dialog floating liquid glass — Tier 2 */
   .liquid-glass-window {
     position: relative;
-    background-color: rgba(6, 6, 8, 0.85);
-    backdrop-filter: blur(24px) saturate(190%) contrast(95%);
-    -webkit-backdrop-filter: blur(24px) saturate(190%) contrast(95%);
-    border: 1px solid rgba(255, 255, 255, 0.09);
-    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.8), 0 0 32px -4px rgba(168, 85, 247, 0.08);
+    background-color: var(--glass-2);
+    backdrop-filter: blur(var(--glass-blur)) saturate(190%) contrast(95%);
+    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(190%) contrast(95%);
+    border: 1px solid var(--glass-border);
+    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.8);
   }
 
-  /* Liquid glass pill navigation container */
+  /* Liquid glass pill navigation container — Tier 1 */
   .liquid-glass-pill {
-    background-color: rgba(6, 6, 8, 0.72);
-    backdrop-filter: blur(24px) saturate(190%) contrast(95%);
-    -webkit-backdrop-filter: blur(24px) saturate(190%) contrast(95%);
-    border: 1px solid rgba(255, 255, 255, 0.09);
+    background-color: var(--glass-1);
+    backdrop-filter: blur(var(--glass-blur)) saturate(190%) contrast(95%);
+    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(190%) contrast(95%);
+    border: 1px solid var(--glass-border);
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
   }
 
@@ -662,33 +671,33 @@
    * SpaceX nav: fixed overlay on full-bleed photography.
    * All-caps labels, button-cap size, zero background on dark sections.
    */
-  /* Apple / iOS Translucent Frosted Glass Navbar */
+  /* Translucent Frosted Glass Navbar — Tier 1 */
   .navbar-ios-glass {
-    background-color: rgba(6, 6, 8, 0.72) !important;
-    -webkit-backdrop-filter: blur(24px) saturate(190%) contrast(95%) !important;
-    backdrop-filter: blur(24px) saturate(190%) contrast(95%) !important;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.09) !important;
+    background-color: var(--glass-1) !important;
+    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(190%) contrast(95%) !important;
+    backdrop-filter: blur(var(--glass-blur)) saturate(190%) contrast(95%) !important;
+    border-bottom: 1px solid var(--glass-border) !important;
     box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5) !important;
   }
 
-  /* Apple / iOS Translucent Frosted Glass Search Console / Modal */
+  /* Frosted Glass Search Console / Modal — Tier 2 */
   .search-console-ios-glass {
-    background-color: rgba(10, 10, 14, 0.85) !important;
+    background-color: var(--glass-2) !important;
     -webkit-backdrop-filter: blur(32px) saturate(180%) contrast(100%) !important;
     backdrop-filter: blur(32px) saturate(180%) contrast(100%) !important;
-    border: 1px solid rgba(255, 255, 255, 0.13) !important;
+    border: 1px solid var(--glass-border) !important;
     box-shadow: 
       0 25px 60px -10px rgba(0, 0, 0, 0.85), 
       0 0 35px -5px rgba(168, 85, 247, 0.2),
       inset 0 1px 1.5px 0 rgba(255, 255, 255, 0.25) !important;
   }
 
-  /* Apple / iOS Translucent Frosted Glass Sidebar Drawer */
+  /* Frosted Glass Sidebar Drawer — Tier 2 */
   .sidebar-ios-glass {
-    background-color: rgba(6, 6, 8, 0.78) !important;
-    -webkit-backdrop-filter: blur(24px) saturate(190%) contrast(95%) !important;
-    backdrop-filter: blur(24px) saturate(190%) contrast(95%) !important;
-    border-right: 1px solid rgba(255, 255, 255, 0.09) !important;
+    background-color: var(--glass-2) !important;
+    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(190%) contrast(95%) !important;
+    backdrop-filter: blur(var(--glass-blur)) saturate(190%) contrast(95%) !important;
+    border-right: 1px solid var(--glass-border) !important;
     box-shadow: 4px 0 30px rgba(0, 0, 0, 0.5) !important;
   }
 
@@ -698,27 +707,27 @@
     border-bottom: 1px solid var(--hairline);
   }
 
-  /* Glassmorphism Panels */
+  /* Glassmorphism Panels — Tier 1 */
   .glass-panel {
-    background-color: rgba(6, 6, 8, 0.72);
-    backdrop-filter: blur(24px) saturate(190%) contrast(95%);
-    -webkit-backdrop-filter: blur(24px) saturate(190%) contrast(95%);
-    border: 1px solid rgba(255, 255, 255, 0.09);
+    background-color: var(--glass-1);
+    backdrop-filter: blur(var(--glass-blur)) saturate(190%) contrast(95%);
+    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(190%) contrast(95%);
+    border: 1px solid var(--glass-border);
     transition: border-color 0.25s ease, box-shadow 0.25s ease;
   }
   .glass-panel:hover {
-    border-color: rgba(255, 255, 255, 0.16);
+    border-color: var(--glass-border-hover);
   }
 
   .glass-card {
-    background-color: rgba(6, 6, 8, 0.72);
-    backdrop-filter: blur(24px) saturate(190%) contrast(95%);
-    -webkit-backdrop-filter: blur(24px) saturate(190%) contrast(95%);
-    border: 1px solid rgba(255, 255, 255, 0.09);
-    transition: border-color 0.2s ease, box-shadow 0.25s ease;
+    background-color: var(--glass-1);
+    backdrop-filter: blur(var(--glass-blur)) saturate(190%) contrast(95%);
+    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(190%) contrast(95%);
+    border: 1px solid var(--glass-border);
+    transition: border-color 0.2s ease, box-shadow 0.25s ease, transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
   }
   .glass-card:hover {
-    border-color: rgba(255, 255, 255, 0.16);
+    border-color: var(--glass-border-hover);
     box-shadow: 0 8px 30px -10px rgba(0, 0, 0, 0.8), 0 0 15px -3px rgba(168, 85, 247, 0.15);
   }
 
@@ -765,13 +774,13 @@
   }
 
   .text-2xs {
-    font-size: 0.6875rem !important; /* 11px */
-    line-height: 0.875rem !important;
+    font-size: 0.75rem !important;  /* 12px */
+    line-height: 1rem !important;
   }
 
   .text-3xs {
-    font-size: 0.5625rem !important; /* 9px */
-    line-height: 0.75rem !important;
+    font-size: 0.6875rem !important; /* 11px */
+    line-height: 0.875rem !important;
   }
 
   /* Shimmer effect for loaders */
@@ -785,6 +794,38 @@
     animation: shimmerSweep 2s ease-in-out infinite;
   }
 }
+
+/* ==========================================================================
+   ♿ ACCESSIBILITY — Reduced motion & focus visibility (sitewide)
+   ========================================================================== */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Standard focus ring for custom interactive elements (buttons/links already
+   get focus-visible rings from ui primitives). */
+.focus-ring {
+  outline: none;
+}
+.focus-ring:focus-visible {
+  outline: 2px solid oklch(0.68 0.22 305);
+  outline-offset: 2px;
+}
+
+/* Canonical rotation keyframes (avatar frames, loaders) */
+@keyframes navRotCW { 0% { transform: rotate(0deg); }   100% { transform: rotate(360deg); } }
+@keyframes navRotCCW { 0% { transform: rotate(360deg); } 100% { transform: rotate(0deg); } }
+
+/* Dedupe keyframes: rotationCW/CCW now alias the navRot names */
+@keyframes rotationCW { 0% { transform: rotate(0deg); }   100% { transform: rotate(360deg); } }
+@keyframes rotationCCW { 0% { transform: rotate(360deg); } 100% { transform: rotate(0deg); } }
 
 /* Custom Article Typography & Spacing */
 .article-body {

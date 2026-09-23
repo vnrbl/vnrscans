@@ -1,5 +1,11 @@
 import type { Metadata, Viewport } from "next";
-import { Inter } from "next/font/google";
+import {
+  Inter,
+  Barlow_Condensed,
+  Lora,
+  Roboto,
+  JetBrains_Mono,
+} from "next/font/google";
 import { Providers } from "@/components/Providers";
 import "@/styles.css";
 
@@ -7,6 +13,33 @@ const inter = Inter({
   subsets: ["latin"],
   display: "swap",
   variable: "--font-inter",
+});
+
+// Condensed industrial display face for page/section titles (genre standard)
+const barlowCondensed = Barlow_Condensed({
+  subsets: ["latin"],
+  weight: ["500", "600", "700"],
+  display: "swap",
+  variable: "--font-barlow-condensed",
+});
+
+// Novel reader faces (previously render-blocking CSS @imports)
+const lora = Lora({
+  subsets: ["latin"],
+  display: "swap",
+  variable: "--font-lora",
+});
+
+const roboto = Roboto({
+  subsets: ["latin"],
+  display: "swap",
+  variable: "--font-roboto",
+});
+
+const jetbrainsMono = JetBrains_Mono({
+  subsets: ["latin"],
+  display: "swap",
+  variable: "--font-jetbrains-mono",
 });
 
 export const metadata: Metadata = {
@@ -59,7 +92,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`dark ${inter.variable}`}
+      className={`dark ${inter.variable} ${barlowCondensed.variable} ${lora.variable} ${roboto.variable} ${jetbrainsMono.variable}`}
       suppressHydrationWarning
     >
       <head>

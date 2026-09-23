@@ -337,7 +337,8 @@ export function HomeHeroCarousel({ initialItems }: { initialItems?: CarouselItem
             <Button
               variant="secondary"
               size="icon"
-              className="absolute left-1 top-1/2 z-20 -translate-y-1/2 h-11 w-11 rounded-[4px] bg-black/75 border border-white/15 text-white opacity-0 group-hover:opacity-100 hover:border-purple-500/60 hover:text-purple-300 hover:scale-105 transition-[opacity,border-color,color,transform] shadow-xl shadow-black/80"
+              aria-label="Scroll carousel left"
+              className="focus-ring absolute left-1 top-1/2 z-20 -translate-y-1/2 h-11 w-11 rounded-full bg-black/75 backdrop-blur-md border border-white/15 text-white opacity-0 group-hover:opacity-100 focus-visible:opacity-100 hover:border-purple-500/60 hover:text-purple-300 hover:scale-105 transition-[opacity,border-color,color,transform] shadow-xl shadow-black/80"
               onClick={() => scroll('left')}
             >
               <ChevronLeft className="h-5 w-5 stroke-[1.8]" />
@@ -363,10 +364,10 @@ export function HomeHeroCarousel({ initialItems }: { initialItems?: CarouselItem
                 key={`${item.id}-${index}`}
                 to="/title/$slug"
                 params={{ slug: item.series.slug }}
-                className="group/card flex-shrink-0 block"
+                className="focus-ring group/card flex-shrink-0 block"
               >
                 <div
-                  className="relative h-[240px] w-[168px] overflow-hidden rounded-[4px] border border-neutral-800/80 bg-neutral-950 transition-[border-color,box-shadow] duration-300 group-hover/card:border-purple-500/50 group-hover/card:shadow-[0_0_25px_-5px_rgba(168,85,247,0.3)] sm:h-[300px] sm:w-[210px] md:h-[345px] md:w-[240px] lg:h-[390px] lg:w-[270px]"
+                  className="relative h-[240px] w-[168px] overflow-hidden rounded-xl border border-white/10 bg-neutral-950 transition-[border-color,box-shadow] duration-300 group-hover/card:border-purple-500/50 group-hover/card:shadow-[0_0_25px_-5px_rgba(168,85,247,0.3)] sm:h-[300px] sm:w-[210px] md:h-[345px] md:w-[240px] lg:h-[390px] lg:w-[270px]"
                   onMouseMove={handleCardTilt}
                   onMouseLeave={resetCardTilt}
                 >
@@ -379,29 +380,28 @@ export function HomeHeroCarousel({ initialItems }: { initialItems?: CarouselItem
                     priority={isAboveFold}
                   />
                   
-                  {/* Glass Reflection Sweep */}
+                  {/* Glass Reflection Sweep (hover-gated) */}
                   <div className="absolute inset-0 opacity-0 group-hover/card:opacity-100 transition-opacity duration-500 pointer-events-none">
                     <div className="absolute inset-0 overflow-hidden">
                       <div className="absolute -inset-full animate-shine bg-gradient-to-r from-transparent via-white/20 to-transparent skew-x-12" />
                     </div>
-                    <div className="absolute inset-0 bg-gradient-to-br from-purple-500/10 via-transparent to-transparent" />
                   </div>
                   
-                  {/* Dark Gradient Overlay on Hover */}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/40 to-transparent opacity-0 group-hover/card:opacity-100 transition-opacity duration-300" />
+                  {/* Cinematic scrim — always on so cover art meets type legibly */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/25 to-transparent pointer-events-none" />
                   
-                  {/* Title on Hover */}
-                  <div className="absolute bottom-0 left-0 right-0 p-4 transform translate-y-full group-hover/card:translate-y-0 transition-transform duration-300">
-                    <div className="inline-block mb-1.5 px-2 py-0.5 rounded bg-black/85 border border-white/20 text-purple-300 text-xs font-semibold uppercase tracking-wider">
+                  {/* Always-on title & type overlay — covers art-directed like film posters */}
+                  <div className="absolute bottom-0 left-0 right-0 p-3 sm:p-4">
+                    <div className="inline-block mb-1.5 px-2 py-0.5 rounded-md bg-black/85 border border-white/20 text-purple-300 text-3xs font-semibold uppercase tracking-wider">
                       {item.series.type}
                     </div>
-                    <h3 className="text-white text-sm sm:text-base font-bold leading-snug line-clamp-2">
+                    <h3 className="text-white text-sm sm:text-base font-bold leading-snug line-clamp-2 drop-shadow-md">
                       {item.series.title}
                     </h3>
                   </div>
 
                   {/* Subtle Border with glass effect */}
-                  <div className="absolute inset-0 border border-white/10 rounded-[4px] pointer-events-none group-hover/card:border-white/20 transition-colors" />
+                  <div className="absolute inset-0 border border-white/10 rounded-xl pointer-events-none group-hover/card:border-white/20 transition-colors" />
                 </div>
               </Link>
               );
@@ -413,7 +413,8 @@ export function HomeHeroCarousel({ initialItems }: { initialItems?: CarouselItem
             <Button
               variant="secondary"
               size="icon"
-              className="absolute right-1 top-1/2 z-20 -translate-y-1/2 h-11 w-11 rounded-[4px] bg-black/75 border border-white/15 text-white opacity-0 group-hover:opacity-100 hover:border-purple-500/60 hover:text-purple-300 hover:scale-105 transition-[opacity,border-color,color,transform] shadow-xl shadow-black/80"
+              aria-label="Scroll carousel right"
+              className="focus-ring absolute right-1 top-1/2 z-20 -translate-y-1/2 h-11 w-11 rounded-full bg-black/75 backdrop-blur-md border border-white/15 text-white opacity-0 group-hover:opacity-100 focus-visible:opacity-100 hover:border-purple-500/60 hover:text-purple-300 hover:scale-105 transition-[opacity,border-color,color,transform] shadow-xl shadow-black/80"
               onClick={() => scroll('right')}
             >
               <ChevronRight className="h-5 w-5 stroke-[1.8]" />
