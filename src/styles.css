@@ -1162,6 +1162,86 @@ article.font-novel * {
   display: none !important;
   visibility: hidden !important;
 }
+
+/* ── Welcome banner (home page) ─────────────────────────────────────────── */
+.welcome-banner {
+  background: linear-gradient(135deg, rgba(20, 12, 40, 0.75), rgba(8, 8, 12, 0.85));
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  animation: welcomeSlideIn 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Slow-shifting aurora wash behind the content */
+.welcome-banner__aurora {
+  background:
+    radial-gradient(60% 120% at 15% 20%, rgba(147, 51, 234, 0.28), transparent 60%),
+    radial-gradient(50% 100% at 85% 80%, rgba(217, 70, 239, 0.2), transparent 60%),
+    radial-gradient(40% 90% at 55% 10%, rgba(88, 28, 135, 0.25), transparent 65%);
+  background-size: 200% 200%;
+  animation: welcomeAurora 14s ease-in-out infinite alternate;
+}
+
+/* Floating glow orbs */
+.welcome-banner__orb--a { animation: welcomeFloatA 11s ease-in-out infinite alternate; }
+.welcome-banner__orb--b { animation: welcomeFloatB 13s ease-in-out infinite alternate; }
+
+/* Twinkling stars */
+.welcome-banner__star {
+  opacity: 0.15;
+  animation: welcomeTwinkle 3.2s ease-in-out infinite;
+}
+
+/* Gradient text shimmer sweep */
+.welcome-banner__shine {
+  background-size: 200% auto;
+  animation: welcomeShine 4s linear infinite;
+}
+
+/* Icon badge breathing */
+.welcome-banner__badge { animation: welcomeBreath 3.4s ease-in-out infinite; }
+
+/* Staggered content rise-in */
+.welcome-banner__rise { animation: welcomeRise 0.8s cubic-bezier(0.22, 1, 0.36, 1) 0.25s both; }
+.welcome-banner__rise--late { animation-delay: 0.45s; }
+
+@keyframes welcomeSlideIn {
+  from { opacity: 0; transform: translateY(-14px) scale(0.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes welcomeAurora {
+  0% { background-position: 0% 0%; }
+  100% { background-position: 100% 100%; }
+}
+
+@keyframes welcomeFloatA {
+  from { transform: translate(0, 0) scale(1); }
+  to { transform: translate(46px, 26px) scale(1.12); }
+}
+
+@keyframes welcomeFloatB {
+  from { transform: translate(0, 0) scale(1.05); }
+  to { transform: translate(-38px, -22px) scale(1); }
+}
+
+@keyframes welcomeTwinkle {
+  0%, 100% { opacity: 0.15; transform: scale(1); }
+  50% { opacity: 0.9; transform: scale(1.5); }
+}
+
+@keyframes welcomeShine {
+  to { background-position: 200% center; }
+}
+
+@keyframes welcomeBreath {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(168, 85, 247, 0.35); }
+  50% { transform: scale(1.06); box-shadow: 0 0 24px 4px rgba(168, 85, 247, 0.35); }
+}
+
+@keyframes welcomeRise {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
 body {
   top: 0px !important;
   position: static !important;

@@ -3,7 +3,6 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import NextLink from "next/link";
 import {
-  Sliders,
   X,
   ChevronLeft,
   ChevronRight,
@@ -523,15 +522,14 @@ export default function NovelSettingsPanel({
         <div className="fixed bottom-6 left-6 z-40 animate-in fade-in zoom-in-75 duration-200">
           <button
             onClick={onOpen}
-            className="flex items-center gap-2 px-4 py-3 rounded-2xl shadow-2xl text-white font-semibold text-xs border border-white/10 backdrop-blur-xl transition-all duration-300 transform hover:scale-105 active:scale-95 group cursor-pointer"
+            className="flex items-center justify-center w-12 h-12 rounded-full shadow-2xl text-white border border-white/10 backdrop-blur-xl transition-all duration-300 transform hover:scale-105 active:scale-95 group cursor-pointer"
             style={{
               backgroundColor: activeAccent.hex,
               boxShadow: `0 10px 25px -5px ${activeAccent.glowHex}`,
             }}
             title="Reader Preferences"
           >
-            <Sliders className="h-4 w-4 transition-transform group-hover:rotate-45" />
-            <span className="tracking-wide">Settings</span>
+            <Settings className="h-5 w-5 transition-transform group-hover:rotate-45" />
           </button>
         </div>
       )}

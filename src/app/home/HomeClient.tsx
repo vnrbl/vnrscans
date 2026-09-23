@@ -19,6 +19,7 @@ import { useDragScroll, DRAG_SCROLL_CONTAINER_CLASS } from "@/hooks/useDragScrol
 import { TITLE_CARD_WIDTH, TITLE_COVER_CLASS } from "@/components/titleCardStyles";
 import dynamic from "next/dynamic";
 import type { CarouselItem } from "@/components/HomeHeroCarousel";
+import WelcomeBanner from "@/components/WelcomeBanner";
 
 const HomeHeroCarousel = dynamic(
   () => import("@/components/HomeHeroCarousel").then((m) => m.HomeHeroCarousel),
@@ -500,6 +501,7 @@ function HomeContent({ initialData }: { initialData?: HomeInitialData }) {
 
   return (
     <div className="min-h-screen">
+      <WelcomeBanner />
       <HomeHeroCarousel initialItems={initialData?.carouselItems} />
 
       {user && (

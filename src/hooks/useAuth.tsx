@@ -19,12 +19,15 @@ interface AuthState {
   session: Session | null;
   user: User | null;
   loading: boolean;
+  /** True when the current session is an anonymous/guest sign-in. */
+  isGuest: boolean;
 }
 
 const AuthContext = createContext<AuthState>({
   session: null,
   user: null,
   loading: true,
+  isGuest: false,
 });
 
 const VNR_CACHED_USER_KEY = "vnr_cached_user";
@@ -47,7 +50,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     session: null,
     user: null,
     loading: true,
+    isGuest: false,
   });
+
+  const applySession = (session: Session | null) => {
+    setState({
+      session,
+      user: session?.user ?? null,
+      loading: false,
+      isGuest: !!session?.user?.is_anonymous,
+    });
+  };
 
   useEffect(() => {
     let mounted = true;
@@ -61,6 +74,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           ...prev,
           user: cachedUser,
           loading: false,
+          isGuest: !!cachedUser?.is_anonymous,
         }));
       }
     } catch {}
@@ -90,7 +104,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             localStorage.removeItem("vnr_is_mod");
             localStorage.removeItem("vnr_is_uploader");
           } catch {}
-          setState({ session: null, user: null, loading: false });
+          setState({ session: null, user: null, loading: false, isGuest: false });
           toast.error("Your account has been suspended. Contact support if you believe this is a mistake.");
         }
       } catch (err) {
@@ -104,18 +118,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (error) {
         console.error("useAuth: getSession error:", error);
-        setState({ session: null, user: null, loading: false });
+        setState({ session: null, user: null, loading: false, isGuest: false });
         try {
           localStorage.removeItem(VNR_CACHED_USER_KEY);
         } catch {}
         return;
       }
 
-      setState({
-        session: data.session,
-        user: data.session?.user ?? null,
-        loading: false,
-      });
+      applySession(data.session);
 
       if (data.session?.user) {
         try {
@@ -138,11 +148,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.log("useAuth: onAuthStateChange fired event:", event, "session present:", !!session);
       
       // Update state synchronously to prevent race conditions and blockages
-      setState({
-        session,
-        user: session?.user ?? null,
-        loading: false,
-      });
+      applySession(session);
 
       // Run ban check in the background without blocking the UI state transition
       if (session?.user) {
@@ -169,6 +175,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   return (
     <AuthContext.Provider value={state}>{children}</AuthContext.Provider>
   );
+}
+
+/**
+ * Sign in as a one-click anonymous guest (Supabase anonymous sign-in).
+ * Creates a real auth.users row with is_anonymous=true so reading progress,
+ * follows and settings attach to a session that can later be upgraded to a
+ * full account without losing data. Returns an error message on failure.
+ */
+export async function signInAsGuest(): Promise<string | null> {
+  try {
+    const { error } = await supabase.auth.signInAnonymously({
+      options: { data: { guest: true } },
+    });
+    if (error) {
+      // Common case: "Anonymous sign-ins are disabled" (422)
+      return error.message;
+    }
+    return null;
+  } catch (err: any) {
+    return err?.message || "Guest sign-in failed";
+  }
 }
 
 /** Read auth state — zero overhead, just a context read. */

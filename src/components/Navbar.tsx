@@ -1,6 +1,6 @@
 import { Link, useNavigate } from "@/lib/router-compat";
 import { useState, useEffect, lazy, Suspense } from "react";
-import { Menu, X, Search, BookOpen, User as UserIcon, LogOut, ShieldCheck, ShieldAlert, Library, Home, Sparkles, Trophy, Crown, Dice1, Dice2, Dice3, Dice4, Dice5, Dice6, Loader2, Users, Settings as SettingsIcon, Plus } from "lucide-react";
+import { Menu, X, Search, BookOpen, User as UserIcon, LogOut, ShieldCheck, ShieldAlert, Library, Home, Sparkles, Trophy, Crown, Dice1, Dice2, Dice3, Dice4, Dice5, Dice6, Loader2, Users, Settings as SettingsIcon, Plus, UserRoundPlus } from "lucide-react";
 import type { DiceSeries } from "@/components/DiceRollOverlay";
 import { useReaderSettings } from "@/contexts/ReaderSettingsContext";
 import dynamic from "next/dynamic";
@@ -105,7 +105,7 @@ export function Navbar() {
     } catch (_) {}
   }, []);
 
-  const { user } = useAuth();
+  const { user, isGuest } = useAuth();
   const { settings } = useReaderSettings();
   const { isAdmin, isMod, isUploader } = useIsAdmin();
   const showPanel = mounted && (isAdmin || isMod || isUploader);
@@ -402,7 +402,7 @@ export function Navbar() {
                       avatarUrl={userStats.data?.avatar_url}
                       avatarFrame={userStats.data?.avatar_frame || 'none'}
                       accentColor={userStats.data?.accent_color || '#8B5CF6'}
-                      username={userStats.data?.username}
+                      username={isGuest ? "Guest" : userStats.data?.username}
                     />
                   </Button>
                 </DropdownMenuTrigger>
@@ -429,6 +429,17 @@ export function Navbar() {
                           </div>
                         </div>
                       </DropdownMenuLabel>
+                      <DropdownMenuSeparator className="bg-white/10" />
+                    </>
+                  )}
+                  {isGuest && (
+                    <>
+                      <DropdownMenuItem
+                        onClick={() => navigate({ to: "/auth" })}
+                        className="text-primary focus:text-primary"
+                      >
+                        <UserRoundPlus className="mr-2 h-4 w-4" /> Upgrade to full account
+                      </DropdownMenuItem>
                       <DropdownMenuSeparator className="bg-white/10" />
                     </>
                   )}

@@ -85,6 +85,12 @@ import NovelSettingsPanel, {
   NOVEL_THEMES,
   NOVEL_ACCENTS,
 } from "@/components/NovelSettingsPanel";
+import {
+  loadNovelSettings,
+  saveNovelSettings,
+  loadSessionNovelSettings,
+  cookiesAllowed,
+} from "@/lib/cookie-settings";
 import { fetchSeriesBySlug } from "@/lib/series-slug";
 import { LiveChapterModal } from "@/components/admin/LiveChapterModal";
 
@@ -1224,33 +1230,7 @@ export default function Reader({
         />
       </div>
 
-      {/* Floating Admin Live Pill */}
-      {canManage && (
-        <div className="fixed top-14 sm:top-16 right-3 sm:right-6 z-40 flex items-center gap-1.5 sm:gap-2 px-3 py-1.5 rounded-full bg-neutral-900/90 border border-amber-500/50 shadow-2xl backdrop-blur-md text-xs font-semibold text-white pointer-events-auto">
-          <span className="flex h-2 w-2 rounded-full bg-amber-400 animate-pulse" />
-          <span className="text-amber-300 font-bold text-2xs uppercase tracking-wider hidden sm:inline">Admin Live</span>
-          <div className="h-3 w-px bg-neutral-700 hidden sm:inline" />
-          <button
-            type="button"
-            onClick={() => setLiveEditOpen(true)}
-            className="flex items-center gap-1 text-neutral-300 hover:text-amber-300 transition-colors cursor-pointer text-xs"
-            title="Live Edit this Chapter"
-          >
-            <Pencil className="h-3.5 w-3.5 text-amber-400" />
-            <span>Edit</span>
-          </button>
-          <div className="h-3 w-px bg-neutral-700" />
-          <button
-            type="button"
-            onClick={() => setLiveCreateOpen(true)}
-            className="flex items-center gap-1 text-neutral-300 hover:text-purple-300 transition-colors cursor-pointer text-xs"
-            title="Add New Chapter Live"
-          >
-            <Plus className="h-3.5 w-3.5 text-purple-400" />
-            <span>Add Next</span>
-          </button>
-        </div>
-      )}
+
 
       {/* Admin Live Modals */}
       {canManage && c && (
@@ -1663,33 +1643,7 @@ function ReaderTopBar({
             <Search className="h-3.5 w-3.5" />
           </button>
 
-          {/* Admin Live Controls */}
-          {canManage && (
-            <div className="flex items-center gap-1 shrink-0">
-              {onLiveEdit && (
-                <button
-                  type="button"
-                  onClick={onLiveEdit}
-                  title="Live Edit Chapter"
-                  className="flex items-center gap-1 text-xs h-8 sm:h-9 px-2 sm:px-2.5 rounded-lg border border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 transition-colors cursor-pointer shrink-0 font-medium"
-                >
-                  <Pencil className="h-3.5 w-3.5 text-amber-400" />
-                  <span className="hidden md:inline">Edit</span>
-                </button>
-              )}
-              {onLiveCreate && (
-                <button
-                  type="button"
-                  onClick={onLiveCreate}
-                  title="Add Next Chapter Live"
-                  className="flex items-center gap-1 text-xs h-8 sm:h-9 px-2 sm:px-2.5 rounded-lg border border-purple-500/40 bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 transition-colors cursor-pointer shrink-0 font-medium"
-                >
-                  <Plus className="h-3.5 w-3.5 text-purple-400" />
-                  <span className="hidden md:inline">Add</span>
-                </button>
-              )}
-            </div>
-          )}
+
 
           {/* Eye Comfort Filter Toggle */}
           {onCycleFilter && (
@@ -2689,58 +2643,37 @@ function NovelView({
   const [scrollProgress, setScrollProgress] = useState(0);
   const [isBookmarked, setIsBookmarked] = useState(false);
 
-  // Load preferences from localStorage on client-side mount
+  // Keep a ref so the consent-change handler always sees the latest settings
+  const settingsRef = useRef(settings);
+  useEffect(() => {
+    settingsRef.current = settings;
+  }, [settings]);
+
+  // Load preferences: cookie (cross-subdomain, persists a year) or sessionStorage
+  // fallback for visitors who rejected cookies. Runs on mount.
   useEffect(() => {
     if (typeof window === "undefined") return;
-    try {
-      const storedV2 = localStorage.getItem("novel-reader-settings-v2");
-      if (storedV2) {
-        const parsed = JSON.parse(storedV2);
-        if (parsed.accentColor === "sky") parsed.accentColor = "purple";
-        if (typeof parsed.paragraphSpacing === "number" && parsed.paragraphSpacing < 5) {
-          parsed.paragraphSpacing = 28;
-        }
-        setSettings((prev) => ({ ...prev, ...parsed }));
-      } else {
-        // Fallback migration from older legacy keys if they exist
-        const storedSize = localStorage.getItem("novel-font-size");
-        const storedFamily = localStorage.getItem("novel-font-family");
-        const storedLineHeight = localStorage.getItem("novel-line-height");
-        const storedTheme = localStorage.getItem("novel-theme");
-
-        setSettings((prev) => ({
-          ...prev,
-          fontSize: storedSize ? parseInt(storedSize, 10) : prev.fontSize,
-          fontFamily:
-            storedFamily === "serif"
-              ? "lora"
-              : storedFamily === "mono"
-              ? "mono"
-              : "default",
-          lineHeight: storedLineHeight ? parseFloat(storedLineHeight) : prev.lineHeight,
-          theme:
-            storedTheme === "charcoal"
-              ? "charcoal"
-              : storedTheme === "sepia"
-              ? "sepia"
-              : storedTheme === "slate"
-              ? "slate"
-              : "pitch-black",
-        }));
-      }
-    } catch (e) {
-      console.error("Failed to load novel preferences", e);
+    const loaded = loadNovelSettings();
+    if (!cookiesAllowed()) {
+      // Rejected consent: overlay any in-session settings from sessionStorage
+      const sessionPartial = loadSessionNovelSettings();
+      setSettings({ ...loaded, ...(sessionPartial || {}) });
+    } else {
+      setSettings(loaded);
     }
+    // If consent flips to accepted mid-session, re-save so session settings
+    // graduate into the persistent cookie.
+    const onConsentChange = () => {
+      if (cookiesAllowed()) saveNovelSettings(settingsRef.current);
+    };
+    window.addEventListener("vnr-cookie-consent-change", onConsentChange);
+    return () => window.removeEventListener("vnr-cookie-consent-change", onConsentChange);
   }, []);
 
   const updateSettings = useCallback((updater: Partial<NovelReaderSettings>) => {
     setSettings((prev) => {
       const next = { ...prev, ...updater };
-      try {
-        localStorage.setItem("novel-reader-settings-v2", JSON.stringify(next));
-      } catch (e) {
-        console.error("Failed to save novel reader settings", e);
-      }
+      saveNovelSettings(next);
       return next;
     });
   }, []);
@@ -3631,31 +3564,7 @@ function FloatingControls({
           <Flag className="h-4 w-4 lg:h-5 lg:w-5" />
         </button>
 
-        {/* Admin Live Controls */}
-        {canManage && (
-          <>
-            {onLiveEdit && (
-              <button
-                type="button"
-                onClick={onLiveEdit}
-                className="p-2 lg:p-2.5 xl:p-3 rounded-full hover:bg-amber-500/20 text-amber-400 hover:text-amber-300 transition-colors"
-                title="Live Edit Chapter (Admin)"
-              >
-                <Pencil className="h-4 w-4 lg:h-5 lg:w-5" />
-              </button>
-            )}
-            {onLiveCreate && (
-              <button
-                type="button"
-                onClick={onLiveCreate}
-                className="p-2 lg:p-2.5 xl:p-3 rounded-full hover:bg-purple-500/20 text-purple-400 hover:text-purple-300 transition-colors"
-                title="Add Next Chapter Live (Admin)"
-              >
-                <Plus className="h-4 w-4 lg:h-5 lg:w-5" />
-              </button>
-            )}
-          </>
-        )}
+
 
         {/* Next Chapter */}
         <button

@@ -1237,6 +1237,10 @@ export default {
 
         if (body.record?.email) {
           // Supabase DB webhook format
+          // Anonymous/guest users have no email — skip them quietly (no notification)
+          if (body.record.is_anonymous === true) {
+            return Response.json({ success: true, skipped: "anonymous user" });
+          }
           payload = {
             email: body.record.email,
             userId: body.record.id,

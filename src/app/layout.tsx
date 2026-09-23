@@ -7,6 +7,7 @@ import {
   JetBrains_Mono,
 } from "next/font/google";
 import { Providers } from "@/components/Providers";
+import CookieConsentBanner from "@/components/CookieConsentBanner";
 import "@/styles.css";
 
 const inter = Inter({
@@ -117,6 +118,7 @@ export default function RootLayout({
       </head>
       <body suppressHydrationWarning>
         <Providers>{children}</Providers>
+        <CookieConsentBanner />
       </body>
     </html>
   );
