@@ -24,7 +24,6 @@ import { ThemeProvider } from "@/contexts/ThemeContext";
 import { ReaderSettingsProvider } from "@/contexts/ReaderSettingsContext";
 import { AuthProvider } from "@/hooks/useAuth";
 import { NavigationProgress } from "@/components/NavigationProgress";
-import { SiteChatAssistant } from "@/components/SiteChatAssistant";
 
 import { ProcessingTaskProvider } from "@/contexts/ProcessingTaskContext";
 
@@ -130,7 +129,6 @@ function AppShell({ children }: { children: ReactNode }) {
       <main className="flex-1 pb-[calc(3.5rem+env(safe-area-inset-bottom,0px))] sm:pb-0">
         {children}
       </main>
-      <SiteChatAssistant />
       <Footer />
       <Toaster />
       <Analytics />

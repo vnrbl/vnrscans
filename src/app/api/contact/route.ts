@@ -12,6 +12,33 @@ const ContactSchema = z.object({
 
 const WORKER_URL = process.env.WORKER_URL || process.env.CLOUDFLARE_WORKER_URL;
 
+function createContactNo() {
+  const date = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+  return `CT-${date}-${crypto.randomUUID().slice(0, 6).toUpperCase()}`;
+}
+
+async function sendTelegramContactAlert(data: z.infer<typeof ContactSchema>, contactNo: string) {
+  const secret = process.env.TELEGRAM_ACTION_SECRET;
+  if (!WORKER_URL || !secret) {
+    console.warn("[/api/contact] Telegram contact alert is not configured");
+    return;
+  }
+
+  try {
+    const response = await fetch(`${WORKER_URL.replace(/\/$/, "")}/telegram/contact-alert`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Site-Action-Secret": secret },
+      body: JSON.stringify({ ...data, contactNo }),
+      signal: AbortSignal.timeout(8_000),
+    });
+    if (!response.ok) {
+      console.warn("[/api/contact] Telegram contact alert was not delivered immediately", { status: response.status, contactNo });
+    }
+  } catch (error) {
+    console.warn("[/api/contact] Telegram contact alert request failed", { contactNo, error: error instanceof Error ? error.message : "unknown error" });
+  }
+}
+
 // Simple in-memory sliding window rate limiter (max 5 requests per 10 minutes per IP)
 const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
 
@@ -49,6 +76,7 @@ export async function POST(req: NextRequest) {
     }
 
     const data = parsed.data;
+    const contactNo = createContactNo();
     console.log("[/api/contact] Received submission for", data.email, "WORKER_URL set?", !!WORKER_URL);
 
     // If WORKER_URL is set, forward to Cloudflare Worker (preferred for emails)
@@ -57,14 +85,15 @@ export async function POST(req: NextRequest) {
         const workerRes = await fetch(`${WORKER_URL.replace(/\/$/, "")}/email/contact`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(data),
+          body: JSON.stringify({ ...data, contactNo }),
         });
 
         const result = (await workerRes.json()) as { success?: boolean; error?: string; id?: string };
         console.log("[/api/contact] Worker response:", { status: workerRes.status, result });
 
         if (workerRes.ok && result.success) {
-          return NextResponse.json({ success: true, via: "worker", id: result.id });
+          await sendTelegramContactAlert(data, contactNo);
+          return NextResponse.json({ success: true, via: "worker", id: result.id, contactNo });
         }
         // Fall through to direct if worker failed
         console.warn("[/api/contact] Worker failed, falling back to direct:", result);
@@ -92,7 +121,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    return NextResponse.json({ success: true, via: "direct", id: result.id });
+    await sendTelegramContactAlert(data, contactNo);
+    return NextResponse.json({ success: true, via: "direct", id: result.id, contactNo });
   } catch (err: any) {
     console.error("[/api/contact] error:", err);
     return NextResponse.json(

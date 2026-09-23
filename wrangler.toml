@@ -2,6 +2,9 @@ name = "vnrscans"
 main = "src/workers/index.ts"
 compatibility_date = "2025-07-01"
 
+[triggers]
+crons = ["*/5 * * * *"]
+
 # Cloudflare account (you can set via env or wrangler login)
 # account_id = "your-account-id"
 
@@ -10,8 +13,8 @@ compatibility_date = "2025-07-01"
 OWNER_EMAIL = "creator@vnrscans.com"
 FROM_EMAIL = "VNR Scans <onboarding@resend.dev>"
 TELEGRAM_ALLOWED_CHAT_ID = "8873041972"
-SUPABASE_URL = "https://edvqhmvqbtujzcfqkrbe.supabase.co"
-SUPABASE_PUBLISHABLE_KEY = "sb_publishable_jVdWorDtLlkVYzRh6EbEOA_lwnu59an"
+SUPABASE_URL = "https://nzxrshkpjdkrbnsonxos.supabase.co"
+SUPABASE_PUBLISHABLE_KEY = "sb_publishable_r7QucgUpGCGF7oR5doc1ow_uhv0CjQc"
 SITE_URL = "https://www.vnrscans.com"
 
 [ai]

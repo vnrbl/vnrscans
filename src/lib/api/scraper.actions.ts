@@ -61,6 +61,21 @@ async function verifyAdmin(requestUserToken: string) {
   return user as typeof user & { username: string };
 }
 
+function matchesInternalActionSecret(supplied: string, expected: string) {
+  if (supplied.length !== expected.length) return false;
+  let difference = 0;
+  for (let index = 0; index < expected.length; index++) {
+    difference |= supplied.charCodeAt(index) ^ expected.charCodeAt(index);
+  }
+  return difference === 0;
+}
+
+function isInternalActionToken(token: string) {
+  const configuredSecrets = [process.env.CRON_SECRET, process.env.TELEGRAM_ACTION_SECRET]
+    .filter((secret): secret is string => typeof secret === "string" && secret.length >= 32);
+  return configuredSecrets.some((secret) => matchesInternalActionSecret(token, secret));
+}
+
 export async function $extractChaptersFromUrl(args: {
   data: {
     url: string;
@@ -467,10 +482,11 @@ async function mirrorPagesForChapter(
   _admin: ReturnType<typeof getAdminSupabase>,
   seriesSlug: string,
   chapterSlug: string,
-  images: string[]
+  images: string[],
+  forceRefresh = false,
 ): Promise<string[]> {
   // Skip mirroring entirely for trusted CDN sources
-  if (shouldSkipMirroring(images)) {
+  if (!forceRefresh && shouldSkipMirroring(images)) {
     console.log(`[StorageMirror] Skipping mirror for ${chapterSlug} — ${images.length} images from trusted CDN`);
     return images;
   }
@@ -496,7 +512,7 @@ async function mirrorPagesForChapter(
       batchPromises.push(
         (async () => {
           // Skip if already on our infrastructure
-          if (isAlreadyMirrored(rawImgUrl)) {
+          if (!forceRefresh && isAlreadyMirrored(rawImgUrl)) {
             return { idx, url: rawImgUrl };
           }
           try {
@@ -908,7 +924,7 @@ export async function $syncImportSource(args: {
     .parse(data);
 
   let uploaderUsername = "vnr610";
-  if (validated.accessToken !== "cron-internal") {
+  if (!isInternalActionToken(validated.accessToken)) {
     const adminUser = await verifyAdmin(validated.accessToken);
     uploaderUsername = (adminUser as any)?.username || "vnr610";
   }
@@ -1658,6 +1674,99 @@ export async function $deleteChapter(args: {
   }
 }
 
+/** Re-scrape and refresh a reported chapter without deleting its chapter row or reader references. */
+export async function $repairReportedChapter(args: {
+  data: { chapterId: string; internalSecret: string };
+}) {
+  try {
+    const expectedSecret = process.env.TELEGRAM_ACTION_SECRET;
+    if (!expectedSecret || !matchesInternalActionSecret(args.data.internalSecret, expectedSecret)) {
+      return { success: false, error: "Unauthorized chapter repair request" };
+    }
+    const { chapterId } = z.object({ chapterId: z.string().uuid(), internalSecret: z.string().min(32) }).parse(args.data);
+    const admin = getAdminSupabase();
+    const { data: chapter, error: chapterError } = await admin
+      .from("chapters")
+      .select("id,series_id,chapter_number,title,slug,chapter_type,source_url,scanlation_group,series:series(title,slug),chapter_pages(id,page_number,image_url)")
+      .eq("id", chapterId)
+      .maybeSingle();
+    if (chapterError) throw chapterError;
+    if (!chapter) return { success: false, error: "Reported chapter no longer exists" };
+    if (chapter.chapter_type !== "image") return { success: false, error: "Automatic repair only supports image chapters" };
+
+    let sourceUrl = chapter.source_url || "";
+    let imageUrlExample = sourceUrl ? detectImportSource(sourceUrl).imageUrlExample || "" : "";
+    if (!sourceUrl) {
+      const { data: sources, error: sourcesError } = await admin
+        .from("series_import_sources")
+        .select("source_url,scanlation_group,image_url_example")
+        .eq("series_id", chapter.series_id)
+        .eq("enabled", true)
+        .order("last_success_at", { ascending: false, nullsFirst: false });
+      if (sourcesError) throw sourcesError;
+
+      for (const source of sources || []) {
+        const discovered = await extractChaptersFromSeriesUrl(source.source_url);
+        const sourceGroup = normalizeScanlationGroup(source.scanlation_group || "");
+        const targetGroup = normalizeScanlationGroup(chapter.scanlation_group || "");
+        const match = discovered.find((candidate) =>
+          Number(candidate.chapterNumber) === Number(chapter.chapter_number)
+          && (!sourceGroup || !targetGroup || sourceGroup === targetGroup)
+          && (!candidate.scanGroup || !targetGroup || normalizeScanlationGroup(candidate.scanGroup) === targetGroup),
+        );
+        if (match) {
+          sourceUrl = match.url;
+          imageUrlExample = source.image_url_example || detectImportSource(source.source_url).imageUrlExample || "";
+          break;
+        }
+      }
+    }
+    if (!sourceUrl) return { success: false, error: "No source URL was saved and no matching import source could be found" };
+
+    const rawImages = await extractImagesFromChapterUrl(sourceUrl, { imageUrlExample: imageUrlExample || null });
+    const images = filterImagesByExampleUrl(rawImages, imageUrlExample).slice(0, 300);
+    if (!images.length) return { success: false, error: "The chapter source returned no usable reader images" };
+
+    const series = Array.isArray(chapter.series) ? chapter.series[0] : chapter.series;
+    if (!series?.slug) return { success: false, error: "The chapter's series record is unavailable" };
+    const uploadedImages = await mirrorPagesForChapter(admin, series.slug, chapter.slug, images, true);
+    const uploadedCount = uploadedImages.filter((image, index) => image !== images[index]).length;
+    if (uploadedImages.length !== images.length || uploadedCount !== images.length) {
+      return { success: false, error: "The source pages were found, but not all pages could be re-uploaded to site storage" };
+    }
+
+    const { error: upsertError } = await admin.from("chapter_pages").upsert(
+      uploadedImages.map((image_url, index) => ({ chapter_id: chapter.id, page_number: index + 1, image_url })),
+      { onConflict: "chapter_id,page_number" },
+    );
+    if (upsertError) throw upsertError;
+
+    const { error: stalePagesError } = await admin
+      .from("chapter_pages")
+      .delete()
+      .eq("chapter_id", chapter.id)
+      .gt("page_number", uploadedImages.length);
+    if (stalePagesError) throw stalePagesError;
+
+    const { count, error: verifyError } = await admin
+      .from("chapter_pages")
+      .select("id", { count: "exact", head: true })
+      .eq("chapter_id", chapter.id);
+    if (verifyError) throw verifyError;
+    if (count !== uploadedImages.length) return { success: false, error: "The refreshed page count did not verify" };
+
+    return {
+      success: true,
+      seriesTitle: series.title || "Unknown series",
+      chapterNumber: Number(chapter.chapter_number),
+      pageCount: uploadedImages.length,
+      message: `Re-scraped and re-uploaded ${uploadedImages.length} pages`,
+    };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "Automatic chapter repair failed" };
+  }
+}
+
 /**
  * Bulk delete multiple chapters with admin authentication
  */
@@ -1694,16 +1803,17 @@ export async function $bulkDeleteChapters(args: {
 /**
  * Sync all series import sources that are due on their Estimated Next Release Time.
  */
-export async function $syncDueScheduledSeries(args?: {
-  data?: {
-    accessToken?: string;
+export async function $syncDueScheduledSeries(args: {
+  data: {
+    accessToken: string;
     forceAll?: boolean;
     maxChaptersPerSeries?: number;
+    maxSourcesPerRun?: number;
   };
 }) {
   try {
-    const token = args?.data?.accessToken || "cron-internal";
-    if (token !== "cron-internal") {
+    const token = z.string().min(1).parse(args.data.accessToken);
+    if (!isInternalActionToken(token)) {
       await verifyAdmin(token);
     }
 
@@ -1722,16 +1832,29 @@ export async function $syncDueScheduledSeries(args?: {
         message: "No enabled import sources found.",
         totalProcessed: 0,
         totalImported: 0,
+        totalDue: 0,
+        totalEligible: 0,
+        totalPending: 0,
         results: [],
       };
     }
 
     const forceAll = args?.data?.forceAll ?? false;
-    const dueSources = forceAll
+    const eligibleSources = forceAll
       ? sources
       : sources.filter((s) => isSourceDueForScraping(s));
+    eligibleSources.sort((a, b) => {
+      const checkedA = a.last_checked_at ? new Date(a.last_checked_at).getTime() : 0;
+      const checkedB = b.last_checked_at ? new Date(b.last_checked_at).getTime() : 0;
+      return checkedA - checkedB;
+    });
+    const configuredLimit = args?.data?.maxSourcesPerRun;
+    const maxSources = forceAll
+      ? eligibleSources.length
+      : Math.max(1, Math.min(20, Math.floor(configuredLimit || eligibleSources.length)));
+    const dueSources = eligibleSources.slice(0, maxSources);
 
-    console.log(`[ScheduledImporter] ${dueSources.length} of ${sources.length} sources are due for checking.`);
+    console.log(`[ScheduledImporter] Checking ${dueSources.length} of ${eligibleSources.length} due sources (${sources.length} enabled).`);
 
     const results = [];
     let totalImported = 0;
@@ -1743,7 +1866,7 @@ export async function $syncDueScheduledSeries(args?: {
       const syncRes = await $syncImportSource({
         data: {
           sourceId: source.id,
-          accessToken: "cron-internal",
+          accessToken: token,
           maxChapters: args?.data?.maxChaptersPerSeries ?? 25,
         },
       });
@@ -1770,6 +1893,8 @@ export async function $syncDueScheduledSeries(args?: {
     return {
       success: true,
       totalDue: dueSources.length,
+      totalEligible: eligibleSources.length,
+      totalPending: Math.max(0, eligibleSources.length - dueSources.length),
       totalProcessed: results.length,
       totalImported,
       results,
@@ -1785,12 +1910,12 @@ export async function $syncDueScheduledSeries(args?: {
 /**
  * Scan all series to recalculate and refresh their Estimated Next Release timing.
  */
-export async function $scanAllSeriesTimings(args?: {
-  data?: { accessToken: string };
+export async function $scanAllSeriesTimings(args: {
+  data: { accessToken: string };
 }) {
   try {
-    const token = args?.data?.accessToken || "cron-internal";
-    if (token !== "cron-internal") {
+    const token = z.string().min(1).parse(args.data.accessToken);
+    if (!isInternalActionToken(token)) {
       await verifyAdmin(token);
     }
 
@@ -1870,5 +1995,3 @@ export async function $scanAllSeriesTimings(args?: {
     };
   }
 }
-
-

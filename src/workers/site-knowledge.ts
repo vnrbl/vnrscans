@@ -11,8 +11,8 @@ const SITE_DOCUMENTS: KnowledgeDocument[] = [
   {
     title: "About VNR Scans and reading",
     url: "/about",
-    keywords: ["vnrscans about manga manhwa manhua novel reader free read chapters platform"],
-    content: "VNR Scans is a community reading site for manga, manhwa, manhua, and web novels. Reading indexed series, bookmarking favorites, and tracking reading progress are free; there is no required paid subscription. Browse the catalog at /browse, search titles at /search, and open a series at /title/{slug}.",
+    keywords: ["vnrscans website actually purpose platform what is about manga manhwa manhua novel reader free read chapters community social creator copyright who built created made developer founder owner"],
+    content: "VNR Scans is a modern online reader for manga, manhwa, manhua, and web novels, built around a clean reading experience and reader community. The site includes a searchable catalog, series and chapter pages, reader profiles, social discussions, bookmarks and progress, and Spiritual Qi progression. The public About page describes VNR Scans as built by manga lovers, for manga lovers, but does not name an individual developer. The About page says it links to media hosted by third parties rather than storing media files on its own servers. Reading indexed series, bookmarks, and reading progress are free according to the site FAQ. Browse at /browse, search at /search, and read about the platform at /about.",
   },
   {
     title: "Frequently asked questions",
@@ -77,7 +77,7 @@ const SITE_DOCUMENTS: KnowledgeDocument[] = [
 ];
 
 const STOP_WORDS = new Set([
-  "about", "also", "and", "are", "can", "could", "does", "for", "from", "have", "hello", "help", "how", "into", "is", "it", "latest", "me", "my", "please", "site", "tell", "that", "the", "this", "to", "what", "when", "where", "which", "who", "with", "you", "your",
+  "about", "actually", "also", "and", "are", "can", "could", "does", "for", "from", "have", "hello", "help", "how", "into", "is", "it", "latest", "me", "my", "please", "site", "tell", "that", "the", "this", "to", "what", "when", "where", "which", "who", "with", "you", "your",
 ]);
 
 function tokenize(value: string): string[] {
@@ -100,6 +100,13 @@ export function retrieveSiteKnowledge(question: string, limit = 4): string {
     }
     return { document, score };
   }).filter((item) => item.score > 0).sort((a, b) => b.score - a.score).slice(0, limit);
+
+  // Broad questions such as "what is this website for?" should have a useful,
+  // grounded answer even when their wording does not match a page keyword.
+  if (ranked.length === 0) {
+    const about = SITE_DOCUMENTS[0];
+    return `Source: https://www.vnrscans.com${about.url}\n${about.title}: ${about.content}`;
+  }
 
   return ranked.map(({ document }) => `Source: https://www.vnrscans.com${document.url}\n${document.title}: ${document.content}`).join("\n\n");
 }

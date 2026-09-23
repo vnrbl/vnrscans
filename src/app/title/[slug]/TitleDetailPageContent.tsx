@@ -855,9 +855,10 @@ const RecommendationsSection = React.memo(function RecommendationsSection({
   const sourceTropes = STORY_PLOT_TROPES.filter((trope) => sourceText.includes(trope));
 
   const recommendations = useQuery({
-    queryKey: ["recommendations-strict-grid-50pct", currentSeriesId],
+    queryKey: ["recommendations-strict-grid-50pct", currentSeriesId, currentType],
     queryFn: async () => {
       try {
+        // Primary query: same type only (novels→novels, manhwa→manhwa, etc.)
         const { data, error } = await supabase
           .from("series")
           .select(
@@ -865,6 +866,7 @@ const RecommendationsSection = React.memo(function RecommendationsSection({
           )
           .neq("id", currentSeriesId)
           .eq("is_hidden", false)
+          .eq("type", currentType)
           .order("rating_average", { ascending: false })
           .limit(200);
 
@@ -873,59 +875,62 @@ const RecommendationsSection = React.memo(function RecommendationsSection({
           return [];
         }
 
-        const scored = (data || []).map((candidate: any) => {
-          const candGenres: string[] = (candidate?.series_genres || [])
-            .map((sg: any) => sg?.genre?.slug?.toLowerCase() || sg?.genre?.name?.toLowerCase())
-            .filter(Boolean);
+        const scoreCandidates = (candidates: any[]) =>
+          candidates.map((candidate: any) => {
+            const candGenres: string[] = (candidate?.series_genres || [])
+              .map((sg: any) => sg?.genre?.slug?.toLowerCase() || sg?.genre?.name?.toLowerCase())
+              .filter(Boolean);
 
-          const candTags: string[] = (candidate?.series_tags || [])
-            .map((st: any) => st?.tag?.slug?.toLowerCase() || st?.tag?.name?.toLowerCase())
-            .filter(Boolean);
+            const candTags: string[] = (candidate?.series_tags || [])
+              .map((st: any) => st?.tag?.slug?.toLowerCase() || st?.tag?.name?.toLowerCase())
+              .filter(Boolean);
 
-          const candText = `${candidate?.title || ""} ${candidate?.description || ""}`.toLowerCase();
-          const candTitleLower = (candidate?.title || "").toLowerCase();
+            const candText = `${candidate?.title || ""} ${candidate?.description || ""}`.toLowerCase();
+            const candTitleLower = (candidate?.title || "").toLowerCase();
 
-          // 1. Common Genres overlap
-          const commonGenres = candGenres.filter((g) => currentGenres.includes(g));
+            // 1. Common Genres overlap
+            const commonGenres = candGenres.filter((g) => currentGenres.includes(g));
 
-          // 2. Common Tags overlap
-          const commonTags = candTags.filter((t) => currentTags.includes(t));
+            // 2. Common Tags overlap
+            const commonTags = candTags.filter((t) => currentTags.includes(t));
 
-          // 3. Shared Story Tropes & Plot Style
-          const sharedTropes = sourceTropes.filter((trope) => candText.includes(trope));
+            // 3. Shared Story Tropes & Plot Style
+            const sharedTropes = sourceTropes.filter((trope) => candText.includes(trope));
 
-          // 4. Format / Type Match
-          const formatMatch = candidate?.type === currentType;
+            // 4. Format / Type Match
+            const formatMatch = candidate?.type === currentType;
 
-          // 5. Author / Artist Affinity
-          const candAuthor = (candidate?.author || "").toLowerCase().trim();
-          const candArtist = (candidate?.artist || "").toLowerCase().trim();
-          const authorMatch = currentAuthor && candAuthor && (currentAuthor.includes(candAuthor) || candAuthor.includes(currentAuthor));
-          const artistMatch = currentArtist && candArtist && (currentArtist.includes(candArtist) || candArtist.includes(currentArtist));
+            // 5. Author / Artist Affinity
+            const candAuthor = (candidate?.author || "").toLowerCase().trim();
+            const candArtist = (candidate?.artist || "").toLowerCase().trim();
+            const authorMatch = currentAuthor && candAuthor && (currentAuthor.includes(candAuthor) || candAuthor.includes(currentAuthor));
+            const artistMatch = currentArtist && candArtist && (currentArtist.includes(candArtist) || candArtist.includes(currentArtist));
 
-          // 6. Title keywords overlap
-          const titleOverlap = currentTitleWords.filter((w: string) => candTitleLower.includes(w));
+            // 6. Title keywords overlap
+            const titleOverlap = currentTitleWords.filter((w: string) => candTitleLower.includes(w));
 
-          // Scoring Formula (expanded sensitivity)
-          let score = 0;
-          score += commonGenres.length * 25;
-          score += commonTags.length * 30;
-          score += sharedTropes.length * 25;
-          if (formatMatch) score += 15;
-          if (authorMatch) score += 35;
-          if (artistMatch) score += 30;
-          score += titleOverlap.length * 20;
+            // Scoring Formula
+            let score = 0;
+            score += commonGenres.length * 25;
+            score += commonTags.length * 30;
+            score += sharedTropes.length * 25;
+            if (formatMatch) score += 40;
+            if (authorMatch) score += 35;
+            if (artistMatch) score += 30;
+            score += titleOverlap.length * 20;
 
-          const totalSharedSignals = commonGenres.length + commonTags.length + sharedTropes.length;
+            const totalSharedSignals = commonGenres.length + commonTags.length + sharedTropes.length;
 
-          return {
-            ...candidate,
-            score,
-            commonCount: totalSharedSignals,
-          };
-        });
+            return {
+              ...candidate,
+              score,
+              commonCount: totalSharedSignals,
+            };
+          });
 
-        // 50% more matches: target 21 items (3 rows of 7 in grid)
+        const scored = scoreCandidates(data || []);
+
+        // Target 21 items (3 rows of 7 in grid)
         const primaryMatches = scored
           .filter((item) => item.score >= 18 && (item.commonCount >= 1 || item.score >= 20))
           .sort((a, b) => b.score - a.score || Number(b.rating_average || 0) - Number(a.rating_average || 0));
@@ -934,13 +939,36 @@ const RecommendationsSection = React.memo(function RecommendationsSection({
           return primaryMatches.slice(0, 21);
         }
 
-        // Backfill with top series of same genre or format to guarantee 21 recommendation items
+        // Backfill from same-type candidates first
         const pickedIds = new Set(primaryMatches.map((m) => m.id));
-        const backfills = scored
+        const sameTypeBackfills = scored
           .filter((item) => !pickedIds.has(item.id))
           .sort((a, b) => (b.score * 0.5 + Number(b.rating_average || 0) * 10) - (a.score * 0.5 + Number(a.rating_average || 0) * 10));
 
-        return [...primaryMatches, ...backfills].slice(0, 21);
+        const combined = [...primaryMatches, ...sameTypeBackfills];
+        if (combined.length >= 21) {
+          return combined.slice(0, 21);
+        }
+
+        // If still not enough same-type results, fetch cross-type backfill
+        const excludeIds = new Set(combined.map((m) => m.id));
+        excludeIds.add(currentSeriesId);
+        const { data: crossTypeData } = await supabase
+          .from("series")
+          .select(
+            "id,slug,title,cover_url,type,description,rating_average,status,author,artist,series_genres(genre:genres(name,slug)),series_tags(tag:tags(name,slug))"
+          )
+          .neq("id", currentSeriesId)
+          .eq("is_hidden", false)
+          .neq("type", currentType)
+          .order("rating_average", { ascending: false })
+          .limit(100);
+
+        const crossScored = scoreCandidates(crossTypeData || [])
+          .filter((item) => !excludeIds.has(item.id) && item.commonCount >= 2)
+          .sort((a, b) => b.score - a.score);
+
+        return [...combined, ...crossScored].slice(0, 21);
       } catch (err) {
         console.warn("[Recommendations] Query catch:", err);
         return [];
@@ -948,6 +976,7 @@ const RecommendationsSection = React.memo(function RecommendationsSection({
     },
     enabled: !!currentSeriesId,
     staleTime: 1000 * 60 * 10,
+
   });
 
   return (

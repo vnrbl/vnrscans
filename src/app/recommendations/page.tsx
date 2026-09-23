@@ -24,29 +24,97 @@ export default function RecommendationsPage() {
         .select("series:series_id(id,slug,title,cover_url,type,rating_average,description,status)")
         .eq("user_id", user.id)
         .order("score", { ascending: false })
-        .limit(20);
+        .limit(30);
       
-      if (existingError) throw existingError;
-      
-      // If no recommendations, generate them
-      if (!existing || existing.length === 0) {
-        await supabase.rpc("generate_user_recommendations", { target_user_id: user.id });
-        
-        const { data: newData, error: newError } = await supabase
-          .from("user_recommendations")
-          .select("series:series_id(id,slug,title,cover_url,type,rating_average,description,status)")
-          .eq("user_id", user.id)
-          .order("score", { ascending: false })
-          .limit(20);
-        
-        if (newError) throw newError;
-        return newData ?? [];
+      if (existingError) {
+        console.error("[Recommendations] Error fetching existing:", existingError);
       }
       
-      return existing ?? [];
+      // If we have existing recommendations, return them
+      if (existing && existing.length > 0) {
+        return existing;
+      }
+      
+      // If no recommendations, try to generate them via RPC
+      try {
+        const { error: rpcError } = await supabase.rpc("generate_user_recommendations", { target_user_id: user.id });
+        
+        if (rpcError) {
+          console.error("[Recommendations] RPC error:", rpcError);
+          // Fall through to client-side fallback
+        } else {
+          // Re-fetch after generation
+          const { data: newData, error: newError } = await supabase
+            .from("user_recommendations")
+            .select("series:series_id(id,slug,title,cover_url,type,rating_average,description,status)")
+            .eq("user_id", user.id)
+            .order("score", { ascending: false })
+            .limit(30);
+          
+          if (!newError && newData && newData.length > 0) {
+            return newData;
+          }
+        }
+      } catch (rpcErr) {
+        console.error("[Recommendations] RPC call failed:", rpcErr);
+      }
+      
+      // Client-side fallback: get genres from reading history + bookmarks, find matching series
+      try {
+        // Step 1: Get series IDs from reading history and bookmarks
+        const [historyRes, bookmarkRes] = await Promise.all([
+          supabase.from("reading_history").select("series_id").eq("user_id", user.id),
+          supabase.from("bookmarks").select("series_id").eq("user_id", user.id),
+        ]);
+        
+        const readSeriesIds = new Set<string>();
+        (historyRes.data ?? []).forEach((r) => readSeriesIds.add(r.series_id));
+        (bookmarkRes.data ?? []).forEach((b) => readSeriesIds.add(b.series_id));
+        
+        if (readSeriesIds.size === 0) return [];
+        
+        // Step 2: Get genre IDs for those series
+        const { data: genreLinks } = await supabase
+          .from("series_genres")
+          .select("genre_id")
+          .in("series_id", Array.from(readSeriesIds));
+        
+        const genreIds = [...new Set((genreLinks ?? []).map((g) => g.genre_id))];
+        if (genreIds.length === 0) return [];
+        
+        // Step 3: Find series with matching genres, excluding already-read
+        const { data: matchingSeries } = await supabase
+          .from("series_genres")
+          .select("series_id, series:series_id(id,slug,title,cover_url,type,rating_average,description,status)")
+          .in("genre_id", genreIds)
+          .not("series_id", "in", `(${Array.from(readSeriesIds).join(",")})`)
+          .limit(200);
+        
+        // Score by genre overlap count
+        const seriesMap = new Map<string, { series: any; matchCount: number }>();
+        (matchingSeries ?? []).forEach((row: any) => {
+          const s = row.series;
+          if (!s || !s.id) return;
+          const existing = seriesMap.get(s.id);
+          if (existing) {
+            existing.matchCount += 1;
+          } else {
+            seriesMap.set(s.id, { series: s, matchCount: 1 });
+          }
+        });
+        
+        return Array.from(seriesMap.values())
+          .sort((a, b) => b.matchCount - a.matchCount || (b.series.rating_average || 0) - (a.series.rating_average || 0))
+          .slice(0, 20)
+          .map((entry) => ({ series: entry.series }));
+      } catch (fallbackErr) {
+        console.error("[Recommendations] Client-side fallback failed:", fallbackErr);
+        return [];
+      }
     },
     enabled: !!user,
     staleTime: 1000 * 60 * 30,
+    retry: 1,
   });
 
   const basedOnGenres = useQuery({
@@ -54,48 +122,66 @@ export default function RecommendationsPage() {
     queryFn: async () => {
       if (!user) return [];
       
-      // Get user's reading history genres
+      // Step 1: Get series IDs from reading history
       const { data: historyData, error: historyError } = await supabase
         .from("reading_history")
-        .select("series:series_id(series_genres(genre:genres(slug)))")
+        .select("series_id")
         .eq("user_id", user.id)
-        .limit(50);
+        .limit(100);
       
-      if (historyError) throw historyError;
+      if (historyError) {
+        console.error("[GenreRecs] History fetch error:", historyError);
+        return [];
+      }
       
-      // Extract genre slugs
+      const readSeriesIds = [...new Set((historyData ?? []).map((r) => r.series_id))];
+      if (readSeriesIds.length === 0) return [];
+      
+      // Step 2: Get genre slugs for read series
+      const { data: genreLinks, error: genreError } = await supabase
+        .from("series_genres")
+        .select("genre_id, genre:genres(slug)")
+        .in("series_id", readSeriesIds);
+      
+      if (genreError) {
+        console.error("[GenreRecs] Genre fetch error:", genreError);
+        return [];
+      }
+      
       const genreSlugs = new Set<string>();
-      historyData?.forEach((h: any) => {
-        h.series?.series_genres?.forEach((sg: any) => {
-          if (sg.genre?.slug) genreSlugs.add(sg.genre.slug);
-        });
+      const genreIds: string[] = [];
+      (genreLinks ?? []).forEach((sg: any) => {
+        if (sg.genre?.slug) genreSlugs.add(sg.genre.slug);
+        if (sg.genre_id) genreIds.push(sg.genre_id);
       });
       
-      if (genreSlugs.size === 0) return [];
+      if (genreIds.length === 0) return [];
+      const uniqueGenreIds = [...new Set(genreIds)];
       
-      // Find series with matching genres that user hasn't read
-      const { data: readSeries } = await supabase
-        .from("reading_history")
-        .select("series_id")
-        .eq("user_id", user.id);
+      // Step 3: Find series with matching genres, excluding already-read
+      const dummyId = "00000000-0000-0000-0000-000000000000";
+      const excludeList = readSeriesIds.length > 0 ? readSeriesIds : [dummyId];
       
-      const readSeriesIds = (readSeries ?? []).map((r) => r.series_id);
-      
-      const { data, error } = await supabase
+      const { data: candidates, error: candidateError } = await supabase
         .from("series")
-        .select("id,slug,title,cover_url,type,rating_average,description,status,series_genres(genre:genres(slug))")
-        .not("id", "in", `(${readSeriesIds.join(",") || "'00000000-0000-0000-0000-000000000000'"})`)
+        .select("id,slug,title,cover_url,type,rating_average,description,status,series_genres!inner(genre_id)")
+        .in("series_genres.genre_id", uniqueGenreIds)
+        .not("id", "in", `(${excludeList.join(",")})`)
+        .eq("is_hidden", false)
         .order("rating_average", { ascending: false })
         .limit(100);
       
-      if (error) throw error;
+      if (candidateError) {
+        console.error("[GenreRecs] Candidate fetch error:", candidateError);
+        return [];
+      }
       
-      // Score based on genre matches
-      const scored = (data ?? []).map((series: any) => {
-        const matches = series.series_genres?.filter((sg: any) => 
-          genreSlugs.has(sg.genre?.slug)
-        ).length || 0;
-        return { ...series, genreMatches: matches };
+      // Score based on how many of the user's genres each series matches
+      const scored = (candidates ?? []).map((series: any) => {
+        const matchingGenres = (series.series_genres ?? []).filter((sg: any) =>
+          uniqueGenreIds.includes(sg.genre_id)
+        ).length;
+        return { ...series, genreMatches: matchingGenres };
       });
       
       return scored
@@ -105,7 +191,9 @@ export default function RecommendationsPage() {
     },
     enabled: !!user,
     staleTime: 1000 * 60 * 30,
+    retry: 1,
   });
+
 
   if (!user) {
     return (
