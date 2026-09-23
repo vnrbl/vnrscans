@@ -859,7 +859,8 @@ export default function ProfilePage() {
     queryKey: ["profile", "uploaded-series", activeUsername],
     queryFn: async () => {
       if (!activeUsername) return [];
-      const matchNames = Array.from(new Set([activeUsername, "vnr610"].filter(Boolean)));
+      // No hardcoded admin fallback: only match chapters actually uploaded by this user.
+      const matchNames = Array.from(new Set([activeUsername].filter(Boolean)));
       
       const { data, error } = await supabase
         .from("series")

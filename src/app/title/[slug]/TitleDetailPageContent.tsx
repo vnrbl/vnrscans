@@ -46,7 +46,7 @@ import {
 import { useDragScroll, DRAG_SCROLL_CONTAINER_CLASS } from "@/hooks/useDragScroll";
 import { TITLE_CARD_WIDTH, TITLE_COVER_CLASS } from "@/components/titleCardStyles";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { Breadcrumbs, formatTypeLabel } from "@/components/Breadcrumbs";
 import { ReleaseScheduleCard } from "@/components/ReleaseScheduleCard";
 import { formatAppDate } from "@/lib/date";
 import { fetchSeriesBySlug } from "@/lib/series-slug";
@@ -100,7 +100,6 @@ export default function TitleDetailPageContent({
   initialSeriesData?: any;
   initialChaptersData?: any[];
 }) {
-  const router = useRouter();
   const { user } = useAuth();
 
   const seriesQ = useQuery({
@@ -356,23 +355,15 @@ export default function TitleDetailPageContent({
       </div>
 
       <div className="container mx-auto px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16 py-6 lg:py-8 relative z-10">
-        {/* Back navigation */}
-        <div className="mb-4">
-          <button
-            type="button"
-            onClick={() => {
-              if (typeof window !== "undefined" && window.history.length > 1) {
-                router.back();
-              } else {
-                router.push("/browse");
-              }
-            }}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[4px] text-xs font-semibold text-neutral-300 hover:text-white bg-neutral-900/70 hover:bg-neutral-800/90 border border-neutral-800 hover:border-purple-500/50 transition-all cursor-pointer shadow-sm group"
-          >
-            <ChevronLeft className="h-4 w-4 transition-transform group-hover:-translate-x-0.5 text-neutral-400 group-hover:text-purple-400" />
-            <span>Back to catalog</span>
-          </button>
-        </div>
+        {/* Breadcrumb navigation */}
+        <Breadcrumbs
+          className="mb-4"
+          items={[
+            { label: "Home", href: "/home" },
+            { label: formatTypeLabel(s.type), href: `/browse?type=${s.type}` },
+            { label: s.title },
+          ]}
+        />
 
         <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:gap-8 lg:gap-10">
           {/* Left sidebar — cover & actions (memoized) */}
@@ -945,30 +936,11 @@ const RecommendationsSection = React.memo(function RecommendationsSection({
           .filter((item) => !pickedIds.has(item.id))
           .sort((a, b) => (b.score * 0.5 + Number(b.rating_average || 0) * 10) - (a.score * 0.5 + Number(a.rating_average || 0) * 10));
 
+        // Show same-type matches only — never pad with other formats (e.g. manhwa
+        // on a novel page). Fewer than 21 items is fine; the UI has an empty state
+        // when there are none at all.
         const combined = [...primaryMatches, ...sameTypeBackfills];
-        if (combined.length >= 21) {
-          return combined.slice(0, 21);
-        }
-
-        // If still not enough same-type results, fetch cross-type backfill
-        const excludeIds = new Set(combined.map((m) => m.id));
-        excludeIds.add(currentSeriesId);
-        const { data: crossTypeData } = await supabase
-          .from("series")
-          .select(
-            "id,slug,title,cover_url,type,description,rating_average,status,author,artist,series_genres(genre:genres(name,slug)),series_tags(tag:tags(name,slug))"
-          )
-          .neq("id", currentSeriesId)
-          .eq("is_hidden", false)
-          .neq("type", currentType)
-          .order("rating_average", { ascending: false })
-          .limit(100);
-
-        const crossScored = scoreCandidates(crossTypeData || [])
-          .filter((item) => !excludeIds.has(item.id) && item.commonCount >= 2)
-          .sort((a, b) => b.score - a.score);
-
-        return [...combined, ...crossScored].slice(0, 21);
+        return combined.slice(0, 21);
       } catch (err) {
         console.warn("[Recommendations] Query catch:", err);
         return [];

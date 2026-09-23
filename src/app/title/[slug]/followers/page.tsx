@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ChevronLeft, Users, ShieldCheck, Heart } from "lucide-react";
+import { Breadcrumbs } from "@/components/Breadcrumbs";
+import { Users, ShieldCheck, Heart } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchSeriesBySlug } from "@/lib/series-slug";
 import { formatAppDate } from "@/lib/date";
@@ -69,15 +70,15 @@ export default async function SeriesFollowersPage({ params }: PageProps) {
   return (
     <div className="min-h-screen bg-black text-white pb-20 pt-8 sm:pt-12 font-sans">
       <div className="container mx-auto max-w-4xl px-4 sm:px-6">
-        {/* Back Link */}
+        {/* Breadcrumb Navigation */}
         <div className="mb-6">
-          <Link
-            href={`/title/${slug}`}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[4px] text-xs font-semibold text-neutral-300 hover:text-white bg-neutral-900/70 hover:bg-neutral-800/90 border border-neutral-800 hover:border-neutral-600 transition-all cursor-pointer"
-          >
-            <ChevronLeft className="h-4 w-4" />
-            <span>Back to {series.title}</span>
-          </Link>
+          <Breadcrumbs
+            items={[
+              { label: "Home", href: "/home" },
+              { label: series.title, href: `/title/${slug}` },
+              { label: "Followers" },
+            ]}
+          />
         </div>
 
         {/* Series Banner Header */}

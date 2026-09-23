@@ -3,7 +3,6 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import {
-  ChevronRight,
   Shield,
   Sparkles,
   Zap,
@@ -28,6 +27,7 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { FormattedText } from "@/components/FormattedText";
 import type { SeriesCharacter } from "@/lib/character-fetcher";
 
@@ -100,20 +100,13 @@ export default function CharacterProfileClient({
       {/* ─── Breadcrumb Navigation Bar ──────────────────────────────────── */}
       <header className="border-b border-white/10 bg-neutral-950/80 backdrop-blur-md sticky top-0 z-40">
         <div className="container mx-auto px-4 py-3 flex items-center justify-between text-xs text-neutral-400">
-          <nav className="flex items-center gap-1.5 overflow-x-auto scrollbar-hide py-0.5">
-            <Link href="/" className="hover:text-white transition-colors">
-              Home
-            </Link>
-            <ChevronRight className="h-3.5 w-3.5 shrink-0 text-neutral-600" />
-            <Link
-              href={`/title/${series.slug}`}
-              className="hover:text-purple-300 transition-colors truncate max-w-[140px] sm:max-w-xs font-semibold"
-            >
-              {series.title}
-            </Link>
-            <ChevronRight className="h-3.5 w-3.5 shrink-0 text-neutral-600" />
-            <span className="text-white font-black truncate">{character.name}</span>
-          </nav>
+        <Breadcrumbs
+          items={[
+            { label: "Home", href: "/home" },
+            { label: series.title, href: `/title/${series.slug}` },
+            { label: character.name },
+          ]}
+        />
 
           <Link
             href={`/title/${series.slug}`}

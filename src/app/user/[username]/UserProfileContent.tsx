@@ -722,7 +722,9 @@ export default function UserProfileContent({ username }: { username: string }) {
     queryKey: ["public-profile-uploaded-series", targetUsername],
     queryFn: async () => {
       if (!targetUsername) return [];
-      const matchNames = Array.from(new Set([targetUsername, decodedUsername, username, "The Love Venerable 0", "vnr610"].filter(Boolean)));
+      // No hardcoded admin fallback: only match chapters actually uploaded by this
+      // user, otherwise every profile would inherit the admin's upload history.
+      const matchNames = Array.from(new Set([targetUsername, decodedUsername, username].filter(Boolean)));
       
       const { data, error } = await supabase
         .from("series")

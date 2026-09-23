@@ -163,15 +163,7 @@ export const SeriesHeader = React.memo(function SeriesHeader({
   return (
     <main className="min-w-0 flex-1 text-center sm:text-left">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <nav className="flex flex-wrap items-center justify-center gap-2 text-xs font-sans font-medium text-neutral-400 sm:justify-start">
-          <Link href="/home" className="hover:text-white transition-colors">
-            Home
-          </Link>
-          <span className="text-neutral-600 font-light">/</span>
-          <Link href={`/browse?type=${s.type}`} className="hover:text-purple-300 text-neutral-300 capitalize transition-colors font-semibold">
-            {s.type}
-          </Link>
-        </nav>
+        {/* Breadcrumb lives at the page level (TitleDetailPageContent) — intentionally empty here */}
 
         <div className="flex items-center gap-2">
           <button
