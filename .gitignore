@@ -51,3 +51,8 @@ nul
 my-agent/
 
 .env*
+
+.vercel
+
+.vercel
+.env*
