@@ -9,6 +9,13 @@ compatibility_date = "2025-07-01"
 [vars]
 OWNER_EMAIL = "creator@vnrscans.com"
 FROM_EMAIL = "VNR Scans <onboarding@resend.dev>"
+TELEGRAM_ALLOWED_CHAT_ID = "8873041972"
+SUPABASE_URL = "https://edvqhmvqbtujzcfqkrbe.supabase.co"
+SUPABASE_PUBLISHABLE_KEY = "sb_publishable_jVdWorDtLlkVYzRh6EbEOA_lwnu59an"
+SITE_URL = "https://www.vnrscans.com"
+
+[ai]
+binding = "AI"
 
 # Optional: set via `wrangler secret put WORKER_UPLOAD_SECRET` to protect /assets/upload
 # WORKER_UPLOAD_SECRET = "a-very-long-random-secret"  # better as secret than var

@@ -17,7 +17,16 @@
 /// <reference types="@cloudflare/workers-types" />
 
 export interface Env {
+  AI: Ai;
   RESEND_API_KEY: string;
+  TELEGRAM_BOT_TOKEN?: string;
+  TELEGRAM_ALLOWED_CHAT_ID?: string;
+  TELEGRAM_WEBHOOK_SECRET?: string;
+  AI_PROXY_SECRET?: string;
+  AI_MODEL?: string;
+  SUPABASE_URL?: string;
+  SUPABASE_PUBLISHABLE_KEY?: string;
+  SITE_URL?: string;
   OWNER_EMAIL?: string;
   FROM_EMAIL?: string;
   RATE_LIMIT?: KVNamespace;    // For rate limiting (recommended)
@@ -187,10 +196,100 @@ async function isRateLimited(kv: KVNamespace | undefined, key: string, limit = 5
 
 function getClientIp(request: Request): string {
   return (
+    request.headers.get("x-client-ip") ||
     request.headers.get("cf-connecting-ip") ||
     request.headers.get("x-forwarded-for")?.split(",")[0] ||
     "unknown"
   );
+}
+
+type ChatMessage = { role: "user" | "assistant"; content: string };
+
+async function getSeriesContext(env: Env, question: string): Promise<string> {
+  if (!env.SUPABASE_URL || !env.SUPABASE_PUBLISHABLE_KEY) return "";
+
+  const headers = { apikey: env.SUPABASE_PUBLISHABLE_KEY, Authorization: `Bearer ${env.SUPABASE_PUBLISHABLE_KEY}` };
+  const terms = question.toLowerCase().match(/[\p{L}\p{N}][\p{L}\p{N}'-]{2,}/gu) || [];
+  const stop = new Set(["what", "when", "where", "which", "does", "have", "with", "about", "chapter", "chapters", "latest", "vnr", "scans", "series", "please", "tell", "show", "find", "read", "hello", "site"]);
+  const query = terms.filter((word) => !stop.has(word)).slice(0, 3).join(" ");
+  const seriesUrl = new URL("/rest/v1/series", env.SUPABASE_URL);
+  seriesUrl.searchParams.set("select", "id,title,slug,type,status,description,author,release_year");
+  seriesUrl.searchParams.set("is_hidden", "eq.false");
+  seriesUrl.searchParams.set("limit", "5");
+  if (query) seriesUrl.searchParams.set("title", `ilike.*${query}*`);
+  else seriesUrl.searchParams.set("order", "updated_at.desc");
+
+  try {
+    const response = await fetch(seriesUrl, { headers, signal: AbortSignal.timeout(4500) });
+    if (!response.ok) return "";
+    const series = await response.json() as Array<Record<string, unknown>>;
+    const rows = await Promise.all(series.map(async (item) => {
+      const chapterUrl = new URL("/rest/v1/chapters", env.SUPABASE_URL);
+      chapterUrl.searchParams.set("select", "chapter_number,title,created_at");
+      chapterUrl.searchParams.set("series_id", `eq.${item.id}`);
+      chapterUrl.searchParams.set("status", "eq.published");
+      chapterUrl.searchParams.set("order", "chapter_number.desc");
+      chapterUrl.searchParams.set("limit", "1");
+      let latest = "";
+      try {
+        const chapterResponse = await fetch(chapterUrl, { headers, signal: AbortSignal.timeout(3000) });
+        if (chapterResponse.ok) {
+          const chapters = await chapterResponse.json() as Array<{ chapter_number?: number; title?: string; created_at?: string }>;
+          if (chapters[0]) latest = `; latest published chapter ${chapters[0].chapter_number}${chapters[0].title ? ` (${chapters[0].title})` : ""}`;
+        }
+      } catch { /* chapter data is optional */ }
+      return `- ${item.title} (${item.type}, ${item.status})${item.release_year ? `, ${item.release_year}` : ""}${latest}; URL ${env.SITE_URL || "https://www.vnrscans.com"}/title/${item.slug}${item.description ? `; description: ${String(item.description).slice(0, 300)}` : ""}`;
+    }));
+    return rows.length ? rows.join("\n") : "No matching public series were found.";
+  } catch (error) {
+    console.error("[worker] AI catalog lookup failed", error);
+    return "";
+  }
+}
+
+async function generateAssistantReply(env: Env, messages: ChatMessage[]): Promise<string> {
+  const latestQuestion = messages.at(-1)?.content || "";
+  const catalog = await getSeriesContext(env, latestQuestion);
+  const system = `You are the VNR Scans site assistant. Be friendly and concise. Help with site navigation, manga/manhwa/manhua/novel reading, account basics, and general greetings. For factual claims about VNR Scans titles or chapters, only rely on this current public catalog data; if it is absent, say you could not verify it and suggest using site search. Never invent chapter availability, account access, policies, or links.\nCurrent catalog matches:\n${catalog || "Catalog lookup unavailable."}`;
+  const answer = await env.AI.run(env.AI_MODEL || "@cf/zai-org/glm-4.7-flash", {
+    messages: [{ role: "system", content: system }, ...messages.slice(-8)],
+    max_tokens: 420,
+    temperature: 0.35,
+  }) as { response?: string };
+  const response = answer?.response?.trim();
+  if (!response) throw new Error("AI model returned an empty response");
+  return response.slice(0, 3500);
+}
+
+async function telegramSend(env: Env, chatId: number, text: string) {
+  if (!env.TELEGRAM_BOT_TOKEN) throw new Error("Telegram bot token is not configured");
+  const response = await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ chat_id: chatId, text: text.slice(0, 4000), disable_web_page_preview: true }),
+  });
+  if (!response.ok) throw new Error(`Telegram sendMessage failed with HTTP ${response.status}`);
+}
+
+async function handleTelegramUpdate(request: Request, env: Env) {
+  const update = await request.json() as { message?: { text?: string; chat?: { id?: number; type?: string }; from?: { is_bot?: boolean } } };
+  const message = update.message;
+  const chatId = message?.chat?.id;
+  const text = message?.text?.trim();
+  if (!chatId || !text || message?.from?.is_bot) return;
+  if (String(chatId) !== env.TELEGRAM_ALLOWED_CHAT_ID || message?.chat?.type !== "private") return;
+  const rateKey = `ai:telegram:${chatId}`;
+  if (env.RATE_LIMIT && await isRateLimited(env.RATE_LIMIT, rateKey, 30, 3600)) {
+    await telegramSend(env, chatId, "You have reached the hourly chat limit. Please try again later.");
+    return;
+  }
+  try {
+    const answer = await generateAssistantReply(env, [{ role: "user", content: text.slice(0, 1200) }]);
+    await telegramSend(env, chatId, answer);
+  } catch (error) {
+    console.error("[worker] Telegram AI reply failed", error);
+    await telegramSend(env, chatId, "Sorry, I couldn't answer just now. Please try again shortly.");
+  }
 }
 
 // ==================== MAIN HANDLER ====================
@@ -201,14 +300,48 @@ export default {
     const pathname = url.pathname;
 
     // CORS for browser calls (if you call Worker directly from frontend)
+    const allowedOrigin = request.headers.get("Origin");
+    const allowedOrigins = new Set(["https://www.vnrscans.com", "https://vnrscans.com", "http://localhost:3000"]);
     const corsHeaders = {
-      "Access-Control-Allow-Origin": "*",
+      ...(allowedOrigin && allowedOrigins.has(allowedOrigin) ? { "Access-Control-Allow-Origin": allowedOrigin, "Vary": "Origin" } : {}),
       "Access-Control-Allow-Methods": "POST, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type",
+      "Access-Control-Allow-Headers": "Content-Type, X-AI-Proxy-Secret",
     };
 
     if (request.method === "OPTIONS") {
+      if (!allowedOrigin || !allowedOrigins.has(allowedOrigin)) return new Response(null, { status: 403 });
       return new Response(null, { headers: corsHeaders });
+    }
+
+    if (pathname === "/ai/chat" && request.method === "POST") {
+      if (!env.AI_PROXY_SECRET || request.headers.get("X-AI-Proxy-Secret") !== env.AI_PROXY_SECRET) {
+        return Response.json({ error: "Unauthorized" }, { status: 401 });
+      }
+      try {
+        const body = await request.json() as { messages?: ChatMessage[] };
+        if (!Array.isArray(body.messages) || body.messages.length < 1 || body.messages.length > 12) {
+          return Response.json({ error: "Invalid conversation" }, { status: 400 });
+        }
+        const messages = body.messages.filter((item) => item && (item.role === "user" || item.role === "assistant") && typeof item.content === "string").slice(-8).map((item) => ({ role: item.role, content: item.content.trim().slice(0, 1200) })).filter((item) => item.content);
+        if (!messages.length || messages.at(-1)?.role !== "user") return Response.json({ error: "A user message is required" }, { status: 400 });
+        const ip = getClientIp(request);
+        if (env.RATE_LIMIT && await isRateLimited(env.RATE_LIMIT, `ai:web:${ip}`, 20, 3600)) {
+          return Response.json({ error: "Chat limit reached. Please try again later." }, { status: 429 });
+        }
+        return Response.json({ reply: await generateAssistantReply(env, messages) }, { headers: corsHeaders });
+      } catch (error) {
+        console.error("[worker] AI chat failed", error);
+        return Response.json({ error: "The assistant is temporarily unavailable." }, { status: 502, headers: corsHeaders });
+      }
+    }
+
+    if (pathname === "/telegram/webhook" && request.method === "POST") {
+      const receivedSecret = request.headers.get("X-Telegram-Bot-Api-Secret-Token");
+      if (!env.TELEGRAM_WEBHOOK_SECRET || receivedSecret !== env.TELEGRAM_WEBHOOK_SECRET) {
+        return Response.json({ error: "Unauthorized" }, { status: 401 });
+      }
+      ctx.waitUntil(handleTelegramUpdate(request, env).catch((error) => console.error("[worker] Telegram webhook failed", error)));
+      return Response.json({ ok: true });
     }
 
     // Health check

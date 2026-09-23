@@ -12,6 +12,7 @@ import {
   detectSourceScanTiming,
   advanceNextReleaseAfterDrop,
 } from '../src/lib/release-timing';
+import { isTelegramConfigured, sendTelegramMessage } from './telegram-notifier';
 
 config();
 
@@ -21,12 +22,11 @@ const supabaseUrl =
   process.env.NEXT_PUBLIC_SUPABASE_URL ||
   'https://edvqhmvqbtujzcfqkrbe.supabase.co';
 
-const serviceKey =
-  process.env.SUPABASE_SERVICE_ROLE_KEY ||
-  process.env.SUPABASE_KEY ||
-  process.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
-  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
-  'sb_publishable_jVdWorDtLlkVYzRh6EbEOA_lwnu59an';
+const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY;
+
+if (!serviceKey) {
+  throw new Error('Missing SUPABASE_SERVICE_ROLE_KEY (or SUPABASE_SECRET_KEY) for the auto-import bot.');
+}
 
 const supabase = createClient(supabaseUrl, serviceKey, {
   auth: { autoRefreshToken: false, persistSession: false },
@@ -88,13 +88,32 @@ async function runCycle() {
       const seriesTitle = (source as any)?.series?.title || 'Unknown';
       console.log(`\n[${i + 1}/${dueSources.length}] Checking "${seriesTitle}": ${source.source_url}`);
       try {
-        await syncSource(source);
+        const result = await syncSource(source);
+        if (result.failed > 0) {
+          const failedChapters = result.details
+            .filter((entry) => entry.status === 'failed')
+            .map((entry) => `Ch. ${entry.chapter}: ${entry.message || 'failed'}`)
+            .join('; ');
+          await notifyTelegram(
+            `${result.status === 'partial' ? '⚠️ PARTIAL SCRAPE' : '❌ SCRAPE FAILED'}\n` +
+              `Series: ${seriesTitle}\nSource: ${source.source_url}\n` +
+              `Imported: ${result.imported} | Failed: ${result.failed}\n` +
+              `Error: ${result.error || failedChapters || 'One or more chapters failed.'}`,
+          );
+        } else if (result.imported > 0) {
+          await notifyTelegram(
+            `✅ CHAPTERS SCRAPED\nSeries: ${seriesTitle}\n` +
+              `Imported: ${result.imported} chapter(s)\nSource: ${source.source_url}`,
+          );
+        }
       } catch (srcErr: any) {
         console.error(`[AutoImport] Error on source ${source.id}:`, srcErr.message || srcErr);
+        await notifyTelegram(`❌ SCRAPE FAILED\nSeries: ${seriesTitle}\nSource: ${source.source_url}\nError: ${srcErr.message || srcErr}`);
       }
     }
   } catch (cycleErr: any) {
     console.error('[AutoImport] Cycle error:', cycleErr.message || cycleErr);
+    await notifyTelegram(`❌ AUTO-SCRAPER CYCLE FAILED\nError: ${cycleErr.message || cycleErr}`);
   }
 
   const cycleEnd = new Date();
@@ -110,13 +129,26 @@ async function runCycle() {
 }
 
 async function main() {
+  if (process.argv.includes('--telegram-required') && !isTelegramConfigured()) {
+    throw new Error('Set TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID before starting the Telegram scraper bot.');
+  }
   if (isWatchMode) {
+    await notifyTelegram(`🤖 VNR Scans auto-scraper is online. Checking enabled source scans every ${intervalMinutes} minutes.`);
     console.log(`🚀 Starting Auto-Import Daemon (continuous mode: every ${intervalMinutes} min)`);
   }
   await runCycle();
 }
 
-async function syncSource(source: any) {
+type SourceSyncResult = {
+  status: 'success' | 'partial' | 'failed';
+  imported: number;
+  failed: number;
+  chaptersFound: number;
+  error?: string;
+  details: Array<{ chapter: number; status: string; message?: string }>;
+};
+
+async function syncSource(source: any): Promise<SourceSyncResult> {
   const startedAt = new Date().toISOString();
   const preset = detectImportSource(source.source_url);
   const scanlationGroup = source.scanlation_group || preset.scanlationGroup || null;
@@ -320,6 +352,7 @@ async function syncSource(source: any) {
     }
 
     console.log(`${message} Found ${chaptersFound}, failed ${failed}.`);
+    return { status, imported, failed, chaptersFound, details };
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Auto import failed';
     await writeLog(source.id, 'failed', message, chaptersFound, imported, skipped, failed || 1, details);
@@ -328,6 +361,15 @@ async function syncSource(source: any) {
       .update({ last_checked_at: startedAt, last_error: message })
       .eq('id', source.id);
     console.error(`Failed ${source.source_url}: ${message}`);
+    return { status: 'failed', imported, failed: failed || 1, chaptersFound, error: message, details };
+  }
+}
+
+async function notifyTelegram(message: string) {
+  try {
+    await sendTelegramMessage(message.slice(0, 4000));
+  } catch (error) {
+    console.error('[Telegram] Could not send notification:', error instanceof Error ? error.message : error);
   }
 }
 
