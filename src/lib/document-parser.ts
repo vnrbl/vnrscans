@@ -1,4 +1,4 @@
-npm run telegram: get - chat - id/**
+/**
  * Document Parser for Novel Chapters
  * Supports uploading and importing Word (.docx, .doc), PDF (.pdf), Text (.txt), and Markdown (.md) documents.
  * Preserves paragraph formatting, line gaps, spaces, and text styles.
