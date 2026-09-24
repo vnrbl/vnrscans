@@ -1,4 +1,10 @@
 {
+  "crons": [
+    {
+      "path": "/api/cron/cleanup-guests",
+      "schedule": "0 4 * * *"
+    }
+  ],
   "framework": "nextjs",
   "buildCommand": "npm run build",
   "installCommand": "PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true npm install --legacy-peer-deps",

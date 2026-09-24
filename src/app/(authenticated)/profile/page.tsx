@@ -853,20 +853,41 @@ export default function ProfilePage() {
     staleTime: 30 * 1000,
   });
 
-  // ─── Uploaded Series: series where user uploaded chapters (fast single-query join) ───
+  // ─── Uploaded Series: series where user uploaded chapters (fast two-step query) ───
   const activeUsername = profile.data?.username;
   const uploadedSeries = useQuery({
     queryKey: ["profile", "uploaded-series", activeUsername],
     queryFn: async () => {
       if (!activeUsername) return [];
-      // No hardcoded admin fallback: only match chapters actually uploaded by this user.
+      // Only match chapters actually uploaded by this user.
       const matchNames = Array.from(new Set([activeUsername].filter(Boolean)));
-      
+
+      // Step 1: Get distinct series_id from chapters uploaded by this user
+      const { data: chapterData, error: chapterError } = await supabase
+        .from("chapters")
+        .select("series_id")
+        .in("uploaded_by", matchNames);
+
+      if (chapterError || !chapterData || chapterData.length === 0) {
+        return [];
+      }
+
+      // Count chapters per series uploaded by this user
+      const seriesCountMap = new Map<string, number>();
+      for (const ch of chapterData) {
+        if (ch.series_id) {
+          seriesCountMap.set(ch.series_id, (seriesCountMap.get(ch.series_id) || 0) + 1);
+        }
+      }
+      const seriesIds = Array.from(seriesCountMap.keys());
+      if (seriesIds.length === 0) return [];
+
+      // Step 2: Fetch series details for those IDs
       const { data, error } = await supabase
         .from("series")
-        .select("id, slug, title, cover_url, type, status, rating_average, view_count, chapters!inner(count)")
+        .select("id, slug, title, cover_url, type, status, rating_average, view_count")
         .eq("is_hidden", false)
-        .in("chapters.uploaded_by", matchNames);
+        .in("id", seriesIds);
 
       if (error || !data) {
         console.error("Error fetching uploaded series:", error);
@@ -882,12 +903,13 @@ export default function ProfilePage() {
         status: s.status,
         rating_average: s.rating_average,
         view_count: s.view_count,
-        uploaded_chapter_count: s.chapters?.[0]?.count || 0,
+        uploaded_chapter_count: seriesCountMap.get(s.id) || 0,
       })).sort((a: any, b: any) => b.uploaded_chapter_count - a.uploaded_chapter_count);
     },
     enabled: !!activeUsername,
     staleTime: 60 * 1000,
   });
+
 
   const streaks = useMemo(() => {
     if (!historyQuery.data) return { current: 0, longest: 0 };

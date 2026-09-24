@@ -24,7 +24,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { XP_AMOUNTS } from "@/lib/xp";
-import { SeriesFollowersStack } from "@/components/series/SeriesFollowersStack";
+
 
 /* ------------------------------------------------------------------ */
 /*  SeriesActions — cover image + follow/rate/library action buttons.  */
@@ -635,16 +635,7 @@ export const SeriesActions = React.memo(function SeriesActions({
           <span>{isFavorited.data ? "Favorited" : "Mark as Favorite"}</span>
         </Button>
 
-        {/* Social Proof: Series followed by ElasticStack */}
-        <div className="pt-2.5 border-t border-border/30 flex items-center justify-center">
-          <SeriesFollowersStack
-            seriesId={seriesId}
-            seriesTitle={title}
-            slug={slug}
-            itemSize={28}
-            className="justify-center text-center scale-95"
-          />
-        </div>
+
 
         {/* Admin Scan Cover Import Tool */}
         {isAdmin && (

@@ -716,21 +716,41 @@ export default function UserProfileContent({ username }: { username: string }) {
     staleTime: 60 * 1000,
   });
 
-  // ─── Uploaded Series: series where user uploaded chapters (fast single-query join) ───
+  // ─── Uploaded Series: series where user uploaded chapters (fast two-step query) ───
   const targetUsername = profile.data?.username || decodedUsername;
   const uploadedSeries = useQuery({
     queryKey: ["public-profile-uploaded-series", targetUsername],
     queryFn: async () => {
       if (!targetUsername) return [];
-      // No hardcoded admin fallback: only match chapters actually uploaded by this
-      // user, otherwise every profile would inherit the admin's upload history.
+      // Only match chapters actually uploaded by this user.
       const matchNames = Array.from(new Set([targetUsername, decodedUsername, username].filter(Boolean)));
-      
+
+      // Step 1: Get distinct series_id + count from chapters uploaded by this user
+      const { data: chapterData, error: chapterError } = await supabase
+        .from("chapters")
+        .select("series_id")
+        .in("uploaded_by", matchNames);
+
+      if (chapterError || !chapterData || chapterData.length === 0) {
+        return [];
+      }
+
+      // Count chapters per series uploaded by this user
+      const seriesCountMap = new Map<string, number>();
+      for (const ch of chapterData) {
+        if (ch.series_id) {
+          seriesCountMap.set(ch.series_id, (seriesCountMap.get(ch.series_id) || 0) + 1);
+        }
+      }
+      const seriesIds = Array.from(seriesCountMap.keys());
+      if (seriesIds.length === 0) return [];
+
+      // Step 2: Fetch series details for those IDs
       const { data, error } = await supabase
         .from("series")
-        .select("id, slug, title, cover_url, type, status, rating_average, view_count, chapters!inner(count)")
+        .select("id, slug, title, cover_url, type, status, rating_average, view_count")
         .eq("is_hidden", false)
-        .in("chapters.uploaded_by", matchNames);
+        .in("id", seriesIds);
 
       if (error || !data) {
         console.error("Error fetching uploaded series:", error);
@@ -746,12 +766,13 @@ export default function UserProfileContent({ username }: { username: string }) {
         status: s.status,
         rating_average: s.rating_average,
         view_count: s.view_count,
-        uploaded_chapter_count: s.chapters?.[0]?.count || 0,
+        uploaded_chapter_count: seriesCountMap.get(s.id) || 0,
       })).sort((a: any, b: any) => b.uploaded_chapter_count - a.uploaded_chapter_count);
     },
     enabled: !!username && isProfilePublic,
     staleTime: 60 * 1000,
   });
+
 
   // Fetch total comments count accurately from DB
   const publicCommentsCount = useQuery({

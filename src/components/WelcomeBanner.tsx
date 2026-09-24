@@ -2,11 +2,19 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { X, Share2, Heart, Sparkles } from "lucide-react";
+import { BookmarkPlus, BookOpen, Heart, History, Share2, Sparkles, X, Zap } from "lucide-react";
 import { toast } from "sonner";
 
 const DISMISS_KEY = "vnr_welcome_banner_dismissed_at";
 const RESHOW_AFTER_MS = 7 * 24 * 60 * 60 * 1000; // re-show after a week away
+
+/** Quick "how to use the site" pointers shown under the welcome copy. */
+const TIPS = [
+  { icon: BookOpen, label: "Read free — no signup needed" },
+  { icon: History, label: "Continue where you left off" },
+  { icon: BookmarkPlus, label: "Follow series & build a library" },
+  { icon: Zap, label: "Earn XP & unlock achievements" },
+];
 
 /**
  * WelcomeBanner — animated welcome / thanks / recommend strip at the top of
@@ -117,6 +125,20 @@ export default function WelcomeBanner() {
                 Recommend us to your friends
               </button>
             </p>
+
+            {/* How-to-use tips */}
+            <div className="mt-3 grid w-full max-w-xl grid-cols-1 gap-1.5 sm:grid-cols-2">
+              {TIPS.map((tip, i) => (
+                <div
+                  key={tip.label}
+                  className="welcome-banner__rise flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5"
+                  style={{ animationDelay: `${0.5 + i * 0.08}s` }}
+                >
+                  <tip.icon className="h-3.5 w-3.5 shrink-0 text-primary" aria-hidden="true" />
+                  <span className="text-xs font-medium text-neutral-300">{tip.label}</span>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
 

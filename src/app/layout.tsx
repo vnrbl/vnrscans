@@ -57,7 +57,7 @@ export const metadata: Metadata = {
     url: "https://www.vnrscans.com",
   },
   twitter: {
-    card: "summary",
+    card: "summary_large_image",
   },
   manifest: "/site.webmanifest",
   // Google Search Console verification. Set NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION
