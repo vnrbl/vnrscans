@@ -83,6 +83,7 @@ import {
   SCANLATION_GROUP_NEW,
   SCANLATION_GROUP_NONE,
 } from "@/lib/chapter-utils";
+import { canonicalScanlationGroup, canonicalSourceSite } from "@/lib/import-source-utils";
 
 
 function slugify(s: string) {
@@ -1688,7 +1689,7 @@ export default function AdminSeries() {
 
                               {scanlationGroup && (
                                 <Badge variant="secondary" className="text-[9px] px-1.5 py-0 font-normal">
-                                  {scanlationGroup}
+                                  {canonicalScanlationGroup(scanlationGroup)}
                                 </Badge>
                               )}
 

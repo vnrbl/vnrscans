@@ -23,6 +23,7 @@ import {
   prepareSearchInput,
   rankSeriesResults,
 } from "@/lib/search-utils";
+import { canonicalScanlationGroup } from "@/lib/import-source-utils";
 
 type FilterCategory = "all" | "manga" | "manhwa" | "manhua" | "novel" | "users" | "groups";
 
@@ -128,7 +129,7 @@ export function NavbarSearch({ open, onOpenChange }: NavbarSearchProps) {
             if (error) throw error;
             const uniqueGroups = groupsData
               ? (Array.from(
-                  new Set(groupsData.map((c: any) => c.scanlation_group).filter(Boolean))
+                  new Set(groupsData.map((c: any) => canonicalScanlationGroup(c.scanlation_group)).filter(Boolean))
                 ) as string[]).slice(0, 10)
               : [];
             setGroupResults(uniqueGroups);

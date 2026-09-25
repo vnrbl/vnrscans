@@ -36,7 +36,7 @@ import {
 } from "@/lib/api/comix-import.actions";
 import { useProcessingTask } from "@/contexts/ProcessingTaskContext";
 import { $syncImportSource } from "@/lib/api/scraper.actions";
-import { detectImportSource } from "@/lib/import-source-utils";
+import { detectImportSource, canonicalSourceSite, canonicalScanlationGroup } from "@/lib/import-source-utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -113,7 +113,7 @@ const WORKABLE_SCAN_PROVIDERS: ScanProviderOption[] = [
   },
   {
     id: "hivetoon",
-    name: "Hive / Void",
+    name: "Hive Toons",
     icon: "⚡",
     domain: "hivetoons.org",
     getUrl: (slug) => `https://hivetoons.org/series/${slug}`,
@@ -593,13 +593,15 @@ export function AddNewSeriesDialog({ trigger }: AddNewSeriesDialogProps) {
       if (hasScanSource) {
         processing.setStepStatus("source", "active", "Connecting chapter upstream source...");
         const preset = detectImportSource(scanSourceUrl.trim());
+        const canonicalSite = canonicalSourceSite(preset.sourceSite);
+        const canonicalGroup = canonicalScanlationGroup(preset.scanlationGroup);
         const { data: newSource, error: srcErr } = await (supabase as any)
           .from("series_import_sources")
           .insert({
             series_id: newSeries.id,
             source_url: scanSourceUrl.trim(),
-            source_site: preset.sourceSite,
-            scanlation_group: preset.scanlationGroup || null,
+            source_site: canonicalSite,
+            scanlation_group: canonicalGroup || null,
             auto_publish: true,
             enabled: true,
           })

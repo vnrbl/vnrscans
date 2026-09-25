@@ -38,6 +38,7 @@ import {
 } from "@/components/ui/select";
 import { AddNewSeriesDialog } from "@/components/admin/AddNewSeriesDialog";
 import { XP_AMOUNTS } from "@/lib/xp";
+import { canonicalScanlationGroup, normalizeScanlationGroup } from "@/lib/import-source-utils";
 import {
   saveChapterOffline,
   getOfflineChapters,
@@ -169,7 +170,11 @@ export const ChapterList = React.memo(function ChapterList({
         .in("status", ["published", "scheduled"]);
 
       if (selectedGroup !== "all") {
-        query = query.eq("scanlation_group", selectedGroup);
+        if (selectedGroup === "Hive Toons") {
+          query = query.or("scanlation_group.eq.Hive Toons,scanlation_group.ilike.%hivetoon%");
+        } else {
+          query = query.eq("scanlation_group", selectedGroup);
+        }
       }
 
       query = query.order("chapter_number", { ascending: sortOrder === "asc" });
@@ -183,7 +188,11 @@ export const ChapterList = React.memo(function ChapterList({
           .in("status", ["published", "scheduled"]);
 
         if (selectedGroup !== "all") {
-          fallbackQuery = fallbackQuery.eq("scanlation_group", selectedGroup);
+          if (selectedGroup === "Hive Toons") {
+            fallbackQuery = fallbackQuery.or("scanlation_group.eq.Hive Toons,scanlation_group.ilike.%hivetoon%");
+          } else {
+            fallbackQuery = fallbackQuery.eq("scanlation_group", selectedGroup);
+          }
         }
 
         fallbackQuery = fallbackQuery.order("chapter_number", { ascending: sortOrder === "asc" });
@@ -481,7 +490,11 @@ export const ChapterList = React.memo(function ChapterList({
 
       if (error) throw error;
 
-      const uniqueGroups = [...new Set(data?.map((c) => c.scanlation_group).filter(Boolean) ?? [])];
+      const uniqueGroups = [
+        ...new Set(
+          (data?.map((c) => canonicalScanlationGroup(c.scanlation_group)).filter(Boolean) ?? [])
+        ),
+      ];
       return uniqueGroups.sort();
     },
     staleTime: 1000 * 60 * 5,
@@ -839,7 +852,7 @@ export const ChapterList = React.memo(function ChapterList({
                     </div>
                   </div>
                   <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-neutral-400">
-                    {scanlationGroup && <span className="font-semibold text-purple-400">{scanlationGroup}</span>}
+                    {scanlationGroup && <span className="font-semibold text-purple-400">{canonicalScanlationGroup(scanlationGroup)}</span>}
                     {uploadedBy && (() => {
                       const prof =
                         uploaderProfilesQ.data?.[uploadedBy] ||
@@ -948,7 +961,7 @@ export const ChapterList = React.memo(function ChapterList({
                                   <p className="text-xs font-bold text-purple-300">Chapter {c.chapter_number}</p>
                                   <p className="text-xs text-neutral-300 mt-0.5 leading-snug">{c.title}</p>
                                   {scanlationGroup && (
-                                    <p className="text-[10px] text-purple-400/80 mt-1">Group: {scanlationGroup}</p>
+                                    <p className="text-[10px] text-purple-400/80 mt-1">Group: {canonicalScanlationGroup(scanlationGroup)}</p>
                                   )}
                                 </TooltipContent>
                               )}
@@ -1006,10 +1019,10 @@ export const ChapterList = React.memo(function ChapterList({
                       <td className="px-3 py-3 hidden lg:table-cell">
                         {scanlationGroup ? (
                           <Link
-                            href={`/browse?group=${scanlationGroup}`}
+                            href={`/browse?group=${encodeURIComponent(canonicalScanlationGroup(scanlationGroup))}`}
                             className="text-sm font-medium text-violet-600 transition-colors hover:text-violet-400"
                           >
-                            {scanlationGroup}
+                            {canonicalScanlationGroup(scanlationGroup)}
                           </Link>
                         ) : (
                           <span className="text-sm text-muted-foreground">—</span>

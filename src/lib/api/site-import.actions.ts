@@ -8,7 +8,7 @@ import {
   extractImagesFromChapterUrls,
 } from "../chapter-scraper";
 import { buildChapterSlug } from "../chapter-utils";
-import { detectImportSource } from "../import-source-utils";
+import { detectImportSource, canonicalSourceSite, canonicalScanlationGroup, normalizeScanlationGroup } from "../import-source-utils";
 import { discoverAsuraCatalog, isSupportedAsuraCatalogUrl } from "../site-import/asura";
 import { discoverQiScansCatalog, isSupportedQiScansCatalogUrl } from "../site-import/qiscans";
 import { discoverHivetoonCatalog, isSupportedHivetoonCatalogUrl } from "../site-import/hivetoons";
@@ -148,7 +148,7 @@ export async function $discoverSiteCatalog(args: {
       .from("site_import_jobs")
       .insert({
         source_url: discovery.canonicalUrl,
-        source_site: discovery.sourceSite,
+        source_site: canonicalSourceSite(discovery.sourceSite),
         status: "scanning",
         created_by: user.id,
       })
@@ -516,7 +516,7 @@ export async function $processNextSiteImportItem(args: {
       if (existingError) throw existingError;
 
       const sourcePreset = detectImportSource(item.source_url);
-      const scanlationGroup = sourcePreset.scanlationGroup || "Asura Scans";
+      const scanlationGroup = canonicalScanlationGroup(sourcePreset.scanlationGroup || "Asura Scans");
       const existingKeys = new Set(
         (existingChapters ?? []).map(
           (chapter: { chapter_number: number; scanlation_group: string | null }) =>
@@ -798,8 +798,8 @@ async function ensureSeriesAndSource(
     const { error } = await admin.from("series_import_sources").insert({
       series_id: seriesId,
       source_url: item.source_url,
-      source_site: preset.sourceSite,
-      scanlation_group: preset.scanlationGroup,
+      source_site: canonicalSourceSite(preset.sourceSite),
+      scanlation_group: canonicalScanlationGroup(preset.scanlationGroup),
       image_url_example: preset.imageUrlExample,
       enabled: true,
       auto_publish: item.auto_publish,
@@ -875,6 +875,9 @@ async function refreshJobSummary(jobId: string): Promise<{ job: SiteImportJob; h
 function canonicalizeUrl(value: string): string {
   try {
     const parsed = new URL(value);
+    if (parsed.hostname.includes("hivetoon")) {
+      parsed.hostname = "hivetoons.org";
+    }
     parsed.hash = "";
     parsed.search = "";
     return parsed.toString().replace(/\/$/, "").toLowerCase();
@@ -901,7 +904,7 @@ function normalizeMatchKey(value: unknown): string {
 }
 
 function chapterScanKey(chapterNumber: number, scanlationGroup: string | null) {
-  return `${chapterNumber}::${(scanlationGroup || "").trim().toLowerCase()}`;
+  return `${chapterNumber}::${normalizeScanlationGroup(scanlationGroup)}`;
 }
 
 function slugify(value: string): string {

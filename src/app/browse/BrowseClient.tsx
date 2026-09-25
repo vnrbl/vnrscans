@@ -29,6 +29,7 @@ import { Command, CommandGroup, CommandItem } from "@/components/ui/command";
 import { buildSeriesSearchOrFilter, prepareSearchInput, rankSeriesResults } from "@/lib/search-utils";
 import { AddNewSeriesDialog } from "@/components/admin/AddNewSeriesDialog";
 import { PageKineticLoader } from "@/components/ui/kinetic-text-loader";
+import { canonicalScanlationGroup } from "@/lib/import-source-utils";
 
 export type BrowseGenre = { id: string; name: string; slug: string };
 export type BrowseTag = { id: string; name: string; slug: string; color: string | null; icon: string | null };
@@ -495,10 +496,17 @@ function BrowsePageContent({ initialData }: { initialData?: BrowseInitialData })
 
       // Apply scanlation group filter
       if (groupFilter) {
-        const { data: chaptersWithGroup } = await supabase
+        let chQuery = supabase
           .from("chapters")
-          .select("series_id")
-          .ilike("scanlation_group", groupFilter);
+          .select("series_id");
+
+        if (groupFilter.toLowerCase().includes("hivetoon") || groupFilter.toLowerCase().includes("hive toon")) {
+          chQuery = chQuery.or("scanlation_group.ilike.%hivetoon%,scanlation_group.ilike.%hive toon%");
+        } else {
+          chQuery = chQuery.ilike("scanlation_group", groupFilter);
+        }
+
+        const { data: chaptersWithGroup } = await chQuery;
         
         const seriesIds = Array.from(new Set((chaptersWithGroup || []).map((c: any) => c.series_id).filter(Boolean)));
         if (seriesIds.length > 0) {
@@ -953,7 +961,7 @@ function BrowsePageContent({ initialData }: { initialData?: BrowseInitialData })
 
           {groupFilter && (
             <Badge variant="secondary" className="gap-1.5 py-1 px-2.5 bg-violet-500/10 text-primary border border-violet-500/20 text-xs font-semibold h-9 rounded-lg">
-              Group: {groupFilter}
+              Group: {canonicalScanlationGroup(groupFilter)}
               <X 
                 className="h-3.5 w-3.5 cursor-pointer hover:text-foreground" 
                 onClick={() => {

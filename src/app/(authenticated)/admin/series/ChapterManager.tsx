@@ -35,6 +35,7 @@ import { logAdminAction } from "@/lib/adminLog";
 import { useAuth } from "@/hooks/useAuth";
 import { moveToRecycleBin } from "@/lib/recycle-bin";
 import { $extractChaptersFromUrl, $extractImagesFromUrl, $syncImportSource } from "@/lib/api/scraper.actions";
+import type { ChapterInfo } from "@/lib/chapter-scraper";
 import { detectImportSource, normalizeScanlationGroup, canonicalSourceSite, canonicalScanlationGroup } from "@/lib/import-source-utils";
 import { Button } from "@/components/ui/button";
 import { formatAppDate } from "@/lib/date";
@@ -480,7 +481,11 @@ export default function ChapterManager({ seriesId, onBack }: { seriesId: string;
         }
 
         // Get unique groups
-        const uniqueGroups = [...new Set(data?.map((c) => c.scanlation_group).filter(Boolean) ?? [])];
+        const uniqueGroups = [
+          ...new Set(
+            (data?.map((c) => canonicalScanlationGroup(c.scanlation_group)).filter(Boolean) ?? [])
+          ),
+        ];
         return uniqueGroups.sort();
       } catch (err) {
         console.error("Scanlation groups fetch failed:", err);
@@ -566,7 +571,7 @@ export default function ChapterManager({ seriesId, onBack }: { seriesId: string;
     return chapters.data.filter((ch) => {
       // 1. Group filter
       if (filterGroup !== "all") {
-        if (ch.scanlation_group !== filterGroup) return false;
+        if (normalizeScanlationGroup(ch.scanlation_group) !== normalizeScanlationGroup(filterGroup)) return false;
       }
 
       // 2. Search term filter
@@ -2620,7 +2625,7 @@ export default function ChapterManager({ seriesId, onBack }: { seriesId: string;
                 {ch.scanlation_group && (
                   <>
                     <span>•</span>
-                    <span className="text-violet-600">{ch.scanlation_group}</span>
+                    <span className="text-violet-600">{canonicalScanlationGroup(ch.scanlation_group)}</span>
                   </>
                 )}
                 {ch.uploaded_by && (

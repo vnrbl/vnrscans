@@ -79,6 +79,12 @@ import { safeUrlOrNull, serializeAttachmentUrls, parseSafeAttachmentUrls } from 
 import { CommentAttachmentGrid } from "@/components/comments/CommentAttachmentGrid";
 import { sanitizeHtml } from "@/lib/html-sanitizer";
 import { resolveChapterImageUrl, getCleanChapterSlug } from "@/lib/chapter-utils";
+import {
+  canonicalScanlationGroup,
+  normalizeScanlationGroup,
+  canonicalSourceSite,
+  detectImportSource,
+} from "@/lib/import-source-utils";
 import NovelSettingsPanel, {
   NovelReaderSettings,
   DEFAULT_NOVEL_SETTINGS,
@@ -377,6 +383,20 @@ export default function Reader({
     gcTime: 1000 * 60 * 20,
   });
 
+  const uniqueAlternateGroups = useMemo(() => {
+    const list = alternateGroupsQ.data ?? [];
+    const seen = new Set<string>();
+    const res: typeof list = [];
+    for (const item of list) {
+      const canon = canonicalScanlationGroup(item.scanlation_group);
+      if (!seen.has(canon)) {
+        seen.add(canon);
+        res.push(item);
+      }
+    }
+    return res;
+  }, [alternateGroupsQ.data]);
+
   useEffect(() => {
     if (chapterQ.data?.id) {
       setIsDownloaded(isChapterSavedOffline(chapterQ.data.id));
@@ -642,7 +662,7 @@ export default function Reader({
       return { prev: p, next: n };
     }
 
-    const normGroup = (g?: string | null) => g?.trim().toLowerCase() || null;
+    const normGroup = (g?: string | null) => normalizeScanlationGroup(g) || null;
     const currentGroup = normGroup(activeScanlationGroup);
 
     // Candidates strictly greater than current chapter number (never same chapter!)
@@ -678,7 +698,7 @@ export default function Reader({
     const raw = siblingsQ.data ?? [];
     if (raw.length === 0) return [];
 
-    const normGroup = (g?: string | null) => g?.trim().toLowerCase() || null;
+    const normGroup = (g?: string | null) => normalizeScanlationGroup(g) || null;
     const currentGroup = normGroup(activeScanlationGroup);
 
     const map = new Map<number, (typeof raw)[0]>();
@@ -1216,8 +1236,8 @@ export default function Reader({
           isNovel={isNovel}
           allChapters={navChapters}
           currentChapterSlug={chapterSlug}
-          alternateGroups={alternateGroupsQ.data ?? []}
-          currentGroup={activeScanlationGroup}
+          alternateGroups={uniqueAlternateGroups}
+          currentGroup={activeScanlationGroup ? canonicalScanlationGroup(activeScanlationGroup) : null}
           currentFilter={currentFilter}
           onCycleFilter={cycleFilter}
           isDownloading={isDownloading}
@@ -1706,7 +1726,7 @@ function ReaderTopBar({
               <SelectContent>
                 {alternateGroups.map((ch) => (
                   <SelectItem key={ch.id} value={getCleanChapterSlug(ch)}>
-                    {ch.scanlation_group || "Default"}
+                    {canonicalScanlationGroup(ch.scanlation_group) || "Default"}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -1830,15 +1850,18 @@ function ScheduledChapterUnlockView({
   const sourceUrl = chapter.source_url;
   const getScanGroupName = () => {
     if (chapter.scanlation_group && chapter.scanlation_group.trim()) {
-      return chapter.scanlation_group.trim();
+      return canonicalScanlationGroup(chapter.scanlation_group.trim());
     }
     if ((chapter as any).source_site && (chapter as any).source_site.trim()) {
-      return (chapter as any).source_site.trim();
+      return canonicalSourceSite((chapter as any).source_site.trim());
     }
     if (chapter.source_url) {
       try {
+        const detected = detectImportSource(chapter.source_url);
+        if (detected.scanlationGroup) return detected.scanlationGroup;
         const hostname = new URL(chapter.source_url).hostname.replace(/^www\./, "");
         const main = hostname.split(".")[0];
+        if (main && main.toLowerCase().includes("hive")) return "Hive Toons";
         if (main && main.toLowerCase().includes("qi")) return "Qi Scans";
         if (main && main.toLowerCase().includes("asura")) return "Asura Scans";
         if (main && main.toLowerCase().includes("flame")) return "Flame Comics";

@@ -39,6 +39,7 @@ import {
   getOfflineChapters,
   isOfflineStorageSupported,
 } from "@/lib/offlineStorage";
+import { canonicalScanlationGroup, normalizeScanlationGroup } from "@/lib/import-source-utils";
 
 export interface ChapterItem {
   id: string;
@@ -110,7 +111,9 @@ export function DownloadChaptersModal({
 
     // 1. Scanlation Group
     if (selectedGroup !== "all") {
-      list = list.filter((c) => c.scanlation_group === selectedGroup);
+      list = list.filter(
+        (c) => normalizeScanlationGroup(c.scanlation_group) === normalizeScanlationGroup(selectedGroup),
+      );
     }
 
     // 2. Read / Unread Status
@@ -653,7 +656,7 @@ export function DownloadChaptersModal({
                             </span>
                             {c.scanlation_group && (
                               <span className="text-[10px] px-1.5 py-0.2 rounded bg-secondary text-muted-foreground">
-                                {c.scanlation_group}
+                                {canonicalScanlationGroup(c.scanlation_group)}
                               </span>
                             )}
                             {c.uploaded_by && (
