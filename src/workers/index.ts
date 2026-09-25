@@ -618,7 +618,6 @@ async function getLocalLatestChapter(env: Env, seriesId: string): Promise<number
   const url = new URL("/rest/v1/chapters", env.SUPABASE_URL);
   url.searchParams.set("select", "chapter_number");
   url.searchParams.set("series_id", `eq.${seriesId}`);
-  url.searchParams.set("status", "eq.published");
   url.searchParams.set("order", "chapter_number.desc");
   url.searchParams.set("limit", "1");
   const response = await fetch(url, { headers: supabaseHeaders(env), signal: AbortSignal.timeout(3500) });
@@ -659,11 +658,18 @@ async function scanComickForNewChapters(env: Env) {
       if (!comick) continue;
       const stateKey = `telegram:comick-watch:series:${series.id}`;
       const pendingKey = `telegram:comick-watch:pending:${series.id}`;
+
+      // If our database already has this chapter (or newer), do NOT alert or auto-import!
+      if (localLatest !== null && comick.chapter <= localLatest) {
+        await env.RATE_LIMIT.put(stateKey, String(Math.max(comick.chapter, localLatest)), { expirationTtl: 60 * 60 * 24 * 365 });
+        continue;
+      }
+
       const previousRaw = await env.RATE_LIMIT.get(stateKey);
       const previous = previousRaw === null ? null : Number.parseFloat(previousRaw);
       if (!Number.isFinite(previous)) {
         await env.RATE_LIMIT.put(stateKey, String(comick.chapter), { expirationTtl: 60 * 60 * 24 * 365 });
-      } else if (comick.chapter > (previous as number)) {
+      } else if (comick.chapter > (previous as number) && (localLatest === null || comick.chapter > localLatest)) {
         const alert = {
           eventKey: `comick:${series.id}:${comick.chapter}`,
           seriesId: series.id,

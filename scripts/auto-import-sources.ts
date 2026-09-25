@@ -171,32 +171,48 @@ async function syncSource(source: any): Promise<SourceSyncResult> {
 
     const activeRows = existingRows ?? [];
 
-    const existingKeys = new Set(
-      activeRows.map((chapter: any) =>
-        chapterScanKey(Number(chapter.chapter_number), chapter.scanlation_group),
-      ),
+    const existingChapterNumbers = new Set(
+      activeRows.map((chapter: any) => Number(chapter.chapter_number)),
     );
 
-    // Note: the old "<= maxChapterNumber" guard was removed because it dropped
-    // legitimate decimal/re-published chapters. Exact duplicates are already
-    // covered by existingKeys.
-    const seenKeys = new Set<string>();
-    const missing = discovered
+    const seenNumbers = new Set<number>();
+    const missingCandidates = discovered
       .filter((chapter) => {
         if (isPremiumOrLockedChapter(chapter)) {
           return false;
         }
-        const key = chapterScanKey(chapter.chapterNumber, scanlationGroup);
-        if (existingKeys.has(key) || seenKeys.has(key)) {
+        const num = Number(chapter.chapterNumber);
+        // Skip if chapter number already exists in our database for this series
+        if (isNaN(num) || existingChapterNumbers.has(num) || seenNumbers.has(num)) {
           return false;
         }
-        seenKeys.add(key);
+        seenNumbers.add(num);
         return true;
       })
-      .sort((a, b) => a.chapterNumber - b.chapterNumber)
-      .slice(0, maxChaptersPerSource);
+      .sort((a, b) => a.chapterNumber - b.chapterNumber);
+
+    // If more missing chapters than limit, take the LATEST ones (newest releases)
+    const missing =
+      missingCandidates.length > maxChaptersPerSource
+        ? missingCandidates.slice(missingCandidates.length - maxChaptersPerSource)
+        : missingCandidates;
 
     skipped = discovered.length - missing.length;
+
+    if (missing.length === 0) {
+      console.log(`[AutoImport] All ${discovered.length} chapters already exist in database.`);
+      await writeLog(source.id, 'success', `Checked source: all ${discovered.length} chapters already in database.`, chaptersFound, 0, skipped, 0, details);
+      await supabase
+        .from('series_import_sources')
+        .update({
+          last_checked_at: startedAt,
+          last_success_at: startedAt,
+          last_error: null,
+        })
+        .eq('id', source.id);
+      return { status: 'success', imported: 0, failed: 0, chaptersFound, details };
+    }
+
     const isAsuraSource = source.source_url.toLowerCase().includes('asura');
     const batchExtractedImages = await extractImagesFromChapterUrls(
       missing.map((chapter) => chapter.url),
@@ -320,13 +336,16 @@ async function syncSource(source: any): Promise<SourceSyncResult> {
         .eq('id', source.id);
 
       if (source.series_id) {
+        const seriesUpdate: Record<string, any> = {
+          estimated_next_release_at: nextEstimated,
+          release_cadence: timing.cadence,
+        };
+        if (imported > 0) {
+          seriesUpdate.updated_at = new Date().toISOString();
+        }
         await supabase
           .from('series')
-          .update({
-            estimated_next_release_at: nextEstimated,
-            release_cadence: timing.cadence,
-            updated_at: new Date().toISOString(),
-          })
+          .update(seriesUpdate)
           .eq('id', source.series_id);
       }
     } catch (timingErr) {

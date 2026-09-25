@@ -644,16 +644,15 @@ export async function $runCloudScrape(args: {
   );
 
   let exactDuplicateCount = 0;
-  const seenKeys = new Set<string>();
+  const seenNumbers = new Set<number>();
   const missing = discovered.filter((chapter) => {
     const num = Number(chapter.chapterNumber);
-    const key = chapterScanKey(num, scanlationGroup);
-    // Skip ONLY if a chapter with this number already exists for this scanlation group
-    if (existingKeys.has(key) || seenKeys.has(key)) {
+    // Skip if chapter with this number already exists in our database for this series
+    if (isNaN(num) || existingChapterNumbers.has(num) || seenNumbers.has(num)) {
       exactDuplicateCount++;
       return false;
     }
-    seenKeys.add(key);
+    seenNumbers.add(num);
     return true;
   });
 
@@ -981,22 +980,22 @@ export async function $syncImportSource(args: {
       ),
     );
 
-    const seenKeys = new Set<string>();
+    const seenNumbers = new Set<number>();
     const missingCandidates = discovered
       .filter((chapter) => {
         const num = Number(chapter.chapterNumber);
-        const key = chapterScanKey(num, scanlationGroup);
-        // Skip ONLY if already exists for this scanlation group
-        if (existingKeys.has(key) || seenKeys.has(key)) {
+        if (isNaN(num)) return false;
+        // Skip if chapter already exists in our database for this series
+        if (existingChapterNumbers.has(num) || seenNumbers.has(num)) {
           details.push({
             chapter: chapter.chapterNumber,
             status: "skipped",
-            message: "Already imported for this scanlation group",
+            message: "Chapter already exists in database",
             series_title: seriesTitle || undefined,
           });
           return false;
         }
-        seenKeys.add(key);
+        seenNumbers.add(num);
         return true;
       })
       .sort((a, b) => a.chapterNumber - b.chapterNumber);
@@ -1014,14 +1013,17 @@ export async function $syncImportSource(args: {
         : missingCandidates.slice(0, limit);
 
     skipped = discovered.length - missing.length;
-    const isAsuraSource = source.source_url.toLowerCase().includes('asura');
-    const isElftoonSource = isElftoonUrl(source.source_url);
-    const isDuskSource = source.source_url.toLowerCase().includes('duskscans');
-    const batchConcurrency = isAsuraSource ? 6 : isDuskSource ? 15 : isElftoonSource ? 15 : 10;
-    const batchExtractedImages = await extractImagesFromChapterUrls(
-      missing.map((chapter) => chapter.url),
-      { concurrency: batchConcurrency, imageUrlExample },
-    );
+    let batchExtractedImages = new Map<string, string[]>();
+    if (missing.length > 0) {
+      const isAsuraSource = source.source_url.toLowerCase().includes('asura');
+      const isElftoonSource = isElftoonUrl(source.source_url);
+      const isDuskSource = source.source_url.toLowerCase().includes('duskscans');
+      const batchConcurrency = isAsuraSource ? 6 : isDuskSource ? 15 : isElftoonSource ? 15 : 10;
+      batchExtractedImages = await extractImagesFromChapterUrls(
+        missing.map((chapter) => chapter.url),
+        { concurrency: batchConcurrency, imageUrlExample },
+      );
+    }
 
     // First pass: collect all chapter data + images, filtering out failures
     const chapterRows: Array<{
@@ -1265,13 +1267,16 @@ export async function $syncImportSource(args: {
         .eq("id", source.id);
 
       if (source.series_id) {
+        const seriesUpdate: Record<string, any> = {
+          estimated_next_release_at: nextScheduledDrop,
+          release_cadence: timingCadence,
+        };
+        if (imported > 0) {
+          seriesUpdate.updated_at = new Date().toISOString();
+        }
         await admin
           .from("series")
-          .update({
-            estimated_next_release_at: nextScheduledDrop,
-            release_cadence: timingCadence,
-            updated_at: new Date().toISOString(),
-          })
+          .update(seriesUpdate)
           .eq("id", source.series_id);
       }
     } catch (timingErr) {
@@ -1838,16 +1843,16 @@ export async function $discoverNewChapters(args: {
 
     const activeRows = existingRows ?? [];
 
-    const existingKeys = new Set(
-      activeRows.map((chapter: any) => chapterScanKey(Number(chapter.chapter_number), chapter.scanlation_group))
+    const existingSet = new Set(
+      activeRows.map((ch: any) => Number(ch.chapter_number))
     );
 
-    const seenKeys = new Set<string>();
+    const seenNumbers = new Set<number>();
     const newChapters = discovered
       .filter((chapter) => {
-        const key = chapterScanKey(chapter.chapterNumber, scanlationGroup);
-        if (existingKeys.has(key) || seenKeys.has(key)) return false;
-        seenKeys.add(key);
+        const num = Number(chapter.chapterNumber);
+        if (isNaN(num) || existingSet.has(num) || seenNumbers.has(num)) return false;
+        seenNumbers.add(num);
         return true;
       })
       .sort((a, b) => a.chapterNumber - b.chapterNumber);
@@ -1935,13 +1940,13 @@ export async function $importSelectedChapters(args: {
       .eq("series_id", source.series_id);
     if (existingError) throw existingError;
 
-    const existingKeys = new Set(
-      (existingRows ?? []).map((ch: any) => chapterScanKey(Number(ch.chapter_number), ch.scanlation_group))
+    const existingChapterNumbers = new Set(
+      (existingRows ?? []).map((ch: any) => Number(ch.chapter_number))
     );
 
     const missing = chaptersToImport.filter((ch) => {
-      const key = chapterScanKey(ch.chapterNumber, scanlationGroup);
-      return !existingKeys.has(key);
+      const num = Number(ch.chapterNumber);
+      return !isNaN(num) && !existingChapterNumbers.has(num);
     });
 
     if (missing.length === 0) {

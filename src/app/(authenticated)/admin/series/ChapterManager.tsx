@@ -35,8 +35,7 @@ import { logAdminAction } from "@/lib/adminLog";
 import { useAuth } from "@/hooks/useAuth";
 import { moveToRecycleBin } from "@/lib/recycle-bin";
 import { $extractChaptersFromUrl, $extractImagesFromUrl, $syncImportSource } from "@/lib/api/scraper.actions";
-import type { ChapterInfo } from "@/lib/chapter-scraper";
-import { detectImportSource, normalizeScanlationGroup } from "@/lib/import-source-utils";
+import { detectImportSource, normalizeScanlationGroup, canonicalSourceSite, canonicalScanlationGroup } from "@/lib/import-source-utils";
 import { Button } from "@/components/ui/button";
 import { formatAppDate } from "@/lib/date";
 import { Input } from "@/components/ui/input";
@@ -736,8 +735,8 @@ export default function ChapterManager({ seriesId, onBack }: { seriesId: string;
       const { error } = await (supabase as any).from("series_import_sources").insert({
         series_id: seriesId,
         source_url: sourceUrl,
-        source_site: autoSourceSite.trim() || detected.sourceSite,
-        scanlation_group: autoSourceGroup.trim() || detected.scanlationGroup || null,
+        source_site: canonicalSourceSite(autoSourceSite.trim() || detected.sourceSite),
+        scanlation_group: canonicalScanlationGroup(autoSourceGroup.trim() || detected.scanlationGroup) || null,
         image_url_example: autoSourceImageExample.trim() || detected.imageUrlExample || null,
         enabled: autoSourceEnabled,
         auto_publish: autoSourcePublish,
@@ -1896,7 +1895,7 @@ export default function ChapterManager({ seriesId, onBack }: { seriesId: string;
                           {source.enabled ? "Enabled" : "Paused"}
                         </Badge>
                         <span className="font-semibold">
-                          {source.source_site || detectImportSource(source.source_url).sourceSite}
+                          {canonicalSourceSite(source.source_site || detectImportSource(source.source_url).sourceSite)}
                         </span>
                         <span className="text-sm text-muted-foreground">
                           {scanlationGroupLabel(source.scanlation_group)}

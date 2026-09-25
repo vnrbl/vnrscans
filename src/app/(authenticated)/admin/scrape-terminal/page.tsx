@@ -37,6 +37,12 @@ type ScrapeContext = {
 
 const inferSourceGroup = (sourceUrl: string) => {
   try {
+    const host = new URL(sourceUrl).hostname.replace(/^www\./, "").toLowerCase();
+    if (host.includes("hivetoon")) return "Hive Toons";
+    if (host.includes("asura")) return "Asura Scans";
+    if (host.includes("vortex")) return "Vortex Scans";
+    if (host.includes("elftoon")) return "Elf Toons";
+    if (host.includes("qiscan") || host.includes("qimanga")) return "Qi Scans";
     return new URL(sourceUrl).hostname.replace(/^www\./, "");
   } catch {
     return "";

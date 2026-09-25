@@ -146,7 +146,42 @@ export function isKnownImportSource(url: string): boolean {
   }
 }
 
+export function canonicalSourceSite(site: string | null | undefined): string {
+  if (!site) return "Direct";
+  const s = site.trim();
+  const lower = s.toLowerCase().replace(/[^a-z0-9]/g, "");
+  if (lower.includes("hivetoon") || lower.includes("hivescan")) return "Hive Toons";
+  if (lower.includes("asura")) return "Asura Scans";
+  if (lower.includes("vortex")) return "Vortex Scans";
+  if (lower.includes("elftoon")) return "Elf Toons";
+  if (lower.includes("qiscan") || lower.includes("qimanga") || lower.includes("qimanhwa")) return "Qi Scans";
+  if (lower.includes("comix")) return "Comix.to";
+  if (lower.includes("dusk")) return "Dusk Scans";
+  if (lower.includes("kayn")) return "Kayn Scans";
+  if (lower.includes("drake")) return "Drake Scans";
+  if (lower.includes("witch")) return "WitchToons";
+  return s;
+}
+
+export function canonicalScanlationGroup(group: string | null | undefined): string {
+  if (!group) return "";
+  const s = group.trim();
+  const lower = s.toLowerCase().replace(/[^a-z0-9]/g, "");
+  if (lower.includes("hivetoon") || lower.includes("hivescan")) return "Hive Toons";
+  if (lower.includes("asura")) return "Asura Scans";
+  if (lower.includes("vortex")) return "Vortex Scans";
+  if (lower.includes("elftoon")) return "Elf Toons";
+  if (lower.includes("qiscan") || lower.includes("qimanga") || lower.includes("qimanhwa")) return "Qi Scans";
+  if (lower.includes("dusk")) return "Dusk Scans";
+  if (lower.includes("kayn")) return "Kayn Scans";
+  if (lower.includes("drake")) return "Drake Scans";
+  if (lower.includes("witch")) return "WitchToons";
+  return s;
+}
+
 export function normalizeScanlationGroup(group: string | null | undefined): string {
   if (!group) return "";
-  return group.toLowerCase().replace(/[^a-z0-9]/g, "");
+  const canon = canonicalScanlationGroup(group);
+  return canon.toLowerCase().replace(/[^a-z0-9]/g, "");
 }
+

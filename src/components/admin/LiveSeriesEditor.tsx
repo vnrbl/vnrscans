@@ -46,7 +46,7 @@ import {
   $importSelectedChapters,
 } from "@/lib/api/scraper.actions";
 import { $importComickMetadataToSeries } from "@/lib/api/comick-import.actions";
-import { detectImportSource } from "@/lib/import-source-utils";
+import { detectImportSource, canonicalSourceSite, canonicalScanlationGroup } from "@/lib/import-source-utils";
 import { ComickMetadataImporter } from "@/components/admin/ComickMetadataImporter";
 import { Button } from "@/components/ui/button";
 import { formatAppDate } from "@/lib/date";
@@ -469,8 +469,8 @@ export function LiveSeriesEditor({ series: initialSeries, slug, trigger }: LiveS
       const { error } = await (supabase as any).from("series_import_sources").insert({
         series_id: initialSeries.id,
         source_url: newSourceUrl.trim(),
-        source_site: preset.sourceSite,
-        scanlation_group: preset.scanlationGroup || null,
+        source_site: canonicalSourceSite(preset.sourceSite),
+        scanlation_group: canonicalScanlationGroup(preset.scanlationGroup) || null,
         auto_publish: true,
         enabled: true,
       });
@@ -1661,7 +1661,7 @@ export function LiveSeriesEditor({ series: initialSeries, slug, trigger }: LiveS
                           <div className="min-w-0 flex-1">
                             <div className="flex flex-wrap items-center gap-2">
                               <span className="text-xs font-bold uppercase font-mono px-2 py-0.5 rounded bg-purple-500/10 text-purple-300 border border-purple-500/20">
-                                {src.source_site || "Source"}
+                                {canonicalSourceSite(src.source_site || "Source")}
                               </span>
                               {src.last_checked_at && (
                                 <span className="text-2xs text-muted-foreground">

@@ -47,6 +47,7 @@ import {
   type ComixGroupItem,
 } from "@/lib/api/comix-import.actions";
 import { $syncImportSource } from "@/lib/api/scraper.actions";
+import { canonicalSourceSite, canonicalScanlationGroup } from "@/lib/import-source-utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -1502,7 +1503,7 @@ export default function MangaImporterPage() {
                                   : "bg-purple-600/20 text-purple-300 border-purple-500/30 text-[10px]"
                               }
                             >
-                              {src.source_site || "Direct"}
+                              {canonicalSourceSite(src.source_site || "Direct")}
                             </Badge>
                           </TableCell>
                           <TableCell className="text-xs font-mono text-neutral-400 max-w-xs truncate">
@@ -1517,7 +1518,7 @@ export default function MangaImporterPage() {
                             </a>
                           </TableCell>
                           <TableCell className="text-xs text-neutral-300">
-                            {src.scanlation_group || "Default"}
+                            {canonicalScanlationGroup(src.scanlation_group) || "Default"}
                           </TableCell>
                           <TableCell className="text-right">
                             <Button
