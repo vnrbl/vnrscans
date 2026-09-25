@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { cn } from "@/lib/utils";
+import { VNR_FAQ_ITEMS, type FaqItem as FaqItemContent } from "@/lib/faq-content";
 
 export interface FaqItem {
   question: string;
@@ -12,35 +13,7 @@ export interface FaqAccordionProps extends React.HTMLAttributes<HTMLDivElement> 
   items?: FaqItem[];
   title?: string;
   defaultOpenIndex?: number | null;
-}
-
-export const VNR_FAQ_ITEMS: FaqItem[] = [
-  {
-    question: "Is vnrscans completely free to use?",
-    answer:
-      "Yes! vnrscans is entirely free for all readers. We do not require any paid subscription to read our indexed series, bookmark your favorites, or keep track of your reading progress.",
-  },
-  {
-    question: "How does the cultivation realm and Spiritual Qi system work?",
-    answer:
-      "As you read chapters, post comments, and maintain your daily reading streaks, you gather Spiritual Qi. Accumulating Qi allows your soul to break through higher Cultivation Realms, unlocking rare badges, exclusive animated avatar frames, custom accent glows, and prestigious seasonal community ranks.",
-  },
-  {
-    question: "Where does vnrscans get its content?",
-    answer:
-      "vnrscans does not store any files on its servers. We only link to media hosted on third-party services. If you have copyright concerns, please visit our DMCA registry page.",
-  },
-  {
-    question: "What is your DMCA copyright policy?",
-    answer:
-      "We take intellectual property ownership extremely seriously. If you are a copyright holder and believe your work is on our platform without authorization, you can file a quick takedown notice on our DMCA page. We review and process verified reports within 5 business days.",
-  },
-  {
-    question: "Can independent creators publish their work here?",
-    answer:
-      "Absolutely! We love supporting independent authors and illustrators. Please reach out to creator@vnrscans.com or use our Contact page form to send us details of your work, and our admin team will assist you in setting up your series.",
-  },
-];
+};
 
 export function FaqAccordion({
   items = VNR_FAQ_ITEMS,

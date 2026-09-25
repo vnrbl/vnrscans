@@ -9,6 +9,11 @@ import {
   extractImagesFromChapterUrl,
 } from '../src/lib/chapter-scraper';
 import { buildChapterSlug } from '../src/lib/chapter-utils';
+import {
+  normalizeChapterNumber,
+  chapterScanKey,
+  isChapterAlreadyPresent,
+} from '../src/lib/import-source-utils';
 
 config();
 
@@ -164,9 +169,7 @@ const filterImagesByExampleUrl = (
   return [];
 };
 
-const chapterScanKey = (chapterNumber: number, scanlationGroup: string | null): string => {
-  return `${chapterNumber}::${scanlationGroup?.trim() || ''}`;
-};
+
 
 async function scrollChapterPageForLazyImages(page: any): Promise<void> {
   let lastHeight = 0;
@@ -674,13 +677,24 @@ async function main() {
     const activeRows = (existing ?? []).filter((ch: any) => !emptyChapterIds.includes(ch.id));
 
     const targetGroup = scanlationGroup || null;
+    const existingChapterNumbers = new Set(
+      activeRows.map((c: any) => normalizeChapterNumber(c.chapter_number)).filter((n) => !isNaN(n))
+    );
     const existingScanKeys = new Set(
       activeRows.map((c: any) => chapterScanKey(c.chapter_number, c.scanlation_group)),
     );
     const seenScanKeys = new Set<string>();
     missing = discovered.filter((ch) => {
-      const scanKey = chapterScanKey(ch.chapterNumber, targetGroup);
-      if (existingScanKeys.has(scanKey) || seenScanKeys.has(scanKey)) {
+      const num = normalizeChapterNumber(ch.chapterNumber);
+      if (isNaN(num)) {
+        exactDuplicateCount++;
+        return false;
+      }
+      const scanKey = chapterScanKey(num, targetGroup);
+      if (
+        isChapterAlreadyPresent(num, targetGroup, existingScanKeys, existingChapterNumbers) ||
+        seenScanKeys.has(scanKey)
+      ) {
         exactDuplicateCount++;
         return false;
       }

@@ -7,7 +7,12 @@ import {
   isPremiumOrLockedChapter,
 } from '../src/lib/chapter-scraper';
 import { buildChapterSlug } from '../src/lib/chapter-utils';
-import { detectImportSource } from '../src/lib/import-source-utils';
+import {
+  detectImportSource,
+  normalizeChapterNumber,
+  chapterScanKey,
+  isChapterAlreadyPresent,
+} from '../src/lib/import-source-utils';
 import {
   detectSourceScanTiming,
   advanceNextReleaseAfterDrop,
@@ -32,9 +37,7 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
   auth: { autoRefreshToken: false, persistSession: false },
 });
 
-function chapterScanKey(chapterNumber: number, scanlationGroup: string | null) {
-  return `${chapterNumber}::${scanlationGroup?.trim() || ''}`;
-}
+
 
 async function syncAllSeriesChapters() {
   console.log('🚀 Starting global series chapter sync...');
@@ -117,21 +120,31 @@ async function syncAllSeriesChapters() {
         const preset = detectImportSource(source.source_url);
         const scanlationGroup = source.scanlation_group || preset.scanlationGroup || null;
 
+        const existingChapterNumbers = new Set(
+          activeRows.map((ch: any) => normalizeChapterNumber(ch.chapter_number)).filter((n) => !isNaN(n))
+        );
         const existingKeys = new Set(
           activeRows.map((ch: any) =>
-            chapterScanKey(Number(ch.chapter_number), ch.scanlation_group)
+            chapterScanKey(ch.chapter_number, ch.scanlation_group)
           )
         );
 
-        // Find chapters after the highest existing chapter or missing from DB
+        // Find chapters missing from DB for this source / group
         const seenKeys = new Set<string>();
         const newChapters = discovered
           .filter((ch) => {
             if (isPremiumOrLockedChapter(ch)) {
               return false;
             }
-            const key = chapterScanKey(ch.chapterNumber, scanlationGroup);
-            if (existingKeys.has(key) || seenKeys.has(key)) {
+            const num = normalizeChapterNumber(ch.chapterNumber);
+            if (isNaN(num)) {
+              return false;
+            }
+            const key = chapterScanKey(num, scanlationGroup);
+            if (
+              isChapterAlreadyPresent(num, scanlationGroup, existingKeys, existingChapterNumbers) ||
+              seenKeys.has(key)
+            ) {
               return false;
             }
             seenKeys.add(key);

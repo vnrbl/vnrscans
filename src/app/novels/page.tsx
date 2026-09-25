@@ -7,7 +7,15 @@ export const revalidate = 120; // ISR cache for 2 minutes — instant edge respo
 export const metadata: Metadata = {
   title: "Read Light Novels & Web Novels Online Free — vnrscans",
   description: "Explore our collection of high-quality light novels, web novels, and official translations. Read chapters online with our premium customizable reader.",
-  keywords: ["read novels online", "web novels", "light novels", "novel translations", "vnrscans novels", "read webnovels free"],
+  keywords: [
+    "read novels online",
+    "light novels online",
+    "web novels online",
+    "novel translations online",
+    "read light novels free",
+    "vnrscans novels",
+    "read webnovels free",
+  ],
   alternates: {
     canonical: "/novels",
   },

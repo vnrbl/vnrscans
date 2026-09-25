@@ -6,8 +6,12 @@ import {
   extractImagesFromChapterUrls,
   isPremiumOrLockedChapter,
 } from '../src/lib/chapter-scraper';
-import { buildChapterSlug } from '../src/lib/chapter-utils';
-import { detectImportSource } from '../src/lib/import-source-utils';
+import {
+  detectImportSource,
+  normalizeChapterNumber,
+  chapterScanKey,
+  isChapterAlreadyPresent,
+} from '../src/lib/import-source-utils';
 import {
   detectSourceScanTiming,
   advanceNextReleaseAfterDrop,
@@ -172,21 +176,33 @@ async function syncSource(source: any): Promise<SourceSyncResult> {
     const activeRows = existingRows ?? [];
 
     const existingChapterNumbers = new Set(
-      activeRows.map((chapter: any) => Number(chapter.chapter_number)),
+      activeRows.map((chapter: any) => normalizeChapterNumber(chapter.chapter_number)).filter((n) => !isNaN(n)),
+    );
+    const existingKeys = new Set(
+      activeRows.map((chapter: any) =>
+        chapterScanKey(chapter.chapter_number, chapter.scanlation_group),
+      ),
     );
 
-    const seenNumbers = new Set<number>();
+    const seenKeys = new Set<string>();
     const missingCandidates = discovered
       .filter((chapter) => {
         if (isPremiumOrLockedChapter(chapter)) {
           return false;
         }
-        const num = Number(chapter.chapterNumber);
-        // Skip if chapter number already exists in our database for this series
-        if (isNaN(num) || existingChapterNumbers.has(num) || seenNumbers.has(num)) {
+        const num = normalizeChapterNumber(chapter.chapterNumber);
+        if (isNaN(num)) {
           return false;
         }
-        seenNumbers.add(num);
+        const key = chapterScanKey(num, scanlationGroup);
+        // Skip if chapter number already exists in our database for this series / group
+        if (
+          isChapterAlreadyPresent(num, scanlationGroup, existingKeys, existingChapterNumbers) ||
+          seenKeys.has(key)
+        ) {
+          return false;
+        }
+        seenKeys.add(key);
         return true;
       })
       .sort((a, b) => a.chapterNumber - b.chapterNumber);
@@ -404,9 +420,7 @@ async function writeLog(
   });
 }
 
-function chapterScanKey(chapterNumber: number, scanlationGroup: string | null) {
-  return `${chapterNumber}::${scanlationGroup?.trim() || ''}`;
-}
+
 
 main().catch((error) => {
   console.error(error);

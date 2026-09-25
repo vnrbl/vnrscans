@@ -185,3 +185,61 @@ export function normalizeScanlationGroup(group: string | null | undefined): stri
   return canon.toLowerCase().replace(/[^a-z0-9]/g, "");
 }
 
+/**
+ * Mathematically normalizes chapter numbers to eliminate IEEE-754 precision artifacts.
+ * e.g., "624.00" -> 624, "624" -> 624, "128.10" -> 128.1, 128.10000000000001 -> 128.1
+ */
+export function normalizeChapterNumber(num: number | string | null | undefined): number {
+  if (num == null) return NaN;
+  const n = typeof num === "string" ? parseFloat(num.trim()) : Number(num);
+  if (isNaN(n) || !isFinite(n)) return NaN;
+  // Round to 4 decimal places to prevent floating-point inaccuracies
+  const rounded = Math.round(n * 10000) / 10000;
+  return rounded === 0 ? 0 : rounded;
+}
+
+/**
+ * Creates a unique key for matching chapters by chapter number + scanlation group.
+ * Mathematically normalizes the chapter number and canonicalizes the scanlation group.
+ */
+export function chapterScanKey(
+  chapterNumber: number | string | null | undefined,
+  scanlationGroup: string | null | undefined
+): string {
+  const normNum = normalizeChapterNumber(chapterNumber);
+  const normGroup = normalizeScanlationGroup(scanlationGroup);
+  return `${normNum}::${normGroup}`;
+}
+
+/**
+ * Checks whether a chapter is already present in the database.
+ * If scanlationGroup is provided:
+ * - Checks if the chapter exists for THIS scanlation group (`chapterScanKey(num, scanlationGroup)`).
+ * - Also checks if the chapter exists with an empty/unassigned scanlation group (`chapterScanKey(num, "")`),
+ *   to avoid duplicating chapters that were originally uploaded without a scanlation group.
+ * If scanlationGroup is empty/not provided:
+ * - Falls back to checking if ANY chapter with this number already exists.
+ */
+export function isChapterAlreadyPresent(
+  chapterNumber: number | string,
+  scanlationGroup: string | null | undefined,
+  existingKeys: Set<string>,
+  existingChapterNumbers?: Set<number>
+): boolean {
+  const normNum = normalizeChapterNumber(chapterNumber);
+  if (isNaN(normNum)) return true;
+
+  const normGroup = normalizeScanlationGroup(scanlationGroup);
+  if (normGroup) {
+    const key = `${normNum}::${normGroup}`;
+    const legacyEmptyKey = `${normNum}::`;
+    return existingKeys.has(key) || existingKeys.has(legacyEmptyKey);
+  }
+
+  // If no scanlation group is assigned to this source, check generic / any match
+  if (existingKeys.has(`${normNum}::`)) return true;
+  if (existingChapterNumbers && existingChapterNumbers.has(normNum)) return true;
+  return false;
+}
+
+

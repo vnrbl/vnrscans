@@ -10,7 +10,13 @@ import {
   isElftoonUrl,
 } from "../chapter-scraper";
 import { buildChapterSlug } from "../chapter-utils";
-import { detectImportSource, normalizeScanlationGroup } from "../import-source-utils";
+import {
+  detectImportSource,
+  normalizeScanlationGroup,
+  normalizeChapterNumber,
+  chapterScanKey,
+  isChapterAlreadyPresent,
+} from "../import-source-utils";
 import {
   detectSourceScanTiming,
   advanceNextReleaseAfterDrop,
@@ -635,24 +641,32 @@ export async function $runCloudScrape(args: {
   const activeRows = existingRows ?? [];
 
   const existingChapterNumbers = new Set(
-    activeRows.map((chapter: any) => Number(chapter.chapter_number)),
+    activeRows.map((chapter: any) => normalizeChapterNumber(chapter.chapter_number)).filter((n) => !isNaN(n)),
   );
   const existingKeys = new Set(
     activeRows.map((chapter: any) =>
-      chapterScanKey(Number(chapter.chapter_number), chapter.scanlation_group),
+      chapterScanKey(chapter.chapter_number, chapter.scanlation_group),
     ),
   );
 
   let exactDuplicateCount = 0;
-  const seenNumbers = new Set<number>();
+  const seenKeys = new Set<string>();
   const missing = discovered.filter((chapter) => {
-    const num = Number(chapter.chapterNumber);
-    // Skip if chapter with this number already exists in our database for this series
-    if (isNaN(num) || existingChapterNumbers.has(num) || seenNumbers.has(num)) {
+    const num = normalizeChapterNumber(chapter.chapterNumber);
+    if (isNaN(num)) {
       exactDuplicateCount++;
       return false;
     }
-    seenNumbers.add(num);
+    const key = chapterScanKey(num, scanlationGroup);
+    // Skip if chapter already exists in our database for this series / group
+    if (
+      isChapterAlreadyPresent(num, scanlationGroup, existingKeys, existingChapterNumbers) ||
+      seenKeys.has(key)
+    ) {
+      exactDuplicateCount++;
+      return false;
+    }
+    seenKeys.add(key);
     return true;
   });
 
@@ -972,21 +986,33 @@ export async function $syncImportSource(args: {
     const activeRows = existingRows ?? [];
 
     const existingChapterNumbers = new Set(
-      activeRows.map((chapter: any) => Number(chapter.chapter_number)),
+      activeRows.map((chapter: any) => normalizeChapterNumber(chapter.chapter_number)).filter((n) => !isNaN(n)),
     );
     const existingKeys = new Set(
       activeRows.map((chapter: any) =>
-        chapterScanKey(Number(chapter.chapter_number), chapter.scanlation_group),
+        chapterScanKey(chapter.chapter_number, chapter.scanlation_group),
       ),
     );
 
-    const seenNumbers = new Set<number>();
+    const seenKeys = new Set<string>();
     const missingCandidates = discovered
       .filter((chapter) => {
-        const num = Number(chapter.chapterNumber);
-        if (isNaN(num)) return false;
-        // Skip if chapter already exists in our database for this series
-        if (existingChapterNumbers.has(num) || seenNumbers.has(num)) {
+        const num = normalizeChapterNumber(chapter.chapterNumber);
+        if (isNaN(num)) {
+          details.push({
+            chapter: chapter.chapterNumber,
+            status: "skipped",
+            message: "Invalid chapter number",
+            series_title: seriesTitle || undefined,
+          });
+          return false;
+        }
+        const key = chapterScanKey(num, scanlationGroup);
+        // Skip if chapter already exists in our database for this series / group
+        if (
+          isChapterAlreadyPresent(num, scanlationGroup, existingKeys, existingChapterNumbers) ||
+          seenKeys.has(key)
+        ) {
           details.push({
             chapter: chapter.chapterNumber,
             status: "skipped",
@@ -995,7 +1021,7 @@ export async function $syncImportSource(args: {
           });
           return false;
         }
-        seenNumbers.add(num);
+        seenKeys.add(key);
         return true;
       })
       .sort((a, b) => a.chapterNumber - b.chapterNumber);
@@ -1444,9 +1470,7 @@ export async function $syncAllSeriesImportSources(args: {
   }
 }
 
-function chapterScanKey(chapterNumber: number, scanlationGroup: string | null) {
-  return `${chapterNumber}::${normalizeScanlationGroup(scanlationGroup)}`;
-}
+
 
 function isPremiumChapter(chapter: { chapterNumber: number; title?: string; url: string }): boolean {
   return isPremiumOrLockedChapter(chapter);
@@ -1843,23 +1867,31 @@ export async function $discoverNewChapters(args: {
 
     const activeRows = existingRows ?? [];
 
-    const existingSet = new Set(
-      activeRows.map((ch: any) => Number(ch.chapter_number))
+    const existingChapterNumbers = new Set(
+      activeRows.map((ch: any) => normalizeChapterNumber(ch.chapter_number)).filter((n) => !isNaN(n))
+    );
+    const existingKeys = new Set(
+      activeRows.map((ch: any) => chapterScanKey(ch.chapter_number, ch.scanlation_group))
     );
 
-    const seenNumbers = new Set<number>();
+    const seenKeys = new Set<string>();
     const newChapters = discovered
       .filter((chapter) => {
-        const num = Number(chapter.chapterNumber);
-        if (isNaN(num) || existingSet.has(num) || seenNumbers.has(num)) return false;
-        seenNumbers.add(num);
+        const num = normalizeChapterNumber(chapter.chapterNumber);
+        if (isNaN(num)) return false;
+        const key = chapterScanKey(num, scanlationGroup);
+        if (
+          isChapterAlreadyPresent(num, scanlationGroup, existingKeys, existingChapterNumbers) ||
+          seenKeys.has(key)
+        ) {
+          return false;
+        }
+        seenKeys.add(key);
         return true;
       })
       .sort((a, b) => a.chapterNumber - b.chapterNumber);
 
-    const existingChapterNumbers = activeRows
-      .map((ch: any) => Number(ch.chapter_number))
-      .sort((a: number, b: number) => a - b);
+    const existingSorted = Array.from(existingChapterNumbers).sort((a: number, b: number) => a - b);
 
     return {
       success: true,
@@ -1877,8 +1909,8 @@ export async function $discoverNewChapters(args: {
         title: ch.title || null,
         url: ch.url,
       })),
-      existingChapterNumbers,
-      latestExisting: existingChapterNumbers.length > 0 ? existingChapterNumbers[existingChapterNumbers.length - 1] : null,
+      existingChapterNumbers: existingSorted,
+      latestExisting: existingSorted.length > 0 ? existingSorted[existingSorted.length - 1] : null,
     };
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : "Failed to discover chapters" };
@@ -1941,12 +1973,25 @@ export async function $importSelectedChapters(args: {
     if (existingError) throw existingError;
 
     const existingChapterNumbers = new Set(
-      (existingRows ?? []).map((ch: any) => Number(ch.chapter_number))
+      (existingRows ?? []).map((ch: any) => normalizeChapterNumber(ch.chapter_number)).filter((n) => !isNaN(n))
+    );
+    const existingKeys = new Set(
+      (existingRows ?? []).map((ch: any) => chapterScanKey(ch.chapter_number, ch.scanlation_group))
     );
 
+    const seenKeys = new Set<string>();
     const missing = chaptersToImport.filter((ch) => {
-      const num = Number(ch.chapterNumber);
-      return !isNaN(num) && !existingChapterNumbers.has(num);
+      const num = normalizeChapterNumber(ch.chapterNumber);
+      if (isNaN(num)) return false;
+      const key = chapterScanKey(num, scanlationGroup);
+      if (
+        isChapterAlreadyPresent(num, scanlationGroup, existingKeys, existingChapterNumbers) ||
+        seenKeys.has(key)
+      ) {
+        return false;
+      }
+      seenKeys.add(key);
+      return true;
     });
 
     if (missing.length === 0) {

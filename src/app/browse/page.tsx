@@ -7,7 +7,22 @@ export const revalidate = 60; // Edge cached for 60s — instant 30ms delivery w
 export const metadata: Metadata = {
   title: "Browse Manga, Manhwa, Manhua & Novels - vnrscans",
   description:
-    "Browse public manga, manhwa, manhua, and novel series on vnrscans by genre, tag, status, and latest updates.",
+    "Browse public manga, manhwa, manhua, and novel series on vnrscans by genre, tag, status, and latest updates. Find manga by genre — cultivation, romance, isekai, martial arts, and more.",
+  keywords: [
+    "browse manga by tag",
+    "manga by genre",
+    "manhwa by genre",
+    "manhua series list",
+    "completed manga series",
+    "ongoing manga series",
+    "manga genres list",
+    "manhwa recommendations",
+    "read manhwa online free",
+    "manga aggregator sites",
+    "manga site comparison",
+    "free manga sites",
+    "best free manga reading site 2026",
+  ],
   alternates: {
     canonical: "/browse",
   },

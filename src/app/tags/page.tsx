@@ -13,6 +13,11 @@ export const metadata: Metadata = {
     "manhwa tags",
     "manhua tags",
     "browse manga by tag",
+    "manga by genre",
+    "manhwa by genre",
+    "isekai manhwa",
+    "cultivation manhwa",
+    "martial arts manhwa",
     "vnrscans tags",
   ],
   alternates: {

@@ -26,6 +26,7 @@ import { FlipFadeText } from "@/components/ui/flip-fade-text";
 import { LiquidMetalButton } from "@/components/ui/liquid-metal";
 import { AnimatedButton } from "@/components/ui/animated-button";
 import { PixelatedImageTrail } from "@/components/ui/pixelated-image-trail";
+import { VNR_FAQ_ITEMS } from "@/lib/faq-content";
 
 export const revalidate = 120; // ISR cache for 2 minutes — instant edge HTML response
 
@@ -34,14 +35,31 @@ export const metadata: Metadata = {
   description:
     "Read the latest manga, manhwa, manhua, and web novels online for free on vnrscans. Fast updates, high-quality chapters, bookmarks, reading history, and a gamified reader experience.",
   keywords: [
-    "read manga online",
-    "read manhwa online",
-    "read manhua online",
+    "read manga online free",
+    "read manhwa online free",
+    "read manhua online free",
+    "top rated manga",
+    "light novels online",
+    "trending manhwa series",
+    "most popular manhwa",
+    "latest manga updates",
+    "manga reader experience",
+    "manga by genre",
+    "manhwa by genre",
+    "browse manga by tag",
+    "high quality manga scans",
+    "web novels online",
     "free manga reader",
-    "latest manhwa chapters",
-    "vnrscans",
-    "web novels",
-    "manga updates",
+    "online manga platform",
+    "cultivation manhwa",
+    "manga reading tracker",
+    "best manga reader 2026",
+    "manga vs manhwa vs manhua explained",
+    "best free manga sites compared",
+    "vnrscans vs other manga readers",
+    "is vnrscans a good site to read manhwa",
+    "how does vnrscans compare to other free manga sites",
+    "which manga sites have rewards for reading daily",
   ],
   alternates: {
     canonical: "/",
@@ -153,6 +171,16 @@ export default async function Home() {
     logo: "https://www.vnrscans.com/favicon.svg",
     sameAs: [],
   };
+  // FAQPage structured data — makes the Q&A below eligible for rich results.
+  const faqLd = {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: VNR_FAQ_ITEMS.map((item) => ({
+      "@type": "Question",
+      name: item.question,
+      acceptedAnswer: { "@type": "Answer", text: item.answer },
+    })),
+  };
 
   return (
     <div className="min-h-screen bg-background text-foreground overflow-x-hidden">
@@ -163,6 +191,10 @@ export default async function Home() {
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(orgLd) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(faqLd) }}
       />
 
       {/* ─── Hero Section ─── */}
@@ -515,6 +547,53 @@ export default async function Home() {
                   </Link>
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ─── SEO content section (keyword-rich, readable copy) ─── */}
+      <section className="py-24 bg-surface-1/40 border-b border-border/20">
+        <div className="container mx-auto max-w-5xl px-4 sm:px-6 md:px-8">
+          <h2 className="text-3xl font-bold tracking-[0.04em] text-white uppercase leading-tight text-center">
+            Read Manga, Manhwa &amp; Manhua Online — Free Forever
+          </h2>
+          <p className="mt-4 text-sm text-muted-foreground leading-relaxed font-light text-center max-w-3xl mx-auto">
+            vnrscans is a free online manga platform where you can read manhwa, manhua, manga,
+            and web novels online in high quality. Browse manga by tag or explore series by
+            genre — from cultivation and martial arts to romance, isekai, and slice of life —
+            and stay caught up with the latest manga updates the moment chapters drop.
+          </p>
+          <div className="mt-10 grid gap-8 md:grid-cols-3 text-sm leading-relaxed">
+            <div>
+              <h3 className="text-xs font-bold uppercase tracking-[0.08em] text-white mb-2">
+                Top rated &amp; trending series
+              </h3>
+              <p className="text-muted-foreground font-light">
+                Our manga series ranking tables surface the top rated manga and the most
+                popular manhwa each week, while trending lists highlight new manhwa chapters
+                readers are binging right now.
+              </p>
+            </div>
+            <div>
+              <h3 className="text-xs font-bold uppercase tracking-[0.08em] text-white mb-2">
+                A reader built for true fans
+              </h3>
+              <p className="text-muted-foreground font-light">
+                A fast, high quality manga reader experience: HD scans, seamless vertical
+                scrolling, light novels online with customizable typography, and a clean
+                reading view with zero intrusive ads.
+              </p>
+            </div>
+            <div>
+              <h3 className="text-xs font-bold uppercase tracking-[0.08em] text-white mb-2">
+                Track every chapter
+              </h3>
+              <p className="text-muted-foreground font-light">
+                Your built-in manga reading tracker keeps bookmarks, reading history, and
+                daily streaks in sync — earn XP, collect badges, and level up as you read,
+                all for free.
+              </p>
             </div>
           </div>
         </div>

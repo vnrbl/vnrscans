@@ -72,6 +72,9 @@ export function Footer() {
                 <Link to="/request-series" className="focus-ring hover:text-purple-300 transition-colors">Request Series</Link>
               </li>
               <li>
+                <Link to="/articles" className="focus-ring hover:text-purple-300 transition-colors">Guides & Articles</Link>
+              </li>
+              <li>
                 <Link to="/data-map" className="focus-ring hover:text-purple-300 transition-colors">Data Directory Map</Link>
               </li>
             </ul>

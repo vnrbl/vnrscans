@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { ARTICLES } from "@/lib/articles";
 
 /**
  * Static-pages + taxonomy sitemap.
@@ -7,6 +8,8 @@ import { createClient } from "@supabase/supabase-js";
  *
  * Includes all public, indexable routes that are not series/chapter detail
  * pages (those live in sitemap-series-* and sitemap-chapters-*).
+ * Articles (/articles/*) are included even though they're not linked in the
+ * navbar menu — sitemap presence drives discovery for hidden pages.
  */
 export const revalidate = 3600;
 export const dynamic = "force-dynamic";
@@ -59,9 +62,17 @@ const STATIC_PAGES: SitemapEntry[] = [
   { path: "/request-series", changefreq: "monthly", priority: "0.4" },
 ];
 
+/** Editorial articles (src/lib/articles.ts) — NOT in navbar menu, indexable. */
+const ARTICLE_PAGES: SitemapEntry[] = ARTICLES.map((a) => ({
+  path: `/articles/${a.slug}`,
+  changefreq: "weekly",
+  priority: "0.6",
+  lastmod: a.dateModified ?? a.datePublished,
+}));
+
 export async function GET() {
   const now = new Date().toISOString().split("T")[0];
-  const entries: SitemapEntry[] = [...STATIC_PAGES];
+  const entries: SitemapEntry[] = [...STATIC_PAGES, ...ARTICLE_PAGES];
 
   // Tag detail pages: /tags/{slug} — strong discovery signals for Google
   const supabase = createAdminClient();

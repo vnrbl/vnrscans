@@ -8,7 +8,15 @@ import {
   extractImagesFromChapterUrls,
 } from "../chapter-scraper";
 import { buildChapterSlug } from "../chapter-utils";
-import { detectImportSource, canonicalSourceSite, canonicalScanlationGroup, normalizeScanlationGroup } from "../import-source-utils";
+import {
+  detectImportSource,
+  canonicalSourceSite,
+  canonicalScanlationGroup,
+  normalizeScanlationGroup,
+  normalizeChapterNumber,
+  chapterScanKey,
+  isChapterAlreadyPresent,
+} from "../import-source-utils";
 import { discoverAsuraCatalog, isSupportedAsuraCatalogUrl } from "../site-import/asura";
 import { discoverQiScansCatalog, isSupportedQiScansCatalogUrl } from "../site-import/qiscans";
 import { discoverHivetoonCatalog, isSupportedHivetoonCatalogUrl } from "../site-import/hivetoons";
@@ -517,16 +525,30 @@ export async function $processNextSiteImportItem(args: {
 
       const sourcePreset = detectImportSource(item.source_url);
       const scanlationGroup = canonicalScanlationGroup(sourcePreset.scanlationGroup || "Asura Scans");
+
+      const existingChapterNumbers = new Set(
+        (existingChapters ?? []).map((chapter: any) => normalizeChapterNumber(chapter.chapter_number)).filter((n) => !isNaN(n)),
+      );
       const existingKeys = new Set(
         (existingChapters ?? []).map(
           (chapter: { chapter_number: number; scanlation_group: string | null }) =>
-            chapterScanKey(Number(chapter.chapter_number), chapter.scanlation_group),
+            chapterScanKey(chapter.chapter_number, chapter.scanlation_group),
         ),
       );
-      const missing = eligible.filter(
-        (chapter) =>
-          !existingKeys.has(chapterScanKey(chapter.chapterNumber, scanlationGroup)),
-      );
+      const seenKeys = new Set<string>();
+      const missing = eligible.filter((chapter) => {
+        const num = normalizeChapterNumber(chapter.chapterNumber);
+        if (isNaN(num)) return false;
+        const key = chapterScanKey(num, scanlationGroup);
+        if (
+          isChapterAlreadyPresent(num, scanlationGroup, existingKeys, existingChapterNumbers) ||
+          seenKeys.has(key)
+        ) {
+          return false;
+        }
+        seenKeys.add(key);
+        return true;
+      });
 
       if (missing.length === 0) {
         const completed = await updateItem(admin, item.id, {
@@ -903,9 +925,7 @@ function normalizeMatchKey(value: unknown): string {
     .trim();
 }
 
-function chapterScanKey(chapterNumber: number, scanlationGroup: string | null) {
-  return `${chapterNumber}::${normalizeScanlationGroup(scanlationGroup)}`;
-}
+
 
 function slugify(value: string): string {
   return value

@@ -123,8 +123,6 @@ function RankingsContent() {
 
   return (
     <div className="min-h-screen bg-background relative overflow-hidden">
-      <title>Rankings — vnrscans</title>
-      <meta name="description" content="Top ranked manga, manhwa, and manhua series" />
       {/* Background glow */}
       <div className="absolute top-[-10%] right-[-10%] h-[400px] w-[400px] rounded-full bg-primary/5 blur-[80px] pointer-events-none" />
       <div className="absolute bottom-[-10%] left-[-10%] h-[450px] w-[450px] rounded-full bg-accent/5 blur-[100px] pointer-events-none" />
@@ -136,9 +134,9 @@ function RankingsContent() {
               <Trophy className="h-6 w-6" />
             </div>
             <div>
-              <h1 className="text-3xl font-extrabold tracking-tight">Rankings</h1>
+              <h1 className="text-3xl font-extrabold tracking-tight">Manga, Manhwa &amp; Manhua Rankings</h1>
               <p className="mt-1 text-sm text-muted-foreground leading-relaxed">
-                Discover the top-rated and most popular series on vnrscans
+                Top rated manga, trending manhwa series, and the most popular manhwa on vnrscans — updated continuously
               </p>
             </div>
           </div>

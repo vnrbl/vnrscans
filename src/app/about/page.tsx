@@ -7,7 +7,18 @@ import { Card } from "@/components/ui/card";
 export const metadata: Metadata = {
   title: "About Us — vnrscans - Ultimate Manga Reader",
   description: "Learn more about vnrscans, a premium, community-driven manhwa and manga reader built for speed, safety, and creator respect.",
-  keywords: ["about vnrscans", "manga reader platform", "read manga online free", "vnrscans about", "manhwa reader"],
+  keywords: [
+    "about vnrscans",
+    "manga reader platform",
+    "read manga online free",
+    "online manga platform",
+    "manga reader experience",
+    "free manga sites",
+    "manhwa reader",
+    "vnrscans review",
+    "is vnrscans a good site to read manhwa",
+    "vnrscans vs other manga readers",
+  ],
   alternates: {
     canonical: "/about",
   },
