@@ -1,6 +1,6 @@
 import { Link, useNavigate } from "@/lib/router-compat";
 import { useState, useEffect, lazy, Suspense } from "react";
-import { Menu, X, Search, BookOpen, User as UserIcon, LogOut, ShieldCheck, ShieldAlert, Library, Home, Sparkles, Trophy, Crown, Dice1, Dice2, Dice3, Dice4, Dice5, Dice6, Loader2, Users, Settings as SettingsIcon, Plus, UserRoundPlus } from "lucide-react";
+import { Menu, X, Search, BookOpen, User as UserIcon, LogOut, ShieldCheck, ShieldAlert, Library, Home, Sparkles, Trophy, Crown, Dice1, Dice2, Dice3, Dice4, Dice5, Dice6, Loader2, Users, Settings as SettingsIcon, Plus, UserRoundPlus, Newspaper } from "lucide-react";
 import type { DiceSeries } from "@/components/DiceRollOverlay";
 import { useReaderSettings } from "@/contexts/ReaderSettingsContext";
 import dynamic from "next/dynamic";
@@ -124,6 +124,7 @@ export function Navbar() {
     { to: "/leaderboard", label: "Leaderboard", icon: Crown },
     { to: "/recommendations", label: "For You", icon: Sparkles },
     { to: "/novels", label: "Novels", icon: BookOpen },
+    { to: "/articles", label: "Articles", icon: Newspaper },
   ];
 
   const spotlightItems = [
@@ -132,6 +133,7 @@ export function Navbar() {
     { label: "Rankings", href: "/rankings" },
     { label: "Novels", href: "/novels" },
     { label: "Leaderboard", href: "/leaderboard" },
+    { label: "Articles", href: "/articles" },
   ];
 
   const dockItems = [
@@ -160,6 +162,7 @@ export function Navbar() {
         { label: "Rankings", href: "/rankings" },
         { label: "Leaderboard", href: "/leaderboard" },
         { label: "Light Novels", href: "/novels" },
+        { label: "Articles & Guides", href: "/articles" },
       ],
     },
     {
