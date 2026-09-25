@@ -62,7 +62,7 @@ const defaultSocialLinks: FooterSocialLink[] = [
 export default function Footer20({
   brandName = "VNR SCANS",
   description = "A premium, lightning-fast scanlation reading platform designed for the manga, manhwa, and manhua community.",
-  email = "support@vnrscans.com",
+  email = "creator@vnrscans.com",
   socialLinks = defaultSocialLinks,
 }: Footer20Props) {
   return (

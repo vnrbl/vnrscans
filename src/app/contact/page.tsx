@@ -106,7 +106,7 @@ export default function ContactPage() {
                 </div>
                 <div>
                   <h4 className="text-xs font-bold text-foreground uppercase tracking-wider">Copyright / DMCA</h4>
-                  <p className="text-sm mt-0.5 text-muted-foreground">dmca@vnrscans.com</p>
+                  <p className="text-sm mt-0.5 text-muted-foreground">creator@vnrscans.com</p>
                 </div>
               </div>
 
@@ -116,7 +116,7 @@ export default function ContactPage() {
                 </div>
                 <div>
                   <h4 className="text-xs font-bold text-foreground uppercase tracking-wider">Creator Relations</h4>
-                  <p className="text-sm mt-0.5 text-muted-foreground">partners@vnrscans.com</p>
+                  <p className="text-sm mt-0.5 text-muted-foreground">creator@vnrscans.com</p>
                 </div>
               </div>
             </div>

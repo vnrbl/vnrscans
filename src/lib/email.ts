@@ -31,9 +31,10 @@ export interface SendEmailOptions {
   html: string;
   text?: string;
   from?: string;
+  replyTo?: string;
 }
 
-export async function sendEmail({ to, subject, html, text, from }: SendEmailOptions) {
+export async function sendEmail({ to, subject, html, text, from, replyTo }: SendEmailOptions) {
   const client = getResend();
   if (!client) {
     console.log("[email] (dry-run) Would send:", { to, subject });
@@ -47,6 +48,7 @@ export async function sendEmail({ to, subject, html, text, from }: SendEmailOpti
       subject,
       html,
       text: text || stripHtml(html),
+      ...(replyTo ? { replyTo } : {}),
     });
 
     if (result.error) {
@@ -150,6 +152,7 @@ export async function sendContactFormEmail(params: {
     to: OWNER_EMAIL,
     subject: fullSubject,
     html,
+    replyTo: email,
   });
 }
 

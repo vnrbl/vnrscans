@@ -92,10 +92,10 @@ export default function DmcaPage() {
             All formal removal requests must be drafted and sent to our legal desk at:
           </p>
           <a
-            href="mailto:dmca@vnrscans.com"
+            href="mailto:creator@vnrscans.com?subject=DMCA%20Takedown%20Request"
             className="inline-flex items-center gap-2 rounded-xl border border-primary/20 bg-primary/5 hover:bg-primary/10 transition-colors px-5 py-3.5 text-sm font-bold text-primary"
           >
-            <Mail className="h-4.5 w-4.5" /> dmca@vnrscans.com
+            <Mail className="h-4.5 w-4.5" /> creator@vnrscans.com
           </a>
           <p className="text-3xs text-muted-foreground/60 leading-normal pt-2">
             We confirm receipt and process verified claims within 3 to 5 business days. Once an item is verified as infringing, it is permanently purged from our search indexing and databases.

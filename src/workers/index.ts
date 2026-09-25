@@ -39,6 +39,7 @@ interface SendEmailOptions {
   subject: string;
   html: string;
   from?: string;
+  replyTo?: string;
 }
 
 interface NewUserPayload {
@@ -59,7 +60,7 @@ interface ContactPayload {
 
 // ==================== EMAIL SENDING ====================
 
-async function sendEmail(env: Env, { to, subject, html, from }: SendEmailOptions) {
+async function sendEmail(env: Env, { to, subject, html, from, replyTo }: SendEmailOptions) {
   const apiKey = env.RESEND_API_KEY;
   if (!apiKey) {
     return { success: false, error: "RESEND_API_KEY not configured" };
@@ -80,6 +81,7 @@ async function sendEmail(env: Env, { to, subject, html, from }: SendEmailOptions
         to: Array.isArray(to) ? to : [to],
         subject,
         html,
+        ...(replyTo ? { reply_to: replyTo } : {}),
       }),
     });
 
@@ -175,6 +177,7 @@ async function sendContactFormEmail(env: Env, payload: ContactPayload) {
     to: owner,
     subject: fullSubject,
     html,
+    replyTo: email,
   });
 }
 
