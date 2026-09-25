@@ -1,85 +1,56 @@
 import type { SiteCatalogDiscovery, SiteSeriesMetadata } from "./types";
-
-const HIVETOON_HOSTS = new Set(["hivetoons.org", "www.hivetoons.org"]);
+import { fetchHivetoonHtml, isHivetoonUrl } from "../hivetoon-client";
 
 export function isSupportedHivetoonCatalogUrl(value: string): boolean {
-  try {
-    return HIVETOON_HOSTS.has(new URL(value.trim()).hostname.toLowerCase());
-  } catch {
-    return false;
-  }
+  return isHivetoonUrl(value);
 }
 
 export async function discoverHivetoonCatalog(inputUrl: string): Promise<SiteCatalogDiscovery> {
-  const parsed = new URL(inputUrl.trim());
-  if (!HIVETOON_HOSTS.has(parsed.hostname.toLowerCase())) {
-    throw new Error("This version supports hivetoons.org catalog URLs only.");
+  if (!isHivetoonUrl(inputUrl)) {
+    throw new Error("This version supports hivetoons.org / hivetoon.com catalog URLs only.");
   }
 
-  const origin = parsed.origin;
-  const url = `${origin}/series`;
-  
-  const response = await fetch(url, {
-    headers: {
-      "User-Agent":
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-      Accept: "text/html,application/xhtml+xml",
-    },
-    signal: AbortSignal.timeout(30_000),
-    cache: "no-store",
-  });
+  const origin = "https://hivetoons.org";
+  const url = `${origin}/series/`;
 
-  if (!response.ok) {
-    throw new Error(`Hivetoons catalog page failed: ${response.status} ${response.statusText}`);
-  }
+  const html = await fetchHivetoonHtml(url);
 
-  const html = await response.text();
   const seen = new Set<string>();
   const series: SiteSeriesMetadata[] = [];
 
-  // Parse using a card regex or structural block matching
-  const cardBlocks = html.split(/<div class="overflow-hidden relative flex flex-col[^>]*>/gi);
-  for (let i = 1; i < cardBlocks.length; i++) {
-    const block = cardBlocks[i];
-    
-    // Extract href
-    const hrefMatch = block.match(/href="\/series\/([^"/]+)"/i);
-    if (!hrefMatch) continue;
-    const slug = decodeHtmlEntities(hrefMatch[1]);
+  // 1. Primary: Extract from TSR initialPosts script data
+  const postRegex =
+    /slug:"([^"]+)",postTitle:"([^"]+)",featuredImage:"([^"]+)",seriesType:"([^"]+)",seriesStatus:"([^"]+)"/g;
+  let m: RegExpExecArray | null;
+  while ((m = postRegex.exec(html)) !== null) {
+    const slug = m[1];
     const sourceUrl = `${origin}/series/${slug}`;
     if (seen.has(sourceUrl)) continue;
+    seen.add(sourceUrl);
 
-    // Extract title from h1
-    const titleMatch = block.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i);
-    const title = decodeHtmlEntities(titleMatch ? titleMatch[1] : slug)
-      .replace(/<[^>]+>/g, "")
-      .trim();
+    const title = decodeHtmlEntities(
+      m[2]
+        .replace(/\\u0026/g, "&")
+        .replace(/\\u0027/g, "'")
+        .replace(/\\u0022/g, '"')
+    ).trim();
 
-    // Extract cover image src
-    const imgMatch = block.match(/<img[^>]*src="([^"]+)"/i);
-    const coverUrl = imgMatch ? decodeHtmlEntities(imgMatch[1].trim()) : null;
-
-    // Extract type (Manhwa/Manga/Manhua/Novel)
-    const typeMatch = block.match(/bg-pink-500\/90">([\s\S]*?)<\/span>/i);
-    const typeVal = typeMatch ? typeMatch[1].trim().toLowerCase() : "manhwa";
+    const typeVal = m[4].trim().toLowerCase();
     const type: SiteSeriesMetadata["type"] =
       typeVal === "manga" || typeVal === "manhua" || typeVal === "novel" ? typeVal : "manhwa";
 
-    // Extract status (Ongoing/Completed)
-    const statusMatch = block.match(/bg-green-500">[\s\S]*?<p[^>]*>([\s\S]*?)<\/p>/i);
-    const statusVal = statusMatch ? statusMatch[1].trim().toLowerCase() : "ongoing";
+    const statusVal = m[5].trim().toLowerCase();
     const status: SiteSeriesMetadata["status"] =
       statusVal.includes("completed") || statusVal.includes("complete") ? "completed" : "ongoing";
 
-    seen.add(sourceUrl);
     series.push({
       sourceId: sourceUrl,
       sourceUrl,
       slug,
-      title,
+      title: title || slug,
       alternativeTitles: [],
       description: "",
-      coverUrl,
+      coverUrl: m[3] ? decodeHtmlEntities(m[3].trim()) : null,
       type,
       status,
       author: null,
@@ -90,13 +61,47 @@ export async function discoverHivetoonCatalog(inputUrl: string): Promise<SiteCat
     });
   }
 
+  // 2. Fallback: Parse card blocks or anchor links if TSR script is unavailable
+  if (series.length === 0) {
+    const linkMatches = [...html.matchAll(/href=["']\/series\/([^"'/]+)["']/gi)];
+    for (const linkMatch of linkMatches) {
+      const slug = decodeHtmlEntities(linkMatch[1].trim());
+      if (!slug || slug.startsWith("#") || slug.endsWith(".webp") || slug.endsWith(".jpg")) continue;
+      const sourceUrl = `${origin}/series/${slug}`;
+      if (seen.has(sourceUrl)) continue;
+      seen.add(sourceUrl);
+
+      const title = slug
+        .split("-")
+        .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+        .join(" ");
+
+      series.push({
+        sourceId: sourceUrl,
+        sourceUrl,
+        slug,
+        title,
+        alternativeTitles: [],
+        description: "",
+        coverUrl: null,
+        type: "manhwa",
+        status: "ongoing",
+        author: null,
+        artist: null,
+        genres: [],
+        chapterCount: 0,
+        lastChapterAt: null,
+      });
+    }
+  }
+
   if (series.length === 0) {
     throw new Error("No series were found in the Hivetoons catalog.");
   }
 
   return {
     sourceSite: "Hive Toons",
-    canonicalUrl: url,
+    canonicalUrl: `${origin}/series`,
     series,
   };
 }
@@ -104,7 +109,7 @@ export async function discoverHivetoonCatalog(inputUrl: string): Promise<SiteCat
 function decodeHtmlEntities(value: string): string {
   return value
     .replace(/&quot;/g, '"')
-    .replace(/&#39;|&apos;/g, "'")
+    .replace(/&#39;|&apos;|&#x27;/g, "'")
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
     .replace(/&#x([0-9a-f]+);/gi, (_, hex: string) =>

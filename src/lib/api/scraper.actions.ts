@@ -616,7 +616,7 @@ export async function $runCloudScrape(args: {
 
   const { data: existingRows, error: existingError } = await admin
     .from("chapters")
-    .select("id,chapter_number,scanlation_group,chapter_type,chapter_pages(id)")
+    .select("id,chapter_number,scanlation_group,chapter_type")
     .eq("series_id", validated.seriesId);
 
   if (existingError) {
@@ -632,17 +632,7 @@ export async function $runCloudScrape(args: {
     };
   }
 
-  // Clean up empty image chapters
-  const emptyChapterIds = (existingRows ?? [])
-    .filter((ch: any) => ch.chapter_type === "image" && (!ch.chapter_pages || ch.chapter_pages.length === 0))
-    .map((ch: any) => ch.id);
-
-  if (emptyChapterIds.length > 0) {
-    console.log(`[CloudScrape] Cleaning up ${emptyChapterIds.length} empty chapter(s)...`);
-    await admin.from("chapters").delete().in("id", emptyChapterIds);
-  }
-
-  const activeRows = (existingRows ?? []).filter((ch: any) => !emptyChapterIds.includes(ch.id));
+  const activeRows = existingRows ?? [];
 
   const existingChapterNumbers = new Set(
     activeRows.map((chapter: any) => Number(chapter.chapter_number)),
@@ -975,22 +965,12 @@ export async function $syncImportSource(args: {
 
     const { data: existingRows, error: existingError } = await admin
       .from("chapters")
-      .select("id,chapter_number,scanlation_group,chapter_type,created_at,chapter_pages(id)")
+      .select("id,chapter_number,scanlation_group,chapter_type,created_at")
       .eq("series_id", source.series_id);
 
     if (existingError) throw existingError;
 
-    // Clean up empty image chapters
-    const emptyChapterIds = (existingRows ?? [])
-      .filter((ch: any) => ch.chapter_type === "image" && (!ch.chapter_pages || ch.chapter_pages.length === 0))
-      .map((ch: any) => ch.id);
-
-    if (emptyChapterIds.length > 0) {
-      console.log(`[SyncImport] Cleaning up ${emptyChapterIds.length} empty chapter(s)...`);
-      await admin.from("chapters").delete().in("id", emptyChapterIds);
-    }
-
-    const activeRows = (existingRows ?? []).filter((ch: any) => !emptyChapterIds.includes(ch.id));
+    const activeRows = existingRows ?? [];
 
     const existingChapterNumbers = new Set(
       activeRows.map((chapter: any) => Number(chapter.chapter_number)),
@@ -1852,13 +1832,11 @@ export async function $discoverNewChapters(args: {
 
     const { data: existingRows, error: existingError } = await admin
       .from("chapters")
-      .select("id,chapter_number,scanlation_group,chapter_type,chapter_pages(id)")
+      .select("id,chapter_number,scanlation_group,chapter_type")
       .eq("series_id", source.series_id);
     if (existingError) throw existingError;
 
-    const activeRows = (existingRows ?? []).filter(
-      (ch: any) => !(ch.chapter_type === "image" && (!ch.chapter_pages || ch.chapter_pages.length === 0))
-    );
+    const activeRows = existingRows ?? [];
 
     const existingKeys = new Set(
       activeRows.map((chapter: any) => chapterScanKey(Number(chapter.chapter_number), chapter.scanlation_group))
@@ -1953,7 +1931,7 @@ export async function $importSelectedChapters(args: {
     // Verify they don't already exist
     const { data: existingRows, error: existingError } = await admin
       .from("chapters")
-      .select("id,chapter_number,scanlation_group,chapter_type,chapter_pages(id)")
+      .select("id,chapter_number,scanlation_group,chapter_type")
       .eq("series_id", source.series_id);
     if (existingError) throw existingError;
 

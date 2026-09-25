@@ -4,6 +4,7 @@
  */
 import chromium from '@sparticuz/chromium';
 import { assertSafePublicUrl } from './ssrf-guard';
+import { fetchHivetoonHtml, normalizeHivetoonUrl } from './hivetoon-client';
 
 /**
  * Retry an async operation with exponential backoff and jitter.
@@ -73,7 +74,38 @@ function normalizeSeriesUrl(url: string): string {
   return url.replace(/\/+$/, '');
 }
 
-export async function extractChaptersFromSeriesUrl(seriesUrl: string): Promise<ChapterInfo[]> {
+export function cleanAndNormalizeScanUrl(rawUrl: string): string {
+  if (!rawUrl) return '';
+  let url = rawUrl.trim()
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;|&apos;|&#x27;/g, "'")
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&');
+
+  // Handle concatenated duplicate URLs e.g. https://foo...https://bar...
+  const httpMatches = url.match(/https?:\/\/[^\s"'<>]+/g);
+  if (httpMatches && httpMatches.length > 1) {
+    url = httpMatches[httpMatches.length - 1];
+  }
+
+  // Normalize asuracomic.net -> asurascans.com/comics/
+  if (url.toLowerCase().includes('asuracomic.net')) {
+    url = url
+      .replace(/https?:\/\/(?:www\.)?asuracomic\.net\/series\//i, 'https://asurascans.com/comics/')
+      .replace(/https?:\/\/(?:www\.)?asuracomic\.net/i, 'https://asurascans.com');
+  }
+
+  // Normalize hivetoon.com -> hivetoons.org
+  if (isHivetoonUrl(url)) {
+    url = normalizeHivetoonUrl(url);
+  }
+
+  return url;
+}
+
+export async function extractChaptersFromSeriesUrl(rawSeriesUrl: string): Promise<ChapterInfo[]> {
+  const seriesUrl = cleanAndNormalizeScanUrl(rawSeriesUrl);
   assertSafePublicUrl(seriesUrl);
   try {
     // Custom endpoint/API extraction for Qi Scans / Qi Manga
@@ -1571,9 +1603,10 @@ function extractChapterTitle(text: string): string | null {
 }
 
 export async function extractImagesFromChapterUrl(
-  chapterUrl: string,
+  rawChapterUrl: string,
   options: ExtractChapterImagesOptions = {},
 ): Promise<string[]> {
+  const chapterUrl = cleanAndNormalizeScanUrl(rawChapterUrl);
   assertSafePublicUrl(chapterUrl);
   if (isPremiumOrLockedChapter({ url: chapterUrl })) {
     console.warn(`[Scraper] Chapter URL ${chapterUrl} is flagged as premium/locked. Skipping image extraction.`);
@@ -1661,37 +1694,19 @@ export async function extractImagesFromChapterUrl(
       }
     }
 
-    // Direct HiveToons extraction (images are in the Astro SSR HTML, no need for Puppeteer)
+    // Direct HiveToons extraction (fast, vShield cookie-resilient, no Puppeteer needed)
     if (isHivetoonUrl(chapterUrl)) {
       try {
-        // Normalize hivetoon.com → hivetoons.org
-        let normalizedChapterUrl = normalizeSeriesUrl(chapterUrl);
-        try {
-          const parsed = new URL(normalizedChapterUrl);
-          if (parsed.hostname === 'hivetoon.com' || parsed.hostname === 'www.hivetoon.com') {
-            parsed.hostname = 'hivetoons.org';
-            normalizedChapterUrl = parsed.toString();
-          }
-        } catch {}
+        const normalizedChapterUrl = normalizeHivetoonUrl(chapterUrl);
         console.log(`[Scraper] Using custom HiveToons image extraction for: ${normalizedChapterUrl}`);
-        const hiveRes = await fetch(normalizedChapterUrl, {
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-          },
-          redirect: 'follow',
-          signal: AbortSignal.timeout(20_000),
-        });
-        if (hiveRes.ok) {
-          const hiveHtml = await hiveRes.text();
-          const hiveImages = [...hiveHtml.matchAll(/https?:\/\/storage\.hivetoon\.com\/public\/upload\/series\/[^"'<>\s]+\.(?:webp|jpg|jpeg|png)/gi)]
-            .map((m) => m[0])
-            .filter((u) => isHivetoonReaderPageImage(u));
-          const uniqueImages = Array.from(new Set(hiveImages));
-          if (uniqueImages.length > 0) {
-            console.log(`[Scraper] Successfully extracted ${uniqueImages.length} images for HiveToons (${normalizedChapterUrl})`);
-            return uniqueImages;
-          }
+        const hiveHtml = await fetchHivetoonHtml(normalizedChapterUrl);
+        const hiveImages = [...hiveHtml.matchAll(/https?:\/\/storage\.hivetoon\.com\/public\/upload\/series\/[^"'<>\s]+\.(?:webp|jpg|jpeg|png)/gi)]
+          .map((m) => m[0])
+          .filter((u) => isHivetoonReaderPageImage(u));
+        const uniqueImages = Array.from(new Set(hiveImages)).sort(compareReaderImageOrder);
+        if (uniqueImages.length > 0) {
+          console.log(`[Scraper] Successfully extracted ${uniqueImages.length} images for HiveToons (${normalizedChapterUrl})`);
+          return uniqueImages;
         }
       } catch (hiveErr) {
         console.warn('[Scraper] HiveToons custom image extraction error, falling back to HTML/Puppeteer:', hiveErr);
@@ -1941,10 +1956,10 @@ export async function extractImagesFromChapterUrls(
     );
   }
 
-  // Skip Puppeteer fallback for sites that use embedded JSON data (ts_reader.run, RSC payloads, etc.)
-  // If the fast HTML scraper failed for these, Puppeteer won't help — the data is in inline JSON, not in rendered DOM
+  // Skip Puppeteer fallback for sites that use embedded JSON data (ts_reader.run, RSC payloads, etc.) or pure JSON APIs
+  // If the fast HTML/API scraper failed for these, Puppeteer won't help — the data is in inline JSON or API, not rendered DOM
   const browserUrls = failedUrls
-    .filter((url) => !isElftoonUrl(url) && !isKaynScansUrl(url) && !isDrakeComicUrl(url) && !isWitchToonsUrl(url) && !isDuskScansUrl(url) && !isHivetoonUrl(url))
+    .filter((url) => !isElftoonUrl(url) && !isKaynScansUrl(url) && !isDrakeComicUrl(url) && !isWitchToonsUrl(url) && !isDuskScansUrl(url) && !isHivetoonUrl(url) && !isQimanhwaLikeUrl(url))
     .filter((url) => shouldUseSharedReaderBrowser(url, options.imageUrlExample));
   if (browserUrls.length === 0) return results;
 
@@ -3633,42 +3648,36 @@ async function extractWitchToonsChapters(seriesUrl: string): Promise<ChapterInfo
 }
 
 /**
- * HiveToons chapter extractor. HiveToons uses Astro SSR and embeds the full
- * chapter catalog in the series page HTML as &quot;-encoded JSON blocks.
- * Domain changed from hivetoon.com → hivetoons.org.
+ * HiveToons chapter extractor.
+ * HiveToons uses TanStack Start / TSR with full chapter catalog embedded in script data.
+ * Domain: hivetoons.org (formerly hivetoon.com).
+ * Uses fetchHivetoonHtml to automatically manage vShield 307 redirects & cookies.
  */
 async function extractHiveToonsChapters(seriesUrl: string): Promise<ChapterInfo[]> {
-  const res = await fetch(seriesUrl, {
-    headers: {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
-      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-    },
-    redirect: 'follow',
-    signal: AbortSignal.timeout(20_000),
-  });
-
-  if (!res.ok) {
-    throw new Error(`Failed to fetch HiveToons series page: ${res.status} ${res.statusText}`);
-  }
-
-  const html = await res.text();
-  const hivetoonOrigin = new URL(res.url || seriesUrl).origin;
-  const pathParts = new URL(res.url || seriesUrl).pathname.split('/').filter(Boolean);
-  const seriesSlug = pathParts.length >= 2 && pathParts[0] === 'series' ? pathParts[1] : pathParts[pathParts.length - 1] || '';
+  const normalizedUrl = normalizeHivetoonUrl(seriesUrl);
+  const html = await fetchHivetoonHtml(normalizedUrl);
+  const hivetoonOrigin = 'https://hivetoons.org';
+  const pathParts = new URL(normalizedUrl).pathname.split('/').filter(Boolean);
+  const seriesSlug =
+    pathParts.length >= 2 && pathParts[0] === 'series'
+      ? pathParts[1]
+      : pathParts[pathParts.length - 1] || '';
 
   const chapters: ChapterInfo[] = [];
   const seen = new Set<number>();
 
-  // Parse embedded &quot;-encoded JSON blocks (Astro SSR serialized chapter data)
-  const blockRegex = /\[0,\{&quot;id&quot;:\[0,\d+\],&quot;number&quot;:\[0,([0-9.]+)\],&quot;slug&quot;:\[0,&quot;([^&]+)&quot;\](?:,&quot;title&quot;:\[0,&quot;([^&]*)&quot;\])?[\s\S]*?&quot;isAccessible&quot;:\[0,(true|false)\]/g;
-  let match: RegExpExecArray | null;
-  while ((match = blockRegex.exec(html)) !== null) {
-    const chapterNumber = parseFloat(match[1]);
-    const chapterSlug = match[2];
-    const rawTitle = match[3] || '';
-    const isAccessible = match[4] === 'true';
+  // 1. Primary: Parse TanStack Start / TSR hydration script chapter objects
+  // Format: slug:"chapter-626",number:626,title:"...", ... isLocked:!1 (or false)
+  const tsrRegex =
+    /slug:"(chapter-[^"]+)",number:([0-9.]+)(?:,title:(?:"([^"]*)"|null))?[^}]*?isLocked:(!0|!1|true|false)/g;
+  let tsrMatch: RegExpExecArray | null;
+  while ((tsrMatch = tsrRegex.exec(html)) !== null) {
+    const chapterSlug = tsrMatch[1];
+    const chapterNumber = parseFloat(tsrMatch[2]);
+    const rawTitle = tsrMatch[3] || '';
+    const isLocked = tsrMatch[4] === '!0' || tsrMatch[4] === 'true';
 
-    if (!isAccessible) continue;
+    if (isLocked) continue;
     if (isNaN(chapterNumber)) continue;
     if (seen.has(chapterNumber)) continue;
 
@@ -3688,18 +3697,56 @@ async function extractHiveToonsChapters(seriesUrl: string): Promise<ChapterInfo[
     });
   }
 
-  // Fallback: parse standard HTML chapter links
+  // 2. Fallback: Parse embedded &quot;-encoded JSON blocks (legacy Astro SSR serialized chapter data)
   if (chapters.length === 0) {
-    const linkRegex = new RegExp(`href="(${hivetoonOrigin.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/series/${seriesSlug}/[^"]+)"`, 'gi');
-    let linkMatch;
+    const blockRegex =
+      /\[0,\{&quot;id&quot;:\[0,\d+\],&quot;number&quot;:\[0,([0-9.]+)\],&quot;slug&quot;:\[0,&quot;([^&]+)&quot;\](?:,&quot;title&quot;:\[0,&quot;([^&]*)&quot;\])?[\s\S]*?&quot;isAccessible&quot;:\[0,(true|false)\]/g;
+    let match: RegExpExecArray | null;
+    while ((match = blockRegex.exec(html)) !== null) {
+      const chapterNumber = parseFloat(match[1]);
+      const chapterSlug = match[2];
+      const rawTitle = match[3] || '';
+      const isAccessible = match[4] === 'true';
+
+      if (!isAccessible) continue;
+      if (isNaN(chapterNumber)) continue;
+      if (seen.has(chapterNumber)) continue;
+
+      const title = rawTitle
+        .replace(/&#39;/g, "'")
+        .replace(/&quot;/g, '"')
+        .replace(/&amp;/g, '&')
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .trim();
+
+      seen.add(chapterNumber);
+      chapters.push({
+        chapterNumber,
+        title: title || undefined,
+        url: `${hivetoonOrigin}/series/${seriesSlug}/${chapterSlug}`,
+      });
+    }
+  }
+
+  // 3. Fallback: parse standard HTML chapter links
+  if (chapters.length === 0) {
+    const linkRegex = new RegExp(
+      `href=["'](?:https?:\\/\\/(?:www\\.)?hivetoons?\\.(?:org|com))?\\/series\\/${seriesSlug}\\/([^"']+)["']`,
+      'gi',
+    );
+    let linkMatch: RegExpExecArray | null;
     while ((linkMatch = linkRegex.exec(html)) !== null) {
-      const href = linkMatch[1];
-      const numMatch = href.match(/chapter[- ]?(\d+(?:\.\d+)?)/i);
+      const chapterPart = linkMatch[1];
+      const numMatch = chapterPart.match(/chapter[- ]?(\d+(?:\.\d+)?)/i);
       if (numMatch) {
         const num = parseFloat(numMatch[1]);
         if (!isNaN(num) && !seen.has(num)) {
           seen.add(num);
-          chapters.push({ chapterNumber: num, url: href });
+          chapters.push({
+            chapterNumber: num,
+            url: `${hivetoonOrigin}/series/${seriesSlug}/${chapterPart}`,
+          });
         }
       }
     }
@@ -4799,7 +4846,13 @@ function unwrapAstroValue(value: unknown): unknown {
   return value;
 }
 
-async function extractAsuraChapters(seriesUrl: string): Promise<ChapterInfo[]> {
+async function extractAsuraChapters(rawSeriesUrl: string): Promise<ChapterInfo[]> {
+  let seriesUrl = rawSeriesUrl.trim();
+  if (seriesUrl.toLowerCase().includes('asuracomic.net')) {
+    seriesUrl = seriesUrl
+      .replace(/https?:\/\/(?:www\.)?asuracomic\.net\/series\//i, 'https://asurascans.com/comics/')
+      .replace(/https?:\/\/(?:www\.)?asuracomic\.net/i, 'https://asurascans.com');
+  }
   const urlObj = new URL(seriesUrl);
   const response = await fetch(seriesUrl, {
     headers: {

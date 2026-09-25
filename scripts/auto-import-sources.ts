@@ -165,21 +165,11 @@ async function syncSource(source: any): Promise<SourceSyncResult> {
 
     const { data: existingRows, error: existingError } = await supabase
       .from('chapters')
-      .select('id,chapter_number,scanlation_group,chapter_type,chapter_pages(id)')
+      .select('id,chapter_number,scanlation_group,chapter_type')
       .eq('series_id', source.series_id);
     if (existingError) throw existingError;
 
-    // Clean up empty image chapters
-    const emptyChapterIds = (existingRows ?? [])
-      .filter((ch: any) => ch.chapter_type === 'image' && (!ch.chapter_pages || ch.chapter_pages.length === 0))
-      .map((ch: any) => ch.id);
-
-    if (emptyChapterIds.length > 0) {
-      console.log(`[AutoImport] Cleaning up ${emptyChapterIds.length} empty chapter(s)...`);
-      await supabase.from('chapters').delete().in('id', emptyChapterIds);
-    }
-
-    const activeRows = (existingRows ?? []).filter((ch: any) => !emptyChapterIds.includes(ch.id));
+    const activeRows = existingRows ?? [];
 
     const existingKeys = new Set(
       activeRows.map((chapter: any) =>
