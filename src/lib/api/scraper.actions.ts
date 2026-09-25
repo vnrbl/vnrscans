@@ -1801,6 +1801,469 @@ export async function $bulkDeleteChapters(args: {
 }
 
 /**
+ * Discover chapters from a source URL and return only NEW ones not already in the database.
+ * Used by Telegram bot /import command and LiveSeriesEditor chapter selection.
+ */
+export async function $discoverNewChapters(args: {
+  data: {
+    sourceId?: string;
+    seriesId?: string;
+    accessToken: string;
+  };
+}) {
+  try {
+    const { data } = args;
+    const token = z.string().min(1).parse(data.accessToken);
+    if (!isInternalActionToken(token)) {
+      await verifyAdmin(token);
+    }
+
+    const admin = getAdminSupabase();
+    let source: any;
+
+    if (data.sourceId) {
+      const { data: src, error } = await admin
+        .from("series_import_sources")
+        .select("*, series:series(id, title, slug)")
+        .eq("id", data.sourceId)
+        .single();
+      if (error || !src) return { success: false, error: "Import source not found" };
+      source = src;
+    } else if (data.seriesId) {
+      const { data: sources, error } = await admin
+        .from("series_import_sources")
+        .select("*, series:series(id, title, slug)")
+        .eq("series_id", data.seriesId)
+        .eq("enabled", true)
+        .order("last_success_at", { ascending: false, nullsFirst: false })
+        .limit(1);
+      if (error || !sources?.length) return { success: false, error: "No enabled import source found for this series" };
+      source = sources[0];
+    } else {
+      return { success: false, error: "Either sourceId or seriesId is required" };
+    }
+
+    const seriesTitle = source?.series?.title || "Unknown";
+    const preset = detectImportSource(source.source_url);
+    const scanlationGroup = source.scanlation_group || preset.scanlationGroup || null;
+
+    const allDiscovered = await extractChaptersFromSeriesUrl(source.source_url);
+    const discovered = allDiscovered.filter((ch) => !isPremiumChapter(ch));
+
+    const { data: existingRows, error: existingError } = await admin
+      .from("chapters")
+      .select("id,chapter_number,scanlation_group,chapter_type,chapter_pages(id)")
+      .eq("series_id", source.series_id);
+    if (existingError) throw existingError;
+
+    const activeRows = (existingRows ?? []).filter(
+      (ch: any) => !(ch.chapter_type === "image" && (!ch.chapter_pages || ch.chapter_pages.length === 0))
+    );
+
+    const existingKeys = new Set(
+      activeRows.map((chapter: any) => chapterScanKey(Number(chapter.chapter_number), chapter.scanlation_group))
+    );
+
+    const seenKeys = new Set<string>();
+    const newChapters = discovered
+      .filter((chapter) => {
+        const key = chapterScanKey(chapter.chapterNumber, scanlationGroup);
+        if (existingKeys.has(key) || seenKeys.has(key)) return false;
+        seenKeys.add(key);
+        return true;
+      })
+      .sort((a, b) => a.chapterNumber - b.chapterNumber);
+
+    const existingChapterNumbers = activeRows
+      .map((ch: any) => Number(ch.chapter_number))
+      .sort((a: number, b: number) => a - b);
+
+    return {
+      success: true,
+      seriesTitle,
+      seriesId: source.series_id,
+      sourceId: source.id,
+      sourceUrl: source.source_url,
+      sourceSite: source.source_site || preset.sourceSite || "Unknown",
+      totalDiscovered: discovered.length,
+      totalExisting: activeRows.length,
+      totalNew: newChapters.length,
+      premiumSkipped: allDiscovered.length - discovered.length,
+      newChapters: newChapters.map((ch) => ({
+        chapterNumber: ch.chapterNumber,
+        title: ch.title || null,
+        url: ch.url,
+      })),
+      existingChapterNumbers,
+      latestExisting: existingChapterNumbers.length > 0 ? existingChapterNumbers[existingChapterNumbers.length - 1] : null,
+    };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "Failed to discover chapters" };
+  }
+}
+
+/**
+ * Import specific chapter numbers from a source.
+ * Used by Telegram bot /import command for selective chapter import.
+ */
+export async function $importSelectedChapters(args: {
+  data: {
+    sourceId: string;
+    chapterNumbers: number[];
+    accessToken: string;
+  };
+}) {
+  try {
+    const { data } = args;
+    const token = z.string().min(1).parse(data.accessToken);
+    if (!isInternalActionToken(token)) {
+      await verifyAdmin(token);
+    }
+
+    const validated = z.object({
+      sourceId: z.string().uuid(),
+      chapterNumbers: z.array(z.number()).min(1).max(50),
+    }).parse({ sourceId: data.sourceId, chapterNumbers: data.chapterNumbers });
+
+    const admin = getAdminSupabase();
+
+    const { data: source, error: sourceError } = await admin
+      .from("series_import_sources")
+      .select("*, series:series(id, title, slug, cover_url)")
+      .eq("id", validated.sourceId)
+      .single();
+    if (sourceError || !source) return { success: false, error: "Import source not found" };
+
+    const seriesTitle = source?.series?.title || "";
+    const preset = detectImportSource(source.source_url);
+    const scanlationGroup = source.scanlation_group || preset.scanlationGroup || null;
+    const imageUrlExample = source.image_url_example || preset.imageUrlExample || null;
+
+    const allDiscovered = await extractChaptersFromSeriesUrl(source.source_url);
+    const discovered = allDiscovered.filter((ch) => !isPremiumChapter(ch));
+
+    // Filter to only the requested chapter numbers
+    const requestedSet = new Set(validated.chapterNumbers);
+    const chaptersToImport = discovered.filter((ch) => requestedSet.has(ch.chapterNumber));
+
+    if (chaptersToImport.length === 0) {
+      return { success: false, error: "None of the requested chapters were found on the source" };
+    }
+
+    // Verify they don't already exist
+    const { data: existingRows, error: existingError } = await admin
+      .from("chapters")
+      .select("id,chapter_number,scanlation_group,chapter_type,chapter_pages(id)")
+      .eq("series_id", source.series_id);
+    if (existingError) throw existingError;
+
+    const existingKeys = new Set(
+      (existingRows ?? []).map((ch: any) => chapterScanKey(Number(ch.chapter_number), ch.scanlation_group))
+    );
+
+    const missing = chaptersToImport.filter((ch) => {
+      const key = chapterScanKey(ch.chapterNumber, scanlationGroup);
+      return !existingKeys.has(key);
+    });
+
+    if (missing.length === 0) {
+      return { success: true, imported: 0, failed: 0, message: "All requested chapters already exist in the database", details: [] };
+    }
+
+    const isAsuraSource = source.source_url.toLowerCase().includes("asura");
+    const batchExtractedImages = await extractImagesFromChapterUrls(
+      missing.map((ch) => ch.url),
+      { concurrency: isAsuraSource ? 6 : 10, imageUrlExample },
+    );
+
+    let imported = 0;
+    let failed = 0;
+    const details: Array<{ chapter: number; status: string; message?: string; pages?: number }> = [];
+
+    for (const chapter of missing) {
+      try {
+        const rawImages = batchExtractedImages.get(chapter.url) ??
+          (await extractImagesFromChapterUrl(chapter.url, { imageUrlExample }));
+        const images = filterImagesByExampleUrl(rawImages, imageUrlExample || "");
+        if (images.length === 0) throw new Error("No images found");
+
+        const slug = buildChapterSlug(chapter.chapterNumber, {
+          title: chapter.title || null,
+          scanlationGroup,
+        });
+
+        const scheduledAt = new Date(Date.now() + 30 * 60 * 1000).toISOString();
+
+        const chapterPayload: any = {
+          series_id: source.series_id,
+          chapter_number: chapter.chapterNumber,
+          title: chapter.title || null,
+          slug,
+          chapter_type: "image",
+          status: "published",
+          scheduled_at: scheduledAt,
+          source_url: chapter.url,
+          uploaded_by: "vnr610",
+          scanlation_group: scanlationGroup,
+        };
+
+        let chapterRecord: any;
+        const { data: insertedRecord, error: chapterError } = await admin
+          .from("chapters")
+          .insert(chapterPayload)
+          .select("id")
+          .single();
+
+        if (chapterError) {
+          if (chapterError.code === "42703" || chapterError.message?.includes("source_url")) {
+            delete chapterPayload.source_url;
+            const { data: retryData, error: retryError } = await admin
+              .from("chapters")
+              .insert(chapterPayload)
+              .select("id")
+              .single();
+            if (retryError) throw retryError;
+            chapterRecord = retryData;
+          } else {
+            throw chapterError;
+          }
+        } else {
+          chapterRecord = insertedRecord;
+        }
+
+        const { error: pagesError } = await admin.from("chapter_pages").insert(
+          images.map((imageUrl, index) => ({
+            chapter_id: chapterRecord.id,
+            page_number: index + 1,
+            image_url: imageUrl,
+          })),
+        );
+        if (pagesError) throw pagesError;
+
+        imported++;
+        details.push({ chapter: chapter.chapterNumber, status: "imported", pages: images.length });
+      } catch (error) {
+        failed++;
+        details.push({
+          chapter: chapter.chapterNumber,
+          status: "failed",
+          message: error instanceof Error ? error.message : "Unknown error",
+        });
+      }
+    }
+
+    return { success: true, imported, failed, seriesTitle, details };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "Selective import failed" };
+  }
+}
+
+/**
+ * List all enabled import sources with their status.
+ * Used by Telegram bot /sources command.
+ */
+export async function $getImportSources(args: {
+  data: { accessToken: string };
+}) {
+  try {
+    const token = z.string().min(1).parse(args.data.accessToken);
+    if (!isInternalActionToken(token)) {
+      await verifyAdmin(token);
+    }
+
+    const admin = getAdminSupabase();
+    const { data: sources, error } = await admin
+      .from("series_import_sources")
+      .select("id, source_url, source_site, scanlation_group, enabled, last_checked_at, last_success_at, last_error, estimated_next_release_at, release_cadence, series:series(id, title, slug)")
+      .eq("enabled", true)
+      .order("last_checked_at", { ascending: true, nullsFirst: true });
+
+    if (error) throw error;
+
+    return {
+      success: true,
+      totalSources: sources?.length ?? 0,
+      sources: (sources ?? []).map((src: any) => ({
+        id: src.id,
+        seriesTitle: src.series?.title || "Unknown",
+        seriesSlug: src.series?.slug || "",
+        sourceSite: src.source_site || "Unknown",
+        sourceUrl: src.source_url,
+        scanlationGroup: src.scanlation_group || null,
+        lastChecked: src.last_checked_at || null,
+        lastSuccess: src.last_success_at || null,
+        lastError: src.last_error || null,
+        nextRelease: src.estimated_next_release_at || null,
+        cadence: src.release_cadence || null,
+      })),
+    };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "Failed to list sources" };
+  }
+}
+
+/**
+ * Get per-series import status including latest chapter, next release, and last scan info.
+ * Used by Telegram bot /status command.
+ */
+export async function $getSeriesImportStatus(args: {
+  data: { query: string; accessToken: string };
+}) {
+  try {
+    const token = z.string().min(1).parse(args.data.accessToken);
+    if (!isInternalActionToken(token)) {
+      await verifyAdmin(token);
+    }
+
+    const query = z.string().min(2).max(100).parse(args.data.query);
+    const admin = getAdminSupabase();
+
+    const escaped = query.replace(/[,*()%]/g, " ").replace(/\s+/g, " ").trim();
+    const { data: seriesList, error } = await admin
+      .from("series")
+      .select("id, title, slug, status, chapter_count, estimated_next_release_at, release_cadence, updated_at, is_hidden")
+      .or(`title.ilike.%${escaped}%,alternative_titles.ilike.%${escaped}%`)
+      .limit(5);
+
+    if (error) throw error;
+    if (!seriesList || seriesList.length === 0) return { success: true, found: 0, results: [] };
+
+    const results = [];
+    for (const series of seriesList) {
+      const { data: latestChapter } = await admin
+        .from("chapters")
+        .select("chapter_number, title, created_at")
+        .eq("series_id", series.id)
+        .eq("status", "published")
+        .order("chapter_number", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      const { data: importSource } = await admin
+        .from("series_import_sources")
+        .select("id, source_site, source_url, last_checked_at, last_success_at, last_error, estimated_next_release_at, release_cadence")
+        .eq("series_id", series.id)
+        .eq("enabled", true)
+        .order("last_success_at", { ascending: false, nullsFirst: false })
+        .limit(1)
+        .maybeSingle();
+
+      results.push({
+        title: series.title,
+        slug: series.slug,
+        status: series.status,
+        isHidden: series.is_hidden,
+        chapterCount: series.chapter_count ?? 0,
+        latestChapter: latestChapter ? {
+          number: latestChapter.chapter_number,
+          title: latestChapter.title,
+          importedAt: latestChapter.created_at,
+        } : null,
+        source: importSource ? {
+          site: importSource.source_site,
+          lastChecked: importSource.last_checked_at,
+          lastSuccess: importSource.last_success_at,
+          lastError: importSource.last_error,
+          nextRelease: importSource.estimated_next_release_at,
+          cadence: importSource.release_cadence,
+        } : null,
+      });
+    }
+
+    return { success: true, found: results.length, results };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "Failed to get series status" };
+  }
+}
+
+/**
+ * Get recent import log entries.
+ * Used by Telegram bot /logs command.
+ */
+export async function $getRecentImportLogs(args: {
+  data: { accessToken: string; limit?: number };
+}) {
+  try {
+    const token = z.string().min(1).parse(args.data.accessToken);
+    if (!isInternalActionToken(token)) {
+      await verifyAdmin(token);
+    }
+
+    const limit = Math.min(args.data.limit ?? 5, 10);
+    const admin = getAdminSupabase();
+
+    const { data: logs, error } = await admin
+      .from("series_import_logs")
+      .select("id, status, message, chapters_found, chapters_imported, chapters_skipped, chapters_failed, created_at, duration_seconds, source:series_import_sources(source_site, series:series(title))")
+      .order("created_at", { ascending: false })
+      .limit(limit);
+
+    if (error) throw error;
+
+    return {
+      success: true,
+      logs: (logs ?? []).map((log: any) => ({
+        status: log.status,
+        message: log.message,
+        found: log.chapters_found,
+        imported: log.chapters_imported,
+        skipped: log.chapters_skipped,
+        failed: log.chapters_failed,
+        at: log.created_at,
+        duration: log.duration_seconds,
+        sourceSite: log.source?.source_site || "Unknown",
+        seriesTitle: log.source?.series?.title || "Unknown",
+      })),
+    };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "Failed to get import logs" };
+  }
+}
+
+/**
+ * Trigger import for a specific series by its ID.
+ * Used by Comick watcher auto-import and Telegram /import-all command.
+ */
+export async function $triggerSeriesImport(args: {
+  data: {
+    seriesId: string;
+    accessToken: string;
+    maxChapters?: number;
+    mode?: "latest" | "all";
+  };
+}) {
+  try {
+    const token = z.string().min(1).parse(args.data.accessToken);
+    if (!isInternalActionToken(token)) {
+      await verifyAdmin(token);
+    }
+
+    const admin = getAdminSupabase();
+    const { data: sources, error } = await admin
+      .from("series_import_sources")
+      .select("id")
+      .eq("series_id", args.data.seriesId)
+      .eq("enabled", true)
+      .order("last_success_at", { ascending: false, nullsFirst: false })
+      .limit(1);
+
+    if (error) throw error;
+    if (!sources?.length) return { success: false, error: "No enabled import source found for this series" };
+
+    return await $syncImportSource({
+      data: {
+        sourceId: sources[0].id,
+        accessToken: token,
+        maxChapters: args.data.maxChapters ?? 10,
+        mode: args.data.mode ?? "latest",
+      },
+    });
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "Failed to trigger import" };
+  }
+}
+
+/**
  * Sync all series import sources that are due on their Estimated Next Release Time.
  */
 export async function $syncDueScheduledSeries(args: {

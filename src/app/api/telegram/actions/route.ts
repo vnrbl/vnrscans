@@ -1,6 +1,15 @@
 import { createClient } from "@supabase/supabase-js";
 import { after, NextResponse } from "next/server";
-import { $repairReportedChapter, $syncDueScheduledSeries } from "@/lib/api/scraper.actions";
+import {
+  $repairReportedChapter,
+  $syncDueScheduledSeries,
+  $discoverNewChapters,
+  $importSelectedChapters,
+  $getImportSources,
+  $getSeriesImportStatus,
+  $getRecentImportLogs,
+  $triggerSeriesImport,
+} from "@/lib/api/scraper.actions";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -9,8 +18,13 @@ type ActionBody = {
   action?: string;
   query?: string;
   seriesId?: string;
+  sourceId?: string;
   hidden?: boolean;
   reportNoChanges?: boolean;
+  chapterNumbers?: number[];
+  mode?: "latest" | "all";
+  maxChapters?: number;
+  limit?: number;
 };
 
 function authorized(request: Request) {
@@ -27,6 +41,12 @@ function getAdminClient() {
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !key) throw new Error("Server-side Supabase admin credentials are not configured");
   return createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } });
+}
+
+function getInternalToken() {
+  const secret = process.env.TELEGRAM_ACTION_SECRET;
+  if (!secret) throw new Error("Telegram action secret is not configured");
+  return secret;
 }
 
 async function notifyWorker(payload: Record<string, unknown>) {
@@ -184,6 +204,76 @@ async function processOpenReportsAndNotify() {
   }
 }
 
+async function runSeriesImportAndNotify(seriesId: string, seriesTitle: string, mode: "latest" | "all", maxChapters: number) {
+  try {
+    const token = getInternalToken();
+    const result = await $triggerSeriesImport({
+      data: { seriesId, accessToken: token, maxChapters, mode },
+    });
+    await notifyWorker({
+      type: "series_import",
+      seriesId,
+      seriesTitle,
+      success: result.success !== false,
+      imported: result.imported ?? 0,
+      failed: result.failed ?? 0,
+      chaptersFound: result.chaptersFound ?? 0,
+      error: result.error,
+      details: result.details ?? [],
+      mode,
+    });
+  } catch (error) {
+    console.error("[TelegramActions] Series import failed:", error);
+    try {
+      await notifyWorker({
+        type: "series_import",
+        seriesId,
+        seriesTitle,
+        success: false,
+        imported: 0,
+        failed: 1,
+        error: error instanceof Error ? error.message : "Series import failed",
+        mode,
+      });
+    } catch (notifyError) {
+      console.error("[TelegramActions] Failed to report series import error:", notifyError);
+    }
+  }
+}
+
+async function runSelectedChapterImportAndNotify(sourceId: string, chapterNumbers: number[]) {
+  try {
+    const token = getInternalToken();
+    const result = await $importSelectedChapters({
+      data: { sourceId, chapterNumbers, accessToken: token },
+    });
+    await notifyWorker({
+      type: "selective_import",
+      sourceId,
+      success: result.success !== false,
+      imported: result.imported ?? 0,
+      failed: result.failed ?? 0,
+      seriesTitle: result.seriesTitle || "Unknown",
+      error: result.error || result.message,
+      details: result.details ?? [],
+    });
+  } catch (error) {
+    console.error("[TelegramActions] Selective import failed:", error);
+    try {
+      await notifyWorker({
+        type: "selective_import",
+        sourceId,
+        success: false,
+        imported: 0,
+        failed: chapterNumbers.length,
+        error: error instanceof Error ? error.message : "Selective import failed",
+      });
+    } catch (notifyError) {
+      console.error("[TelegramActions] Failed to report selective import error:", notifyError);
+    }
+  }
+}
+
 export async function POST(request: Request) {
   if (!authorized(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
@@ -239,6 +329,88 @@ export async function POST(request: Request) {
       console.error("[TelegramActions] Catalog visibility update failed:", error);
       return NextResponse.json({ error: "Catalog update failed" }, { status: 500 });
     }
+  }
+
+  // --- NEW: Discover new chapters for a series/source ---
+  if (body.action === "discover_chapters") {
+    try {
+      const token = getInternalToken();
+      const result = await $discoverNewChapters({
+        data: {
+          sourceId: body.sourceId,
+          seriesId: body.seriesId,
+          accessToken: token,
+        },
+      });
+      return NextResponse.json(result);
+    } catch (error) {
+      console.error("[TelegramActions] Discover chapters failed:", error);
+      return NextResponse.json({ error: "Chapter discovery failed" }, { status: 500 });
+    }
+  }
+
+  // --- NEW: Import selected chapters ---
+  if (body.action === "import_selected_chapters") {
+    if (!body.sourceId || !Array.isArray(body.chapterNumbers) || body.chapterNumbers.length === 0) {
+      return NextResponse.json({ error: "sourceId and chapterNumbers[] are required" }, { status: 400 });
+    }
+    after(() => runSelectedChapterImportAndNotify(body.sourceId!, body.chapterNumbers!));
+    return NextResponse.json({ accepted: true, message: "Selective chapter import started" }, { status: 202 });
+  }
+
+  // --- NEW: List enabled import sources ---
+  if (body.action === "list_sources") {
+    try {
+      const token = getInternalToken();
+      const result = await $getImportSources({ data: { accessToken: token } });
+      return NextResponse.json(result);
+    } catch (error) {
+      console.error("[TelegramActions] List sources failed:", error);
+      return NextResponse.json({ error: "Failed to list sources" }, { status: 500 });
+    }
+  }
+
+  // --- NEW: Per-series import status ---
+  if (body.action === "series_status") {
+    const query = typeof body.query === "string" ? body.query.trim() : "";
+    if (query.length < 2) return NextResponse.json({ error: "Provide a series title" }, { status: 400 });
+    try {
+      const token = getInternalToken();
+      const result = await $getSeriesImportStatus({ data: { query, accessToken: token } });
+      return NextResponse.json(result);
+    } catch (error) {
+      console.error("[TelegramActions] Series status lookup failed:", error);
+      return NextResponse.json({ error: "Series status failed" }, { status: 500 });
+    }
+  }
+
+  // --- NEW: Recent import logs ---
+  if (body.action === "import_logs") {
+    try {
+      const token = getInternalToken();
+      const result = await $getRecentImportLogs({ data: { accessToken: token, limit: body.limit } });
+      return NextResponse.json(result);
+    } catch (error) {
+      console.error("[TelegramActions] Import logs lookup failed:", error);
+      return NextResponse.json({ error: "Failed to get logs" }, { status: 500 });
+    }
+  }
+
+  // --- NEW: Trigger import for a specific series ---
+  if (body.action === "trigger_series_import") {
+    if (!body.seriesId) return NextResponse.json({ error: "seriesId is required" }, { status: 400 });
+    // Look up series title for notification
+    let seriesTitle = "Unknown";
+    try {
+      const { data } = await getAdminClient()
+        .from("series")
+        .select("title")
+        .eq("id", body.seriesId)
+        .maybeSingle();
+      if (data?.title) seriesTitle = data.title;
+    } catch {}
+    after(() => runSeriesImportAndNotify(body.seriesId!, seriesTitle, body.mode || "latest", body.maxChapters || 10));
+    return NextResponse.json({ accepted: true, message: "Series import started" }, { status: 202 });
   }
 
   return NextResponse.json({ error: "Unknown Telegram action" }, { status: 400 });

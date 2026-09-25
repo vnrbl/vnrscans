@@ -42,6 +42,8 @@ import {
   $syncImportSource,
   $deleteChapter,
   $bulkDeleteChapters,
+  $discoverNewChapters,
+  $importSelectedChapters,
 } from "@/lib/api/scraper.actions";
 import { $importComickMetadataToSeries } from "@/lib/api/comick-import.actions";
 import { detectImportSource } from "@/lib/import-source-utils";
@@ -147,6 +149,12 @@ export function LiveSeriesEditor({ series: initialSeries, slug, trigger }: LiveS
   const [isAddingSource, setIsAddingSource] = useState(false);
   const [syncingState, setSyncingState] = useState<{ sourceId: string; mode: "latest" | "all" } | null>(null);
   const isSyncingSeries = !!syncingState;
+
+  // Chapter Discovery & Selective Import state
+  const [discoveredChapters, setDiscoveredChapters] = useState<any>(null);
+  const [isDiscovering, setIsDiscovering] = useState(false);
+  const [selectedImportChapters, setSelectedImportChapters] = useState<Set<number>>(new Set());
+  const [isSelectiveImporting, setIsSelectiveImporting] = useState(false);
 
   const isSyncingSource = (sourceId: string, mode?: "latest" | "all") => {
     if (!syncingState) return false;
@@ -474,6 +482,109 @@ export function LiveSeriesEditor({ series: initialSeries, slug, trigger }: LiveS
       toast.error(err.message || "Failed to add source");
     } finally {
       setIsAddingSource(false);
+    }
+  };
+
+  // Discover new chapters from source
+  const handleDiscoverChapters = async (sourceId?: string) => {
+    try {
+      setIsDiscovering(true);
+      setDiscoveredChapters(null);
+      setSelectedImportChapters(new Set());
+      const session = (await supabase.auth.getSession()).data.session;
+      if (!session?.access_token) {
+        toast.error("Please sign in as admin");
+        return;
+      }
+
+      const res = await $discoverNewChapters({
+        data: {
+          sourceId: sourceId || undefined,
+          seriesId: !sourceId ? initialSeries?.id : undefined,
+          accessToken: session.access_token,
+        },
+      });
+
+      if (!res.success) {
+        toast.error(res.error || "Chapter discovery failed");
+        return;
+      }
+
+      setDiscoveredChapters(res);
+      if (res.totalNew === 0) {
+        toast.info(`${res.seriesTitle || "Series"} is fully up to date! (${res.totalExisting} chapters)`);
+      } else {
+        toast.success(`Found ${res.totalNew} new chapter(s) from ${res.sourceSite}`);
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Discovery failed");
+    } finally {
+      setIsDiscovering(false);
+    }
+  };
+
+  // Import selected chapters
+  const handleSelectiveImport = async () => {
+    if (selectedImportChapters.size === 0 || !discoveredChapters?.sourceId) return;
+    try {
+      setIsSelectiveImporting(true);
+      const session = (await supabase.auth.getSession()).data.session;
+      if (!session?.access_token) {
+        toast.error("Please sign in as admin");
+        return;
+      }
+
+      const chapterNumbers = Array.from(selectedImportChapters).sort((a, b) => a - b);
+
+      processing.startTask({
+        title: `Importing ${chapterNumbers.length} Selected Chapter(s)`,
+        description: `Selectively importing chapters ${chapterNumbers.slice(0, 5).join(", ")}${chapterNumbers.length > 5 ? "..." : ""}`,
+        steps: [
+          { id: "auth", label: "Verifying authorization" },
+          { id: "import", label: `Importing ${chapterNumbers.length} chapter(s)` },
+          { id: "refresh", label: "Refreshing catalog" },
+        ],
+      });
+
+      processing.setStepStatus("auth", "done", "Authorized");
+      processing.setStepStatus("import", "active", `Importing chapters ${chapterNumbers.join(", ")}...`);
+
+      const res = await $importSelectedChapters({
+        data: {
+          sourceId: discoveredChapters.sourceId,
+          chapterNumbers,
+          accessToken: session.access_token,
+        },
+      });
+
+      if (!res.success) {
+        throw new Error(res.error || "Selective import failed");
+      }
+
+      processing.setStepStatus("import", "done", `${res.imported} imported, ${res.failed} failed`);
+      processing.setStepStatus("refresh", "active", "Refreshing...");
+
+      qc.invalidateQueries({ queryKey: ["series"] });
+      qc.invalidateQueries({ queryKey: ["chapters", slug] });
+      qc.invalidateQueries({ queryKey: ["admin", "series-editor-chapters", initialSeries?.id] });
+      qc.invalidateQueries({ queryKey: ["admin", "series-import-sources", initialSeries?.id] });
+
+      processing.setStepStatus("refresh", "done");
+      await processing.completeTask(`Selective Import Complete! ${res.imported} chapter(s) imported ✓`);
+
+      if ((res.imported ?? 0) > 0) {
+        toast.success(`Imported ${res.imported} chapter(s)! ${(res.failed ?? 0) > 0 ? `(${res.failed} failed)` : ""}`);
+      } else {
+        toast.info(res.message || "No new chapters imported.");
+      }
+
+      setSelectedImportChapters(new Set());
+      setDiscoveredChapters(null);
+    } catch (err: any) {
+      processing.failTask(err.message || "Selective import failed");
+      toast.error(err.message || "Selective import failed");
+    } finally {
+      setIsSelectiveImporting(false);
     }
   };
 
@@ -1597,6 +1708,123 @@ export function LiveSeriesEditor({ series: initialSeries, slug, trigger }: LiveS
                       ))}
                     </div>
                   )}
+
+                  {/* === Chapter Discovery & Selective Import === */}
+                  {(importSourcesQ.data || []).length > 0 && (
+                    <div className="pt-3 border-t border-border/20 space-y-3">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <Search className="h-4 w-4 text-emerald-400" />
+                          <h3 className="text-sm font-bold">Discover & Select Chapters</h3>
+                        </div>
+                        <Button
+                          type="button"
+                          size="sm"
+                          onClick={() => handleDiscoverChapters()}
+                          disabled={isDiscovering || isSyncingSeries}
+                          className="h-7 text-2xs font-semibold bg-emerald-600/80 hover:bg-emerald-600 text-white gap-1 cursor-pointer"
+                          title="Discover new chapters from the scan source"
+                        >
+                          {isDiscovering ? (
+                            <RefreshCw className="h-3 w-3 animate-spin" />
+                          ) : (
+                            <Search className="h-3 w-3" />
+                          )}
+                          <span>{isDiscovering ? "Scanning..." : "Discover New Chapters"}</span>
+                        </Button>
+                      </div>
+
+                      {discoveredChapters && (
+                        <div className="rounded-lg border border-emerald-500/20 bg-emerald-950/20 p-3 space-y-3">
+                          <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                            <div className="space-y-0.5">
+                              <p className="font-semibold text-emerald-300">
+                                {discoveredChapters.totalNew > 0
+                                  ? `📋 ${discoveredChapters.totalNew} new chapter(s) available`
+                                  : "✅ All chapters up to date"}
+                              </p>
+                              <p className="text-muted-foreground">
+                                {discoveredChapters.totalDiscovered} on source · {discoveredChapters.totalExisting} in DB
+                                {discoveredChapters.premiumSkipped > 0 && ` · ${discoveredChapters.premiumSkipped} premium skipped`}
+                                {discoveredChapters.latestExisting != null && ` · Latest: Ch. ${discoveredChapters.latestExisting}`}
+                              </p>
+                            </div>
+                            {discoveredChapters.totalNew > 0 && selectedImportChapters.size > 0 && (
+                              <Button
+                                type="button"
+                                size="sm"
+                                onClick={handleSelectiveImport}
+                                disabled={isSelectiveImporting || isSyncingSeries}
+                                className="h-7 text-2xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white gap-1 cursor-pointer shadow-sm"
+                              >
+                                {isSelectiveImporting ? (
+                                  <RefreshCw className="h-3 w-3 animate-spin" />
+                                ) : (
+                                  <Download className="h-3 w-3" />
+                                )}
+                                <span>{isSelectiveImporting ? "Importing..." : `Import ${selectedImportChapters.size} Selected`}</span>
+                              </Button>
+                            )}
+                          </div>
+
+                          {discoveredChapters.totalNew > 0 && (
+                            <>
+                              <div className="flex items-center justify-between">
+                                <label className="text-2xs text-muted-foreground flex items-center gap-1.5 cursor-pointer">
+                                  <Checkbox
+                                    checked={selectedImportChapters.size === discoveredChapters.newChapters?.length && discoveredChapters.newChapters?.length > 0}
+                                    onCheckedChange={(checked) => {
+                                      if (checked) {
+                                        setSelectedImportChapters(new Set(discoveredChapters.newChapters.map((ch: any) => ch.chapterNumber)));
+                                      } else {
+                                        setSelectedImportChapters(new Set());
+                                      }
+                                    }}
+                                  />
+                                  Select all ({discoveredChapters.newChapters?.length})
+                                </label>
+                                {selectedImportChapters.size > 0 && (
+                                  <span className="text-2xs text-emerald-400 font-mono">
+                                    {selectedImportChapters.size} selected
+                                  </span>
+                                )}
+                              </div>
+                              <div className="max-h-[200px] overflow-y-auto rounded-lg border border-border/20 bg-background/30">
+                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-1 p-2">
+                                  {(discoveredChapters.newChapters || []).map((ch: any) => {
+                                    const isChecked = selectedImportChapters.has(ch.chapterNumber);
+                                    return (
+                                      <label
+                                        key={ch.chapterNumber}
+                                        className={`flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer text-xs transition-all ${
+                                          isChecked
+                                            ? "bg-emerald-500/20 border border-emerald-500/40 text-emerald-200"
+                                            : "hover:bg-secondary/30 border border-transparent"
+                                        }`}
+                                      >
+                                        <Checkbox
+                                          checked={isChecked}
+                                          onCheckedChange={(checked) => {
+                                            const next = new Set(selectedImportChapters);
+                                            if (checked) next.add(ch.chapterNumber);
+                                            else next.delete(ch.chapterNumber);
+                                            setSelectedImportChapters(next);
+                                          }}
+                                        />
+                                        <span className="font-mono font-bold">Ch. {ch.chapterNumber}</span>
+                                        {ch.title && <span className="text-muted-foreground truncate text-2xs">{ch.title}</span>}
+                                      </label>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
 
                   {/* Add new scan source */}
                   <div className="pt-3 border-t border-border/20 space-y-2">

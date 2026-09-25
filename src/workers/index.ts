@@ -687,6 +687,18 @@ async function scanComickForNewChapters(env: Env) {
         await telegramSend(env, chatId, alert.message);
         await env.RATE_LIMIT.put(`telegram:comick-watch:series:${alert.seriesId}`, String(alert.latestChapter), { expirationTtl: 60 * 60 * 24 * 365 });
         await env.RATE_LIMIT.delete(key.name);
+
+        // Auto-import: trigger the source import for this series when Comick detects a new chapter
+        try {
+          const autoImportKey = `telegram:comick-auto-import:${alert.seriesId}:${alert.latestChapter}`;
+          if (!(await env.RATE_LIMIT.get(autoImportKey))) {
+            await env.RATE_LIMIT.put(autoImportKey, "pending", { expirationTtl: 60 * 60 * 24 });
+            await callSiteAction(env, { action: "trigger_series_import", seriesId: alert.seriesId, mode: "latest", maxChapters: 5 });
+            await telegramSend(env, chatId, `⚡ Auto-importing latest chapters for this series...`);
+          }
+        } catch (autoImportErr) {
+          console.warn("[worker] Comick auto-import trigger failed:", autoImportErr);
+        }
       } catch (error) {
         console.error("[worker] Comick chapter alert delivery failed", error);
       }
@@ -727,19 +739,30 @@ function telegramHelpText() {
   return [
     "I can answer questions about VNR Scans, search its public series, and check current catalog details.",
     "",
+    "📖 Catalog",
     "/browse — open the catalog",
     "/stats — count public series",
     "/latest — see the latest published chapters",
     "/find title — search for a series",
     "/chapters title — show recent chapters for a series",
-    "/scan — start a due-source scan and get a result message",
+    "",
+    "🔄 Import & Scanning",
+    "/scan — start a due-source scan",
     "/scan-status — check the last source scan",
-    "/catalog hide title — hide a series after confirmation",
-    "/catalog show title — restore a hidden series after confirmation",
+    "/import title — discover & pick new chapters to import",
+    "/import-all title — import all missing chapters for a series",
+    "/sources — list all enabled import sources",
+    "/status title — per-series import status",
+    "/logs — recent import history",
+    "/health — system health check",
+    "",
+    "⚙️ Admin",
+    "/catalog hide title — hide a series",
+    "/catalog show title — restore a hidden series",
     "/remember fact — save a note for future chats",
     "/memory — show saved notes",
-    "/reset — clear chat history but keep saved notes",
-    "/forget — clear chat history and saved notes",
+    "/reset — clear chat history",
+    "/forget — clear everything",
   ].join("\n");
 }
 
@@ -752,15 +775,15 @@ function formatLatest(latest: LatestChapter[]) {
 type SiteActionSeries = { id: string; title: string; slug: string; is_hidden: boolean };
 type SiteActionResponse = { accepted?: boolean; error?: string; series?: SiteActionSeries[] | SiteActionSeries };
 
-async function callSiteAction(env: Env, payload: Record<string, unknown>): Promise<SiteActionResponse> {
+async function callSiteAction(env: Env, payload: Record<string, unknown>): Promise<Record<string, any>> {
   if (!env.SITE_URL || !env.TELEGRAM_ACTION_SECRET) throw new Error("Telegram site actions are not configured");
   const response = await fetch(`${env.SITE_URL.replace(/\/$/, "")}/api/telegram/actions`, {
     method: "POST",
     headers: { "Content-Type": "application/json", "X-Telegram-Action-Secret": env.TELEGRAM_ACTION_SECRET },
     body: JSON.stringify(payload),
-    signal: AbortSignal.timeout(12_000),
+    signal: AbortSignal.timeout(30_000),
   });
-  const result = await response.json() as SiteActionResponse;
+  const result = await response.json() as Record<string, any>;
   if (!response.ok) throw new Error(result.error || `Site action failed with HTTP ${response.status}`);
   return result;
 }
@@ -922,7 +945,7 @@ async function handleTelegramCommand(env: Env, chatId: number, text: string): Pr
     try {
       const started = await startSiteSourceScan(env, true);
       await telegramSend(env, chatId, started
-        ? "Source scan started. I'll send you the result when it finishes."
+        ? "🔄 Source scan started. I'll send you the result when it finishes (only NEW chapters will be imported)."
         : "A source scan is already running. Use /scan-status to check its result.");
     } catch (error) {
       console.error("[worker] Telegram source scan could not start", error);
@@ -936,10 +959,240 @@ async function handleTelegramCommand(env: Env, chatId: number, text: string): Pr
     else {
       try {
         const status = JSON.parse(latest) as { at?: string; success?: boolean; totalDue?: number; totalPending?: number; totalImported?: number; failures?: number };
-        await telegramSend(env, chatId, `Last source scan: ${status.success ? "completed" : "failed"}${status.at ? ` at ${status.at}` : ""}. ${status.totalDue ?? 0} sources checked; ${status.totalPending ?? 0} more due; ${status.totalImported ?? 0} chapters imported; ${status.failures ?? 0} failures.`);
+        await telegramSend(env, chatId, `Last source scan: ${status.success ? "✅ completed" : "❌ failed"}${status.at ? ` at ${status.at}` : ""}\n• Sources checked: ${status.totalDue ?? 0}\n• More due: ${status.totalPending ?? 0}\n• New chapters imported: ${status.totalImported ?? 0}\n• Failures: ${status.failures ?? 0}`);
       } catch {
         await telegramSend(env, chatId, "The saved scan status could not be read. Try again shortly.");
       }
+    }
+    return true;
+  }
+
+  // ---- /import <series title> - discover & select new chapters to import ----
+  if (command === "/import") {
+    if (!argument) {
+      await telegramSend(env, chatId, "Usage: /import series title\n\nDiscovers new chapters from the scan source and shows what's available to import. Reply with chapter numbers to selectively import.");
+      return true;
+    }
+    try {
+      await telegramTyping(env, chatId);
+      const result = await callSiteAction(env, { action: "discover_chapters", query: argument }) as any;
+      if (!result.success) {
+        // If no direct match by seriesId, try finding the series first
+        const findResult = await callSiteAction(env, { action: "find_series", query: argument });
+        const matches = Array.isArray(findResult.series) ? findResult.series : findResult.series ? [findResult.series] : [];
+        if (matches.length === 0) {
+          await telegramSend(env, chatId, `No series found matching "${argument}".`);
+          return true;
+        }
+        if (matches.length > 1) {
+          await telegramSend(env, chatId, `Multiple matches found:\n${matches.map((s: any) => `• ${s.title}`).join("\n")}\n\nBe more specific.`);
+          return true;
+        }
+        // Retry with seriesId
+        const discoverResult = await callSiteAction(env, { action: "discover_chapters", seriesId: matches[0].id }) as any;
+        if (!discoverResult.success) {
+          await telegramSend(env, chatId, `❌ ${discoverResult.error || "Could not discover chapters"}`);
+          return true;
+        }
+        Object.assign(result, discoverResult);
+      }
+
+      if (result.totalNew === 0) {
+        await telegramSend(env, chatId, `✅ ${result.seriesTitle || argument} is fully up to date!\n• ${result.totalExisting} chapters in DB\n• ${result.totalDiscovered} on source\n• Latest: Ch. ${result.latestExisting ?? "N/A"}`);
+        return true;
+      }
+
+      const chapterList = (result.newChapters || []).slice(0, 30).map((ch: any) => `  ${ch.chapterNumber}${ch.title ? ` — ${ch.title}` : ""}`).join("\n");
+      const msg = [
+        `📋 ${result.seriesTitle} — ${result.totalNew} new chapter(s) found`,
+        `Source: ${result.sourceSite}`,
+        `Existing: ${result.totalExisting} | On source: ${result.totalDiscovered}`,
+        result.premiumSkipped > 0 ? `Premium skipped: ${result.premiumSkipped}` : "",
+        "",
+        "New chapters:",
+        chapterList,
+        result.totalNew > 30 ? `  ...and ${result.totalNew - 30} more` : "",
+        "",
+        "Reply with chapter numbers to import:",
+        `e.g. /pick ${result.sourceId} 45 46 47`,
+        `Or import all: /import-all ${argument}`,
+      ].filter(Boolean).join("\n");
+
+      await telegramSend(env, chatId, msg);
+    } catch (error) {
+      console.error("[worker] Telegram import discovery failed", error);
+      await telegramSend(env, chatId, "❌ I couldn't discover chapters. Check the site action connection.");
+    }
+    return true;
+  }
+
+  // ---- /pick <sourceId> <chapter numbers...> - import specific chapters ----
+  if (command === "/pick") {
+    const parts = argument.split(/\s+/);
+    const sourceId = parts[0];
+    const chapters = parts.slice(1).map(Number).filter(n => Number.isFinite(n) && n > 0);
+    if (!sourceId || chapters.length === 0) {
+      await telegramSend(env, chatId, "Usage: /pick sourceId 45 46 47\n\nUse /import title first to discover chapters and get the sourceId.");
+      return true;
+    }
+    try {
+      await telegramSend(env, chatId, `⏳ Importing ${chapters.length} chapter(s): ${chapters.join(", ")}...`);
+      await callSiteAction(env, { action: "import_selected_chapters", sourceId, chapterNumbers: chapters });
+    } catch (error) {
+      console.error("[worker] Telegram selective import failed", error);
+      await telegramSend(env, chatId, "❌ I couldn't start the selective import. Check the site connection.");
+    }
+    return true;
+  }
+
+  // ---- /import-all <series title> - import all missing chapters ----
+  if (command === "/import-all") {
+    if (!argument) {
+      await telegramSend(env, chatId, "Usage: /import-all series title\n\nImports ALL missing chapters for the series.");
+      return true;
+    }
+    try {
+      await telegramTyping(env, chatId);
+      const findResult = await callSiteAction(env, { action: "find_series", query: argument });
+      const matches = Array.isArray(findResult.series) ? findResult.series : findResult.series ? [findResult.series] : [];
+      if (matches.length === 0) {
+        await telegramSend(env, chatId, `No series found matching "${argument}".`);
+        return true;
+      }
+      if (matches.length > 1) {
+        await telegramSend(env, chatId, `Multiple matches:\n${matches.map((s: any) => `• ${s.title}`).join("\n")}\n\nBe more specific.`);
+        return true;
+      }
+      const series = matches[0];
+      await telegramSend(env, chatId, `⏳ Importing all missing chapters for ${series.title}...`);
+      await callSiteAction(env, { action: "trigger_series_import", seriesId: series.id, mode: "all", maxChapters: 500 });
+    } catch (error) {
+      console.error("[worker] Telegram import-all failed", error);
+      await telegramSend(env, chatId, "❌ I couldn't start the import. Check the site connection.");
+    }
+    return true;
+  }
+
+  // ---- /sources - list all enabled import sources ----
+  if (command === "/sources") {
+    try {
+      await telegramTyping(env, chatId);
+      const result = await callSiteAction(env, { action: "list_sources" }) as any;
+      if (!result.success) {
+        await telegramSend(env, chatId, `❌ ${result.error || "Could not list sources"}`);
+        return true;
+      }
+      if (!result.sources?.length) {
+        await telegramSend(env, chatId, "No enabled import sources found.");
+        return true;
+      }
+      const lines = result.sources.slice(0, 15).map((src: any) => {
+        const checked = src.lastChecked ? new Date(src.lastChecked).toLocaleDateString() : "never";
+        const error = src.lastError ? ` ⚠️` : "";
+        return `• ${src.seriesTitle}${error}\n  ${src.sourceSite} | Last: ${checked}${src.cadence ? ` | ${src.cadence}` : ""}`;
+      });
+      await telegramSend(env, chatId, `📡 ${result.totalSources} enabled source(s):\n\n${lines.join("\n\n")}${result.totalSources > 15 ? `\n\n...and ${result.totalSources - 15} more` : ""}`);
+    } catch (error) {
+      console.error("[worker] Telegram sources command failed", error);
+      await telegramSend(env, chatId, "❌ Couldn't load sources. Try again shortly.");
+    }
+    return true;
+  }
+
+  // ---- /status <series title> - per-series import status ----
+  if (command === "/status") {
+    if (!argument) {
+      await telegramSend(env, chatId, "Usage: /status series title\n\nShows import status, latest chapter, next release, and scan info.");
+      return true;
+    }
+    try {
+      await telegramTyping(env, chatId);
+      const result = await callSiteAction(env, { action: "series_status", query: argument }) as any;
+      if (!result.success) {
+        await telegramSend(env, chatId, `❌ ${result.error || "Status lookup failed"}`);
+        return true;
+      }
+      if (!result.results?.length) {
+        await telegramSend(env, chatId, `No series found matching "${argument}".`);
+        return true;
+      }
+      for (const s of result.results.slice(0, 3)) {
+        const latest = s.latestChapter ? `Ch. ${s.latestChapter.number}${s.latestChapter.title ? ` — ${s.latestChapter.title}` : ""}` : "None";
+        const imported = s.latestChapter?.importedAt ? new Date(s.latestChapter.importedAt).toLocaleDateString() : "—";
+        const nextRelease = s.source?.nextRelease ? new Date(s.source.nextRelease).toLocaleDateString() : "unknown";
+        const lastChecked = s.source?.lastChecked ? new Date(s.source.lastChecked).toLocaleDateString() : "never";
+        const msg = [
+          `📊 ${s.title}`,
+          `Status: ${s.status} | Chapters: ${s.chapterCount}${s.isHidden ? " | 🔒 Hidden" : ""}`,
+          `Latest: ${latest} (imported ${imported})`,
+          s.source ? `Source: ${s.source.site} | Last scan: ${lastChecked}` : "No import source linked",
+          s.source?.cadence ? `Cadence: ${s.source.cadence}` : "",
+          s.source ? `Next release: ${nextRelease}` : "",
+          s.source?.lastError ? `⚠️ Last error: ${s.source.lastError.slice(0, 200)}` : "",
+          `${SITE_URL}/title/${s.slug}`,
+        ].filter(Boolean).join("\n");
+        await telegramSend(env, chatId, msg);
+      }
+    } catch (error) {
+      console.error("[worker] Telegram status command failed", error);
+      await telegramSend(env, chatId, "❌ Couldn't get series status. Try again shortly.");
+    }
+    return true;
+  }
+
+  // ---- /logs - recent import logs ----
+  if (command === "/logs") {
+    try {
+      await telegramTyping(env, chatId);
+      const result = await callSiteAction(env, { action: "import_logs", limit: 5 }) as any;
+      if (!result.success) {
+        await telegramSend(env, chatId, `❌ ${result.error || "Could not get logs"}`);
+        return true;
+      }
+      if (!result.logs?.length) {
+        await telegramSend(env, chatId, "No import logs found.");
+        return true;
+      }
+      const lines = result.logs.map((log: any) => {
+        const icon = log.status === "success" ? "✅" : log.status === "partial" ? "⚠️" : "❌";
+        const at = log.at ? new Date(log.at).toLocaleString() : "—";
+        return `${icon} ${log.seriesTitle}\n  ${log.imported} imported | ${log.skipped} skipped | ${log.failed} failed\n  ${at} (${log.duration || 0}s)`;
+      });
+      await telegramSend(env, chatId, `📝 Recent Import Logs:\n\n${lines.join("\n\n")}`);
+    } catch (error) {
+      console.error("[worker] Telegram logs command failed", error);
+      await telegramSend(env, chatId, "❌ Couldn't get logs. Try again shortly.");
+    }
+    return true;
+  }
+
+  // ---- /health - system health check ----
+  if (command === "/health") {
+    try {
+      await telegramTyping(env, chatId);
+      const count = await getPublicSeriesCount(env);
+      const lastScan = env.RATE_LIMIT ? await env.RATE_LIMIT.get("telegram:imports:last-status") : null;
+      let scanInfo = "No scan data";
+      if (lastScan) {
+        try {
+          const s = JSON.parse(lastScan) as any;
+          scanInfo = `${s.success ? "✅" : "❌"} ${s.at || "—"} | ${s.totalImported ?? 0} imported`;
+        } catch {}
+      }
+      const sourcesResult = await callSiteAction(env, { action: "list_sources" }) as any;
+      const totalSources = sourcesResult.success ? sourcesResult.totalSources : "?";
+      const errored = sourcesResult.success ? sourcesResult.sources?.filter((s: any) => s.lastError).length : 0;
+      await telegramSend(env, chatId, [
+        "🏥 System Health",
+        `DB: ${count !== null ? `${count} public series` : "⚠️ unavailable"}`,
+        `Sources: ${totalSources} enabled${errored > 0 ? ` (${errored} with errors)` : ""}`,
+        `Last scan: ${scanInfo}`,
+        `Worker: ✅ running`,
+        `Site: ${SITE_URL}`,
+      ].join("\n"));
+    } catch (error) {
+      console.error("[worker] Telegram health command failed", error);
+      await telegramSend(env, chatId, "❌ Health check failed. Worker is running but some services may be down.");
     }
     return true;
   }
@@ -1146,6 +1399,10 @@ export default {
           results?: Array<{ seriesTitle?: string; status?: string; imported?: number; error?: string }>;
           error?: string; reportNoChanges?: boolean; complete?: boolean;
           alerts?: Array<{ eventKey?: string; message?: string }>;
+          // series_import and selective_import fields
+          seriesId?: string; seriesTitle?: string; imported?: number; failed?: number; chaptersFound?: number;
+          mode?: string; sourceId?: string;
+          details?: Array<{ chapter?: number; status?: string; pages?: number; message?: string }>;
         };
         if (result.type === "site_alerts") {
           const chatId = Number(env.TELEGRAM_ALLOWED_CHAT_ID);
@@ -1160,6 +1417,46 @@ export default {
           if (result.complete && env.RATE_LIMIT) await env.RATE_LIMIT.delete("telegram:reports:active");
           return Response.json({ ok: true });
         }
+
+        // Handle series_import result (from /import-all or Comick auto-import)
+        if (result.type === "series_import") {
+          const chatId = Number(env.TELEGRAM_ALLOWED_CHAT_ID);
+          if (Number.isFinite(chatId) && chatId > 0) {
+            const imported = result.imported ?? 0;
+            const seriesTitle = result.seriesTitle || "Unknown";
+            const mode = result.mode === "all" ? "full catalog" : "latest";
+            if (result.success === false) {
+              await telegramSend(env, chatId, `❌ ${seriesTitle}: ${mode} import failed.\n${result.error || "Unknown error"}`);
+            } else if (imported > 0) {
+              const detailLines = (result.details || []).filter((d: any) => d.status === "imported").slice(0, 10).map((d: any) => `  Ch. ${d.chapter} (${d.pages || 0} pages)`).join("\n");
+              await telegramSend(env, chatId, `✅ ${seriesTitle}: ${imported} new chapter(s) imported (${mode}).${detailLines ? `\n${detailLines}` : ""}`);
+            } else {
+              await telegramSend(env, chatId, `✅ ${seriesTitle}: already up to date (${mode} scan, ${result.chaptersFound ?? 0} found on source).`);
+            }
+          }
+          return Response.json({ ok: true });
+        }
+
+        // Handle selective_import result (from /pick)
+        if (result.type === "selective_import") {
+          const chatId = Number(env.TELEGRAM_ALLOWED_CHAT_ID);
+          if (Number.isFinite(chatId) && chatId > 0) {
+            const imported = result.imported ?? 0;
+            const failed = result.failed ?? 0;
+            const seriesTitle = result.seriesTitle || "Unknown";
+            if (result.success === false) {
+              await telegramSend(env, chatId, `❌ Selective import failed for ${seriesTitle}.\n${result.error || "Unknown error"}`);
+            } else {
+              const detailLines = (result.details || []).slice(0, 15).map((d: any) => {
+                const icon = d.status === "imported" ? "✅" : "❌";
+                return `  ${icon} Ch. ${d.chapter}${d.status === "imported" ? ` (${d.pages || 0} pages)` : ` — ${d.message || "failed"}`}`;
+              }).join("\n");
+              await telegramSend(env, chatId, `📦 ${seriesTitle}: selective import done.\n${imported} imported, ${failed} failed.${detailLines ? `\n${detailLines}` : ""}`);
+            }
+          }
+          return Response.json({ ok: true });
+        }
+
         if (result.type !== "source_scan") return Response.json({ error: "Unknown action result" }, { status: 400 });
         const failures = result.results?.filter((item) => item.status === "failed" || item.status === "partial") || [];
         if (env.RATE_LIMIT) {
@@ -1177,10 +1474,10 @@ export default {
             const detail = failures.slice(0, 5).map((item) => `• ${item.seriesTitle || "Source"}: ${item.error || item.status}`).join("\n");
             await telegramSend(env, chatId, `⚠️ Source scan finished with errors. ${imported} new chapter(s) imported.${detail ? `\n\n${detail}` : result.error ? `\n${result.error.slice(0, 500)}` : ""}`);
           } else if (imported > 0) {
-            const details = (result.results || []).filter((item) => (item.imported ?? 0) > 0).slice(0, 8).map((item) => `• ${item.seriesTitle}: ${item.imported} chapter(s)`).join("\n");
+            const details = (result.results || []).filter((item) => (item.imported ?? 0) > 0).slice(0, 8).map((item) => `• ${item.seriesTitle}: ${item.imported} new chapter(s)`).join("\n");
             await telegramSend(env, chatId, `✅ Source scan succeeded: ${imported} new chapter(s) imported.${details ? `\n\n${details}` : ""}`);
           } else if (result.reportNoChanges) {
-            await telegramSend(env, chatId, `✅ Source scan completed. ${result.totalDue ?? 0} source(s) checked; no new chapters were found.`);
+            await telegramSend(env, chatId, `✅ Source scan completed. ${result.totalDue ?? 0} source(s) checked — no new chapters found. All series are up to date.`);
           }
         }
         return Response.json({ ok: true });
