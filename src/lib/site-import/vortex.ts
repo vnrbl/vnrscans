@@ -178,37 +178,93 @@ export async function discoverVortexCatalog(inputUrl: string): Promise<SiteCatal
             /<astro-island[^>]*opts="\{&quot;name&quot;:&quot;SeriesDescriptionIsland&quot;[^>]*props="([^"]*)"/i
           );
 
-        if (!islandMatch) return defaultData;
+        let alternativeTitles: string[] = [];
+        let description = "";
+        let author: string | null = null;
+        let artist: string | null = null;
+        let genres: string[] = [];
+        let chapterCount = 0;
+        let lastChapterAt: string | null = null;
 
-        const decoded = decodeHtmlEntities(islandMatch[1]);
-        const parsed = JSON.parse(decoded);
-        const unwrapped = unwrapAstroValue(parsed) as any;
-        const post = unwrapped?.post;
-        if (!post) return defaultData;
+        if (islandMatch) {
+          try {
+            const decoded = decodeHtmlEntities(islandMatch[1]);
+            const parsed = JSON.parse(decoded);
+            const unwrapped = unwrapAstroValue(parsed) as any;
+            const post = unwrapped?.post;
+            if (post) {
+              alternativeTitles = post.alternativeTitles
+                ? String(post.alternativeTitles)
+                    .split(/[,;\n|]+/)
+                    .map((t) => t.trim())
+                    .filter(Boolean)
+                : [];
 
-        const alternativeTitles = post.alternativeTitles
-          ? String(post.alternativeTitles)
+              genres = Array.isArray(post.genres)
+                ? post.genres
+                    .map((g: any) => String(g?.name ?? "").trim())
+                    .filter((name: string) => name && name.toLowerCase() !== item.type.toLowerCase())
+                : [];
+
+              description = stripHtml(post.postContent || "");
+              author = post.author?.trim() || null;
+              artist = post.artist?.trim() || null;
+              chapterCount = Math.max(0, Number(post._count?.chapters) || 0);
+              lastChapterAt = normalizeDate(post.lastChapterAddedAt);
+            }
+          } catch {}
+        }
+
+        // If Astro Island was absent (Vortex migrated to TanStack Start / TSR), parse TSR script and meta tags
+        if (!description && chapterCount === 0) {
+          const countMatch =
+            detailHtml.match(/_count:\$R\[\d+\]=\{[^}]*?chapters:(\d+)/i) ||
+            detailHtml.match(/chapters:(\d+)/i) ||
+            detailHtml.match(/ChapterCount:(\d+)/i);
+          if (countMatch) {
+            chapterCount = Math.max(0, parseInt(countMatch[1], 10));
+          }
+
+          const authorMatch = detailHtml.match(/author:"([^"]*)"/i);
+          if (authorMatch && authorMatch[1].trim()) {
+            author = decodeHtmlEntities(authorMatch[1].trim());
+          }
+
+          const artistMatch = detailHtml.match(/artist:"([^"]*)"/i);
+          if (artistMatch && artistMatch[1].trim()) {
+            artist = decodeHtmlEntities(artistMatch[1].trim());
+          }
+
+          const postContentMatch = detailHtml.match(/postContent:"([^"]*)"/i);
+          if (postContentMatch && postContentMatch[1].trim()) {
+            description = stripHtml(decodeHtmlEntities(postContentMatch[1].trim()));
+          } else {
+            const metaDesc = detailHtml.match(
+              /<meta[^>]+(?:name|property)="(?:description|og:description)"[^>]+content="([^"]*)"/i
+            );
+            if (metaDesc && metaDesc[1].trim()) {
+              description = stripHtml(decodeHtmlEntities(metaDesc[1].trim()));
+            }
+          }
+
+          const altMatch = detailHtml.match(/alternativeTitles:"([^"]*)"/i);
+          if (altMatch && altMatch[1].trim()) {
+            alternativeTitles = decodeHtmlEntities(altMatch[1].trim())
               .split(/[,;\n|]+/)
               .map((t) => t.trim())
-              .filter(Boolean)
-          : [];
-
-        // Exclude the type string (e.g. "Manhwa") from the genres array if present
-        const genres = Array.isArray(post.genres)
-          ? post.genres
-              .map((g: any) => String(g?.name ?? "").trim())
-              .filter((name: string) => name && name.toLowerCase() !== item.type.toLowerCase())
-          : [];
+              .filter(Boolean);
+          }
+        }
 
         return {
           ...defaultData,
           alternativeTitles,
-          description: stripHtml(post.postContent || ""),
-          author: post.author?.trim() || null,
-          artist: post.artist?.trim() || null,
+          description,
+          author,
+          artist,
           genres,
-          chapterCount: Math.max(0, Number(post._count?.chapters) || 0),
-          lastChapterAt: normalizeDate(post.lastChapterAddedAt),
+          chapterCount,
+          lastChapterAt,
         };
       } catch (err) {
         console.warn(`[Vortex Scans] Failed to fetch details for series ${item.slug}:`, err);

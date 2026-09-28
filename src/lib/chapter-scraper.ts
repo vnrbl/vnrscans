@@ -39,6 +39,7 @@ async function retryAsync<T>(
 /** Check if a URL belongs to a source with a dedicated fast (non-Puppeteer) extractor */
 function hasFastExtractor(url: string): boolean {
   return (
+    isVortexLikeUrl(url) ||
     isDuskScansUrl(url) ||
     isKaynScansUrl(url) ||
     isDrakeComicUrl(url) ||
@@ -4671,6 +4672,7 @@ async function extractComixChapterImages(chapterUrl: string): Promise<string[]> 
 
 async function extractVortexChapters(seriesUrl: string): Promise<ChapterInfo[]> {
   const urlObj = new URL(seriesUrl);
+  const basePath = urlObj.pathname.replace(/\/+$/, '');
   const response = await fetch(seriesUrl, {
     headers: {
       'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
@@ -4683,45 +4685,126 @@ async function extractVortexChapters(seriesUrl: string): Promise<ChapterInfo[]> 
   }
   const html = await response.text();
   const chapters: ChapterInfo[] = [];
+  const seenNumbers = new Set<number>();
   const seenSlugs = new Set<string>();
 
-  // 1. Primary: Parse embedded hydration data from Astro island props, inspecting lock attributes
-  const chapObjRegex = /\[0,\{&quot;id&quot;:\[0,\d+\],&quot;number&quot;:\[0,([0-9.]+)\],&quot;slug&quot;:\[0,&quot;([^&]+)&quot;\]([\s\S]*?)(?=\[0,\{&quot;id&quot;|\]\]\})/g;
-  let m: RegExpExecArray | null;
-  while ((m = chapObjRegex.exec(html)) !== null) {
-    const num = parseFloat(m[1]);
-    const slug = m[2];
-    const props = m[3];
+  // 1. Primary: Parse TanStack Start / TSR hydration script chapter objects ($_TSR.router / $R[...])
+  // Vortex Scans migrated to TanStack Start where all chapters are embedded in script blocks:
+  // e.g. {id:25332,slug:"chapter-65",number:65,title:"THE END",chapterStatus:"PUBLIC",...}
+  const tsrObjRegex = /\{id:\d+[^}]*?slug:"(chapter-[^"]+|[^"]+)"[^}]*?number:([0-9.]+)[^}]*?\}/g;
+  let tm: RegExpExecArray | null;
+  while ((tm = tsrObjRegex.exec(html)) !== null) {
+    const rawObj = tm[0];
+    const slug = tm[1];
+    const num = parseFloat(tm[2]);
 
-    // Check if locked/paywalled/coins required
+    if (isNaN(num)) continue;
+
+    // Check locked / paywalled flags
     const isLocked =
-      props.includes('&quot;isLocked&quot;:[0,true]') ||
-      props.includes('&quot;isLockedByCoins&quot;:[0,true]') ||
-      props.includes('&quot;isAccessible&quot;:[0,false]') ||
-      props.includes('&quot;chapterStatus&quot;:[0,&quot;LOCKED&quot;]') ||
-      /&quot;(?:price|finalPrice)&quot;:\[0,([1-9]\d*)\]/.test(props);
+      /isLocked:(!0|true)/.test(rawObj) ||
+      /isLockedByCoins:(!0|true)/.test(rawObj) ||
+      /isPermanentlyLocked:(!0|true)/.test(rawObj) ||
+      /isAccessible:(!1|false)/.test(rawObj) ||
+      /chapterStatus:"(LOCKED|PREMIUM|PRIVATE)"/i.test(rawObj) ||
+      /(?:price|finalPrice):([1-9]\d*)/.test(rawObj);
 
-    if (isLocked) {
-      continue; // Skip locked/paywalled chapter
-    }
+    if (isLocked) continue;
 
-    if (!seenSlugs.has(slug)) {
-      seenSlugs.add(slug);
+    const titleMatch = rawObj.match(/title:"([^"]*)"/);
+    const title = titleMatch && titleMatch[1].trim() ? titleMatch[1].trim() : undefined;
+
+    const cleanSlug = decodeHtmlEntities(slug);
+    const chapterUrl = `${urlObj.origin}${decodeHtmlEntities(basePath)}/${cleanSlug}`;
+
+    if (!seenNumbers.has(num) && !seenSlugs.has(cleanSlug)) {
+      seenNumbers.add(num);
+      seenSlugs.add(cleanSlug);
       chapters.push({
         chapterNumber: num,
-        url: `${urlObj.origin}${urlObj.pathname.replace(/\/+$/, '')}/${slug}`,
+        title,
+        url: chapterUrl,
       });
     }
   }
 
-  // 2. Fallback: Parse HTML anchor links if any additional exist (checking for lock badges)
+  // Also check if fields are ordered differently (number before slug in TSR)
+  const tsrAltRegex = /\{id:\d+[^}]*?number:([0-9.]+)[^}]*?slug:"(chapter-[^"]+|[^"]+)"[^}]*?\}/g;
+  let tam: RegExpExecArray | null;
+  while ((tam = tsrAltRegex.exec(html)) !== null) {
+    const rawObj = tam[0];
+    const num = parseFloat(tam[1]);
+    const slug = tam[2];
+
+    if (isNaN(num)) continue;
+
+    const isLocked =
+      /isLocked:(!0|true)/.test(rawObj) ||
+      /isLockedByCoins:(!0|true)/.test(rawObj) ||
+      /isPermanentlyLocked:(!0|true)/.test(rawObj) ||
+      /isAccessible:(!1|false)/.test(rawObj) ||
+      /chapterStatus:"(LOCKED|PREMIUM|PRIVATE)"/i.test(rawObj) ||
+      /(?:price|finalPrice):([1-9]\d*)/.test(rawObj);
+
+    if (isLocked) continue;
+
+    const titleMatch = rawObj.match(/title:"([^"]*)"/);
+    const title = titleMatch && titleMatch[1].trim() ? titleMatch[1].trim() : undefined;
+
+    const cleanSlug = decodeHtmlEntities(slug);
+    const chapterUrl = `${urlObj.origin}${decodeHtmlEntities(basePath)}/${cleanSlug}`;
+
+    if (!seenNumbers.has(num) && !seenSlugs.has(cleanSlug)) {
+      seenNumbers.add(num);
+      seenSlugs.add(cleanSlug);
+      chapters.push({
+        chapterNumber: num,
+        title,
+        url: chapterUrl,
+      });
+    }
+  }
+
+  // 2. Secondary: Parse legacy Astro island props (backward compatibility)
+  if (chapters.length === 0) {
+    const chapObjRegex = /\[0,\{&quot;id&quot;:\[0,\d+\],&quot;number&quot;:\[0,([0-9.]+)\],&quot;slug&quot;:\[0,&quot;([^&]+)&quot;\]([\s\S]*?)(?=\[0,\{&quot;id&quot;|\]\]\})/g;
+    let m: RegExpExecArray | null;
+    while ((m = chapObjRegex.exec(html)) !== null) {
+      const num = parseFloat(m[1]);
+      const slug = m[2];
+      const props = m[3];
+
+      const isLocked =
+        props.includes('&quot;isLocked&quot;:[0,true]') ||
+        props.includes('&quot;isLockedByCoins&quot;:[0,true]') ||
+        props.includes('&quot;isAccessible&quot;:[0,false]') ||
+        props.includes('&quot;chapterStatus&quot;:[0,&quot;LOCKED&quot;]') ||
+        /&quot;(?:price|finalPrice)&quot;:\[0,([1-9]\d*)\]/.test(props);
+
+      if (isLocked) continue;
+
+      const cleanSlug = decodeHtmlEntities(slug);
+      const chapterUrl = `${urlObj.origin}${decodeHtmlEntities(basePath)}/${cleanSlug}`;
+
+      if (!seenNumbers.has(num) && !seenSlugs.has(cleanSlug)) {
+        seenNumbers.add(num);
+        seenSlugs.add(cleanSlug);
+        chapters.push({
+          chapterNumber: num,
+          url: chapterUrl,
+        });
+      }
+    }
+  }
+
+  // 3. Fallback: Parse HTML anchor links if any additional exist (checking for lock badges)
   const anchorRegex = /<a\b[^>]*?href=["']([^"']*\/chapter-([0-9.]+)[^"']*)["'][^>]*>([\s\S]*?)<\/a>/gi;
   let am: RegExpExecArray | null;
   while ((am = anchorRegex.exec(html)) !== null) {
     const rawHref = am[1];
     const num = parseFloat(am[2]);
     const linkContent = am[3];
-    const cleanUrl = rawHref.startsWith('http') ? rawHref : `${urlObj.origin}${rawHref.startsWith('/') ? '' : '/'}${rawHref}`;
+    const cleanUrl = decodeHtmlEntities(rawHref.startsWith('http') ? rawHref : `${urlObj.origin}${rawHref.startsWith('/') ? '' : '/'}${rawHref}`);
     const slug = cleanUrl.split('/').pop() || '';
 
     // Check if the link itself or surrounding HTML is locked
@@ -4735,7 +4818,8 @@ async function extractVortexChapters(seriesUrl: string): Promise<ChapterInfo[]> 
       continue;
     }
 
-    if (!seenSlugs.has(slug)) {
+    if (!seenNumbers.has(num) && !seenSlugs.has(slug)) {
+      seenNumbers.add(num);
       seenSlugs.add(slug);
       chapters.push({
         chapterNumber: num,

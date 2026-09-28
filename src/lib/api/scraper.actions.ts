@@ -881,6 +881,18 @@ export async function $runCloudScrape(args: {
         pages: chapterImages.get(key)?.length ?? 0,
       });
     }
+    if (validated.seriesId && imported > 0) {
+      const { count: realCount } = await admin
+        .from("chapters")
+        .select("*", { count: "exact", head: true })
+        .eq("series_id", validated.seriesId);
+      if (typeof realCount === "number") {
+        await admin
+          .from("series")
+          .update({ chapter_count: realCount, updated_at: new Date().toISOString() })
+          .eq("id", validated.seriesId);
+      }
+    }
   }
 
   return {
@@ -1297,6 +1309,13 @@ export async function $syncImportSource(args: {
           estimated_next_release_at: nextScheduledDrop,
           release_cadence: timingCadence,
         };
+        const { count: realCount } = await admin
+          .from("chapters")
+          .select("*", { count: "exact", head: true })
+          .eq("series_id", source.series_id);
+        if (typeof realCount === "number") {
+          seriesUpdate.chapter_count = realCount;
+        }
         if (imported > 0) {
           seriesUpdate.updated_at = new Date().toISOString();
         }
